@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sun, Mic, ChevronRight, Inbox, Headphones } from 'lucide-react';
 import { usePatients } from '@/contexts/PatientsProvider';
@@ -349,6 +349,7 @@ function SignOffRail({
   notes: ReturnType<typeof useNotes>['notes'];
   patients: Patient[];
 }) {
+  const [now] = useState(() => Date.now());
   return (
     <SurfaceCard padding="14px 16px">
       <Eyebrow>Needs your sign-off</Eyebrow>
@@ -366,7 +367,7 @@ function SignOffRail({
         <ul style={{ marginTop: 10 }} className="flex flex-col gap-2.5">
           {notes.slice(0, 4).map((n) => {
             const patient = patients.find((p) => p.id === n.patientId);
-            const ageHours = (Date.now() - n.updatedAt) / (1000 * 60 * 60);
+            const ageHours = (now - n.updatedAt) / (1000 * 60 * 60);
             const tone: StatusTone =
               ageHours > 48 ? 'flagged' : ageHours > 24 ? 'plateau' : 'on-track';
             return (
