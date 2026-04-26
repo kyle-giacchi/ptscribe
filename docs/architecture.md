@@ -84,24 +84,30 @@ Without this split, every consumer of a single global context would re-render on
 | Store                         | Key / name                                          | Contents                            |
 | ----------------------------- | --------------------------------------------------- | ----------------------------------- |
 | `localStorage`                | `ptnotes.appData`                                   | Full `AppData` JSON blob (≤ 5 MB)   |
+| `localStorage`                | `ptnotes.vault`                                     | Wrapped DEK + KDF params; tab-scoped key only       |
 | IndexedDB (`ptnotes-audio`)   | object store `recordings`, key = `sessionId`        | Raw audio Blob per session          |
 
 Defined in `src/lib/storageKeys.ts`.
 
+When the vault is unlocked, every value in `ptnotes.appData` and the `recordings`/`recording_chunks` IndexedDB stores is round-tripped through AES-GCM via `src/lib/vault/`. The recorder also owns a `'screen'` wake lock and a `visibilitychange` listener for the duration of a clip; both are released on `stop`/`reset`/unmount. Wake lock is best-effort and never blocks recording.
+
 ## AI services
 
-Both AI calls run browser → provider directly using credentials the clinician pastes into Settings.
+AI calls flow `browser → our Cloudflare Worker → provider`. Provider credentials are server-side secrets (Worker `env`); the browser never sees them. Each request carries the `AppGate` 6-digit code in the `x-ptscribe-key` header — a friction layer, not authentication.
 
-| Service                      | Provider                     | Default model                          | Endpoint                                                                                |
-| ---------------------------- | ---------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
-| `transcribe(blob, ai)`       | Cloudflare Workers AI        | `@cf/openai/whisper-large-v3-turbo`    | `POST https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/{model}`         |
-| `generateNote(prompt, ai)`   | Anthropic Messages           | `claude-sonnet-4-6`                    | `POST https://api.anthropic.com/v1/messages`                                            |
+| Browser endpoint    | Worker action                                       | Provider                | Default model                       |
+| ------------------- | --------------------------------------------------- | ----------------------- | ----------------------------------- |
+| `POST /api/transcribe` | Forwards raw audio bytes to the Workers AI binding | Cloudflare Workers AI   | `@cf/openai/whisper-large-v3-turbo` |
+| `POST /api/generate`   | Forwards JSON to the Anthropic Messages API        | Anthropic Messages      | `claude-sonnet-4-6`                 |
 
-Cloudflare requires both an **account ID** (in the URL) and an **API token** (in `Authorization: Bearer`). Audio is sent base64-encoded in the JSON body. Anthropic requests set `anthropic-dangerous-direct-browser-access: true`. The provider value `'none'` short-circuits the call so the workflow stays manual.
+Wire details:
 
-### Browser CORS caveat
+- `/api/transcribe` accepts `Content-Type: application/octet-stream` (raw bytes, no base64). Optional `x-ptscribe-model` and `x-ptscribe-language` headers override defaults. Response is `{ text: string }`.
+- `/api/generate` accepts a JSON body forwarded near-verbatim to Anthropic. The Worker injects the API key and the `anthropic-version` header; the browser does not.
+- Local development: `vite.config.ts` proxies `/api/*` → `http://localhost:8787` (the wrangler dev server). `npm run dev` and `wrangler dev` run side by side.
+- Provider value `'none'` short-circuits both calls so the workflow stays manual (Web Speech for live transcript, hand-edited notes).
 
-The Cloudflare Workers AI REST endpoint is intended for server-to-server use; if Cloudflare blocks browser origins via CORS, transcription will fail with a network error. The fall-back path (deferred) is to put a tiny Cloudflare Worker in front that adds CORS headers and re-uses the clinician's same token. That breaks the "100% client-side" rule, so it stays out of scope until a real CORS issue is reported.
+The Worker source lives at `worker/index.ts`; secrets are managed via `wrangler secret put` and surfaced as `env.PTSCRIBE_GATE`, `env.ANTHROPIC_API_KEY`, etc. The Workers AI binding (`env.AI`) handles Whisper without an explicit token.
 
 ## Schema validation
 
