@@ -10,6 +10,7 @@ import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { AppGate } from '@/components/common/AppGate';
+import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
 import { Setup } from '@/pages/Setup';
 import { Dashboard } from '@/pages/Dashboard';
@@ -25,42 +26,44 @@ import { Settings } from '@/pages/Settings';
 export default function App() {
   return (
     <AppGate>
-    <BrowserRouter>
-      <AppDataProvider>
-        <ClinicianProvider>
-          <PatientsProvider>
-            <SessionsProvider>
-              <NotesProvider>
-                <TemplatesProvider>
-                  <ExercisesProvider>
-                    <PlansProvider>
-                      <SettingsProvider>
-                        <FirstRunGuard>
-                          <Routes>
-                            <Route path="/setup" element={<Setup />} />
-                            <Route element={<AppShell />}>
-                              <Route index element={<Dashboard />} />
-                              <Route path="/patients" element={<Patients />} />
-                              <Route path="/patients/:id" element={<PatientDetail />} />
-                              <Route path="/sessions/new" element={<NewSession />} />
-                              <Route path="/sessions/:id" element={<SessionPage />} />
-                              <Route path="/notes" element={<Notes />} />
-                              <Route path="/templates" element={<Templates />} />
-                              <Route path="/exercises" element={<Exercises />} />
-                              <Route path="/settings" element={<Settings />} />
-                            </Route>
-                          </Routes>
-                        </FirstRunGuard>
-                      </SettingsProvider>
-                    </PlansProvider>
-                  </ExercisesProvider>
-                </TemplatesProvider>
-              </NotesProvider>
-            </SessionsProvider>
-          </PatientsProvider>
-        </ClinicianProvider>
-      </AppDataProvider>
-    </BrowserRouter>
+      <VaultGate>
+        <BrowserRouter>
+          <AppDataProvider>
+            <ClinicianProvider>
+              <PatientsProvider>
+                <SessionsProvider>
+                  <NotesProvider>
+                    <TemplatesProvider>
+                      <ExercisesProvider>
+                        <PlansProvider>
+                          <SettingsProvider>
+                            <FirstRunGuard>
+                              <Routes>
+                                <Route path="/setup" element={<Setup />} />
+                                <Route element={<AppShell />}>
+                                  <Route index element={<Dashboard />} />
+                                  <Route path="/patients" element={<Patients />} />
+                                  <Route path="/patients/:id" element={<PatientDetail />} />
+                                  <Route path="/sessions/new" element={<NewSession />} />
+                                  <Route path="/sessions/:id" element={<SessionPage />} />
+                                  <Route path="/notes" element={<Notes />} />
+                                  <Route path="/templates" element={<Templates />} />
+                                  <Route path="/exercises" element={<Exercises />} />
+                                  <Route path="/settings" element={<Settings />} />
+                                </Route>
+                              </Routes>
+                            </FirstRunGuard>
+                          </SettingsProvider>
+                        </PlansProvider>
+                      </ExercisesProvider>
+                    </TemplatesProvider>
+                  </NotesProvider>
+                </SessionsProvider>
+              </PatientsProvider>
+            </ClinicianProvider>
+          </AppDataProvider>
+        </BrowserRouter>
+      </VaultGate>
     </AppGate>
   );
 }

@@ -1,11 +1,5 @@
 import { useRef } from 'react';
-import {
-  Download,
-  Upload,
-  ShieldAlert,
-  Eraser,
-  RefreshCw,
-} from 'lucide-react';
+import { Download, Upload, ShieldAlert, Eraser, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
@@ -25,7 +19,11 @@ export function Settings() {
 
   function handleExport() {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadFile(`ptnotes-backup-${stamp}.json`, JSON.stringify(appData, null, 2), 'application/json');
+    downloadFile(
+      `ptnotes-backup-${stamp}.json`,
+      JSON.stringify(appData, null, 2),
+      'application/json',
+    );
     toast.success('Backup downloaded');
   }
 
@@ -46,7 +44,9 @@ export function Settings() {
   }
 
   async function handleReset() {
-    if (!confirm('Erase ALL local data — patients, sessions, notes, audio? This cannot be undone.')) {
+    if (
+      !confirm('Erase ALL local data — patients, sessions, notes, audio? This cannot be undone.')
+    ) {
       return;
     }
     try {
@@ -55,12 +55,22 @@ export function Settings() {
       /* ignore */
     }
     resetAll();
-    dataRepository.save(defaultAppData());
+    await dataRepository.save(defaultAppData());
     toast.success('All local data erased');
   }
 
   return (
-    <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start', maxWidth: 880, margin: '0 auto', width: '100%' }}>
+    <div
+      style={{
+        padding: 22,
+        display: 'grid',
+        gap: 14,
+        alignContent: 'start',
+        maxWidth: 880,
+        margin: '0 auto',
+        width: '100%',
+      }}
+    >
       <div style={{ display: 'grid', gap: 4 }}>
         <Eyebrow>Settings</Eyebrow>
         <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
@@ -137,9 +147,9 @@ export function Settings() {
           <Eyebrow>AI providers</Eyebrow>
           <DisclaimerStrip>
             This testing build uses hosted credentials managed on the server, so audio and
-            transcripts are proxied through our Cloudflare Worker on their way to Cloudflare
-            Workers AI (Whisper) and Anthropic. Treat anything you record as PHI in transit.
-            PTScribe is not HIPAA-certified.
+            transcripts are proxied through our Cloudflare Worker on their way to Cloudflare Workers
+            AI (Whisper) and Anthropic. Treat anything you record as PHI in transit. PTScribe is not
+            HIPAA-certified.
           </DisclaimerStrip>
 
           <div

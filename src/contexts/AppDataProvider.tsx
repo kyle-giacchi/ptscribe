@@ -43,19 +43,32 @@ export interface AppDataContextValue {
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [appData, setAppData] = useState<AppData>(() => dataRepository.load() ?? defaultAppData());
+  const [appData, setAppData] = useState<AppData | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const loaded = await dataRepository.load();
+      if (cancelled) return;
+      setAppData(loaded ?? defaultAppData());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scheduleSave = useCallback((next: AppData) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      dataRepository.save(next);
+      void dataRepository.save(next);
     }, SAVE_DEBOUNCE_MS);
   }, []);
 
   const merge = useCallback(
     <K extends keyof AppData>(key: K, value: SliceUpdater<AppData[K]>) => {
       setAppData((prev) => {
+        if (!prev) return prev;
         const resolved =
           typeof value === 'function' ? (value as (p: AppData[K]) => AppData[K])(prev[key]) : value;
         if (Object.is(resolved, prev[key])) return prev;
@@ -70,6 +83,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const bulkUpdate = useCallback(
     (patch: Partial<Omit<AppData, 'version' | 'lastModified'>>) => {
       setAppData((prev) => {
+        if (!prev) return prev;
         const filtered: Partial<AppData> = {};
         let changed = false;
         for (const key of Object.keys(patch) as (keyof typeof patch)[]) {
@@ -94,8 +108,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo<AppDataContextValue>(
-    () => ({
+  const value = useMemo<AppDataContextValue | null>(() => {
+    if (!appData) return null;
+    return {
       appData,
       updateClinicianSlice: (next) => merge('clinician', next),
       updatePatientsSlice: (next) => merge('patients', next),
@@ -111,9 +126,25 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         setAppData(fresh);
         dataRepository.clear();
       },
-    }),
-    [appData, merge, bulkUpdate],
-  );
+    };
+  }, [appData, merge, bulkUpdate]);
+
+  if (!value) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: 'var(--color-pt-bg, #fafafa)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--color-pt-text-2, #666)',
+          fontSize: 13,
+        }}
+      >
+        Loading…
+      </div>
+    );
+  }
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }
