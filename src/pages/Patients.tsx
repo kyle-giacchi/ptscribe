@@ -72,10 +72,10 @@ export function Patients() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [open, setOpen] = useState(false);
+  const [now] = useState(() => Date.now());
 
   const sessionStats = useMemo(() => {
     const map = new Map<string, { count: number; last?: number; next?: number }>();
-    const now = Date.now();
     for (const s of sessions) {
       const cur = map.get(s.patientId) ?? { count: 0 };
       cur.count += 1;
@@ -84,7 +84,7 @@ export function Patients() {
       map.set(s.patientId, cur);
     }
     return map;
-  }, [sessions]);
+  }, [sessions, now]);
 
   const rows: PatientRowData[] = useMemo(() => {
     return patients
