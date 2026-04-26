@@ -1,23 +1,13 @@
 import { useMemo, useState } from 'react';
-import {
-  ClipboardList,
-  Copy,
-  Pencil,
-  Trash2,
-  Lock,
-  Plus,
-} from 'lucide-react';
+import { Copy, Pencil, Trash2, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
+import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { newId } from '@/utils/ids';
 import type { NoteFormat, NoteTemplate, NoteTemplateSection } from '@/types';
 
-// Visit-type-aligned formats. 'custom' is kept in the type for legacy data
-// but is no longer offered as a choice — every template binds to a real
-// visit type so the New Session picker can scope it.
 const FORMAT_LABEL: Record<NoteFormat, string> = {
   evaluation: 'Initial evaluation',
   soap: 'Follow-up (SOAP)',
@@ -75,72 +65,93 @@ export function Templates() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <PageHeader
-        title="Templates"
-        subtitle="One template per visit type. Built-in formats are read-only — clone one to customize."
-        Icon={ClipboardList}
-        actions={
-          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            <Plus size={14} strokeWidth={2} /> New template
-          </button>
-        }
-      />
+    <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start', maxWidth: 980, margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'grid', gap: 4 }}>
+          <Eyebrow>Templates</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            One template per visit type. Built-in formats are read-only — clone one to customize.
+          </p>
+        </div>
+        <PtButton
+          variant="primary"
+          iconLeft={<Plus size={14} strokeWidth={2} />}
+          onClick={() => setCreating(true)}
+        >
+          New template
+        </PtButton>
+      </div>
 
-      <div className="space-y-4">
+      <div style={{ display: 'grid', gap: 12 }}>
         {FORMAT_ORDER.map((fmt) => {
           const items = grouped[fmt];
           if (items.length === 0) return null;
           return (
-            <section key={fmt} className="card p-0">
+            <SurfaceCard key={fmt} padding={0}>
               <div
-                className="flex items-baseline justify-between border-b px-4 py-2.5"
-                style={{ borderColor: 'var(--color-border-soft)' }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  padding: '10px 18px',
+                  borderBottom: '1px solid var(--color-pt-border)',
+                  background: 'var(--color-pt-surface-mut)',
+                }}
               >
-                <h2
-                  className="font-display text-sm"
-                  style={{ color: 'var(--color-fg)' }}
-                >
-                  {FORMAT_LABEL[fmt]}
-                </h2>
-                <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+                <Eyebrow>{FORMAT_LABEL[fmt]}</Eyebrow>
+                <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
                   {items.length} {items.length === 1 ? 'template' : 'templates'}
                 </span>
               </div>
-              <ul className="divide-y" style={{ borderColor: 'var(--color-border-soft)' }}>
-                {items.map((t) => (
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {items.map((t, i) => (
                   <li
                     key={t.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '12px 18px',
+                      fontSize: 13,
+                      borderBottom:
+                        i === items.length - 1 ? 'none' : '1px solid var(--color-pt-border)',
+                    }}
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium" style={{ color: 'var(--color-fg)' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-pt-text)' }}>
                           {t.name}
                         </span>
                         {t.builtin && (
                           <span
-                            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide"
                             style={{
-                              background: 'var(--color-surface-2)',
-                              color: 'var(--color-fg-subtle)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 7px',
+                              borderRadius: 999,
+                              fontSize: 10,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              background: 'var(--color-pt-surface-mut)',
+                              color: 'var(--color-pt-text-3)',
+                              border: '1px solid var(--color-pt-border)',
                             }}
                           >
                             <Lock size={10} /> Built-in
                           </span>
                         )}
                       </div>
-                      <div
-                        className="mt-0.5 text-xs"
-                        style={{ color: 'var(--color-fg-subtle)' }}
-                      >
+                      <div style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
                         {t.sections.length} sections
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        className="btn btn-ghost text-xs"
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <PtButton
+                        variant="ghost"
+                        iconLeft={<Copy size={12} strokeWidth={2} />}
+                        style={{ padding: '6px 10px', fontSize: 12 }}
                         onClick={() => {
                           const clone = cloneTemplate(t.id);
                           if (clone) {
@@ -149,34 +160,34 @@ export function Templates() {
                           }
                         }}
                       >
-                        <Copy size={12} strokeWidth={2} /> Clone
-                      </button>
+                        Clone
+                      </PtButton>
                       {!t.builtin && (
                         <>
-                          <button
-                            type="button"
-                            className="btn btn-ghost text-xs"
+                          <PtButton
+                            variant="ghost"
+                            iconLeft={<Pencil size={12} strokeWidth={2} />}
+                            style={{ padding: '6px 10px', fontSize: 12 }}
                             onClick={() => setEditing(t)}
                           >
-                            <Pencil size={12} strokeWidth={2} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost text-xs"
-                            style={{ color: 'var(--color-negative)' }}
+                            Edit
+                          </PtButton>
+                          <PtButton
+                            variant="ghost"
+                            style={{ padding: '6px 10px', fontSize: 12, color: 'var(--color-pt-red)' }}
                             onClick={() => {
                               if (confirm(`Delete template "${t.name}"?`)) removeTemplate(t.id);
                             }}
                           >
                             <Trash2 size={12} strokeWidth={2} />
-                          </button>
+                          </PtButton>
                         </>
                       )}
                     </div>
                   </li>
                 ))}
               </ul>
-            </section>
+            </SurfaceCard>
           );
         })}
       </div>
@@ -210,7 +221,7 @@ function CreateTemplateModal({
 
   return (
     <Modal open onClose={onClose} title="New template" size="sm">
-      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+      <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
         Templates are scoped to a visit type so the New Session picker can show
         only the relevant ones. You can refine sections and the AI prompt
         immediately after creating.
@@ -235,18 +246,17 @@ function CreateTemplateModal({
           }}
         />
       </Field>
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <PtButton variant="ghost" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
+        </PtButton>
+        <PtButton
+          variant="primary"
           disabled={!name.trim()}
           onClick={() => onCreate(format, name)}
         >
           Create &amp; edit
-        </button>
+        </PtButton>
       </div>
     </Modal>
   );
@@ -266,9 +276,6 @@ function TemplateEditorModal({
   const [systemPrompt, setSystemPrompt] = useState(template.systemPrompt);
   const [sections, setSections] = useState<NoteTemplateSection[]>(template.sections);
 
-  // Legacy templates stored as 'custom' should be migrated to a real visit
-  // type on save — but we keep the option in the dropdown so users can see
-  // the current value and pick a replacement.
   const formatOptions: NoteFormat[] =
     template.format === 'custom'
       ? ['custom', ...SELECTABLE_FORMATS]
@@ -296,7 +303,7 @@ function TemplateEditorModal({
 
   return (
     <Modal open onClose={onClose} title={`Edit ${template.name}`} size="lg">
-      <div className="space-y-3">
+      <div style={{ display: 'grid', gap: 12 }}>
         <Field label="Name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
@@ -313,26 +320,37 @@ function TemplateEditorModal({
           </Select>
         </Field>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>
-              Sections
-            </span>
-            <button type="button" className="btn btn-ghost text-xs" onClick={add}>
-              <Plus size={12} strokeWidth={2} /> Add section
-            </button>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Eyebrow>Sections</Eyebrow>
+            <PtButton
+              variant="ghost"
+              iconLeft={<Plus size={12} strokeWidth={2} />}
+              style={{ padding: '6px 10px', fontSize: 12 }}
+              onClick={add}
+            >
+              Add section
+            </PtButton>
           </div>
-          <div className="space-y-2">
+          <div style={{ display: 'grid', gap: 8 }}>
             {sections.map((s, i) => (
               <div
                 key={i}
-                className="rounded-lg border p-2.5 text-xs"
                 style={{
-                  borderColor: 'var(--color-border-soft)',
-                  background: 'var(--color-surface-2)',
+                  borderRadius: 10,
+                  border: '1px solid var(--color-pt-border)',
+                  background: 'var(--color-pt-surface-mut)',
+                  padding: 10,
+                  fontSize: 12,
                 }}
               >
-                <div className="grid gap-2 sm:grid-cols-[120px_1fr_auto]">
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '120px 1fr auto',
+                    gap: 8,
+                  }}
+                >
                   <TextInput
                     placeholder="key"
                     value={s.key}
@@ -345,29 +363,37 @@ function TemplateEditorModal({
                     value={s.label}
                     onChange={(e) => update(i, { label: e.target.value })}
                   />
-                  <div className="flex items-center gap-1">
-                    <button type="button" className="btn btn-ghost text-[10px]" onClick={() => move(i, -1)}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <PtButton
+                      variant="ghost"
+                      style={{ padding: '4px 8px', fontSize: 10 }}
+                      onClick={() => move(i, -1)}
+                    >
                       ↑
-                    </button>
-                    <button type="button" className="btn btn-ghost text-[10px]" onClick={() => move(i, 1)}>
+                    </PtButton>
+                    <PtButton
+                      variant="ghost"
+                      style={{ padding: '4px 8px', fontSize: 10 }}
+                      onClick={() => move(i, 1)}
+                    >
                       ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost text-[10px]"
-                      style={{ color: 'var(--color-negative)' }}
+                    </PtButton>
+                    <PtButton
+                      variant="ghost"
+                      style={{ padding: '4px 8px', fontSize: 10, color: 'var(--color-pt-red)' }}
                       onClick={() => remove(i)}
                     >
                       <Trash2 size={11} />
-                    </button>
+                    </PtButton>
                   </div>
                 </div>
-                <TextInput
-                  placeholder="Prompt hint (optional — guides the AI for this section)"
-                  className="mt-2"
-                  value={s.promptHint ?? ''}
-                  onChange={(e) => update(i, { promptHint: e.target.value })}
-                />
+                <div style={{ marginTop: 8 }}>
+                  <TextInput
+                    placeholder="Prompt hint (optional — guides the AI for this section)"
+                    value={s.promptHint ?? ''}
+                    onChange={(e) => update(i, { promptHint: e.target.value })}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -378,24 +404,24 @@ function TemplateEditorModal({
           hint="Tell the AI exactly what JSON to return. Section keys must match the keys above."
         >
           <textarea
-            className="input min-h-32 text-xs"
+            className="input"
+            style={{ minHeight: 128, fontSize: 12, fontFamily: 'var(--font-mono)' }}
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
           />
         </Field>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+        <PtButton variant="ghost" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
+        </PtButton>
+        <PtButton
+          variant="primary"
           onClick={() => onSave({ name, format, sections, systemPrompt })}
         >
           Save template
-        </button>
+        </PtButton>
       </div>
     </Modal>
   );
