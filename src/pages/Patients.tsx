@@ -1,183 +1,167 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
-import { Command } from 'cmdk';
-import { Users, Plus, Search, ChevronRight } from 'lucide-react';
-import { duration, ease } from '@/lib/motion';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { Search, Plus, Upload } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
+import {
+  Avatar,
+  Eyebrow,
+  PtButton,
+  SegmentedControl,
+  StatusBadge,
+  SurfaceCard,
+  type StatusTone,
+} from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { newId } from '@/utils/ids';
 import { parseIsoDate, fmtIsoDateOptional, relativeFromNow } from '@/utils/dates';
-import type { Patient, PatientStatus, Sex } from '@/types';
+import type { Patient, Sex } from '@/types';
 
-const STATUS_LABEL: Record<PatientStatus, string> = {
-  active: 'Active',
-  on_hold: 'On hold',
-  discharged: 'Discharged',
-};
+type StatusFilter = 'all' | 'on_track' | 'plateau' | 'flagged' | 'new';
 
-type StatusFilter = 'all' | PatientStatus;
-type SortKey = 'recent' | 'name' | 'added';
-
-const STATUS_TABS: { value: StatusFilter; label: string }[] = [
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'active', label: 'Active' },
-  { value: 'on_hold', label: 'On hold' },
-  { value: 'discharged', label: 'Discharged' },
+  { value: 'on_track', label: 'On-track' },
+  { value: 'plateau', label: 'Plateau' },
+  { value: 'flagged', label: 'Flagged' },
+  { value: 'new', label: 'New' },
 ];
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'recent', label: 'Recently active' },
-  { value: 'name', label: 'Name (A–Z)' },
-  { value: 'added', label: 'Recently added' },
-];
+interface PatientRowData {
+  patient: Patient;
+  sessionCount: number;
+  lastVisit?: number;
+  nextVisit?: number;
+  displayStatus: StatusFilter;
+  tone: StatusTone;
+  badgeLabel: string;
+}
+
+function deriveStatus(p: Patient, sessionCount: number): {
+  filter: StatusFilter;
+  tone: StatusTone;
+  label: string;
+} {
+  if (p.status === 'discharged') {
+    return { filter: 'on_track', tone: 'done', label: 'Discharged' };
+  }
+  if (p.status === 'on_hold') {
+    return { filter: 'plateau', tone: 'plateau', label: 'Plateau' };
+  }
+  if (sessionCount === 0) {
+    return { filter: 'new', tone: 'new', label: 'New' };
+  }
+  return { filter: 'on_track', tone: 'on-track', label: 'On-track' };
+}
+
+function ageFromDob(dob?: number): number | null {
+  if (!dob) return null;
+  const diffMs = Date.now() - dob;
+  return Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
+}
+
+function shortMrn(p: Patient): string {
+  return p.mrn?.trim() || `PT-${p.id.slice(0, 5).toUpperCase()}`;
+}
 
 export function Patients() {
   const { patients, addPatient } = usePatients();
   const { sessions } = useSessions();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [sort, setSort] = useState<SortKey>('recent');
+  const [filter, setFilter] = useState<StatusFilter>('all');
   const [open, setOpen] = useState(false);
 
-  const sessionStatsByPatient = useMemo(() => {
-    const map = new Map<string, { count: number; lastDate: number }>();
+  const sessionStats = useMemo(() => {
+    const map = new Map<string, { count: number; last?: number; next?: number }>();
+    const now = Date.now();
     for (const s of sessions) {
-      const cur = map.get(s.patientId) ?? { count: 0, lastDate: 0 };
+      const cur = map.get(s.patientId) ?? { count: 0 };
       cur.count += 1;
-      if (s.date > cur.lastDate) cur.lastDate = s.date;
+      if (s.date <= now && (!cur.last || s.date > cur.last)) cur.last = s.date;
+      if (s.date > now && (!cur.next || s.date < cur.next)) cur.next = s.date;
       map.set(s.patientId, cur);
     }
     return map;
   }, [sessions]);
 
-  const counts = useMemo(() => {
-    const c: Record<StatusFilter, number> = {
-      all: patients.length,
-      active: 0,
-      on_hold: 0,
-      discharged: 0,
-    };
-    for (const p of patients) c[p.status] += 1;
-    return c;
-  }, [patients]);
+  const rows: PatientRowData[] = useMemo(() => {
+    return patients
+      .map((patient) => {
+        const stats = sessionStats.get(patient.id) ?? { count: 0 };
+        const { filter: f, tone, label } = deriveStatus(patient, stats.count);
+        return {
+          patient,
+          sessionCount: stats.count,
+          lastVisit: stats.last,
+          nextVisit: stats.next,
+          displayStatus: f,
+          tone,
+          badgeLabel: label,
+        };
+      })
+      .sort((a, b) => {
+        const la = a.lastVisit ?? a.patient.updatedAt;
+        const lb = b.lastVisit ?? b.patient.updatedAt;
+        return lb - la;
+      });
+  }, [patients, sessionStats]);
 
   const filtered = useMemo(() => {
-    return patients
-      .filter((p) => (statusFilter === 'all' ? true : p.status === statusFilter))
-      .sort((a, b) => {
-        if (sort === 'name') {
-          return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
-        }
-        if (sort === 'added') return b.createdAt - a.createdAt;
-        // recent: last session, falling back to updatedAt
-        const lastA = sessionStatsByPatient.get(a.id)?.lastDate ?? a.updatedAt;
-        const lastB = sessionStatsByPatient.get(b.id)?.lastDate ?? b.updatedAt;
-        return lastB - lastA;
-      });
-  }, [patients, statusFilter, sort, sessionStatsByPatient]);
+    return rows.filter((r) => {
+      if (filter !== 'all' && r.displayStatus !== filter) return false;
+      if (!query) return true;
+      const q = query.toLowerCase();
+      const p = r.patient;
+      return (
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+        (p.mrn ?? '').toLowerCase().includes(q) ||
+        shortMrn(p).toLowerCase().includes(q) ||
+        (p.primaryDiagnosis ?? '').toLowerCase().includes(q) ||
+        (p.icd10 ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [rows, filter, query]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <PageHeader
-        title="Patients"
-        subtitle="Caseload, demographics, and recent activity."
-        Icon={Users}
-        actions={
-          <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
-            <Plus size={14} strokeWidth={2} /> Add patient
-          </button>
-        }
+    <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
+      <Toolbar
+        query={query}
+        onQuery={setQuery}
+        filter={filter}
+        onFilter={setFilter}
+        onAdd={() => setOpen(true)}
       />
 
-      <div className="card space-y-3">
-        <StatusTabs value={statusFilter} onChange={setStatusFilter} counts={counts} />
-
-        <Command
-          label="Patient search"
-          shouldFilter
-          loop
-          className="space-y-3"
-        >
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+      {patients.length === 0 ? (
+        <EmptyState onAdd={() => setOpen(true)} />
+      ) : (
+        <SurfaceCard padding={0}>
+          <TableHeader />
+          {filtered.length === 0 ? (
             <div
-              className="relative flex flex-1 items-center gap-2 rounded-lg border px-3"
               style={{
-                borderColor: 'var(--color-border)',
-                background: 'var(--color-surface-2)',
+                padding: '28px 18px',
+                textAlign: 'center',
+                color: 'var(--color-pt-text-3)',
+                fontSize: 13,
               }}
             >
-              <Search size={14} style={{ color: 'var(--color-fg-subtle)' }} />
-              <Command.Input
-                value={query}
-                onValueChange={setQuery}
-                placeholder="Search by name, MRN, or diagnosis…"
-                className="h-10 w-full bg-transparent text-sm outline-none"
-                style={{ color: 'var(--color-fg)' }}
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  className="text-xs hover:underline"
-                  style={{ color: 'var(--color-fg-subtle)' }}
-                >
-                  Clear
-                </button>
-              )}
+              No patients match this filter.
             </div>
-            <Select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              className="md:w-44"
-              aria-label="Sort patients"
-            >
-              {SORT_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          {patients.length === 0 ? (
-            <EmptyState onAdd={() => setOpen(true)} />
           ) : (
-            <Command.List className="overflow-hidden">
-              <Command.Empty
-                className="rounded-lg border border-dashed py-10 text-center text-sm"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-fg-subtle)',
-                }}
-              >
-                No patients match “{query}”.
-              </Command.Empty>
-              <motion.ul
-                className="divide-y"
-                style={{ borderColor: 'var(--color-border-soft)' }}
-                initial="hidden"
-                animate="show"
-                variants={{ show: { transition: { staggerChildren: 0.02 } } }}
-              >
-                {filtered.map((p) => (
-                  <PatientItem
-                    key={p.id}
-                    patient={p}
-                    sessionCount={sessionStatsByPatient.get(p.id)?.count ?? 0}
-                    lastVisit={sessionStatsByPatient.get(p.id)?.lastDate}
-                    onSelect={() => navigate(`/patients/${p.id}`)}
-                  />
-                ))}
-              </motion.ul>
-            </Command.List>
+            filtered.map((row, i) => (
+              <PatientRow
+                key={row.patient.id}
+                data={row}
+                isLast={i === filtered.length - 1}
+                onSelect={() => navigate(`/patients/${row.patient.id}`)}
+              />
+            ))
           )}
-        </Command>
-      </div>
+        </SurfaceCard>
+      )}
 
       <AddPatientModal
         open={open}
@@ -191,206 +175,272 @@ export function Patients() {
   );
 }
 
-function StatusTabs({
-  value,
-  onChange,
-  counts,
+function Toolbar({
+  query,
+  onQuery,
+  filter,
+  onFilter,
+  onAdd,
 }: {
-  value: StatusFilter;
-  onChange: (v: StatusFilter) => void;
-  counts: Record<StatusFilter, number>;
+  query: string;
+  onQuery: (v: string) => void;
+  filter: StatusFilter;
+  onFilter: (v: StatusFilter) => void;
+  onAdd: () => void;
 }) {
   return (
-    <div
-      role="tablist"
-      aria-label="Filter by status"
-      className="flex flex-wrap gap-1 rounded-lg border p-1"
-      style={{
-        borderColor: 'var(--color-border-soft)',
-        background: 'var(--color-surface-2)',
-      }}
-    >
-      {STATUS_TABS.map((tab) => {
-        const active = value === tab.value;
-        return (
-          <button
-            key={tab.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(tab.value)}
-            className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2"
-            style={{
-              background: active ? 'var(--color-surface)' : 'transparent',
-              color: active ? 'var(--color-fg)' : 'var(--color-fg-muted)',
-              boxShadow: active ? 'var(--shadow-sm)' : undefined,
-            }}
-          >
-            {tab.label}
-            <span
-              className="rounded-full px-1.5 text-[10px] tabular-nums"
-              style={{
-                background: active
-                  ? 'var(--color-accent-soft)'
-                  : 'var(--color-surface)',
-                color: active ? 'var(--color-accent-fg)' : 'var(--color-fg-subtle)',
-              }}
-            >
-              {counts[tab.value]}
-            </span>
-          </button>
-        );
-      })}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: 420 }}>
+        <Search
+          size={14}
+          style={{
+            position: 'absolute',
+            left: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--color-pt-text-3)',
+          }}
+        />
+        <input
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search by name, ID, or diagnosis"
+          style={{
+            width: '100%',
+            padding: '9px 12px 9px 32px',
+            borderRadius: 9,
+            border: '1px solid var(--color-pt-border)',
+            fontSize: 13,
+            color: 'var(--color-pt-text)',
+            background: 'var(--color-pt-surface)',
+            outline: 'none',
+            fontFamily: 'inherit',
+          }}
+        />
+      </div>
+      <SegmentedControl
+        items={STATUS_FILTERS}
+        value={filter}
+        onChange={onFilter}
+        size="sm"
+      />
+      <div style={{ flex: 1 }} />
+      <PtButton variant="ghost" iconLeft={<Upload size={14} strokeWidth={2} />}>
+        Import patient
+      </PtButton>
+      <PtButton
+        variant="primary"
+        iconLeft={<Plus size={14} strokeWidth={2.4} />}
+        onClick={onAdd}
+      >
+        New patient
+      </PtButton>
     </div>
   );
 }
 
-function PatientItem({
-  patient,
-  sessionCount,
-  lastVisit,
+const COLS = '36px 1.6fr 1fr 1fr 1fr 1fr 120px';
+
+function TableHeader() {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: COLS,
+        gap: 14,
+        padding: '10px 18px',
+        borderBottom: '1px solid var(--color-pt-border)',
+        background: 'var(--color-pt-surface-mut)',
+      }}
+    >
+      <span />
+      <Eyebrow>Patient</Eyebrow>
+      <Eyebrow>Diagnosis</Eyebrow>
+      <Eyebrow>Last visit</Eyebrow>
+      <Eyebrow>Next visit</Eyebrow>
+      <Eyebrow>Progress</Eyebrow>
+      <Eyebrow>Status</Eyebrow>
+    </div>
+  );
+}
+
+function PatientRow({
+  data,
+  isLast,
   onSelect,
 }: {
-  patient: Patient;
-  sessionCount: number;
-  lastVisit: number | undefined;
+  data: PatientRowData;
+  isLast: boolean;
   onSelect: () => void;
 }) {
-  const initials = initialsOf(patient);
-  const value = `${patient.firstName} ${patient.lastName} ${patient.mrn ?? ''} ${
-    patient.primaryDiagnosis ?? ''
-  } ${patient.icd10 ?? ''}`;
+  const { patient: p, sessionCount, lastVisit, nextVisit, tone, badgeLabel } = data;
+  const age = ageFromDob(p.dob);
+  const fullName = `${p.firstName} ${p.lastName}`.trim();
   return (
-    <motion.li
-      variants={{
-        hidden: { opacity: 0, y: 4 },
-        show: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: duration.quick, ease: ease.enter },
-        },
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
       }}
-    >
-      <Command.Item
-        value={value}
-        onSelect={onSelect}
-        className="group flex cursor-pointer items-center gap-3 px-3 py-3 text-sm aria-selected:bg-[var(--color-accent-soft)]"
-      >
-        <Avatar initials={initials} status={patient.status} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-medium" style={{ color: 'var(--color-fg)' }}>
-              {patient.lastName}, {patient.firstName}
-            </span>
-            <StatusPill status={patient.status} />
-          </div>
-          <div
-            className="mt-0.5 truncate text-xs"
-            style={{ color: 'var(--color-fg-subtle)' }}
-          >
-            {[
-              patient.mrn ? `MRN ${patient.mrn}` : null,
-              patient.primaryDiagnosis,
-              `${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}`,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span
-            className="hidden text-xs tabular-nums sm:inline"
-            style={{ color: 'var(--color-fg-subtle)' }}
-          >
-            {lastVisit ? relativeFromNow(lastVisit) : 'No visits'}
-          </span>
-          <ChevronRight
-            size={14}
-            className="transition-transform group-aria-selected:translate-x-0.5"
-            style={{ color: 'var(--color-fg-subtle)' }}
-          />
-        </div>
-      </Command.Item>
-    </motion.li>
-  );
-}
-
-function Avatar({
-  initials,
-  status,
-}: {
-  initials: string;
-  status: PatientStatus;
-}) {
-  const ring =
-    status === 'active'
-      ? 'var(--color-positive)'
-      : status === 'on_hold'
-        ? 'var(--color-caution)'
-        : 'var(--color-border)';
-  return (
-    <span
-      className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+      className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
       style={{
-        background: 'var(--color-accent-soft)',
-        color: 'var(--color-accent-fg)',
-        boxShadow: `0 0 0 2px var(--color-surface), 0 0 0 3px ${ring}`,
+        display: 'grid',
+        gridTemplateColumns: COLS,
+        gap: 14,
+        padding: '12px 18px',
+        alignItems: 'center',
+        borderBottom: isLast ? 'none' : '1px solid var(--color-pt-border)',
+        cursor: 'pointer',
+        background: 'transparent',
       }}
-      aria-hidden
     >
-      {initials || '?'}
-    </span>
+      <Avatar name={fullName || '?'} size={32} />
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13.5,
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {fullName || 'Unnamed patient'}
+        </div>
+        <div
+          style={{
+            fontSize: 11.5,
+            color: 'var(--color-pt-text-3)',
+            fontFamily: 'var(--font-mono)',
+            marginTop: 1,
+          }}
+        >
+          {shortMrn(p)}
+          {age !== null ? ` · ${age} yo` : ''}
+        </div>
+      </div>
+      <div
+        style={{
+          fontSize: 12.5,
+          color: 'var(--color-pt-text)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+        title={p.primaryDiagnosis}
+      >
+        {p.primaryDiagnosis || '—'}
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+        {lastVisit ? relativeFromNow(lastVisit) : '—'}
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+        {nextVisit ? relativeFromNow(nextVisit) : '—'}
+      </div>
+      <ProgressCell count={sessionCount} />
+      <StatusBadge tone={tone} label={badgeLabel} />
+    </div>
   );
 }
 
-function StatusPill({ status }: { status: PatientStatus }) {
-  const color =
-    status === 'active'
-      ? 'var(--color-positive)'
-      : status === 'on_hold'
-        ? 'var(--color-caution)'
-        : 'var(--color-fg-subtle)';
+function ProgressCell({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--color-pt-text-3)',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        Eval
+      </span>
+    );
+  }
+  const target = Math.max(8, Math.ceil(count / 4) * 4);
+  const pct = Math.min(100, Math.round((count / target) * 100));
   return (
-    <span
-      className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide"
-      style={{ background: 'var(--color-surface-2)', color }}
-    >
-      {STATUS_LABEL[status]}
-    </span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: 'var(--color-pt-text)',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        {count}/{target}
+      </span>
+      <div
+        style={{
+          flex: 1,
+          height: 4,
+          borderRadius: 999,
+          background: '#eef0f4',
+          overflow: 'hidden',
+          maxWidth: 80,
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: 'var(--color-pt-accent)',
+            borderRadius: 999,
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div
-      className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-12 text-center text-sm"
-      style={{
-        borderColor: 'var(--color-border)',
-        color: 'var(--color-fg-muted)',
-      }}
-    >
+    <SurfaceCard padding={28}>
       <div
-        className="flex h-12 w-12 items-center justify-center rounded-full"
         style={{
-          background: 'var(--color-accent-soft)',
-          color: 'var(--color-accent-fg)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 12,
+          textAlign: 'center',
         }}
-        aria-hidden
       >
-        <Users size={20} strokeWidth={1.75} />
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 999,
+            background: 'var(--color-pt-accent-soft)',
+            color: 'var(--color-pt-accent-fg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          aria-hidden
+        >
+          <Plus size={20} strokeWidth={2} />
+        </div>
+        <p style={{ fontSize: 13.5, color: 'var(--color-pt-text-2)' }}>
+          No patients yet — add your first to start charting.
+        </p>
+        <PtButton
+          variant="primary"
+          onClick={onAdd}
+          iconLeft={<Plus size={14} strokeWidth={2.4} />}
+        >
+          Add your first patient
+        </PtButton>
       </div>
-      <p>No patients yet — add your first to start charting.</p>
-      <button type="button" className="btn btn-primary" onClick={onAdd}>
-        <Plus size={14} strokeWidth={2} /> Add your first patient
-      </button>
-    </div>
+    </SurfaceCard>
   );
-}
-
-function initialsOf(p: Patient): string {
-  const a = p.firstName?.trim()[0] ?? '';
-  const b = p.lastName?.trim()[0] ?? '';
-  return `${a}${b}`.toUpperCase();
 }
 
 function AddPatientModal({
@@ -451,10 +501,7 @@ function AddPatientModal({
 
   return (
     <Modal open={open} onClose={handleClose} title="Add patient" size="lg">
-      <FormSection
-        title="Identity"
-        hint="Required to create a chart."
-      >
+      <FormSection title="Identity" hint="Required to create a chart.">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="First name">
             <TextInput
@@ -522,17 +569,12 @@ function AddPatientModal({
       </FormSection>
 
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" className="btn btn-ghost" onClick={handleClose}>
+        <PtButton variant="ghost" onClick={handleClose}>
           Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!canSave}
-          onClick={handleSave}
-        >
+        </PtButton>
+        <PtButton variant="primary" disabled={!canSave} onClick={handleSave}>
           Save patient
-        </button>
+        </PtButton>
       </div>
     </Modal>
   );
@@ -551,13 +593,18 @@ function FormSection({
     <section className="space-y-2">
       <div className="flex items-baseline justify-between">
         <h3
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: 'var(--color-fg-muted)' }}
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--color-pt-text-2)',
+          }}
         >
           {title}
         </h3>
         {hint && (
-          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
             {hint}
           </span>
         )}
@@ -566,3 +613,4 @@ function FormSection({
     </section>
   );
 }
+
