@@ -8,6 +8,7 @@ import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
+import { vault } from '@/lib/vault/vault';
 import { AppDataSchema, defaultAppData } from '@/schemas';
 import { downloadFile } from '@/utils/download';
 
@@ -77,6 +78,34 @@ export function Settings() {
           Clinician profile, AI providers, and your local data.
         </p>
       </div>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <Eyebrow>Vault</Eyebrow>
+          <p
+            style={{
+              fontSize: 12,
+              color: 'var(--color-pt-text-3)',
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            Your data on this device is encrypted with your passphrase. The key lives in this tab
+            and is cleared when you close it. Use Lock now if you need to hand the device over.
+          </p>
+          <div>
+            <PtButton
+              variant="ghost"
+              onClick={() => {
+                vault.lock();
+                window.location.reload();
+              }}
+            >
+              Lock now
+            </PtButton>
+          </div>
+        </div>
+      </SurfaceCard>
 
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 12 }}>
