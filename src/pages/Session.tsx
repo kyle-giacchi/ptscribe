@@ -46,6 +46,7 @@ import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteForm
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
 import { useClinician } from '@/contexts/ClinicianProvider';
+import { MAX_CLIP_DURATION_SEC, WARN_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 import { newId } from '@/utils/ids';
 import type {
   ClipStatus,
@@ -88,6 +89,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState<string | null>(null);
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
+  // Guards the auto-rotate effect against double-firing while the stop→start
+  // round-trip is in flight (the duration tick keeps incrementing during stop).
+  const rotatingRef = useRef(false);
 
   // ── Atomic session/clip patches via functional slice update ──────────────
   // Per-clip transitions need functional setState because the slice mutator
@@ -181,6 +185,30 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     [session],
   );
 
+  // ── Auto-rotate when a clip approaches the Cloudflare Whisper limit ──────
+  // We watch the live duration tick; when a recording crosses MAX_CLIP_DURATION_SEC,
+  // stop the current clip and immediately start a fresh one. References below
+  // (handleStopRecording / handleStartRecording) are function declarations,
+  // so they're hoisted into this scope and safe to invoke from the async body.
+  useEffect(() => {
+    if (recorder.status !== 'recording') return;
+    if (recorder.durationSec < MAX_CLIP_DURATION_SEC) return;
+    if (rotatingRef.current) return;
+    rotatingRef.current = true;
+    (async () => {
+      try {
+        await handleStopRecording();
+        await handleStartRecording();
+        toast.info('Started a new clip — long sessions are split automatically for transcription.');
+      } finally {
+        rotatingRef.current = false;
+      }
+    })();
+    // We intentionally only depend on the recorder tick — handlers are read fresh
+    // each render via closure, and re-subscribing on every render would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.status, recorder.durationSec]);
+
   if (!session || !patient) return <NotFound />;
 
   function ensureNote(initialSections?: NoteSection[]): Note {
@@ -212,16 +240,20 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
     const clipId = newId();
     const now = Date.now();
-    const newClip: SessionClip = {
-      id: clipId,
-      index: session.clips.length,
-      durationSec: 0,
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now,
-    };
     activeClipIdRef.current = clipId;
-    patchClips((clips) => [...clips, newClip]);
+    // Compute index inside the functional patch so concurrent stop→start
+    // (e.g. auto-rotation) sees the post-stop clip count, not a stale snapshot.
+    patchClips((clips) => [
+      ...clips,
+      {
+        id: clipId,
+        index: clips.length,
+        durationSec: 0,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
     patchSession({ status: 'recording' });
 
     const ok = await recorder.start(clipId);
@@ -800,6 +832,12 @@ function RecordingPanel({
   );
   const hasTranscribedClip = clips.some((c) => c.status === 'transcribed');
   const transcribing = busy === 'transcribing';
+  const nearingLimit = recording && recorder.durationSec >= WARN_CLIP_DURATION_SEC;
+  const timerColor = nearingLimit
+    ? 'var(--color-caution)'
+    : recording
+      ? 'var(--color-negative)'
+      : 'var(--color-fg-subtle)';
 
   return (
     <section className="card space-y-3">
@@ -808,9 +846,18 @@ function RecordingPanel({
           Recording
         </h2>
         <div className="flex items-center gap-3">
+          {nearingLimit && (
+            <span
+              className="text-[11px]"
+              style={{ color: 'var(--color-caution)' }}
+              title={`Auto-rotates to a new clip at ${Math.floor(MAX_CLIP_DURATION_SEC / 60)} min`}
+            >
+              Approaching clip limit
+            </span>
+          )}
           <span
             className="font-mono text-sm tabular-nums"
-            style={{ color: recording ? 'var(--color-negative)' : 'var(--color-fg-subtle)' }}
+            style={{ color: timerColor }}
           >
             {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
           </span>
