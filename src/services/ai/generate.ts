@@ -5,7 +5,6 @@ import { buildUserPrompt } from '@/lib/clinical/prompts';
 export interface GenerateNoteArgs {
   provider: GenerationProvider;
   model: string;
-  apiKey?: string;
   template: NoteTemplate;
   transcript: string;
   patient: Patient;
@@ -29,9 +28,6 @@ export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNote
   if (args.provider !== 'anthropic') {
     throw new Error('AI generation is disabled. Pick a provider in Settings.');
   }
-  if (!args.apiKey) {
-    throw new Error('Anthropic API key is missing. Add one in Settings.');
-  }
 
   const userPrompt = buildUserPrompt({
     template: args.template,
@@ -41,7 +37,6 @@ export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNote
   });
 
   const result = await callAnthropic({
-    apiKey: args.apiKey,
     model: args.model || 'claude-sonnet-4-6',
     system: args.template.systemPrompt,
     user: userPrompt,
