@@ -1,12 +1,12 @@
 /**
- * Browser-side Whisper client. Calls our hosted Worker at /api/transcribe with
+ * Browser-side ASR client. Calls our hosted Worker at /api/transcribe with
  * the raw audio bytes; the Worker forwards to the Cloudflare Workers AI
  * binding using its server-side secret. The browser never sees a CF token.
  *
  * Wire format: POST /api/transcribe
- *   Content-Type:    application/octet-stream
+ *   Content-Type:    <blob.type or audio/webm>  ← Worker uses this verbatim for Nova-3
  *   x-ptscribe-key:  <gate code>            (added by apiFetch)
- *   x-ptscribe-model: <whisper model id>    (optional override)
+ *   x-ptscribe-model: <model id>            (optional override; default Nova-3)
  *   x-ptscribe-language: <ISO-639-1>        (optional)
  *   body:            raw audio bytes
  *   response:        { text: string }
@@ -15,7 +15,7 @@
 import { apiFetch } from '@/lib/apiClient';
 
 export interface CloudflareWhisperArgs {
-  model: string; // e.g. '@cf/openai/whisper-large-v3-turbo'
+  model: string; // e.g. '@cf/deepgram/nova-3'
   audio: Blob;
   language?: string;
   signal?: AbortSignal;
@@ -32,8 +32,12 @@ export async function transcribeWithCloudflare(
   args: CloudflareWhisperArgs,
 ): Promise<CloudflareWhisperResult> {
   const buffer = await args.audio.arrayBuffer();
+  // Forward the actual audio MIME so the Worker can hand a typed body to
+  // Deepgram Nova-3 (which requires contentType). Fall back to webm — that
+  // matches what MediaRecorder produces in Chromium.
+  const contentType = args.audio.type || 'audio/webm';
   const headers: Record<string, string> = {
-    'Content-Type': 'application/octet-stream',
+    'Content-Type': contentType,
   };
   if (args.model) headers['x-ptscribe-model'] = args.model;
   if (args.language) headers['x-ptscribe-language'] = args.language;
@@ -42,7 +46,7 @@ export async function transcribeWithCloudflare(
 
   const data = (await res.json()) as { text?: string; error?: string };
   if (typeof data.text !== 'string') {
-    throw new Error(data.error || 'Whisper proxy response missing `text`');
+    throw new Error(data.error || 'Transcription proxy response missing `text`');
   }
   return { text: data.text };
 }

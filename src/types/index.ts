@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 3;
+export const APP_DATA_VERSION = 4;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────

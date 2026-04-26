@@ -16,7 +16,7 @@ export interface TranscribeResult {
 export async function transcribe(args: TranscribeArgs): Promise<TranscribeResult> {
   if (args.provider === 'cloudflare') {
     const out = await transcribeWithCloudflare({
-      model: args.model || '@cf/openai/whisper-large-v3-turbo',
+      model: args.model || '@cf/deepgram/nova-3',
       audio: args.blob,
       signal: args.signal,
     });

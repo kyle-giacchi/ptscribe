@@ -177,8 +177,8 @@ export function Settings() {
           <DisclaimerStrip>
             This testing build uses hosted credentials managed on the server, so audio and
             transcripts are proxied through our Cloudflare Worker on their way to Cloudflare Workers
-            AI (Whisper) and Anthropic. Treat anything you record as PHI in transit. PTScribe is not
-            HIPAA-certified.
+            AI (Deepgram Nova-3 for speech-to-text + speaker diarization) and Anthropic. Treat
+            anything you record as PHI in transit. PTScribe is not HIPAA-certified.
           </DisclaimerStrip>
 
           <div
@@ -200,14 +200,14 @@ export function Settings() {
                   })
                 }
               >
-                <option value="cloudflare">Cloudflare Workers AI (Whisper)</option>
-                <option value="webspeech">Browser live (Web Speech)</option>
+                <option value="cloudflare">Cloudflare Workers AI (Nova-3 with diarization)</option>
+                <option value="webspeech">Browser live (Web Speech, no speaker labels)</option>
                 <option value="none">Off</option>
               </Select>
             </Field>
-            <Field label="Whisper model" hint="Cloudflare model ID">
+            <Field label="Transcription model" hint="Cloudflare model ID">
               <TextInput
-                placeholder="@cf/openai/whisper-large-v3-turbo"
+                placeholder="@cf/deepgram/nova-3"
                 value={settings.ai.transcription.model}
                 onChange={(e) =>
                   updateAi({
