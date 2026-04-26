@@ -1,128 +1,224 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
+  Calendar,
   Users,
   Mic,
-  FileText,
-  ClipboardList,
+  CheckSquare,
   Dumbbell,
+  ClipboardList,
   Settings as SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
+import { useNotes } from '@/contexts/NotesProvider';
+import { useClinician } from '@/contexts/ClinicianProvider';
 
 interface NavEntry {
   to: string;
   label: string;
   Icon: LucideIcon;
+  end?: boolean;
 }
 
-interface NavSection {
-  label: string;
-  items: NavEntry[];
-}
-
-const PRIMARY: NavSection[] = [
-  {
-    label: 'Today',
-    items: [
-      { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
-      { to: '/sessions/new', label: 'New session', Icon: Mic },
-    ],
-  },
-  {
-    label: 'Records',
-    items: [
-      { to: '/patients', label: 'Patients', Icon: Users },
-      { to: '/notes', label: 'Notes', Icon: FileText },
-    ],
-  },
-  {
-    label: 'Library',
-    items: [
-      { to: '/templates', label: 'Templates', Icon: ClipboardList },
-      { to: '/exercises', label: 'Exercises', Icon: Dumbbell },
-    ],
-  },
-];
-
-const FOOTER: NavEntry[] = [{ to: '/settings', label: 'Settings', Icon: SettingsIcon }];
+type Badge = { kind: 'live' } | { kind: 'count'; value: number };
 
 export function Sidebar() {
+  const { notes } = useNotes();
+  const { clinician } = useClinician();
+  const pendingReviewCount = notes.filter((n) => !n.finalized).length;
+
+  const items: Array<NavEntry & { badge?: Badge }> = [
+    { to: '/', label: 'Today', Icon: Calendar, end: true },
+    { to: '/patients', label: 'Patients', Icon: Users },
+    { to: '/sessions/new', label: 'Active session', Icon: Mic },
+    {
+      to: '/notes',
+      label: 'Review queue',
+      Icon: CheckSquare,
+      badge:
+        pendingReviewCount > 0
+          ? { kind: 'count', value: pendingReviewCount }
+          : undefined,
+    },
+    { to: '/exercises', label: 'Exercise library', Icon: Dumbbell },
+    { to: '/templates', label: 'Templates', Icon: ClipboardList },
+  ];
+
+  const initials = (clinician.name || 'PT')
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
     <aside
-      className="hidden w-56 shrink-0 flex-col border-r md:flex"
+      className="grid h-full overflow-hidden"
       style={{
-        background: 'var(--color-surface)',
-        borderColor: 'var(--color-border-soft)',
+        background: 'var(--color-pt-surface)',
+        borderRight: '1px solid var(--color-pt-border)',
+        gridTemplateRows: 'auto 1fr auto',
       }}
     >
-      <div className="px-5 pt-5 pb-6">
-        <div
-          className="font-display text-lg leading-none tracking-tight"
-          style={{ color: 'var(--color-fg)' }}
-        >
-          PT <span style={{ color: 'var(--color-accent-deep)' }}>Notes</span>
-        </div>
-        <div className="mt-1 text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
-          Local-first clinical scribe
-        </div>
-      </div>
-      <nav className="flex flex-1 flex-col gap-5 px-3">
-        {PRIMARY.map((section) => (
-          <NavGroup key={section.label} section={section} />
-        ))}
-        <div
-          className="mt-auto border-t pt-4 pb-4"
-          style={{ borderColor: 'var(--color-border-soft)' }}
-        >
-          <div className="flex flex-col gap-0.5">
-            {FOOTER.map((item) => (
-              <NavItem key={item.to} {...item} />
-            ))}
+      {/* Brand block */}
+      <div style={{ padding: '20px 18px 14px' }}>
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center justify-center"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              background: 'var(--color-pt-accent)',
+              color: '#ffffff',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            P
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '-0.2px',
+              color: 'var(--color-pt-text)',
+            }}
+          >
+            PTScribe
           </div>
         </div>
+      </div>
+
+      {/* Nav */}
+      <nav
+        className="flex flex-col"
+        style={{ padding: '4px 10px', gap: 2, overflowY: 'auto' }}
+      >
+        {items.map((item) => (
+          <NavItem key={item.to} {...item} />
+        ))}
       </nav>
+
+      {/* User block */}
+      <div
+        className="flex items-center gap-2.5"
+        style={{
+          padding: 14,
+          borderTop: '1px solid var(--color-pt-border)',
+        }}
+      >
+        <div
+          className="flex shrink-0 items-center justify-center"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: 'var(--color-pt-accent-soft)',
+            color: 'var(--color-pt-accent-fg)',
+            fontSize: 11.5,
+            fontWeight: 600,
+          }}
+        >
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className="truncate"
+            style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-pt-text)' }}
+          >
+            {clinician.name || 'Clinician'}
+          </div>
+          <div
+            className="truncate"
+            style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
+          >
+            {[clinician.credentials, clinician.practiceName].filter(Boolean).join(' · ') ||
+              'PTScribe'}
+          </div>
+        </div>
+        <NavLink
+          to="/settings"
+          aria-label="Settings"
+          className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            color: 'var(--color-pt-text-3)',
+          }}
+        >
+          <SettingsIcon size={15} strokeWidth={1.75} />
+        </NavLink>
+      </div>
     </aside>
   );
 }
 
-function NavGroup({ section }: { section: NavSection }) {
-  return (
-    <div>
-      <div
-        className="px-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.12em]"
-        style={{ color: 'var(--color-fg-subtle)' }}
-      >
-        {section.label}
-      </div>
-      <div className="flex flex-col gap-0.5">
-        {section.items.map((item) => (
-          <NavItem key={item.to} {...item} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function NavItem({ to, label, Icon }: NavEntry) {
+function NavItem({
+  to,
+  label,
+  Icon,
+  end,
+  badge,
+}: NavEntry & { badge?: Badge }) {
   return (
     <NavLink
       to={to}
-      end={to === '/'}
-      className="group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] transition-colors duration-150 hover:bg-[var(--color-surface-2)] aria-[current=page]:bg-[var(--color-accent-soft)] aria-[current=page]:text-[var(--color-accent-fg)] aria-[current=page]:font-medium"
-      style={{ color: 'var(--color-fg-muted)' }}
+      end={end}
+      className={({ isActive }) =>
+        `flex items-center transition-colors ${
+          isActive ? '' : 'hover:bg-[var(--color-pt-surface-mut)]'
+        }`
+      }
+      style={({ isActive }) => ({
+        padding: '8px 10px',
+        borderRadius: 8,
+        gap: 10,
+        fontSize: 13,
+        fontWeight: isActive ? 600 : 500,
+        color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+        background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
+      })}
     >
-      <span
-        aria-hidden
-        className="absolute left-0 top-1/2 h-4 w-[2px] -translate-y-1/2 rounded-full opacity-0 transition-opacity duration-150 group-aria-[current=page]:opacity-100"
-        style={{ background: 'var(--color-accent)' }}
-      />
-      <Icon
-        size={15}
-        strokeWidth={1.75}
-        className="text-[var(--color-fg-subtle)] group-aria-[current=page]:text-[var(--color-accent-deep)]"
-      />
-      <span>{label}</span>
+      <Icon size={16} strokeWidth={1.75} />
+      <span className="flex-1">{label}</span>
+      {badge?.kind === 'live' && (
+        <span
+          style={{
+            background: 'var(--color-pt-accent)',
+            color: '#ffffff',
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: '0.6px',
+            textTransform: 'uppercase',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}
+        >
+          LIVE
+        </span>
+      )}
+      {badge?.kind === 'count' && (
+        <span
+          className="font-mono"
+          style={{
+            background: 'var(--color-pt-slate-soft)',
+            color: 'var(--color-pt-text-2)',
+            fontSize: 10.5,
+            fontWeight: 600,
+            padding: '1px 7px',
+            borderRadius: 999,
+            minWidth: 20,
+            textAlign: 'center',
+          }}
+        >
+          {badge.value}
+        </span>
+      )}
     </NavLink>
   );
 }
