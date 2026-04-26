@@ -155,15 +155,20 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
 
 function AIStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
   const { settings, updateAi } = useSettings();
-  const [openaiKey, setOpenaiKey] = useState(settings.ai.transcription.apiKey ?? '');
+  const [cloudflareAccountId, setCloudflareAccountId] = useState(
+    settings.ai.transcription.accountId ?? '',
+  );
+  const [cloudflareToken, setCloudflareToken] = useState(settings.ai.transcription.apiKey ?? '');
   const [anthropicKey, setAnthropicKey] = useState(settings.ai.generation.apiKey ?? '');
 
   function handleNext() {
+    const cloudflareReady = cloudflareAccountId && cloudflareToken;
     updateAi({
       transcription: {
         ...settings.ai.transcription,
-        provider: openaiKey ? 'openai' : 'webspeech',
-        apiKey: openaiKey || undefined,
+        provider: cloudflareReady ? 'cloudflare' : 'webspeech',
+        accountId: cloudflareAccountId || undefined,
+        apiKey: cloudflareToken || undefined,
       },
       generation: {
         ...settings.ai.generation,
@@ -178,19 +183,31 @@ function AIStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) 
     <div className="space-y-6">
       <StepHeading
         title="AI providers (optional)"
-        subtitle="Paste your API keys if you want server-quality transcription and AI-drafted notes. You can skip this and use the live web transcription, or add keys later."
+        subtitle="Paste your credentials if you want server-quality transcription and AI-drafted notes. You can skip this and use the live web transcription, or add keys later."
       />
 
       <div className="card space-y-4">
         <Field
-          label="OpenAI API key — for Whisper transcription"
-          hint="Used only for audio→text. If empty, the app falls back to the browser’s built-in speech recognition."
+          label="Cloudflare account ID — for Whisper transcription"
+          hint="Found in your Cloudflare dashboard. Required to call Workers AI."
+        >
+          <TextInput
+            placeholder="32-character account ID"
+            value={cloudflareAccountId}
+            onChange={(e) => setCloudflareAccountId(e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+
+        <Field
+          label="Cloudflare API token — for Whisper transcription"
+          hint="A Workers AI–scoped API token. If either field is empty, the app falls back to the browser’s built-in speech recognition."
         >
           <TextInput
             type="password"
-            placeholder="sk-..."
-            value={openaiKey}
-            onChange={(e) => setOpenaiKey(e.target.value)}
+            placeholder="Workers AI API token"
+            value={cloudflareToken}
+            onChange={(e) => setCloudflareToken(e.target.value)}
             autoComplete="off"
           />
         </Field>
@@ -275,7 +292,7 @@ function DisclaimerCard() {
           <strong style={{ color: 'var(--color-fg)' }}>Privacy &amp; HIPAA.</strong> PTScribe runs
           entirely in your browser. Patient data lives in this device’s local storage. Enabling AI
           transcription or note generation sends audio and transcripts directly to the provider you
-          configured (OpenAI / Anthropic) using your API key.
+          configured (Cloudflare / Anthropic) using your credentials.
         </p>
         <p>
           Nothing is sent to a server we operate. <strong>PTScribe is not HIPAA-certified

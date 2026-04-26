@@ -107,10 +107,11 @@ Do not use `Date.now()`, incrementing counters, or `Math.random()` as IDs. UUID 
 
 ## BYO API key — no server proxy
 
-Transcription (OpenAI Whisper) and note generation (Anthropic Messages) are called directly from the browser using a key the clinician pastes into Settings. There is no backend.
+Transcription (Cloudflare Workers AI Whisper) and note generation (Anthropic Messages) are called directly from the browser using credentials the clinician pastes into Settings. There is no backend.
 
+- Cloudflare Whisper requires **two** values: `Settings.ai.transcription.accountId` (URL-bound) and `Settings.ai.transcription.apiKey` (Bearer token). Both must be present or `transcribe()` throws.
 - Anthropic requests include the `anthropic-dangerous-direct-browser-access: true` header.
-- Keys are persisted in `Settings.ai.{transcription,generation}.apiKey` inside `AppData`.
+- Credentials are persisted in `Settings.ai.{transcription,generation}.{apiKey,accountId}` inside `AppData`.
 - Settings page surfaces a HIPAA disclaimer — recordings and transcripts leave the device when these providers are used. Provider `'none'` keeps everything local (Web Speech for live transcript, manual note editing).
 
 ## Type changes ripple
