@@ -255,13 +255,10 @@ export interface AISettings {
   transcription: {
     provider: TranscriptionProvider;
     model: string; // e.g. '@cf/openai/whisper-large-v3-turbo'
-    apiKey?: string; // Cloudflare API token
-    accountId?: string; // Cloudflare account ID (required for the cloudflare provider)
   };
   generation: {
     provider: GenerationProvider;
     model: string; // e.g. 'claude-sonnet-4-6'
-    apiKey?: string;
   };
 }
 
