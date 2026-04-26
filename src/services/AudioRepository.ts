@@ -1,4 +1,5 @@
 import { AUDIO_DB } from '@/lib/storageKeys';
+import { vault } from '@/lib/vault/vault';
 
 /**
  * IndexedDB-backed store for raw audio Blobs keyed by clip id.
@@ -11,13 +12,11 @@ import { AUDIO_DB } from '@/lib/storageKeys';
  *
  * Two object stores live in this database:
  *   - `recordings`        : final consolidated Blob per clip (key = clipId)
- *   - `recording_chunks`  : durable per-chunk write-ahead log during recording,
- *                           keyed `${clipId}:${zero-padded index}` so a tab
- *                           crash mid-recording can be recovered from chunks.
- *                           Cleared after the consolidated Blob is saved.
+ *   - `recording_chunks`  : durable per-chunk write-ahead log during recording.
  *
- * The repository API uses `sessionId` as the parameter name for backward
- * compatibility with legacy callers; for v3+ the value is always a clip id.
+ * When the vault is unlocked, every Blob is round-tripped through AES-GCM
+ * encryption before hitting IDB and decrypted on read. `saveRaw`/`loadRaw`
+ * bypass that path and are migration-only.
  */
 
 let _dbPromise: Promise<IDBDatabase> | null = null;
@@ -72,72 +71,163 @@ function chunkKey(sessionId: string, index: number): string {
 }
 
 function chunkRangeFor(sessionId: string): IDBKeyRange {
-  // ':' is ASCII 58, ';' is 59 — bound captures every `${sessionId}:NNNNNN` key.
   return IDBKeyRange.bound(`${sessionId}:`, `${sessionId};`, false, true);
+}
+
+const RECORDING_MIME = 'audio/webm';
+
+/**
+ * IndexedDB has gnarly cross-realm behavior with Blob (especially under
+ * jsdom + fake-indexeddb in tests, where Blob loses its prototype after
+ * structured clone). We normalize to ArrayBuffer at the storage boundary
+ * and reconstruct Blobs on read. Encryption is byte-level either way.
+ */
+async function toBytes(
+  value: Blob | ArrayBuffer | Uint8Array | undefined,
+): Promise<Uint8Array | null> {
+  if (!value) return null;
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (typeof (value as Blob).arrayBuffer === 'function') {
+    return new Uint8Array(await (value as Blob).arrayBuffer());
+  }
+  // jsdom + fake-indexeddb path: a structured-cloned Blob may come back as a
+  // plain object with internal slots inaccessible. Try to recover via ctor.
+  try {
+    return new Uint8Array(await new Blob([value as BlobPart]).arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+async function maybeEncrypt(blob: Blob): Promise<ArrayBuffer> {
+  const bytes = (await toBytes(blob)) ?? new Uint8Array();
+  if (vault.isUnlocked()) {
+    const enc = await vault.encryptBlob(new Blob([bytes as BlobPart]));
+    return (await toBytes(enc))!.buffer as ArrayBuffer;
+  }
+  return bytes.buffer.slice(0) as ArrayBuffer;
+}
+
+async function maybeDecrypt(
+  raw: Blob | ArrayBuffer | Uint8Array | undefined,
+  mime: string,
+): Promise<Blob | undefined> {
+  const bytes = await toBytes(raw);
+  if (!bytes) return undefined;
+  if (!vault.isUnlocked()) return new Blob([bytes as BlobPart], { type: mime });
+  // Plaintext WebM left over from before vault setup — pass through.
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+    return new Blob([bytes as BlobPart], { type: mime });
+  }
+  return vault.decryptBlob(new Blob([bytes as BlobPart]), mime);
 }
 
 export const audioRepository = {
   async save(sessionId: string, blob: Blob): Promise<void> {
-    await withStore<IDBValidKey>(AUDIO_DB.store, 'readwrite', (store) =>
-      store.put(blob, sessionId),
-    );
+    const out = await maybeEncrypt(blob);
+    await withStore<IDBValidKey>(AUDIO_DB.store, 'readwrite', (store) => store.put(out, sessionId));
   },
 
   async load(sessionId: string): Promise<Blob | null> {
-    const result = await withStore<Blob | undefined>(AUDIO_DB.store, 'readonly', (store) =>
-      store.get(sessionId) as IDBRequest<Blob | undefined>,
+    const stored = await withStore<Blob | ArrayBuffer | undefined>(
+      AUDIO_DB.store,
+      'readonly',
+      (store) => store.get(sessionId) as IDBRequest<Blob | ArrayBuffer | undefined>,
     );
-    return result ?? null;
+    const decoded = await maybeDecrypt(stored, RECORDING_MIME);
+    return decoded ?? null;
+  },
+
+  /** Migration-only: write bytes without invoking the encryption path. */
+  async saveRaw(sessionId: string, data: Blob | ArrayBuffer | Uint8Array): Promise<void> {
+    const bytes = (await toBytes(data)) ?? new Uint8Array();
+    await withStore<IDBValidKey>(AUDIO_DB.store, 'readwrite', (store) =>
+      store.put(bytes.buffer.slice(0) as ArrayBuffer, sessionId),
+    );
+  },
+
+  /** Migration-only: read the stored bytes without decryption, as a Blob. */
+  async loadRaw(sessionId: string): Promise<Blob | null> {
+    const stored = await withStore<Blob | ArrayBuffer | undefined>(
+      AUDIO_DB.store,
+      'readonly',
+      (store) => store.get(sessionId) as IDBRequest<Blob | ArrayBuffer | undefined>,
+    );
+    const bytes = await toBytes(stored);
+    if (!bytes) return null;
+    return new Blob([bytes as BlobPart], { type: RECORDING_MIME });
   },
 
   async remove(sessionId: string): Promise<void> {
     await Promise.all([
-      withStore<undefined>(AUDIO_DB.store, 'readwrite', (store) =>
-        store.delete(sessionId) as IDBRequest<undefined>,
+      withStore<undefined>(
+        AUDIO_DB.store,
+        'readwrite',
+        (store) => store.delete(sessionId) as IDBRequest<undefined>,
       ),
       this.clearChunks(sessionId),
     ]);
   },
 
   async listKeys(): Promise<string[]> {
-    return withStore<string[]>(AUDIO_DB.store, 'readonly', (store) =>
-      store.getAllKeys() as IDBRequest<string[]>,
+    return withStore<string[]>(
+      AUDIO_DB.store,
+      'readonly',
+      (store) => store.getAllKeys() as IDBRequest<string[]>,
     );
   },
 
   async clear(): Promise<void> {
     await Promise.all([
-      withStore<undefined>(AUDIO_DB.store, 'readwrite', (store) =>
-        store.clear() as IDBRequest<undefined>,
+      withStore<undefined>(
+        AUDIO_DB.store,
+        'readwrite',
+        (store) => store.clear() as IDBRequest<undefined>,
       ),
-      withStore<undefined>(AUDIO_DB.chunkStore, 'readwrite', (store) =>
-        store.clear() as IDBRequest<undefined>,
+      withStore<undefined>(
+        AUDIO_DB.chunkStore,
+        'readwrite',
+        (store) => store.clear() as IDBRequest<undefined>,
       ),
     ]);
   },
 
   async appendChunk(sessionId: string, index: number, blob: Blob): Promise<void> {
+    const out = await maybeEncrypt(blob);
     await withStore<IDBValidKey>(AUDIO_DB.chunkStore, 'readwrite', (store) =>
-      store.put(blob, chunkKey(sessionId, index)),
+      store.put(out, chunkKey(sessionId, index)),
     );
   },
 
   async loadChunks(sessionId: string): Promise<Blob[]> {
-    return withStore<Blob[]>(AUDIO_DB.chunkStore, 'readonly', (store) =>
-      store.getAll(chunkRangeFor(sessionId)) as IDBRequest<Blob[]>,
+    const stored = await withStore<(Blob | ArrayBuffer)[]>(
+      AUDIO_DB.chunkStore,
+      'readonly',
+      (store) => store.getAll(chunkRangeFor(sessionId)) as IDBRequest<(Blob | ArrayBuffer)[]>,
     );
+    const decoded: Blob[] = [];
+    for (const item of stored) {
+      const out = await maybeDecrypt(item, RECORDING_MIME);
+      if (out) decoded.push(out);
+    }
+    return decoded;
   },
 
   async hasChunks(sessionId: string): Promise<boolean> {
-    const count = await withStore<number>(AUDIO_DB.chunkStore, 'readonly', (store) =>
-      store.count(chunkRangeFor(sessionId)) as IDBRequest<number>,
+    const count = await withStore<number>(
+      AUDIO_DB.chunkStore,
+      'readonly',
+      (store) => store.count(chunkRangeFor(sessionId)) as IDBRequest<number>,
     );
     return count > 0;
   },
 
   async clearChunks(sessionId: string): Promise<void> {
-    await withStore<undefined>(AUDIO_DB.chunkStore, 'readwrite', (store) =>
-      store.delete(chunkRangeFor(sessionId)) as IDBRequest<undefined>,
+    await withStore<undefined>(
+      AUDIO_DB.chunkStore,
+      'readwrite',
+      (store) => store.delete(chunkRangeFor(sessionId)) as IDBRequest<undefined>,
     );
   },
 };
