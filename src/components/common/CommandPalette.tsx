@@ -11,9 +11,11 @@ import {
   Dumbbell,
   Settings as SettingsIcon,
   Search,
+  User,
   type LucideIcon,
 } from 'lucide-react';
 import { duration, ease } from '@/lib/motion';
+import { usePatients } from '@/contexts/PatientsProvider';
 
 interface NavItem {
   to: string;
@@ -35,6 +37,11 @@ const ITEMS: NavItem[] = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const { patients } = usePatients();
+  const activePatients = patients
+    .filter((p) => p.status !== 'discharged')
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 12);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -151,6 +158,37 @@ export function CommandPalette() {
                       </Command.Item>
                     ))}
                   </Command.Group>
+
+                  {activePatients.length > 0 && (
+                    <Command.Group
+                      heading="Patients"
+                      className="mt-2 text-xs"
+                      style={{ color: 'var(--color-fg-subtle)' }}
+                    >
+                      {activePatients.map((p) => (
+                        <Command.Item
+                          key={p.id}
+                          value={`patient ${p.firstName} ${p.lastName} ${p.mrn ?? ''} ${p.primaryDiagnosis ?? ''}`}
+                          onSelect={() => go(`/patients/${p.id}`)}
+                          className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm aria-selected:bg-[var(--color-accent-soft)] aria-selected:text-[var(--color-accent-fg)]"
+                          style={{ color: 'var(--color-fg)' }}
+                        >
+                          <User size={16} strokeWidth={1.75} />
+                          <span className="flex-1 truncate">
+                            {p.lastName}, {p.firstName}
+                          </span>
+                          {p.primaryDiagnosis && (
+                            <span
+                              className="truncate text-xs"
+                              style={{ color: 'var(--color-fg-subtle)' }}
+                            >
+                              {p.primaryDiagnosis}
+                            </span>
+                          )}
+                        </Command.Item>
+                      ))}
+                    </Command.Group>
+                  )}
                 </Command.List>
               </Command>
             </motion.div>
