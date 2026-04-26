@@ -192,13 +192,10 @@ const SettingsSchema = z.object({
     transcription: z.object({
       provider: z.enum(['cloudflare', 'webspeech', 'none']),
       model: z.string(),
-      apiKey: z.string().optional(),
-      accountId: z.string().optional(),
     }),
     generation: z.object({
       provider: z.enum(['anthropic', 'none']),
       model: z.string(),
-      apiKey: z.string().optional(),
     }),
   }),
   ui: z.object({
@@ -253,7 +250,7 @@ export function defaultAppData(): AppData {
     plans: [],
     settings: {
       ai: {
-        transcription: { provider: 'webspeech', model: '@cf/openai/whisper-large-v3-turbo' },
+        transcription: { provider: 'cloudflare', model: '@cf/openai/whisper-large-v3-turbo' },
         generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
       },
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },

@@ -1,0 +1,9 @@
+# Copy to `.dev.vars` (gitignored) and fill in. Used by `wrangler dev` only —
+# production secrets are set via `npx wrangler secret put NAME`.
+
+# Anthropic API key for /api/generate (server-side, never exposed to browser)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# 6-digit gate code. Must match the SHA-256 hash hardcoded in src/lib/gate.ts.
+# Default test code is 112233.
+PTSCRIBE_GATE=112233

@@ -1,24 +1,12 @@
 /**
- * Minimal browser-side Anthropic Messages API client.
- *
- * The user supplies their own API key in Settings; the call goes directly
- * from the browser to api.anthropic.com. We use `fetch` (rather than the SDK)
- * so we don't pull in the SDK's Node-isms, and so the caller can wire
- * `prompt-cache-control` cleanly.
+ * Browser-side Anthropic client. Calls our hosted Worker at /api/generate;
+ * the Worker forwards to api.anthropic.com using its server-side ANTHROPIC_API_KEY
+ * secret. The browser never sees the key.
  */
 
-export interface AnthropicCacheControl {
-  type: 'ephemeral';
-}
-
-export interface AnthropicTextBlock {
-  type: 'text';
-  text: string;
-  cache_control?: AnthropicCacheControl;
-}
+import { apiFetch } from '@/lib/apiClient';
 
 export interface AnthropicMessageArgs {
-  apiKey: string;
   model: string; // e.g. 'claude-sonnet-4-6'
   system: string;
   user: string;
@@ -34,54 +22,29 @@ export interface AnthropicResult {
 }
 
 export async function callAnthropic(args: AnthropicMessageArgs): Promise<AnthropicResult> {
-  if (!args.apiKey) {
-    throw new Error('Anthropic API key is missing. Add one in Settings.');
-  }
-  const cacheSystem = args.cacheSystem !== false;
-  const systemBlocks: AnthropicTextBlock[] = [
-    cacheSystem
-      ? { type: 'text', text: args.system, cache_control: { type: 'ephemeral' } }
-      : { type: 'text', text: args.system },
-  ];
-
-  const body = {
-    model: args.model,
-    max_tokens: args.maxTokens ?? 2048,
-    temperature: args.temperature ?? 0.2,
-    system: systemBlocks,
-    messages: [
-      {
-        role: 'user',
-        content: [{ type: 'text', text: args.user }],
-      },
-    ],
-  };
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await apiFetch('/api/generate', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': args.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: args.model,
+      system: args.system,
+      user: args.user,
+      maxTokens: args.maxTokens,
+      temperature: args.temperature,
+      cacheSystem: args.cacheSystem,
+    }),
     signal: args.signal,
   });
 
   if (!res.ok) {
     const errBody = await safeReadText(res);
-    throw new Error(`Anthropic request failed (${res.status}): ${errBody || res.statusText}`);
+    throw new Error(`Generate proxy failed (${res.status}): ${errBody || res.statusText}`);
   }
-  const data = (await res.json()) as {
-    content?: { type: string; text?: string }[];
-  };
-  const text = (data.content ?? [])
-    .filter((b) => b.type === 'text' && typeof b.text === 'string')
-    .map((b) => b.text as string)
-    .join('');
-  if (!text) throw new Error('Anthropic response had no text content');
-  return { text };
+  const data = (await res.json()) as { text?: string; error?: string };
+  if (typeof data.text !== 'string' || data.text.length === 0) {
+    throw new Error(data.error || 'Generate proxy response had no text content');
+  }
+  return { text: data.text };
 }
 
 async function safeReadText(res: Response): Promise<string> {

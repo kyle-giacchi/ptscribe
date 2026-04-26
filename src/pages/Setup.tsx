@@ -5,18 +5,16 @@ import { toast } from 'sonner';
 import {
   Stethoscope,
   ArrowRight,
-  ArrowLeft,
   Check,
   ShieldAlert,
 } from 'lucide-react';
 import { useClinician } from '@/contexts/ClinicianProvider';
-import { useSettings } from '@/contexts/SettingsProvider';
 import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { duration, ease } from '@/lib/motion';
 
-type Step = 'welcome' | 'profile' | 'ai' | 'done';
-const FLOW: Step[] = ['profile', 'ai', 'done'];
+type Step = 'welcome' | 'profile' | 'done';
+const FLOW: Step[] = ['profile', 'done'];
 
 export function Setup() {
   const [step, setStep] = useState<Step>('welcome');
@@ -76,10 +74,7 @@ export function Setup() {
             transition={{ duration: duration.base, ease: ease.enter }}
           >
             {step === 'welcome' && <WelcomeStep onStart={() => setStep('profile')} />}
-            {step === 'profile' && <ProfileStep onNext={() => setStep('ai')} />}
-            {step === 'ai' && (
-              <AIStep onBack={() => setStep('profile')} onNext={() => setStep('done')} />
-            )}
+            {step === 'profile' && <ProfileStep onNext={() => setStep('done')} />}
             {step === 'done' && <DoneStep />}
           </motion.div>
         </AnimatePresence>
@@ -105,7 +100,8 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         </h1>
         <p style={{ marginTop: 8, fontSize: 13.5, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
           Record a session, get a structured note. Patients, sessions, notes, templates, and
-          exercises all live in this browser. Nothing is sent to a server we operate.
+          exercises live in this browser. Audio and transcripts are sent to AI providers through
+          a hosted proxy on this testing build.
         </p>
       </div>
 
@@ -187,103 +183,6 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
           onClick={handleNext}
           iconRight={<ArrowRight size={14} strokeWidth={2} />}
         >
-          Next: AI providers
-        </PtButton>
-      </div>
-    </div>
-  );
-}
-
-function AIStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
-  const { settings, updateAi } = useSettings();
-  const [cloudflareAccountId, setCloudflareAccountId] = useState(
-    settings.ai.transcription.accountId ?? '',
-  );
-  const [cloudflareToken, setCloudflareToken] = useState(settings.ai.transcription.apiKey ?? '');
-  const [anthropicKey, setAnthropicKey] = useState(settings.ai.generation.apiKey ?? '');
-
-  function handleNext() {
-    const cloudflareReady = cloudflareAccountId && cloudflareToken;
-    updateAi({
-      transcription: {
-        ...settings.ai.transcription,
-        provider: cloudflareReady ? 'cloudflare' : 'webspeech',
-        accountId: cloudflareAccountId || undefined,
-        apiKey: cloudflareToken || undefined,
-      },
-      generation: {
-        ...settings.ai.generation,
-        provider: anthropicKey ? 'anthropic' : 'none',
-        apiKey: anthropicKey || undefined,
-      },
-    });
-    onNext();
-  }
-
-  return (
-    <div style={{ display: 'grid', gap: 20 }}>
-      <StepHeading
-        title="AI providers (optional)"
-        subtitle="Paste your credentials if you want server-quality transcription and AI-drafted notes. You can skip this and use the live web transcription, or add keys later."
-      />
-
-      <SurfaceCard padding={18}>
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Field
-            label="Cloudflare account ID — for Whisper transcription"
-            hint="Found in your Cloudflare dashboard. Required to call Workers AI."
-          >
-            <TextInput
-              placeholder="32-character account ID"
-              value={cloudflareAccountId}
-              onChange={(e) => setCloudflareAccountId(e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-
-          <Field
-            label="Cloudflare API token — for Whisper transcription"
-            hint="A Workers AI–scoped API token. If either field is empty, the app falls back to the browser’s built-in speech recognition."
-          >
-            <TextInput
-              type="password"
-              placeholder="Workers AI API token"
-              value={cloudflareToken}
-              onChange={(e) => setCloudflareToken(e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-
-          <Field
-            label="Anthropic API key — for note generation"
-            hint="Used to turn the transcript into a structured SOAP / Eval / Progress note. If empty, you can still type notes manually."
-          >
-            <TextInput
-              type="password"
-              placeholder="sk-ant-..."
-              value={anthropicKey}
-              onChange={(e) => setAnthropicKey(e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-        </div>
-      </SurfaceCard>
-
-      <DisclaimerCard />
-
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <PtButton
-          variant="ghost"
-          iconLeft={<ArrowLeft size={14} strokeWidth={2} />}
-          onClick={onBack}
-        >
-          Back
-        </PtButton>
-        <PtButton
-          variant="primary"
-          iconRight={<ArrowRight size={14} strokeWidth={2} />}
-          onClick={handleNext}
-        >
           Finish setup
         </PtButton>
       </div>
@@ -339,17 +238,17 @@ function DisclaimerCard() {
       />
       <div style={{ display: 'grid', gap: 6 }}>
         <p style={{ margin: 0 }}>
-          <strong style={{ color: 'var(--color-pt-text)' }}>Privacy &amp; HIPAA.</strong> PTScribe
-          runs entirely in your browser. Patient data lives in this device’s local storage. Enabling
-          AI transcription or note generation sends audio and transcripts directly to the provider
-          you configured (Cloudflare / Anthropic) using your credentials.
+          <strong style={{ color: 'var(--color-pt-text)' }}>Privacy &amp; HIPAA.</strong> Patient
+          metadata, session details, and notes live in this browser’s local storage. When you
+          transcribe or generate a note, audio and transcripts pass through a hosted Cloudflare
+          Worker on their way to Cloudflare Workers AI (Whisper) and Anthropic.
         </p>
         <p style={{ margin: 0 }}>
-          Nothing is sent to a server we operate.{' '}
           <strong style={{ color: 'var(--color-pt-text)' }}>
             PTScribe is not HIPAA-certified software
-          </strong>{' '}
-          — confirm BAA terms with your providers before using it with PHI.
+          </strong>
+          {' '}— treat anything you record as PHI in transit and confirm BAA terms with both
+          providers before using it with real patient data.
         </p>
       </div>
     </div>
@@ -357,7 +256,7 @@ function DisclaimerCard() {
 }
 
 function Stepper({ current }: { current: number }) {
-  const steps = ['Profile', 'AI', 'Done'];
+  const steps = ['Profile', 'Done'];
   return (
     <ol style={{ display: 'flex', alignItems: 'center', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
       {steps.map((label, i) => {
