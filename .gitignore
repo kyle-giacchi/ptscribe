@@ -1,0 +1,36 @@
+# User reference data (NOT for production)
+groupfinanceapp.xlsx
+*.xlsx
+!tests/fixtures/*.xlsx
+
+# Brainstorm artifacts
+.superpowers/
+
+# Build & deps
+node_modules/
+dist/
+build/
+.vite/
+
+# Test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+.playwright-mcp/
+coverage/
+
+# Stray screenshots at repo root
+/*.png
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+
+# Env
+.env
+.env.local
+.env.*.local

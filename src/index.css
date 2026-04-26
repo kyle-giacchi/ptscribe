@@ -1,0 +1,207 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Ground — soft gray-blue */
+  --color-bg: oklch(0.985 0.008 240);
+  --color-surface: oklch(0.97 0.012 240);
+  --color-surface-2: oklch(0.945 0.016 240);
+  --color-border: oklch(0.9 0.02 240);
+  --color-border-soft: oklch(0.93 0.015 240);
+
+  /* Text */
+  --color-fg: oklch(0.28 0.03 250);
+  --color-fg-muted: oklch(0.5 0.025 245);
+  --color-fg-subtle: oklch(0.65 0.02 245);
+
+  /* Accent — soft orange */
+  --color-accent: oklch(0.78 0.13 60);
+  --color-accent-soft: oklch(0.92 0.06 65);
+  --color-accent-fg: oklch(0.3 0.08 50);
+  --color-accent-deep: oklch(0.62 0.16 55);
+
+  /* Semantic — desaturated */
+  --color-positive: oklch(0.72 0.1 165);
+  --color-caution: oklch(0.8 0.1 85);
+  --color-negative: oklch(0.62 0.12 25);
+  --color-info: oklch(0.7 0.07 235);
+
+  /* Legacy aliases (kept until full migration sweep) */
+  --color-muted: oklch(0.945 0.016 240);
+  --color-muted-fg: oklch(0.5 0.025 245);
+  --color-primary: oklch(0.78 0.13 60);
+  --color-primary-fg: oklch(0.3 0.08 50);
+  --color-success: oklch(0.72 0.1 165);
+  --color-warning: oklch(0.8 0.1 85);
+  --color-danger: oklch(0.62 0.12 25);
+
+  /* Radii — soft */
+  --radius-sm: 0.5rem;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* Shadows — blue-cast */
+  --shadow-sm: 0 1px 2px oklch(0.3 0.03 250 / 0.04);
+  --shadow-md: 0 4px 16px -4px oklch(0.3 0.03 250 / 0.08);
+  --shadow-lg: 0 12px 32px -8px oklch(0.3 0.03 250 / 0.1);
+
+  /* Fonts */
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans:
+    'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular numerals for any element marked as a money figure */
+.tnum,
+.font-display {
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 96, 'SOFT' 100;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border p-6;
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-sm);
+  }
+  .card-hero {
+    @apply rounded-2xl border p-8;
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow:
+      var(--shadow-md),
+      inset 0 1px 0 oklch(1 0 0 / 0.6);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium;
+    transition:
+      background-color 200ms cubic-bezier(0.32, 0.08, 0.24, 1),
+      color 200ms cubic-bezier(0.32, 0.08, 0.24, 1),
+      border-color 200ms cubic-bezier(0.32, 0.08, 0.24, 1);
+  }
+  .btn-primary {
+    background: var(--color-accent);
+    color: oklch(0.99 0 0);
+  }
+  .btn-primary:hover {
+    background: var(--color-accent-deep);
+  }
+  .btn-secondary {
+    background: var(--color-surface-2);
+    color: var(--color-fg);
+    border: 1px solid var(--color-border);
+  }
+  .btn-secondary:hover {
+    background: var(--color-surface);
+  }
+  .btn-ghost {
+    color: var(--color-fg-muted);
+  }
+  .btn-ghost:hover {
+    background: var(--color-surface-2);
+    color: var(--color-fg);
+  }
+  .input {
+    @apply w-full rounded-lg px-3 py-2 text-sm;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-soft);
+    color: var(--color-fg);
+    transition: border-color 120ms cubic-bezier(0.32, 0.08, 0.24, 1);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px oklch(0.78 0.13 60 / 0.18);
+  }
+  .input::placeholder {
+    color: var(--color-fg-subtle);
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid oklch(0.78 0.13 60 / 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* TipTap ProseMirror styles for note section editors */
+.tiptap-content {
+  min-height: 5.5rem;
+  outline: none;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--color-fg);
+}
+.tiptap-content p {
+  margin: 0 0 0.4rem;
+}
+.tiptap-content p:last-child {
+  margin-bottom: 0;
+}
+.tiptap-content h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--color-fg);
+}
+.tiptap-content h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0.4rem 0 0.2rem;
+  color: var(--color-fg);
+}
+.tiptap-content ul,
+.tiptap-content ol {
+  margin: 0 0 0.4rem 1.25rem;
+  padding: 0;
+}
+.tiptap-content ul {
+  list-style: disc;
+}
+.tiptap-content ol {
+  list-style: decimal;
+}
+.tiptap-content li > p {
+  margin: 0;
+}
+.tiptap-content strong {
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.tiptap-content em {
+  font-style: italic;
+}
+.tiptap-content[contenteditable='false'] {
+  color: var(--color-fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 120ms !important;
+  }
+}
