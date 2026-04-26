@@ -5,6 +5,8 @@ import { vault } from '@/lib/vault/vault';
 import { PASSPHRASE_MIN_CHARS } from '@/lib/vault/crypto';
 import { migrateLegacyPlaintext } from '@/lib/vault/migration';
 import { isDemoMode, getDemoPassphrase } from '@/lib/demoMode';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
+import { audioRepository } from '@/services/AudioRepository';
 
 type Mode = 'setup' | 'unlock';
 
@@ -27,7 +29,17 @@ export function VaultGate({ children }: { children: ReactNode }) {
       try {
         if (vault.isInitialized()) {
           const result = await vault.unlock(demoPass);
-          if (!cancelled && result.ok) setUnlocked(true);
+          if (!cancelled && result.ok) {
+            setUnlocked(true);
+          } else if (!cancelled) {
+            // Stale vault from a prior non-demo visit: nuke local data and
+            // re-init with the demo passphrase. The data is unrecoverable
+            // anyway (we don't have the user's passphrase), so this just
+            // saves the user from a dead-end prompt.
+            await resetLocalDataForDemo();
+            await vault.setup(demoPass);
+            if (!cancelled) setUnlocked(true);
+          }
         } else {
           await vault.setup(demoPass);
           await migrateLegacyPlaintext();
@@ -222,4 +234,19 @@ export function VaultGate({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+async function resetLocalDataForDemo(): Promise<void> {
+  vault.lock();
+  try {
+    localStorage.removeItem(STORAGE_KEYS.vault);
+    localStorage.removeItem(STORAGE_KEYS.appData);
+  } catch {
+    /* ignore — best-effort wipe */
+  }
+  try {
+    await audioRepository.clear();
+  } catch {
+    /* ignore — IDB may be empty or unavailable */
+  }
 }
