@@ -589,12 +589,20 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         transcript,
         patient: patient!,
       });
-      const target = ensureNote(result.sections);
-      updateNote(target.id, {
-        sections: result.sections,
-        templateId: template.id,
-        format: template.format,
-      });
+      if (note) {
+        // Existing draft — overwrite with the new generation.
+        updateNote(note.id, {
+          sections: result.sections,
+          templateId: template.id,
+          format: template.format,
+        });
+      } else {
+        // First generation — ensureNote creates the note with these sections in
+        // one slice write. Doing addNote + updateNote in the same tick would
+        // clobber the create because both calls capture the pre-add notes
+        // snapshot from listSlice.
+        ensureNote(result.sections);
+      }
       recordAction('generate');
       patchSession({ status: 'ready' });
       toast.success('Draft note generated');
