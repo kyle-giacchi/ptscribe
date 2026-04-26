@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Dumbbell, Lock, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Lock, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
+import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useExercises } from '@/contexts/ExercisesProvider';
 import { newId } from '@/utils/ids';
 import {
@@ -34,102 +34,177 @@ export function Exercises() {
   }, [exercises, query, region]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <PageHeader
-        title="Exercise library"
-        subtitle="Reference catalog you can prescribe from a patient's plan of care."
-        Icon={Dumbbell}
-        actions={
-          <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-            <Plus size={14} strokeWidth={2} /> New exercise
-          </button>
-        }
-      />
-
-      <div className="card flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="relative flex-1">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--color-fg-subtle)' }}
-          />
-          <TextInput
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, cue, or instruction"
-            className="pl-8"
-          />
+    <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'grid', gap: 4 }}>
+          <Eyebrow>Exercise library</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            Reference catalog you can prescribe from a patient's plan of care.
+          </p>
         </div>
-        <Select
-          value={region}
-          onChange={(e) => setRegion(e.target.value as 'all' | BodyRegion)}
-          className="md:w-56"
+        <PtButton
+          variant="primary"
+          iconLeft={<Plus size={14} strokeWidth={2} />}
+          onClick={() => setCreating(true)}
         >
-          <option value="all">All regions</option>
-          {BODY_REGIONS.map((r) => (
-            <option key={r} value={r}>
-              {REGION_LABEL[r]}
-            </option>
-          ))}
-        </Select>
+          New exercise
+        </PtButton>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <SurfaceCard padding={14}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          <div style={{ position: 'relative', flex: '1 1 280px', maxWidth: 480 }}>
+            <Search
+              size={14}
+              style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-pt-text-3)',
+              }}
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, cue, or instruction"
+              style={{
+                width: '100%',
+                padding: '9px 12px 9px 32px',
+                borderRadius: 9,
+                border: '1px solid var(--color-pt-border)',
+                fontSize: 13,
+                color: 'var(--color-pt-text)',
+                background: 'var(--color-pt-surface)',
+                outline: 'none',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+          <div style={{ minWidth: 200 }}>
+            <Select
+              value={region}
+              onChange={(e) => setRegion(e.target.value as 'all' | BodyRegion)}
+            >
+              <option value="all">All regions</option>
+              {BODY_REGIONS.map((r) => (
+                <option key={r} value={r}>
+                  {REGION_LABEL[r]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginLeft: 'auto' }}>
+            {filtered.length} {filtered.length === 1 ? 'exercise' : 'exercises'}
+          </span>
+        </div>
+      </SurfaceCard>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 12,
+        }}
+      >
         {filtered.map((e) => (
-          <article key={e.id} className="card space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-display text-base" style={{ color: 'var(--color-fg)' }}>
-                  {e.name}
-                </h3>
-                <div className="mt-0.5 text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                  {REGION_LABEL[e.region]} · {CATEGORY_LABEL[e.category]}
-                </div>
-              </div>
-              {e.builtin ? (
-                <span
-                  className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase"
-                  style={{ background: 'var(--color-surface-2)', color: 'var(--color-fg-subtle)' }}
-                >
-                  <Lock size={10} /> Built-in
-                </span>
-              ) : (
-                <div className="flex gap-1">
-                  <button type="button" className="btn btn-ghost text-xs" onClick={() => setEditing(e)}>
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-xs"
-                    style={{ color: 'var(--color-negative)' }}
-                    onClick={() => {
-                      if (confirm(`Delete "${e.name}"?`)) removeExercise(e.id);
+          <SurfaceCard key={e.id} padding={14}>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <h3
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--color-pt-text)',
+                      margin: 0,
                     }}
                   >
-                    <Trash2 size={12} />
-                  </button>
+                    {e.name}
+                  </h3>
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontSize: 11.5,
+                      color: 'var(--color-pt-text-3)',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    {REGION_LABEL[e.region]} · {CATEGORY_LABEL[e.category]}
+                  </div>
                 </div>
+                {e.builtin ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      background: 'var(--color-pt-surface-mut)',
+                      color: 'var(--color-pt-text-3)',
+                      border: '1px solid var(--color-pt-border)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Lock size={10} /> Built-in
+                  </span>
+                ) : (
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <PtButton
+                      variant="ghost"
+                      style={{ padding: '4px 8px', fontSize: 11 }}
+                      onClick={() => setEditing(e)}
+                    >
+                      <Pencil size={12} />
+                    </PtButton>
+                    <PtButton
+                      variant="ghost"
+                      style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-pt-red)' }}
+                      onClick={() => {
+                        if (confirm(`Delete "${e.name}"?`)) removeExercise(e.id);
+                      }}
+                    >
+                      <Trash2 size={12} />
+                    </PtButton>
+                  </div>
+                )}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--color-pt-text-2)', margin: 0, lineHeight: 1.5 }}>
+                {e.instructions}
+              </p>
+              {e.cues && (
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    fontStyle: 'italic',
+                    color: 'var(--color-pt-text-3)',
+                    margin: 0,
+                  }}
+                >
+                  Cue: {e.cues}
+                </p>
+              )}
+              {e.defaultDosage && (
+                <p style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', margin: 0 }}>
+                  Default dosage:{' '}
+                  <span style={{ color: 'var(--color-pt-text)', fontWeight: 600 }}>
+                    {e.defaultDosage}
+                  </span>
+                </p>
               )}
             </div>
-            <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-              {e.instructions}
-            </p>
-            {e.cues && (
-              <p className="text-xs italic" style={{ color: 'var(--color-fg-subtle)' }}>
-                Cue: {e.cues}
-              </p>
-            )}
-            {e.defaultDosage && (
-              <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-                Default dosage: <span style={{ color: 'var(--color-fg)' }}>{e.defaultDosage}</span>
-              </p>
-            )}
-          </article>
+          </SurfaceCard>
         ))}
         {filtered.length === 0 && (
-          <p className="card text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-            No exercises match.
-          </p>
+          <SurfaceCard padding={20}>
+            <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0, textAlign: 'center' }}>
+              No exercises match.
+            </p>
+          </SurfaceCard>
         )}
       </div>
 
@@ -209,7 +284,13 @@ function ExerciseEditorModal({
 
   return (
     <Modal open onClose={onClose} title={exercise ? 'Edit exercise' : 'New exercise'} size="lg">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        style={{
+          display: 'grid',
+          gap: 12,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        }}
+      >
         <Field label="Name" className="sm:col-span-2">
           <TextInput value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         </Field>
@@ -246,24 +327,27 @@ function ExerciseEditorModal({
         <Field label="Video URL" hint="Optional reference link">
           <TextInput value={draft.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} />
         </Field>
-        <Field label="Instructions" className="sm:col-span-2">
+      </div>
+      <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+        <Field label="Instructions">
           <textarea
-            className="input min-h-24"
+            className="input"
+            style={{ minHeight: 96, fontSize: 13 }}
             value={draft.instructions}
             onChange={(e) => set('instructions', e.target.value)}
           />
         </Field>
-        <Field label="Cues" className="sm:col-span-2" hint="Short coaching cue you say to patients.">
+        <Field label="Cues" hint="Short coaching cue you say to patients.">
           <TextInput value={draft.cues} onChange={(e) => set('cues', e.target.value)} />
         </Field>
       </div>
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+        <PtButton variant="ghost" onClick={onClose}>
           Cancel
-        </button>
-        <button type="button" className="btn btn-primary" disabled={!canSave} onClick={handleSave}>
+        </PtButton>
+        <PtButton variant="primary" disabled={!canSave} onClick={handleSave}>
           Save
-        </button>
+        </PtButton>
       </div>
     </Modal>
   );
