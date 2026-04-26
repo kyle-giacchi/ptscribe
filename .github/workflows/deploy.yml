@@ -1,0 +1,35 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [cloudflare-deployment]
+  workflow_dispatch:
+
+concurrency:
+  group: cf-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm install --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: d5605a787a4fc23826cfd7bf94c63e56
+          command: deploy
