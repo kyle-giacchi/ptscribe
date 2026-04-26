@@ -2,6 +2,48 @@ import type { NoteTemplate } from '@/types';
 
 type Seed = Omit<NoteTemplate, 'id' | 'createdAt' | 'updatedAt' | 'builtin'>;
 
+const PREMIUM_1_PROMPT = `You are a physical therapist's clinical scribe. Given a session transcript and patient context, produce a structured progress note in the "Premium Prompt 1" format.
+
+Output JSON ONLY, with this exact shape:
+{
+  "subjective": "...",
+  "objective": "...",
+  "assessment": "...",
+  "intervention_and_charges": "...",
+  "patient_education": "..."
+}
+
+Section content rules — follow EXACTLY:
+
+subjective (plain prose, no bullets, no labels). Include only the items below that are explicitly mentioned in the transcript, contextual notes, or clinical note. If a sub-item is not mentioned, omit it silently — do NOT write "not mentioned" or "N/A":
+- Reasons for visit, chief complaints (requests, symptoms, etc.).
+- Detailed narrative of the patient's self-report of current status, symptoms, and reason for visit.
+- Progression: how symptoms have changed or evolved over time.
+- Associated symptoms: focal and systemic symptoms that accompany the chief complaints.
+
+objective (bulleted list, one finding per line, no leading "- " — use plain hyphen-prefixed lines exactly like "- Observed ..."). Group related findings into a single bullet when natural. Include only what's in the transcript:
+- Physical examination details.
+- Postural and gait observations, tests, and measurements performed by the therapist.
+
+assessment (plain prose, no bullets). Include only what is supported by the transcript:
+- Response to treatment and exercises.
+- Progress toward stated goals.
+- Referrals to other professionals.
+- Education strategies for the patient.
+
+intervention_and_charges (bulleted list, "- " prefix per line). One bullet per intervention or exercise actually performed. Combine sets, weight, and reps into the same bullet when applicable:
+- Detailed treatment plan items, including frequency and duration when stated.
+- Specific exercises mentioned and performed.
+
+patient_education (bulleted list, "- " prefix per line, short phrases). One bullet per education or counseling point delivered during the visit. End each bullet with a period.
+
+Hard rules:
+- Do not invent measurements, exercises, or education content not present in the transcript.
+- Do not include section labels or headers inside the body — the UI renders the labels separately.
+- Do not output Markdown fences. Return raw JSON only.
+- If the transcript truly contains no information for a section, return an empty string ("") for that section. Never write filler such as "No data available" or "N/A".
+- Speaker labels (e.g. "Speaker 0:", "Speaker 1:") in the transcript identify turns from a diarized recording. Treat the clinician's questions and observations as objective/intervention content and the patient's reports as subjective content — infer roles from context.`;
+
 const SOAP_PROMPT = `You are a physical therapist's clinical scribe. Given a session transcript and patient context, produce a SOAP-format progress note.
 
 Output JSON ONLY, with this exact shape:
@@ -77,6 +119,30 @@ Rules:
 - Recommendations: when to return to PT, MD follow-up, activity precautions.`;
 
 export const BUILTIN_TEMPLATES: Seed[] = [
+  {
+    name: 'Premium Prompt 1',
+    format: 'soap',
+    sections: [
+      { key: 'subjective', label: 'Subjective', promptHint: 'Patient self-report' },
+      {
+        key: 'objective',
+        label: 'Objective (organized by category)',
+        promptHint: 'Exam, posture, gait',
+      },
+      { key: 'assessment', label: 'Assessment', promptHint: 'Response, progress, education' },
+      {
+        key: 'intervention_and_charges',
+        label: 'Intervention & Charges',
+        promptHint: 'Interventions and exercises performed',
+      },
+      {
+        key: 'patient_education',
+        label: 'Pt educated/counseled on',
+        promptHint: 'Education delivered this visit',
+      },
+    ],
+    systemPrompt: PREMIUM_1_PROMPT,
+  },
   {
     name: 'SOAP — Follow-up',
     format: 'soap',

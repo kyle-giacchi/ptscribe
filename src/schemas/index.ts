@@ -250,7 +250,7 @@ export function defaultAppData(): AppData {
     plans: [],
     settings: {
       ai: {
-        transcription: { provider: 'cloudflare', model: '@cf/openai/whisper-large-v3-turbo' },
+        transcription: { provider: 'cloudflare', model: '@cf/deepgram/nova-3' },
         generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
       },
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },
