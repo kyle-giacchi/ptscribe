@@ -2,12 +2,19 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Lock } from 'lucide-react';
 import { checkGateCode, getStoredGateCode, storeGateCode } from '@/lib/gate';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
+import { isDemoMode, getDemoGateCode } from '@/lib/demoMode';
 
 const CODE_LENGTH = 6;
 
 type Status = 'checking' | 'locked' | 'unlocked' | 'error';
 
 export function AppGate({ children }: { children: ReactNode }) {
+  const demoMode = isDemoMode();
+  // In demo mode, store the shipped gate code on first paint so the API
+  // client can attach it as `x-ptscribe-key` and we skip the lock UI entirely.
+  if (demoMode && !getStoredGateCode()) {
+    storeGateCode(getDemoGateCode());
+  }
   // Initial status is derived synchronously from localStorage. If a stored
   // code exists we optimistically treat it as valid until the async hash
   // check below confirms or rejects it; this avoids a flash of the lock UI
