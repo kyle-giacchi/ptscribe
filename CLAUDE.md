@@ -5,7 +5,7 @@
 ## Before editing
 
 1. **Open [docs/INDEX.md](docs/INDEX.md) to navigate docs by section** — read targeted ranges instead of whole files.
-2. **Read [docs/invariants.md](docs/invariants.md) first.** It lists the non-obvious rules (single-write-path persistence, provider nesting, slice mutator pattern, schema validation at boundaries, built-in template/exercise guards, BYO API key model, etc.).
+2. **Read [docs/invariants.md](docs/invariants.md) first.** It lists the non-obvious rules (single-write-path persistence, provider nesting, slice mutator pattern, schema validation at boundaries, built-in template/exercise guards, Worker-proxied AI calls, vault encryption boundary, recorder lifecycle, etc.).
 3. Run `npm run dev` (http://localhost:8080) and try the feature in a browser before reporting a task as complete.
 
 ## Quick lookup
@@ -20,8 +20,10 @@
 | Where does load-time validation happen? | `DataRepository.load()` calls `AppDataSchema.safeParse` once ([invariants.md:48](docs/invariants.md#schema-validation-at-boundaries))                |
 | Which hook for which slice?             | Provider/mutator table at [architecture.md:58](docs/architecture.md#provider-responsibilities)                                                       |
 | Built-in templates / exercises?         | Provider-level guards make `update`/`remove` no-ops when `builtin: true`. UI shows Clone, not Edit. ([invariants.md:73](docs/invariants.md#built-in-entities)) |
-| Default models?                         | Transcription = `@cf/openai/whisper-large-v3-turbo` (Cloudflare Workers AI); generation = `claude-sonnet-4-6` (Anthropic). Both BYO credentials, browser-direct. Cloudflare needs Account ID **and** API Token. |
+| Default models?                         | Transcription = `@cf/openai/whisper-large-v3-turbo` (Cloudflare Workers AI); generation = `claude-sonnet-4-6` (Anthropic). Both reached through our Worker proxy at `/api/transcribe` and `/api/generate`; the browser never sees provider credentials. |
 | ID generation?                          | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                     |
+| Where is data encrypted?                | Inside `DataRepository` (AppData) and `AudioRepository` (audio Blobs + chunks). AES-GCM via `src/lib/vault/`. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption)) |
+| Who owns the wake lock during recording?| `useRecorder` — released on stop/reset/error/unmount. ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility)) |
 
 ## Commands
 
@@ -58,7 +60,9 @@ React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (
 ## Hard rules
 
 - **No backend.** No auth, no server, no analytics. All data is `localStorage` (`AppData`) + IndexedDB (audio) — both client-side.
-- **BYO credentials.** Whisper (Cloudflare Workers AI) and Anthropic calls go browser → provider directly. Cloudflare needs both an account ID and an API token. Anthropic requests include `anthropic-dangerous-direct-browser-access: true`. The Settings page surfaces a HIPAA disclaimer.
+- **AI calls go through our Worker proxy.** Whisper and Anthropic are reached via `POST /api/transcribe` and `POST /api/generate` on our Cloudflare Worker; provider credentials are server-side secrets the browser never sees. Requests carry the `AppGate` 6-digit code in `x-ptscribe-key` (obscurity, not auth — abuse caps live server-side). Settings still surfaces a HIPAA disclaimer because data still leaves the device.
 - **Single write path.** Components/hooks never touch `localStorage` or IndexedDB directly — go through a slice provider mutator → `updateXSlice` → `DataRepository.save`, or through `AudioRepository` for audio Blobs.
 - **Validate only at I/O boundaries.** `AppDataSchema.safeParse` runs on load and on JSON import. Skip it for in-memory state.
 - **Built-ins are read-only.** Templates and exercises with `builtin: true` cannot be edited or deleted at the provider level — UI offers Clone instead.
+- **Encryption is enforced inside the Repository layer.** When the vault is unlocked, `DataRepository` and `AudioRepository` round-trip every byte through AES-GCM. Do not add a second persistence path that bypasses them. Tab close evicts the in-memory key; there is no passphrase recovery. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))
+- **Recorder owns wake lock + visibility.** `useRecorder` holds a `'screen'` wake lock and a `visibilitychange` listener for the lifetime of each clip; both must be released on every exit path (stop, reset, error, unmount). ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))
