@@ -6,6 +6,7 @@ export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
 
 export const AUDIO_DB = {
   name: 'ptnotes-audio',
-  version: 1,
+  version: 2,
   store: 'recordings',
+  chunkStore: 'recording_chunks',
 } as const;

@@ -3,9 +3,14 @@ import { APP_DATA_VERSION, type AppData } from '@/types';
 export const CURRENT_VERSION = APP_DATA_VERSION;
 
 /**
- * v2 swaps the OpenAI Whisper transcription provider for Cloudflare Workers AI Whisper.
- * v0/v1 finance-app data is still rejected by `safeParse` and replaced with the default
- * empty state — this migration only handles v1 PTScribe data.
+ * Migration ladder. Each step takes a working object and returns the next-version
+ * shape. v0/v1 finance-app data is still rejected by `safeParse` and replaced with
+ * the default empty state — these migrations only handle PTScribe v1+ data.
+ *
+ * - v1 → v2: OpenAI Whisper provider replaced with Cloudflare Workers AI Whisper.
+ * - v2 → v3: `Session.audioRef` collapsed into `Session.clips: SessionClip[]` so
+ *   a session can hold multiple discrete recordings. The legacy IDB Blob keyed
+ *   by sessionId is reused as the first clip's audio (clip.id = old audioRef).
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -20,8 +25,11 @@ export function migrate(data: unknown): AppData {
 
   let working = data as Record<string, unknown>;
 
-  if (version === 1) {
+  if ((working as { version?: number }).version === 1) {
     working = migrateV1ToV2(working);
+  }
+  if ((working as { version?: number }).version === 2) {
+    working = migrateV2ToV3(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -45,5 +53,43 @@ function migrateV1ToV2(input: Record<string, unknown>): Record<string, unknown> 
       tx.model = '@cf/openai/whisper-large-v3-turbo';
     }
   }
+  return next;
+}
+
+function migrateV2ToV3(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 3 } as Record<string, unknown>;
+  const sessions = Array.isArray(next.sessions) ? (next.sessions as unknown[]) : [];
+
+  next.sessions = sessions.map((raw) => {
+    const s = raw as Record<string, unknown>;
+    const audioRef = typeof s.audioRef === 'string' && s.audioRef.length > 0 ? s.audioRef : undefined;
+    const transcript = typeof s.transcript === 'string' ? s.transcript : undefined;
+    const createdAt = typeof s.createdAt === 'number' ? s.createdAt : Date.now();
+    const updatedAt = typeof s.updatedAt === 'number' ? s.updatedAt : createdAt;
+    const durationMin = typeof s.durationMin === 'number' ? s.durationMin : 0;
+
+    const clips: Record<string, unknown>[] = audioRef
+      ? [
+          {
+            id: audioRef,
+            index: 0,
+            durationSec: Math.round(durationMin * 60),
+            status: transcript && transcript.length > 0 ? 'transcribed' : 'ready',
+            ...(transcript ? { transcript, transcriptedAt: updatedAt } : {}),
+            createdAt,
+            updatedAt,
+          },
+        ]
+      : [];
+
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(s)) {
+      if (key === 'audioRef') continue;
+      out[key] = value;
+    }
+    out.clips = clips;
+    return out;
+  });
+
   return next;
 }

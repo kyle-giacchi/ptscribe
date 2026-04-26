@@ -42,6 +42,18 @@ const PatientSchema = z.object({
 
 // ─── Session ────────────────────────────────────────────────────────────────
 
+const SessionClipSchema = z.object({
+  id: z.string().min(1),
+  index: z.number().int().min(0),
+  durationSec: z.number().min(0),
+  status: z.enum(['pending', 'ready', 'transcribing', 'transcribed', 'failed']),
+  transcript: z.string().optional(),
+  transcriptedAt: z.number().int().optional(),
+  errorMessage: z.string().optional(),
+  createdAt: z.number().int(),
+  updatedAt: z.number().int(),
+});
+
 const SessionSchema = z.object({
   id: z.string().min(1),
   patientId: z.string().min(1),
@@ -56,7 +68,7 @@ const SessionSchema = z.object({
     'ready',
     'finalized',
   ]),
-  audioRef: z.string().optional(),
+  clips: z.array(SessionClipSchema),
   transcript: z.string().optional(),
   transcriptSource: z.enum(['whisper', 'webspeech', 'manual']).optional(),
   noteId: z.string().optional(),

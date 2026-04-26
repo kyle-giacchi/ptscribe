@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Mic,
@@ -15,6 +15,9 @@ import {
   FileText,
   AlertTriangle,
   RefreshCw,
+  Layers,
+  XCircle,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, Select } from '@/components/ui/Field';
@@ -31,6 +34,7 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { useAppData } from '@/contexts/AppDataProvider';
 import { useRecorder, type UseRecorder } from '@/hooks/useRecorder';
 import { useLiveTranscript, type UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import { audioRepository } from '@/services/AudioRepository';
@@ -42,14 +46,17 @@ import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteForm
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
 import { useClinician } from '@/contexts/ClinicianProvider';
+import { MAX_CLIP_DURATION_SEC, WARN_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 import { newId } from '@/utils/ids';
 import type {
+  ClipStatus,
   Note,
   NoteFormat,
   NoteSection,
   NoteTemplate,
   Patient,
   Session,
+  SessionClip,
 } from '@/types';
 
 type Busy = null | 'transcribing' | 'generating';
@@ -61,11 +68,12 @@ export function SessionPage() {
 
 function SessionRoute({ sessionId }: { sessionId: string }) {
   const navigate = useNavigate();
-  const { getSession, updateSession, removeSession, setStatus } = useSessions();
+  const { getSession, removeSession } = useSessions();
   const { getPatient } = usePatients();
   const { forSession, addNote, updateNote, finalizeNote, unfinalizeNote, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
   const { settings } = useSettings();
+  const { updateSessionsSlice } = useAppData();
 
   const session = getSession(sessionId);
   const patient = session ? getPatient(session.patientId) : undefined;
@@ -75,16 +83,136 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const recorder = useRecorder();
   const live = useLiveTranscript();
 
-  // Initial transcript is captured ONCE per session (component is keyed on sessionId).
+  // Initial transcript captured ONCE per session (component is keyed on sessionId).
   const [transcript, setTranscript] = useState(session?.transcript ?? '');
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
+  // Tracks the clip currently being recorded, so stop() knows which clip to update.
+  const activeClipIdRef = useRef<string | null>(null);
+  // Guards the auto-rotate effect against double-firing while the stop→start
+  // round-trip is in flight (the duration tick keeps incrementing during stop).
+  const rotatingRef = useRef(false);
+
+  // ── Atomic session/clip patches via functional slice update ──────────────
+  // Per-clip transitions need functional setState because the slice mutator
+  // captures `sessions` by closure and would lose intermediate writes when
+  // called twice in the same callback.
+  function patchSession(patch: Partial<Session>) {
+    updateSessionsSlice((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, ...patch, updatedAt: Date.now() } : s)),
+    );
+  }
+  function patchClips(mapper: (clips: SessionClip[]) => SessionClip[]) {
+    updateSessionsSlice((prev) =>
+      prev.map((s) =>
+        s.id === sessionId ? { ...s, clips: mapper(s.clips), updatedAt: Date.now() } : s,
+      ),
+    );
+  }
+  function patchClip(clipId: string, patch: Partial<SessionClip>) {
+    patchClips((clips) =>
+      clips.map((c) => (c.id === clipId ? { ...c, ...patch, updatedAt: Date.now() } : c)),
+    );
+  }
+
+  // ── One-shot crash recovery ──────────────────────────────────────────────
+  // Pending clips left over from an interrupted recording are reconstituted
+  // from their WAL chunks. A clip with no chunks is marked 'failed' so the
+  // clinician can decide whether to delete it.
+  const recoveryRanRef = useRef(false);
+  useEffect(() => {
+    if (recoveryRanRef.current || !session) return;
+    recoveryRanRef.current = true;
+    const pending = session.clips.filter((c) => c.status === 'pending');
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const outcomes: Array<{ clipId: string; ok: boolean; durationSec?: number }> = [];
+      for (const clip of pending) {
+        try {
+          const chunks = await audioRepository.loadChunks(clip.id);
+          if (chunks.length === 0) {
+            outcomes.push({ clipId: clip.id, ok: false });
+            continue;
+          }
+          const mimeType = chunks[0]?.type || 'audio/webm';
+          const blob = new Blob(chunks, { type: mimeType });
+          await audioRepository.save(clip.id, blob);
+          await audioRepository.clearChunks(clip.id);
+          outcomes.push({ clipId: clip.id, ok: true });
+        } catch (err) {
+          console.error(`Audio recovery failed for clip ${clip.id}:`, err);
+          outcomes.push({ clipId: clip.id, ok: false });
+        }
+      }
+      if (cancelled || outcomes.length === 0) return;
+
+      patchClips((clips) =>
+        clips.map((c) => {
+          const o = outcomes.find((x) => x.clipId === c.id);
+          if (!o) return c;
+          return o.ok
+            ? { ...c, status: 'ready' as ClipStatus, updatedAt: Date.now() }
+            : {
+                ...c,
+                status: 'failed' as ClipStatus,
+                errorMessage: 'Recording was interrupted before any audio could be saved.',
+                updatedAt: Date.now(),
+              };
+        }),
+      );
+      const recovered = outcomes.filter((o) => o.ok).length;
+      const abandoned = outcomes.length - recovered;
+      if (recovered > 0) {
+        toast.success(
+          `Recovered ${recovered} interrupted clip${recovered === 1 ? '' : 's'}.`,
+        );
+      }
+      if (abandoned > 0) {
+        toast.error(`${abandoned} clip${abandoned === 1 ? '' : 's'} could not be recovered.`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Run once per mount; sessionId is stable because the component is keyed on it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
+  const sortedClips = useMemo(
+    () => (session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : []),
+    [session],
+  );
+
+  // ── Auto-rotate when a clip approaches the Cloudflare Whisper limit ──────
+  // We watch the live duration tick; when a recording crosses MAX_CLIP_DURATION_SEC,
+  // stop the current clip and immediately start a fresh one. References below
+  // (handleStopRecording / handleStartRecording) are function declarations,
+  // so they're hoisted into this scope and safe to invoke from the async body.
+  useEffect(() => {
+    if (recorder.status !== 'recording') return;
+    if (recorder.durationSec < MAX_CLIP_DURATION_SEC) return;
+    if (rotatingRef.current) return;
+    rotatingRef.current = true;
+    (async () => {
+      try {
+        await handleStopRecording();
+        await handleStartRecording();
+        toast.info('Started a new clip — long sessions are split automatically for transcription.');
+      } finally {
+        rotatingRef.current = false;
+      }
+    })();
+    // We intentionally only depend on the recorder tick — handlers are read fresh
+    // each render via closure, and re-subscribing on every render would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.status, recorder.durationSec]);
 
   if (!session || !patient) return <NotFound />;
 
   function ensureNote(initialSections?: NoteSection[]): Note {
     if (note) return note;
-    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const sections =
       initialSections ??
@@ -101,18 +229,45 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       updatedAt: now,
     };
     addNote(created);
-    updateSession(session!.id, { noteId: created.id });
+    patchSession({ noteId: created.id });
     return created;
   }
 
+  // ── Recording controls ───────────────────────────────────────────────────
   async function handleStartRecording() {
     setError(null);
-    await recorder.start();
+    if (!session) return;
+
+    const clipId = newId();
+    const now = Date.now();
+    activeClipIdRef.current = clipId;
+    // Compute index inside the functional patch so concurrent stop→start
+    // (e.g. auto-rotation) sees the post-stop clip count, not a stale snapshot.
+    patchClips((clips) => [
+      ...clips,
+      {
+        id: clipId,
+        index: clips.length,
+        durationSec: 0,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    patchSession({ status: 'recording' });
+
+    const ok = await recorder.start(clipId);
+    if (!ok) {
+      activeClipIdRef.current = null;
+      patchClips((clips) => clips.filter((c) => c.id !== clipId));
+      patchSession({ status: 'draft' });
+      return;
+    }
+
     if (settings.ai.transcription.provider === 'webspeech' && live.supported) {
       live.reset();
       live.start();
     }
-    setStatus(session!.id, 'recording');
   }
 
   function handlePauseResume() {
@@ -128,34 +283,59 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   async function handleStopRecording() {
+    if (!session) return;
+    const clipId = activeClipIdRef.current;
+    activeClipIdRef.current = null;
+
     const finalBlob = await recorder.stop();
+    const durationSec = recorder.durationSec;
     live.stop();
-    if (finalBlob) {
-      try {
-        await audioRepository.save(session!.id, finalBlob);
-        updateSession(session!.id, { audioRef: session!.id, status: 'draft' });
-      } catch (e) {
-        setError(`Could not save audio: ${(e as Error).message}`);
+
+    if (clipId) {
+      if (finalBlob) {
+        try {
+          await audioRepository.save(clipId, finalBlob);
+          await audioRepository.clearChunks(clipId);
+          patchClip(clipId, {
+            status: 'ready',
+            durationSec,
+          });
+        } catch (e) {
+          setError(`Could not save audio: ${(e as Error).message}`);
+          patchClip(clipId, {
+            status: 'failed',
+            errorMessage: (e as Error).message,
+          });
+        }
+      } else {
+        // No blob produced — drop the placeholder clip.
+        try {
+          await audioRepository.remove(clipId);
+        } catch {
+          /* ignore */
+        }
+        patchClips((clips) =>
+          clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
+        );
       }
     }
+
     if (live.finalText.trim()) {
       const merged = `${transcript} ${live.finalText}`.replace(/\s+/g, ' ').trim();
       setTranscript(merged);
-      updateSession(session!.id, { transcript: merged, transcriptSource: 'webspeech' });
+      patchSession({ transcript: merged, transcriptSource: 'webspeech', status: 'draft' });
+    } else {
+      patchSession({ status: 'draft' });
     }
   }
 
-  async function handleTranscribe() {
-    if (settings.ai.transcription.provider !== 'cloudflare') {
-      toast.error('Cloudflare account ID + API token required. Set them in Settings.');
-      return;
-    }
-    setError(null);
-    setBusy('transcribing');
-    setStatus(session!.id, 'transcribing');
+  // ── Transcription ────────────────────────────────────────────────────────
+  async function transcribeClipBlob(clip: SessionClip): Promise<
+    { ok: true; text: string } | { ok: false; error: string }
+  > {
     try {
-      const blob = await audioRepository.load(session!.id);
-      if (!blob) throw new Error('No audio recording found for this session.');
+      const blob = await audioRepository.load(clip.id);
+      if (!blob) return { ok: false, error: 'No audio found for this clip.' };
       const result = await transcribe({
         blob,
         provider: settings.ai.transcription.provider,
@@ -163,21 +343,94 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         apiKey: settings.ai.transcription.apiKey,
         accountId: settings.ai.transcription.accountId,
       });
-      setTranscript(result.text);
-      updateSession(session!.id, {
-        transcript: result.text,
-        transcriptSource: result.source,
-        status: 'draft',
-      });
-      toast.success('Transcript ready');
+      return { ok: true, text: result.text };
     } catch (e) {
-      setError((e as Error).message);
-      setStatus(session!.id, 'draft');
-    } finally {
-      setBusy(null);
+      return { ok: false, error: (e as Error).message };
     }
   }
 
+  async function handleTranscribeAll() {
+    if (!session) return;
+    if (settings.ai.transcription.provider !== 'cloudflare') {
+      toast.error('Cloudflare account ID + API token required. Set them in Settings.');
+      return;
+    }
+    const targets = session.clips.filter(
+      (c) => c.status === 'ready' || c.status === 'failed' || c.status === 'transcribed',
+    );
+    if (targets.length === 0) {
+      toast.error('No clips to transcribe yet.');
+      return;
+    }
+
+    setBusy('transcribing');
+    patchSession({ status: 'transcribing' });
+    patchClips((clips) =>
+      clips.map((c) =>
+        targets.some((t) => t.id === c.id)
+          ? {
+              ...c,
+              status: 'transcribing' as ClipStatus,
+              errorMessage: undefined,
+              updatedAt: Date.now(),
+            }
+          : c,
+      ),
+    );
+
+    let failures = 0;
+    let successes = 0;
+    for (const clip of targets) {
+      const result = await transcribeClipBlob(clip);
+      if (result.ok) {
+        successes += 1;
+        patchClip(clip.id, {
+          status: 'transcribed',
+          transcript: result.text,
+          transcriptedAt: Date.now(),
+          errorMessage: undefined,
+        });
+      } else {
+        failures += 1;
+        patchClip(clip.id, {
+          status: 'failed',
+          errorMessage: result.error,
+        });
+      }
+    }
+
+    setBusy(null);
+    patchSession({ status: 'draft' });
+    if (successes > 0 && failures === 0) toast.success(`Transcribed ${successes} clip${successes === 1 ? '' : 's'}.`);
+    else if (successes > 0 && failures > 0)
+      toast.error(`${successes} transcribed, ${failures} failed. Try Transcribe all again to retry.`);
+    else toast.error('Transcription failed for all clips.');
+  }
+
+  // ── Clip management ──────────────────────────────────────────────────────
+  async function handleDeleteClip(clipId: string) {
+    if (!confirm('Delete this clip and its audio?')) return;
+    try {
+      await audioRepository.remove(clipId);
+    } catch {
+      /* ignore */
+    }
+    patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
+  }
+
+  function handleRemergeFromClips() {
+    if (!session) return;
+    const merged = mergeClipTranscripts(session.clips);
+    if (!merged) {
+      toast.error('No transcribed clips to merge.');
+      return;
+    }
+    setTranscript(merged);
+    patchSession({ transcript: merged, transcriptSource: 'whisper' });
+    toast.success('Transcript re-merged from clips.');
+  }
+
+  // ── Note generation / lifecycle ──────────────────────────────────────────
   async function handleGenerate() {
     if (!template) return;
     if (!transcript.trim()) {
@@ -190,7 +443,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     }
     setError(null);
     setBusy('generating');
-    setStatus(session!.id, 'generating');
+    patchSession({ status: 'generating' });
     try {
       const result = await generateNote({
         provider: settings.ai.generation.provider,
@@ -206,11 +459,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         templateId: template.id,
         format: template.format,
       });
-      updateSession(session!.id, { status: 'ready' });
+      patchSession({ status: 'ready' });
       toast.success('Draft note generated');
     } catch (e) {
       setError((e as Error).message);
-      setStatus(session!.id, 'draft');
+      patchSession({ status: 'draft' });
     } finally {
       setBusy(null);
     }
@@ -225,29 +478,32 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   function handleFinalize() {
     const target = ensureNote();
     finalizeNote(target.id);
-    setStatus(session!.id, 'finalized');
+    patchSession({ status: 'finalized' });
     toast.success('Note finalized');
   }
   function handleUnfinalize() {
     if (!note) return;
     unfinalizeNote(note.id);
-    setStatus(session!.id, 'ready');
+    patchSession({ status: 'ready' });
   }
 
   async function handleDeleteSession() {
     if (!confirm('Delete this session, its audio, and any draft note?')) return;
     if (note) removeNote(note.id);
-    try {
-      await audioRepository.remove(session!.id);
-    } catch {
-      /* ignore */
+    for (const clip of session?.clips ?? []) {
+      try {
+        await audioRepository.remove(clip.id);
+      } catch {
+        /* ignore */
+      }
     }
     removeSession(session!.id);
     navigate('/', { replace: true });
   }
 
+  const hasClips = session.clips.length > 0;
   const micState = deriveMicState(recorder.status);
-  const sessionStatusBadge = deriveSessionBadge(session.status, !!session.audioRef);
+  const sessionStatusBadge = deriveSessionBadge(session.status, hasClips);
   const fullName = `${patient.firstName} ${patient.lastName}`.trim();
 
   return (
@@ -282,15 +538,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         <RecordingPanel
           recorder={recorder}
           live={live}
-          sessionId={session.id}
+          clips={sortedClips}
           webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
           cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
-          hasAudio={!!session.audioRef}
           busy={busy}
           onStart={handleStartRecording}
           onStop={handleStopRecording}
           onPauseResume={handlePauseResume}
-          onTranscribe={handleTranscribe}
+          onTranscribeAll={handleTranscribeAll}
+          onRemerge={handleRemergeFromClips}
+          onDeleteClip={handleDeleteClip}
         />
 
         <div
@@ -309,7 +566,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             templates={templates}
             transcript={transcript}
             busy={busy}
-            onTemplateChange={(id) => updateSession(session.id, { templateId: id })}
+            onTemplateChange={(id) => patchSession({ templateId: id })}
             onGenerate={handleGenerate}
             onFinalize={handleFinalize}
             onUnfinalize={handleUnfinalize}
@@ -320,7 +577,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             transcript={transcript}
             onChange={setTranscript}
             onCommit={() =>
-              updateSession(session.id, {
+              patchSession({
                 transcript,
                 transcriptSource: session.transcriptSource ?? 'manual',
               })
@@ -482,7 +739,7 @@ function deriveMicState(status: string): MicState {
 
 function deriveSessionBadge(
   status: string,
-  hasAudio: boolean
+  hasClips: boolean,
 ): { tone: StatusTone; label: string } {
   switch (status) {
     case 'recording':
@@ -496,7 +753,7 @@ function deriveSessionBadge(
     case 'finalized':
       return { tone: 'done', label: 'Signed' };
     default:
-      return hasAudio
+      return hasClips
         ? { tone: 'on-track', label: 'Ready to transcribe' }
         : { tone: 'new', label: 'New' };
   }
@@ -538,35 +795,49 @@ function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss
 interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
-  sessionId: string;
+  clips: SessionClip[];
   webspeechProvider: boolean;
   cloudflareProvider: boolean;
-  hasAudio: boolean;
   busy: Busy;
   onStart: () => void;
   onStop: () => void;
   onPauseResume: () => void;
-  onTranscribe: () => void;
+  onTranscribeAll: () => void;
+  onRemerge: () => void;
+  onDeleteClip: (clipId: string) => void;
 }
 
 function RecordingPanel({
   recorder,
   live,
-  sessionId,
+  clips,
   webspeechProvider,
   cloudflareProvider,
-  hasAudio,
   busy,
   onStart,
   onStop,
   onPauseResume,
-  onTranscribe,
+  onTranscribeAll,
+  onRemerge,
+  onDeleteClip,
 }: RecordingPanelProps) {
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
   const minutes = Math.floor(recorder.durationSec / 60);
   const seconds = Math.floor(recorder.durationSec % 60);
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
+
+  const hasReadyClip = clips.some(
+    (c) => c.status === 'ready' || c.status === 'failed' || c.status === 'transcribed',
+  );
+  const hasTranscribedClip = clips.some((c) => c.status === 'transcribed');
+  const transcribing = busy === 'transcribing';
+  const nearingLimit = recording && recorder.durationSec >= WARN_CLIP_DURATION_SEC;
+  const timerColor = nearingLimit
+    ? 'var(--color-caution)'
+    : recording
+      ? 'var(--color-negative)'
+      : 'var(--color-fg-subtle)';
 
   return (
     <section className="card space-y-3">
@@ -575,9 +846,18 @@ function RecordingPanel({
           Recording
         </h2>
         <div className="flex items-center gap-3">
+          {nearingLimit && (
+            <span
+              className="text-[11px]"
+              style={{ color: 'var(--color-caution)' }}
+              title={`Auto-rotates to a new clip at ${Math.floor(MAX_CLIP_DURATION_SEC / 60)} min`}
+            >
+              Approaching clip limit
+            </span>
+          )}
           <span
             className="font-mono text-sm tabular-nums"
-            style={{ color: recording ? 'var(--color-negative)' : 'var(--color-fg-subtle)' }}
+            style={{ color: timerColor }}
           >
             {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
           </span>
@@ -589,13 +869,15 @@ function RecordingPanel({
         idle={idle}
         recording={recording}
         paused={recorder.status === 'paused'}
-        hasAudio={hasAudio}
-        canTranscribe={hasAudio && recorder.status !== 'recording' && cloudflareProvider}
-        transcribing={busy === 'transcribing'}
+        hasClips={clips.length > 0}
+        canTranscribe={hasReadyClip && !recording && cloudflareProvider}
+        canRemerge={hasTranscribedClip}
+        transcribing={transcribing}
         onStart={onStart}
         onPauseResume={onPauseResume}
         onStop={onStop}
-        onTranscribe={onTranscribe}
+        onTranscribeAll={onTranscribeAll}
+        onRemerge={onRemerge}
       />
 
       <RecordingNotices
@@ -603,7 +885,13 @@ function RecordingPanel({
         webspeechProvider={webspeechProvider}
         liveSupported={live.supported}
       />
-      {hasAudio && recorder.status !== 'recording' && <PlaybackWaveform sessionId={sessionId} />}
+
+      <ClipsList
+        clips={clips}
+        recordingDisabled={recording}
+        onDeleteClip={onDeleteClip}
+      />
+
       <LiveTranscriptPreview live={live} />
     </section>
   );
@@ -612,35 +900,44 @@ function RecordingPanel({
 function RecordingControlRow({
   idle,
   paused,
-  hasAudio,
+  hasClips,
   canTranscribe,
+  canRemerge,
   transcribing,
   onStart,
   onPauseResume,
   onStop,
-  onTranscribe,
+  onTranscribeAll,
+  onRemerge,
 }: {
   idle: boolean;
   recording: boolean;
   paused: boolean;
-  hasAudio: boolean;
+  hasClips: boolean;
   canTranscribe: boolean;
+  canRemerge: boolean;
   transcribing: boolean;
   onStart: () => void;
   onPauseResume: () => void;
   onStop: () => void;
-  onTranscribe: () => void;
+  onTranscribeAll: () => void;
+  onRemerge: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {idle ? (
         <button type="button" className="btn btn-primary" onClick={onStart}>
-          <Mic size={14} strokeWidth={2} /> {hasAudio ? 'Re-record' : 'Start recording'}
+          <Mic size={14} strokeWidth={2} /> {hasClips ? 'Add clip' : 'Start recording'}
         </button>
       ) : (
         <ActiveRecordingControls paused={paused} onPauseResume={onPauseResume} onStop={onStop} />
       )}
-      {canTranscribe && <TranscribeButton busy={transcribing} onClick={onTranscribe} />}
+      {canTranscribe && <TranscribeAllButton busy={transcribing} onClick={onTranscribeAll} />}
+      {canRemerge && (
+        <button type="button" className="btn btn-ghost" onClick={onRemerge}>
+          <Layers size={14} strokeWidth={2} /> Re-merge from clips
+        </button>
+      )}
     </div>
   );
 }
@@ -700,7 +997,7 @@ function ActiveRecordingControls({
   );
 }
 
-function TranscribeButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+function TranscribeAllButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
   return (
     <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClick}>
       {busy ? (
@@ -709,11 +1006,212 @@ function TranscribeButton({ busy, onClick }: { busy: boolean; onClick: () => voi
         </>
       ) : (
         <>
-          <RefreshCw size={14} strokeWidth={2} /> Transcribe (Whisper)
+          <RefreshCw size={14} strokeWidth={2} /> Transcribe all
         </>
       )}
     </button>
   );
+}
+
+function ClipsList({
+  clips,
+  recordingDisabled,
+  onDeleteClip,
+}: {
+  clips: SessionClip[];
+  recordingDisabled: boolean;
+  onDeleteClip: (clipId: string) => void;
+}) {
+  if (clips.length === 0) {
+    return (
+      <p className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+        No clips yet. Press <strong>Start recording</strong> to capture the first one.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {clips.map((clip, i) => (
+        <ClipRow
+          key={clip.id}
+          clip={clip}
+          ordinal={i + 1}
+          recordingDisabled={recordingDisabled}
+          onDelete={() => onDeleteClip(clip.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ClipRow({
+  clip,
+  ordinal,
+  recordingDisabled,
+  onDelete,
+}: {
+  clip: SessionClip;
+  ordinal: number;
+  recordingDisabled: boolean;
+  onDelete: () => void;
+}) {
+  const showWaveform =
+    clip.status === 'ready' ||
+    clip.status === 'transcribing' ||
+    clip.status === 'transcribed' ||
+    clip.status === 'failed';
+  return (
+    <div
+      className="rounded-lg border"
+      style={{
+        borderColor: 'var(--color-pt-border)',
+        background: 'var(--color-pt-surface)',
+        padding: 10,
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+          style={{
+            background: 'var(--color-pt-surface-alt)',
+            color: 'var(--color-pt-text-2)',
+            border: '1px solid var(--color-pt-border)',
+          }}
+        >
+          {ordinal}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text)' }}>
+              Clip {ordinal}
+            </span>
+            <ClipStatusBadge status={clip.status} />
+            <span
+              className="font-mono text-[11px] tabular-nums"
+              style={{ color: 'var(--color-pt-text-3)' }}
+            >
+              <Clock size={11} className="inline -mt-0.5" /> {formatDuration(clip.durationSec)}
+            </span>
+            <span className="text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
+              {new Date(clip.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          {clip.errorMessage && (
+            <p
+              className="mt-1 break-words text-[11px]"
+              style={{ color: 'var(--color-negative)' }}
+            >
+              {clip.errorMessage}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-label="Delete clip"
+          onClick={onDelete}
+          disabled={recordingDisabled || clip.status === 'transcribing'}
+          className="transition-colors hover:bg-[var(--color-pt-surface-mut)] disabled:opacity-40"
+          style={{
+            padding: 6,
+            borderRadius: 6,
+            border: '1px solid var(--color-pt-border)',
+            background: 'var(--color-pt-surface)',
+            color: 'var(--color-pt-red)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            cursor: recordingDisabled || clip.status === 'transcribing' ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <Trash2 size={12} strokeWidth={2} />
+        </button>
+      </div>
+      {showWaveform && (
+        <div className="mt-2">
+          <PlaybackWaveform audioKey={clip.id} />
+        </div>
+      )}
+      {clip.status === 'transcribed' && clip.transcript && (
+        <details className="mt-2">
+          <summary
+            className="cursor-pointer text-[11px]"
+            style={{ color: 'var(--color-pt-text-2)' }}
+          >
+            View transcript ({wordCount(clip.transcript)} words)
+          </summary>
+          <p
+            className="mt-1 whitespace-pre-wrap text-xs leading-relaxed"
+            style={{ color: 'var(--color-pt-text)' }}
+          >
+            {clip.transcript}
+          </p>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function ClipStatusBadge({ status }: { status: ClipStatus }) {
+  const meta = clipBadgeMeta(status);
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+      style={{
+        background: meta.bg,
+        color: meta.fg,
+        border: `1px solid ${meta.border}`,
+      }}
+    >
+      {status === 'transcribing' && <Loader2 size={10} className="animate-spin" />}
+      {status === 'transcribed' && <CheckCircle2 size={10} />}
+      {status === 'failed' && <XCircle size={10} />}
+      {meta.label}
+    </span>
+  );
+}
+
+function clipBadgeMeta(status: ClipStatus): {
+  label: string;
+  bg: string;
+  fg: string;
+  border: string;
+} {
+  switch (status) {
+    case 'pending':
+      return {
+        label: 'Recording',
+        bg: 'var(--color-pt-surface-alt)',
+        fg: 'var(--color-pt-text-2)',
+        border: 'var(--color-pt-border)',
+      };
+    case 'ready':
+      return {
+        label: 'Ready',
+        bg: 'var(--color-pt-surface-alt)',
+        fg: 'var(--color-pt-text-2)',
+        border: 'var(--color-pt-border)',
+      };
+    case 'transcribing':
+      return {
+        label: 'Transcribing',
+        bg: 'var(--color-pt-surface-alt)',
+        fg: 'var(--color-pt-text)',
+        border: 'var(--color-pt-border)',
+      };
+    case 'transcribed':
+      return {
+        label: 'Transcribed',
+        bg: 'var(--color-pt-surface-alt)',
+        fg: 'var(--color-positive, var(--color-pt-text))',
+        border: 'var(--color-positive, var(--color-pt-border))',
+      };
+    case 'failed':
+      return {
+        label: 'Failed',
+        bg: 'var(--color-pt-surface-alt)',
+        fg: 'var(--color-negative)',
+        border: 'var(--color-negative)',
+      };
+  }
 }
 
 function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
@@ -1037,6 +1535,21 @@ function PulseDot() {
 
 function wordCount(s: string): number {
   return s.trim() === '' ? 0 : s.trim().split(/\s+/).length;
+}
+
+function formatDuration(sec: number): string {
+  if (!Number.isFinite(sec) || sec <= 0) return '00:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function mergeClipTranscripts(clips: SessionClip[]): string {
+  return clips
+    .filter((c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((c) => c.transcript!.trim())
+    .join('\n\n');
 }
 
 function labelForType(t: string): string {
