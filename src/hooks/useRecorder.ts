@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { audioRepository } from '@/services/AudioRepository';
+import { acquireWakeLock, releaseWakeLock } from '@/lib/wakeLock';
 
 export type RecorderStatus = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
 
@@ -14,14 +15,16 @@ export interface UseRecorder {
   resume: () => void;
   stop: () => Promise<Blob | null>;
   reset: () => void;
+  /**
+   * True if the tab was hidden (Page Visibility API) at any point since the last
+   * `start`. Sticky for the lifetime of the current recording session and
+   * cleared by `reset`. Recording continues while hidden, but on mobile the OS
+   * may have throttled/killed the recorder; clinicians should verify duration.
+   */
+  wasBackgrounded: boolean;
 }
 
-const PREFERRED_MIME_TYPES = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/mp4',
-  'audio/ogg',
-];
+const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
 
 // MediaRecorder timeslice. Each tick fires `ondataavailable` and writes one
 // chunk row to IDB so a tab crash loses at most this many seconds of audio.
@@ -51,6 +54,44 @@ export function useRecorder(): UseRecorder {
   const accumulatedRef = useRef<number>(0);
   const stopResolveRef = useRef<((b: Blob | null) => void) | null>(null);
 
+  const [wasBackgrounded, setWasBackgrounded] = useState(false);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
+
+  const detachVisibilityHandler = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    const handler = visibilityHandlerRef.current;
+    if (!handler) return;
+    document.removeEventListener('visibilitychange', handler);
+    visibilityHandlerRef.current = null;
+  }, []);
+
+  const attachVisibilityHandler = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    detachVisibilityHandler();
+    const handler = () => {
+      if (document.hidden) {
+        setWasBackgrounded(true);
+        return;
+      }
+      // Returned to foreground. Re-acquire wake lock only if we are still
+      // actively recording — the browser auto-released it when we hid.
+      const r = recorderRef.current;
+      if (!r || r.state !== 'recording') return;
+      void acquireWakeLock().then((sentinel) => {
+        if (!sentinel) return;
+        if (recorderRef.current?.state !== 'recording') {
+          // We stopped between acquire and resolve; release immediately.
+          void releaseWakeLock(sentinel);
+          return;
+        }
+        wakeLockRef.current = sentinel;
+      });
+    };
+    visibilityHandlerRef.current = handler;
+    document.addEventListener('visibilitychange', handler);
+  }, [detachVisibilityHandler]);
+
   const teardown = useCallback(() => {
     if (tickRef.current) {
       clearInterval(tickRef.current);
@@ -61,7 +102,13 @@ export function useRecorder(): UseRecorder {
       streamRef.current = null;
     }
     recorderRef.current = null;
-  }, []);
+    if (wakeLockRef.current) {
+      const sentinel = wakeLockRef.current;
+      wakeLockRef.current = null;
+      void releaseWakeLock(sentinel);
+    }
+    detachVisibilityHandler();
+  }, [detachVisibilityHandler]);
 
   useEffect(() => () => teardown(), [teardown]);
 
@@ -137,6 +184,19 @@ export function useRecorder(): UseRecorder {
         setDurationSec(0);
         setBlob(null);
         recorder.start(CHUNK_TIMESLICE_MS);
+        // Best-effort: keep screen awake while recording. Browsers auto-release
+        // on visibilitychange; the handler below re-acquires on return.
+        void acquireWakeLock().then((sentinel) => {
+          if (!sentinel) return;
+          // If recording already ended between acquire and resolve, drop it.
+          if (recorderRef.current !== recorder) {
+            void releaseWakeLock(sentinel);
+            return;
+          }
+          wakeLockRef.current = sentinel;
+        });
+        attachVisibilityHandler();
+        setWasBackgrounded(false);
         tickStart();
         setStatus('recording');
         return true;
@@ -147,7 +207,7 @@ export function useRecorder(): UseRecorder {
         return false;
       }
     },
-    [teardown, tickStart],
+    [teardown, tickStart, attachVisibilityHandler],
   );
 
   const pause = useCallback(() => {
@@ -184,7 +244,19 @@ export function useRecorder(): UseRecorder {
     setBlob(null);
     setError(null);
     setStatus('idle');
+    setWasBackgrounded(false);
   }, [teardown]);
 
-  return { status, error, durationSec, blob, start, pause, resume, stop, reset };
+  return {
+    status,
+    error,
+    durationSec,
+    blob,
+    start,
+    pause,
+    resume,
+    stop,
+    reset,
+    wasBackgrounded,
+  };
 }
