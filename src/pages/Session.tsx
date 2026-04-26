@@ -139,8 +139,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   async function handleTranscribe() {
-    if (settings.ai.transcription.provider !== 'openai') {
-      toast.error('OpenAI key required for batch transcription. Set one in Settings.');
+    if (settings.ai.transcription.provider !== 'cloudflare') {
+      toast.error('Cloudflare account ID + API token required. Set them in Settings.');
       return;
     }
     setError(null);
@@ -154,6 +154,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         provider: settings.ai.transcription.provider,
         model: settings.ai.transcription.model,
         apiKey: settings.ai.transcription.apiKey,
+        accountId: settings.ai.transcription.accountId,
       });
       setTranscript(result.text);
       updateSession(session!.id, {
@@ -267,7 +268,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         live={live}
         sessionId={session.id}
         webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
-        openaiProvider={settings.ai.transcription.provider === 'openai'}
+        cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
         hasAudio={!!session.audioRef}
         busy={busy}
         onStart={handleStartRecording}
@@ -343,7 +344,7 @@ interface RecordingPanelProps {
   live: UseLiveTranscript;
   sessionId: string;
   webspeechProvider: boolean;
-  openaiProvider: boolean;
+  cloudflareProvider: boolean;
   hasAudio: boolean;
   busy: Busy;
   onStart: () => void;
@@ -357,7 +358,7 @@ function RecordingPanel({
   live,
   sessionId,
   webspeechProvider,
-  openaiProvider,
+  cloudflareProvider,
   hasAudio,
   busy,
   onStart,
@@ -393,7 +394,7 @@ function RecordingPanel({
         recording={recording}
         paused={recorder.status === 'paused'}
         hasAudio={hasAudio}
-        canTranscribe={hasAudio && recorder.status !== 'recording' && openaiProvider}
+        canTranscribe={hasAudio && recorder.status !== 'recording' && cloudflareProvider}
         transcribing={busy === 'transcribing'}
         onStart={onStart}
         onPauseResume={onPauseResume}
@@ -466,8 +467,8 @@ function RecordingNotices({
       )}
       {webspeechProvider && !liveSupported && (
         <p className="text-xs" style={{ color: 'var(--color-caution)' }}>
-          This browser doesn't support live transcription. Add an OpenAI API key in Settings to
-          transcribe recordings.
+          This browser doesn't support live transcription. Add a Cloudflare account ID + API token
+          in Settings to transcribe recordings.
         </p>
       )}
     </>

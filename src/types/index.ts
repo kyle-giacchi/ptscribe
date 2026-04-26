@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 1;
+export const APP_DATA_VERSION = 2;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -223,15 +223,16 @@ export interface PlanOfCare {
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
-export type TranscriptionProvider = 'openai' | 'webspeech' | 'none';
+export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'none';
 export type GenerationProvider = 'anthropic' | 'none';
 export type DensityMode = 'cozy' | 'compact';
 
 export interface AISettings {
   transcription: {
     provider: TranscriptionProvider;
-    model: string; // e.g. 'whisper-1'
-    apiKey?: string;
+    model: string; // e.g. '@cf/openai/whisper-large-v3-turbo'
+    apiKey?: string; // Cloudflare API token
+    accountId?: string; // Cloudflare account ID (required for the cloudflare provider)
   };
   generation: {
     provider: GenerationProvider;

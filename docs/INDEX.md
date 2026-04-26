@@ -20,7 +20,7 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Units (ms timestamps, minutes, UUIDs, Markdown)                          | [architecture.md:48](architecture.md#units-and-coordinate-systems)          |
 | Provider/mutator table (every hook + setters)                            | [architecture.md:58](architecture.md#provider-responsibilities)             |
 | Storage keys (`ptnotes.appData` + IndexedDB `ptnotes-audio`)             | [architecture.md:84](architecture.md#storage-key-namespace)                 |
-| AI services (Whisper + Anthropic) and default models                     | [architecture.md:93](architecture.md#ai-services)                           |
+| AI services (Cloudflare Whisper + Anthropic) and default models          | [architecture.md:93](architecture.md#ai-services)                           |
 | Session status state machine                                             | [clinical-model.md:30](clinical-model.md#session-status-state-machine)      |
 | Built-in templates and section structure                                 | [clinical-model.md:60](clinical-model.md#notetemplate)                      |
 | AI prompt shape (`generateNote` user prompt)                             | [clinical-model.md:99](clinical-model.md#ai-prompt-shape)                   |
@@ -41,7 +41,7 @@ Provider hierarchy, data flow, boot sequence, persistence (localStorage + Indexe
 | Provider responsibilities | Master table of every hook + every mutator.                                               |
 | Why slice providers       | Re-render scoping rationale.                                                              |
 | Storage key namespace     | `ptnotes.appData` (localStorage) + `ptnotes-audio` IDB store.                             |
-| AI services               | Whisper (transcription) + Anthropic (generation), browser-direct, BYO key.                |
+| AI services               | Cloudflare Workers AI Whisper (transcription) + Anthropic (generation), browser-direct, BYO credentials. |
 | Schema validation         | `safeParse` on load and on JSON import; never `parse` in render.                          |
 
 ### [docs/invariants.md](invariants.md)
@@ -58,7 +58,7 @@ Non-obvious rules that fail silently if violated. **Read first before any cross-
 | First-run guard                 | Redirect rule keyed on empty `clinician.name`; tolerate one frame of empty state.                             |
 | Storage cap + audio offload     | 5 MB localStorage cap; audio Blobs go to IndexedDB via `AudioRepository`.                                     |
 | ID generation                   | Always `newId()` (UUID); never timestamps/counters.                                                           |
-| BYO API key                     | Browser → Whisper / Anthropic directly; HIPAA disclaimer on Settings.                                         |
+| BYO API key                     | Browser → Cloudflare Whisper / Anthropic directly; HIPAA disclaimer on Settings.                              |
 | Type changes ripple             | 4-step checklist: types + schema + default + migration.                                                       |
 
 ### [docs/style-guide.md](style-guide.md)

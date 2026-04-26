@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * Web Speech API live transcription.
  *
  * Browser support is uneven (Chrome / Edge work; Firefox / Safari are spotty).
- * We treat it as a best-effort live caption — the OpenAI Whisper path produces
- * the canonical transcript at session end.
+ * We treat it as a best-effort live caption — the Cloudflare Whisper path
+ * produces the canonical transcript at session end.
  */
 
 type SpeechRec = {
