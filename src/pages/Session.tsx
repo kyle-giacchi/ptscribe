@@ -292,6 +292,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setError(null);
     if (!session) return;
 
+    if (settings.ai.transcription.provider === 'webspeech' && !live.supported) {
+      toast.error(
+        "This browser doesn't support live transcription. Switch transcription to Cloudflare in Settings before recording.",
+      );
+      return;
+    }
+
     const clipId = newId();
     const now = Date.now();
     activeClipIdRef.current = clipId;
@@ -471,7 +478,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     const userEdits = transcript.trim() && transcript.trim() !== currentMerge;
     if (
       userEdits &&
-      !window.confirm('This will replace your transcript with the Whisper output. Continue?')
+      !window.confirm(
+        'This will replace your transcript with the Cloudflare transcription output. Continue?',
+      )
     ) {
       return;
     }
@@ -1053,6 +1062,7 @@ function RecordingPanel({
         recorderError={recorder.error}
         webspeechProvider={webspeechProvider}
         liveSupported={live.supported}
+        liveError={live.error}
       />
 
       <ClipsList clips={clips} recordingDisabled={recording} onDeleteClip={onDeleteClip} />
@@ -1124,10 +1134,12 @@ function RecordingNotices({
   recorderError,
   webspeechProvider,
   liveSupported,
+  liveError,
 }: {
   recorderError: string | null;
   webspeechProvider: boolean;
   liveSupported: boolean;
+  liveError: string | null;
 }) {
   return (
     <>
@@ -1138,12 +1150,39 @@ function RecordingNotices({
       )}
       {webspeechProvider && !liveSupported && (
         <p className="text-xs" style={{ color: 'var(--color-caution)' }}>
-          This browser doesn't support live transcription. Add a Cloudflare account ID + API token
-          in Settings to transcribe recordings.
+          This browser doesn't support live transcription. Switch transcription to Cloudflare in
+          Settings to transcribe recordings.
+        </p>
+      )}
+      {webspeechProvider && liveSupported && (
+        <p className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+          Browser transcription can't tell speakers apart, which can muddle the generated note when
+          the patient and clinician both talk. Upgrade to Cloudflare Nova-3 for speaker labeling.
+        </p>
+      )}
+      {webspeechProvider && liveSupported && liveError && (
+        <p className="text-xs" style={{ color: 'var(--color-negative)' }}>
+          Live transcription error: {liveError}. {liveErrorHint(liveError)}
         </p>
       )}
     </>
   );
+}
+
+function liveErrorHint(err: string): string {
+  switch (err) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'Microphone permission was blocked for speech recognition.';
+    case 'no-speech':
+      return 'No speech was detected.';
+    case 'audio-capture':
+      return 'No microphone was found.';
+    case 'network':
+      return 'Browser speech recognition needs an internet connection.';
+    default:
+      return 'Switch to Cloudflare in Settings to transcribe saved clips instead.';
+  }
 }
 
 function ActiveRecordingControls({
@@ -1190,7 +1229,7 @@ function CreateTranscriptButton({
 }) {
   const title = disabled
     ? `Per-session limit reached (${used}/${cap}). Reload to reset.`
-    : `Runs Whisper on saved clips and merges into the transcript (${used}/${cap} used).`;
+    : `Transcribes saved clips and merges into the transcript (${used}/${cap} used).`;
   return (
     <button
       type="button"
