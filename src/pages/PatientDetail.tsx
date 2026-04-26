@@ -1,29 +1,45 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  Users,
-  ArrowLeft,
-  Mic,
-  Pencil,
-  Trash2,
-  ChevronRight,
-  Target,
-  Dumbbell,
-  TrendingUp,
-} from 'lucide-react';
+import { Mic, Pencil, Trash2, Calendar, MessageSquare, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
+import {
+  Avatar,
+  Eyebrow,
+  Heatmap,
+  PtButton,
+  StatusBadge,
+  SurfaceCard,
+  type StatusTone,
+} from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { usePlans } from '@/contexts/PlansProvider';
 import { useExercises } from '@/contexts/ExercisesProvider';
 import { newId } from '@/utils/ids';
-import { fmtIsoDateOptional, parseIsoDate } from '@/utils/dates';
-import { SessionTrends } from '@/components/patients/SessionTrends';
-import type { Patient, PatientStatus, PlanGoal, PlanOfCare, Prescription, Sex } from '@/types';
+import { fmtIsoDateOptional, parseIsoDate, relativeFromNow } from '@/utils/dates';
+import type {
+  Note,
+  Patient,
+  PatientStatus,
+  PlanGoal,
+  PlanOfCare,
+  Prescription,
+  Session,
+  Sex,
+} from '@/types';
+
+type Tab = 'overview' | 'history' | 'measures' | 'hep' | 'documents' | 'billing';
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'history', label: 'History' },
+  { value: 'measures', label: 'Measures' },
+  { value: 'hep', label: 'HEP' },
+  { value: 'documents', label: 'Documents' },
+  { value: 'billing', label: 'Billing' },
+];
 
 export function PatientDetail() {
   const { id = '' } = useParams<{ id: string }>();
@@ -36,21 +52,41 @@ export function PatientDetail() {
 
   const patient = getPatient(id);
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<Tab>('overview');
 
-  const sessions = useMemo(() => (patient ? sessionsFor(patient.id) : []), [patient, sessionsFor]);
-  const notes = useMemo(() => (patient ? notesFor(patient.id) : []), [patient, notesFor]);
+  const sessions = useMemo(
+    () => (patient ? sessionsFor(patient.id) : []),
+    [patient, sessionsFor]
+  );
+  const notes = useMemo(
+    () => (patient ? notesFor(patient.id) : []),
+    [patient, notesFor]
+  );
   const plan = patient ? activePlanForPatient(patient.id) : undefined;
 
   if (!patient) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Link to="/patients" className="btn btn-ghost w-fit">
-          <ArrowLeft size={14} strokeWidth={2} /> Back to patients
+      <div style={{ padding: 22 }}>
+        <Link to="/patients">
+          <PtButton variant="ghost">← Back to patients</PtButton>
         </Link>
-        <div className="card">Patient not found.</div>
+        <SurfaceCard padding={20} style={{ marginTop: 14 }}>
+          Patient not found.
+        </SurfaceCard>
       </div>
     );
   }
+
+  const age = ageFromDob(patient.dob);
+  const status = derivePatientBadge(patient, sessions.length);
+  const fullName = `${patient.firstName} ${patient.lastName}`.trim();
+  const subtitle = [
+    patient.primaryDiagnosis,
+    patient.icd10,
+    patient.referringProvider ? `Referred by ${patient.referringProvider}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   function handleStartPlan() {
     if (!patient) return;
@@ -70,144 +106,74 @@ export function PatientDetail() {
 
   function handleDelete() {
     if (!patient) return;
-    if (!confirm(`Remove ${patient.firstName} ${patient.lastName}? Sessions and notes are kept.`)) return;
+    if (
+      !confirm(
+        `Remove ${patient.firstName} ${patient.lastName}? Sessions and notes are kept.`
+      )
+    )
+      return;
     removePatient(patient.id);
     toast.success('Patient removed');
     navigate('/patients', { replace: true });
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <Link to="/patients" className="btn btn-ghost w-fit">
-        <ArrowLeft size={14} strokeWidth={2} /> Patients
-      </Link>
-
-      <PageHeader
-        title={`${patient.firstName} ${patient.lastName}`}
-        subtitle={[patient.primaryDiagnosis, patient.icd10].filter(Boolean).join(' · ') || 'No diagnosis on file'}
-        Icon={Users}
-        actions={
-          <>
-            <Link to={`/sessions/new?patientId=${patient.id}`} className="btn btn-primary">
-              <Mic size={14} strokeWidth={2} /> Start session
-            </Link>
-            <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
-              <Pencil size={14} strokeWidth={2} /> Edit
-            </button>
-          </>
-        }
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'auto 1fr',
+        minHeight: '100%',
+      }}
+    >
+      <PatientHeader
+        patient={patient}
+        age={age}
+        fullName={fullName}
+        subtitle={subtitle || 'No diagnosis on file'}
+        status={status}
+        tab={tab}
+        onTab={setTab}
+        onEdit={() => setEditing(true)}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <section className="card space-y-3">
-          <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-            Demographics
-          </h2>
-          <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-            <Info label="DOB">{fmtIsoDateOptional(patient.dob) || '—'}</Info>
-            <Info label="Sex">{labelForSex(patient.sex)}</Info>
-            <Info label="MRN">{patient.mrn || '—'}</Info>
-            <Info label="Status">{patient.status}</Info>
-            <Info label="Referring provider">{patient.referringProvider || '—'}</Info>
-            <Info label="Created">{new Date(patient.createdAt).toLocaleDateString()}</Info>
-          </dl>
-          {patient.notes && (
-            <div className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-              <div className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>Internal notes</div>
-              <p className="mt-1 whitespace-pre-line">{patient.notes}</p>
-            </div>
-          )}
-          <div className="pt-2">
-            <button
-              type="button"
-              className="btn btn-ghost text-xs"
-              style={{ color: 'var(--color-negative)' }}
-              onClick={handleDelete}
-            >
-              <Trash2 size={12} strokeWidth={2} /> Remove patient
-            </button>
-          </div>
-        </section>
-
-        <section className="card space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg flex items-center gap-2" style={{ color: 'var(--color-fg)' }}>
-              <Target size={16} strokeWidth={1.75} /> Plan of care
-            </h2>
-            {!plan && (
-              <button type="button" className="btn btn-secondary text-xs" onClick={handleStartPlan}>
-                Start plan
-              </button>
-            )}
-          </div>
-          {!plan ? (
-            <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-              No active plan of care. Start one to set goals and prescribe exercises.
-            </p>
-          ) : (
-            <PlanEditor
-              plan={plan}
-              exercises={exercises}
-              onChange={(patch) => updatePlan(plan.id, patch)}
-            />
-          )}
-        </section>
-      </div>
-
-      <section className="card space-y-3">
-        <h2
-          className="flex items-center gap-2 font-display text-lg"
-          style={{ color: 'var(--color-fg)' }}
-        >
-          <TrendingUp size={16} strokeWidth={1.75} /> Trends
-        </h2>
-        <SessionTrends sessions={sessions} />
-      </section>
-
-      <section className="card space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-            Session history
-          </h2>
-          <Link
-            to={`/sessions/new?patientId=${patient.id}`}
-            className="text-xs underline"
-            style={{ color: 'var(--color-accent-deep)' }}
-          >
-            New session
-          </Link>
-        </div>
-        {sessions.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-            No sessions for this patient yet.
-          </p>
-        ) : (
-          <ul className="divide-y" style={{ borderColor: 'var(--color-border-soft)' }}>
-            {sessions.map((s) => {
-              const note = notes.find((n) => n.sessionId === s.id);
-              return (
-                <li key={s.id} className="py-2.5">
-                  <Link
-                    to={`/sessions/${s.id}`}
-                    className="flex items-center justify-between gap-3 text-sm hover:opacity-80"
-                  >
-                    <div>
-                      <div className="font-medium" style={{ color: 'var(--color-fg)' }}>
-                        {labelForType(s.type)}
-                      </div>
-                      <div className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                        {new Date(s.date).toLocaleString()} · {s.status}
-                        {note ? (note.finalized ? ' · Note finalized' : ' · Note draft') : ''}
-                      </div>
-                    </div>
-                    <ChevronRight size={14} style={{ color: 'var(--color-fg-subtle)' }} />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+      <div
+        style={{
+          padding: 22,
+          background: 'var(--color-pt-surface-alt)',
+          overflow: 'auto',
+        }}
+      >
+        {tab === 'overview' && (
+          <Overview
+            patient={patient}
+            sessions={sessions}
+            notes={notes}
+            plan={plan}
+            onStartPlan={handleStartPlan}
+            onUpdatePlan={(patch) => plan && updatePlan(plan.id, patch)}
+            exercises={exercises}
+            onDelete={handleDelete}
+          />
         )}
-      </section>
+        {tab !== 'overview' && (
+          <SurfaceCard padding={40} style={{ textAlign: 'center' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--color-pt-text-2)',
+                marginBottom: 4,
+                textTransform: 'capitalize',
+              }}
+            >
+              {tab}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+              Tab placeholder — coming soon.
+            </div>
+          </SurfaceCard>
+        )}
+      </div>
 
       <EditPatientModal
         open={editing}
@@ -222,37 +188,725 @@ export function PatientDetail() {
   );
 }
 
-function Info({ label, children }: { label: string; children: React.ReactNode }) {
+function PatientHeader({
+  patient,
+  age,
+  fullName,
+  subtitle,
+  status,
+  tab,
+  onTab,
+  onEdit,
+}: {
+  patient: Patient;
+  age: number | null;
+  fullName: string;
+  subtitle: string;
+  status: { tone: StatusTone; label: string };
+  tab: Tab;
+  onTab: (t: Tab) => void;
+  onEdit: () => void;
+}) {
+  const idLine = [
+    `PT-${patient.id.slice(0, 5).toUpperCase()}`,
+    age !== null ? `${age} yo` : null,
+    patient.sex ? labelForSex(patient.sex) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
-    <div>
-      <dt className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-        {label}
-      </dt>
-      <dd className="mt-0.5" style={{ color: 'var(--color-fg)' }}>
-        {children}
-      </dd>
+    <div
+      style={{
+        background: 'var(--color-pt-surface)',
+        borderBottom: '1px solid var(--color-pt-border)',
+        padding: '20px 22px 0',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <Avatar name={fullName || '?'} size={56} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                letterSpacing: '-0.3px',
+                color: 'var(--color-pt-text)',
+              }}
+            >
+              {fullName || 'Unnamed patient'}
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                color: 'var(--color-pt-text-3)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {idLine}
+            </span>
+            <StatusBadge tone={status.tone} label={status.label} />
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: 'var(--color-pt-text-2)',
+              marginTop: 4,
+            }}
+          >
+            {subtitle}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <PtButton variant="ghost" iconLeft={<MessageSquare size={14} strokeWidth={2} />}>
+            Message
+          </PtButton>
+          <PtButton variant="ghost" iconLeft={<Calendar size={14} strokeWidth={2} />}>
+            Schedule
+          </PtButton>
+          <PtButton variant="ghost" iconLeft={<Pencil size={14} strokeWidth={2} />} onClick={onEdit}>
+            Edit
+          </PtButton>
+          <Link to={`/sessions/new?patientId=${patient.id}`}>
+            <PtButton variant="primary" iconLeft={<Mic size={14} strokeWidth={2} />}>
+              Start session
+            </PtButton>
+          </Link>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 22, marginTop: 18 }}>
+        {TABS.map((t) => {
+          const active = tab === t.value;
+          return (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => onTab(t.value)}
+              style={{
+                padding: '10px 0',
+                border: 'none',
+                background: 'transparent',
+                borderBottom: `2px solid ${active ? 'var(--color-pt-accent)' : 'transparent'}`,
+                color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
+                fontSize: 13,
+                fontWeight: active ? 600 : 500,
+                cursor: 'pointer',
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function labelForSex(s?: Sex): string {
-  if (s === 'F') return 'Female';
-  if (s === 'M') return 'Male';
-  if (s === 'X') return 'Other';
-  return '—';
+function Overview({
+  patient,
+  sessions,
+  notes,
+  plan,
+  onStartPlan,
+  onUpdatePlan,
+  exercises,
+  onDelete,
+}: {
+  patient: Patient;
+  sessions: Session[];
+  notes: Note[];
+  plan: PlanOfCare | undefined;
+  onStartPlan: () => void;
+  onUpdatePlan: (patch: Partial<PlanOfCare>) => void;
+  exercises: ReturnType<typeof useExercises>['exercises'];
+  onDelete: () => void;
+}) {
+  const goalsMet = plan?.goals.filter((g) => g.met).length ?? 0;
+  const totalGoals = plan?.goals.length ?? 0;
+  const sessionsCount = sessions.length;
+  const finalizedNotes = notes.filter((n) => n.finalized).length;
+  const pendingNotes = notes.filter((n) => !n.finalized).length;
+
+  const recentVisits = useMemo(
+    () => [...sessions].sort((a, b) => b.date - a.date).slice(0, 5),
+    [sessions]
+  );
+
+  // 14-day adherence: 1 if any session that day, scaled by count
+  const adherence = useMemo(() => {
+    const days = 14;
+    const cells: number[] = Array.from({ length: days }, () => 0);
+    const start = startOfDay(Date.now()) - (days - 1) * DAY_MS;
+    for (const s of sessions) {
+      const idx = Math.floor((startOfDay(s.date) - start) / DAY_MS);
+      if (idx >= 0 && idx < days) cells[idx] = Math.min(1, cells[idx] + 0.4);
+    }
+    return cells.map((v) => Math.max(0.15, v));
+  }, [sessions]);
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) 360px',
+        gap: 18,
+        alignItems: 'start',
+      }}
+    >
+      <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}>
+        <SurfaceCard padding="16px 18px">
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Eyebrow>Progress vs plan</Eyebrow>
+            <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+              Last {Math.min(8, Math.max(2, Math.round(sessionsCount / 2)))} weeks
+            </div>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 22,
+              marginTop: 12,
+            }}
+          >
+            <Metric
+              label="Goals met"
+              value={`${goalsMet}/${totalGoals || '—'}`}
+              delta={totalGoals ? `${Math.round((goalsMet / totalGoals) * 100)}%` : '—'}
+              tone={goalsMet > 0 ? 'good' : 'mute'}
+              target={totalGoals ? 'set in plan' : 'no plan goals yet'}
+              pct={totalGoals ? Math.round((goalsMet / totalGoals) * 100) : 0}
+            />
+            <Metric
+              label="Sessions"
+              value={String(sessionsCount)}
+              delta={pendingNotes ? `${pendingNotes} pending` : 'all signed'}
+              tone={pendingNotes ? 'warn' : 'good'}
+              target={`${finalizedNotes} signed`}
+              pct={
+                sessionsCount > 0 ? Math.round((finalizedNotes / sessionsCount) * 100) : 0
+              }
+            />
+            <Metric
+              label="Days in care"
+              value={daysInCare(patient, sessions, plan).toString()}
+              delta={plan ? 'plan active' : 'no plan'}
+              tone={plan ? 'good' : 'mute'}
+              target={
+                plan?.expectedDischargeDate
+                  ? `discharge ${fmtIsoDateOptional(plan.expectedDischargeDate)}`
+                  : 'open-ended'
+              }
+              pct={dischargePct(plan) ?? 0}
+            />
+          </div>
+        </SurfaceCard>
+
+        <SurfaceCard padding={0}>
+          <div
+            style={{
+              padding: '14px 18px',
+              borderBottom: '1px solid var(--color-pt-border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--color-pt-text)',
+              }}
+            >
+              Recent visits
+            </div>
+            {sessions.length > recentVisits.length && (
+              <button
+                type="button"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--color-pt-accent-fg)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                View all {sessions.length} →
+              </button>
+            )}
+          </div>
+          {recentVisits.length === 0 ? (
+            <div
+              style={{
+                padding: 24,
+                fontSize: 13,
+                color: 'var(--color-pt-text-3)',
+                textAlign: 'center',
+              }}
+            >
+              No sessions for this patient yet.
+            </div>
+          ) : (
+            recentVisits.map((s, i) => {
+              const note = notes.find((n) => n.sessionId === s.id);
+              return (
+                <VisitRow
+                  key={s.id}
+                  session={s}
+                  note={note}
+                  isLast={i === recentVisits.length - 1}
+                />
+              );
+            })
+          )}
+        </SurfaceCard>
+
+        <SurfaceCard padding="16px 18px">
+          <Eyebrow>Plan of care</Eyebrow>
+          {!plan ? (
+            <div
+              style={{
+                marginTop: 12,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>
+                No active plan of care. Start one to set goals and prescribe exercises.
+              </p>
+              <PtButton variant="accent-soft" onClick={onStartPlan}>
+                Start plan
+              </PtButton>
+            </div>
+          ) : (
+            <PlanEditor plan={plan} exercises={exercises} onChange={onUpdatePlan} />
+          )}
+        </SurfaceCard>
+
+        <div>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-pt-red)',
+              fontSize: 12,
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              cursor: 'pointer',
+            }}
+          >
+            <Trash2 size={12} strokeWidth={2} /> Remove patient
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+        <SurfaceCard padding="14px 16px">
+          <Eyebrow>Active home program</Eyebrow>
+          {plan && plan.prescriptions.length > 0 ? (
+            <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+              {plan.prescriptions.map((rx, i) => {
+                const ex = exercises.find((e) => e.id === rx.exerciseId);
+                const isNew = i === 0;
+                return (
+                  <ExRow
+                    key={rx.id}
+                    name={ex?.name ?? 'Unknown exercise'}
+                    dosage={rx.dosage}
+                    isNew={isNew}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <p
+              style={{
+                fontSize: 12.5,
+                color: 'var(--color-pt-text-3)',
+                marginTop: 8,
+              }}
+            >
+              No exercises prescribed yet.
+            </p>
+          )}
+        </SurfaceCard>
+
+        <SurfaceCard padding="14px 16px">
+          <Eyebrow>Adherence</Eyebrow>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 8,
+              marginTop: 6,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 26,
+                fontWeight: 600,
+                color: 'var(--color-pt-text)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {adherencePct(adherence)}%
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                color: 'var(--color-pt-accent-fg)',
+                fontWeight: 600,
+              }}
+            >
+              last 14d
+            </span>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Heatmap values={adherence} />
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 10.5,
+              color: 'var(--color-pt-text-3)',
+              marginTop: 6,
+            }}
+          >
+            <span>2 wks ago</span>
+            <span>Today</span>
+          </div>
+        </SurfaceCard>
+
+        <SurfaceCard padding="14px 16px">
+          <Eyebrow>Notes & flags</Eyebrow>
+          <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+            {patient.notes && <FlagItem tone="amber" text={patient.notes} />}
+            {patient.referringProvider && (
+              <FlagItem
+                tone="mute"
+                text={`Referred by ${patient.referringProvider}`}
+              />
+            )}
+            {patient.icd10 && <FlagItem tone="mute" text={`ICD-10 ${patient.icd10}`} />}
+            {!patient.notes && !patient.referringProvider && !patient.icd10 && (
+              <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+                No flags on file.
+              </p>
+            )}
+          </div>
+        </SurfaceCard>
+      </div>
+    </div>
+  );
 }
 
-function labelForType(t: string): string {
-  switch (t) {
-    case 'evaluation':
-      return 'Initial Evaluation';
-    case 'progress':
-      return 'Progress note';
-    case 'discharge':
-      return 'Discharge';
-    default:
-      return 'Follow-up';
-  }
+function VisitRow({
+  session,
+  note,
+  isLast,
+}: {
+  session: Session;
+  note: Note | undefined;
+  isLast: boolean;
+}) {
+  const navigate = useNavigate();
+  const dateLabel = new Date(session.date).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const summary =
+    session.transcript?.slice(0, 90).trim() || labelForType(session.type);
+  const pendingSign = note && !note.finalized;
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '110px 1fr auto auto',
+        gap: 14,
+        alignItems: 'center',
+        padding: '12px 18px',
+        borderBottom: isLast ? 'none' : '1px solid var(--color-pt-border)',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          color: 'var(--color-pt-text-2)',
+        }}
+      >
+        {dateLabel}
+      </div>
+      <div
+        style={{
+          fontSize: 13,
+          color: 'var(--color-pt-text)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+        title={summary}
+      >
+        {summary}
+      </div>
+      {pendingSign && note ? (
+        <button
+          type="button"
+          onClick={() => navigate(`/notes/${note.id}`)}
+          style={{
+            padding: '4px 10px',
+            borderRadius: 999,
+            border: '1px solid var(--color-pt-amber-border)',
+            background: 'var(--color-pt-amber-soft)',
+            color: 'var(--color-pt-amber-fg)',
+            fontSize: 11.5,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Review & sign
+        </button>
+      ) : note?.finalized ? (
+        <span
+          style={{
+            fontSize: 11.5,
+            color: 'var(--color-pt-text-3)',
+            fontWeight: 500,
+          }}
+        >
+          Signed
+        </span>
+      ) : (
+        <Link
+          to={`/sessions/${session.id}`}
+          style={{
+            fontSize: 11.5,
+            color: 'var(--color-pt-text-3)',
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          Open
+        </Link>
+      )}
+      <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+        {relativeFromNow(session.date)}
+      </span>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  delta,
+  tone,
+  target,
+  pct,
+}: {
+  label: string;
+  value: string;
+  delta: string;
+  tone: 'good' | 'warn' | 'bad' | 'mute';
+  target: string;
+  pct: number;
+}) {
+  const deltaColor =
+    tone === 'good'
+      ? 'var(--color-pt-accent-fg)'
+      : tone === 'warn'
+        ? 'var(--color-pt-amber-fg)'
+        : tone === 'bad'
+          ? 'var(--color-pt-red)'
+          : 'var(--color-pt-text-3)';
+  return (
+    <div>
+      <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{label}</div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 8,
+          marginTop: 4,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 22,
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '-0.3px',
+          }}
+        >
+          {value}
+        </span>
+        <span style={{ fontSize: 11.5, color: deltaColor, fontWeight: 600 }}>
+          {delta}
+        </span>
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          height: 4,
+          borderRadius: 999,
+          background: '#eef0f4',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: 'var(--color-pt-accent)',
+          }}
+        />
+      </div>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: 'var(--color-pt-text-3)',
+          marginTop: 4,
+        }}
+      >
+        {target}
+      </div>
+    </div>
+  );
+}
+
+function ExRow({
+  name,
+  dosage,
+  isNew,
+}: {
+  name: string;
+  dosage: string;
+  isNew?: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 7,
+          background: 'var(--color-pt-surface-mut)',
+          border: '1px solid var(--color-pt-border)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--color-pt-text-2)',
+          fontSize: 14,
+          fontWeight: 600,
+        }}
+        aria-hidden
+      >
+        {name.charAt(0).toUpperCase()}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {name}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>{dosage}</div>
+      </div>
+      {isNew && (
+        <span
+          style={{
+            fontSize: 9.5,
+            fontWeight: 700,
+            padding: '2px 6px',
+            borderRadius: 4,
+            background: 'var(--color-pt-accent-soft)',
+            color: 'var(--color-pt-accent-fg)',
+            border: '1px solid var(--color-pt-accent-border)',
+            letterSpacing: '0.6px',
+          }}
+        >
+          NEW
+        </span>
+      )}
+    </div>
+  );
+}
+
+function FlagItem({ tone, text }: { tone: 'amber' | 'mute'; text: string }) {
+  const colors =
+    tone === 'amber'
+      ? {
+          bg: 'var(--color-pt-amber-soft)',
+          bd: 'var(--color-pt-amber-border)',
+          fg: 'var(--color-pt-amber-fg)',
+          dot: '#c47a09',
+        }
+      : {
+          bg: 'var(--color-pt-surface-mut)',
+          bd: 'var(--color-pt-border)',
+          fg: 'var(--color-pt-text-2)',
+          dot: '#a4adbd',
+        };
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        padding: '8px 10px',
+        borderRadius: 9,
+        background: colors.bg,
+        border: `1px solid ${colors.bd}`,
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: colors.dot,
+          marginTop: 6,
+          flexShrink: 0,
+        }}
+      />
+      <div style={{ fontSize: 12, color: colors.fg, lineHeight: 1.45 }}>{text}</div>
+    </div>
+  );
 }
 
 function PlanEditor({
@@ -275,12 +929,13 @@ function PlanEditor({
     setGoalText('');
   }
   function toggleGoal(gid: string) {
-    onChange({ goals: plan.goals.map((g) => (g.id === gid ? { ...g, met: !g.met } : g)) });
+    onChange({
+      goals: plan.goals.map((g) => (g.id === gid ? { ...g, met: !g.met } : g)),
+    });
   }
   function removeGoal(gid: string) {
     onChange({ goals: plan.goals.filter((g) => g.id !== gid) });
   }
-
   function addPrescription() {
     if (!exerciseId) return;
     const p: Prescription = {
@@ -297,27 +952,38 @@ function PlanEditor({
   }
 
   return (
-    <div className="space-y-4 text-sm">
+    <div style={{ marginTop: 12, display: 'grid', gap: 16 }}>
       <div>
-        <div className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-fg-subtle)' }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--color-pt-text-2)',
+          }}
+        >
           Goals
         </div>
-        <ul className="mt-2 space-y-1.5">
+        <ul style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {plan.goals.length === 0 && (
-            <li style={{ color: 'var(--color-fg-muted)' }}>No goals yet.</li>
+            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+              No goals yet.
+            </li>
           )}
           {plan.goals.map((g) => (
-            <li key={g.id} className="flex items-start gap-2">
+            <li key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <input
                 type="checkbox"
                 checked={g.met}
                 onChange={() => toggleGoal(g.id)}
-                className="mt-1"
+                style={{ marginTop: 4 }}
               />
               <span
-                className="flex-1"
                 style={{
-                  color: g.met ? 'var(--color-fg-subtle)' : 'var(--color-fg)',
+                  flex: 1,
+                  fontSize: 13,
+                  color: g.met ? 'var(--color-pt-text-3)' : 'var(--color-pt-text)',
                   textDecoration: g.met ? 'line-through' : 'none',
                 }}
               >
@@ -325,16 +991,21 @@ function PlanEditor({
               </span>
               <button
                 type="button"
-                className="text-xs"
                 onClick={() => removeGoal(g.id)}
-                style={{ color: 'var(--color-fg-subtle)' }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-pt-text-3)',
+                  cursor: 'pointer',
+                }}
+                aria-label="Remove goal"
               >
                 <Trash2 size={12} />
               </button>
             </li>
           ))}
         </ul>
-        <div className="mt-2 flex gap-2">
+        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
           <TextInput
             placeholder="e.g., Return to overhead lifting pain-free in 6 weeks"
             value={goalText}
@@ -346,35 +1017,64 @@ function PlanEditor({
               }
             }}
           />
-          <button type="button" className="btn btn-secondary" onClick={addGoal}>
+          <PtButton
+            variant="accent-soft"
+            onClick={addGoal}
+            iconLeft={<Plus size={12} strokeWidth={2.4} />}
+          >
             Add
-          </button>
+          </PtButton>
         </div>
       </div>
 
       <div>
-        <div className="text-xs uppercase tracking-wide flex items-center gap-1" style={{ color: 'var(--color-fg-subtle)' }}>
-          <Dumbbell size={12} /> Prescriptions
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: 'var(--color-pt-text-2)',
+          }}
+        >
+          Prescriptions
         </div>
-        <ul className="mt-2 space-y-1.5">
+        <ul style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {plan.prescriptions.length === 0 && (
-            <li style={{ color: 'var(--color-fg-muted)' }}>No exercises prescribed.</li>
+            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+              No exercises prescribed.
+            </li>
           )}
           {plan.prescriptions.map((p) => {
             const ex = exercises.find((e) => e.id === p.exerciseId);
             return (
-              <li key={p.id} className="flex items-start justify-between gap-2">
+              <li
+                key={p.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                }}
+              >
                 <div>
-                  <div style={{ color: 'var(--color-fg)' }}>{ex?.name ?? 'Unknown exercise'}</div>
-                  <div className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 13, color: 'var(--color-pt-text)' }}>
+                    {ex?.name ?? 'Unknown exercise'}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
                     {p.dosage}
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="text-xs"
                   onClick={() => removePrescription(p.id)}
-                  style={{ color: 'var(--color-fg-subtle)' }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-pt-text-3)',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Remove prescription"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -382,7 +1082,14 @@ function PlanEditor({
             );
           })}
         </ul>
-        <div className="mt-2 grid gap-2 sm:grid-cols-[1.4fr_1fr_auto]">
+        <div
+          style={{
+            marginTop: 8,
+            display: 'grid',
+            gap: 8,
+            gridTemplateColumns: '1.4fr 1fr auto',
+          }}
+        >
           <Select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)}>
             <option value="">Select exercise…</option>
             {exercises.map((e) => (
@@ -396,9 +1103,13 @@ function PlanEditor({
             value={dosage}
             onChange={(e) => setDosage(e.target.value)}
           />
-          <button type="button" className="btn btn-secondary" onClick={addPrescription}>
+          <PtButton
+            variant="accent-soft"
+            onClick={addPrescription}
+            iconLeft={<Plus size={12} strokeWidth={2.4} />}
+          >
             Add
-          </button>
+          </PtButton>
         </div>
       </div>
     </div>
@@ -489,14 +1200,83 @@ function EditPatientModal({
           />
         </Field>
       </div>
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
+      <div className="flex justify-end gap-2 pt-3">
+        <PtButton variant="ghost" onClick={onClose}>
           Cancel
-        </button>
-        <button type="button" className="btn btn-primary" onClick={handleSave}>
+        </PtButton>
+        <PtButton variant="primary" onClick={handleSave}>
           Save changes
-        </button>
+        </PtButton>
       </div>
     </Modal>
   );
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+function startOfDay(ts: number): number {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function ageFromDob(dob?: number): number | null {
+  if (!dob) return null;
+  return Math.floor((Date.now() - dob) / (365.25 * DAY_MS));
+}
+
+function labelForSex(s?: Sex): string {
+  if (s === 'F') return 'F';
+  if (s === 'M') return 'M';
+  if (s === 'X') return 'X';
+  return '';
+}
+
+function labelForType(t: string): string {
+  switch (t) {
+    case 'evaluation':
+      return 'Initial Evaluation';
+    case 'progress':
+      return 'Progress note';
+    case 'discharge':
+      return 'Discharge';
+    default:
+      return 'Follow-up';
+  }
+}
+
+function derivePatientBadge(
+  p: Patient,
+  sessionCount: number
+): { tone: StatusTone; label: string } {
+  if (p.status === 'discharged') return { tone: 'done', label: 'Discharged' };
+  if (p.status === 'on_hold') return { tone: 'plateau', label: 'On hold' };
+  if (sessionCount === 0) return { tone: 'new', label: 'New' };
+  return { tone: 'on-track', label: 'On-track' };
+}
+
+function daysInCare(
+  p: Patient,
+  sessions: Session[],
+  plan: PlanOfCare | undefined
+): number {
+  const start =
+    plan?.startDate ??
+    (sessions.length
+      ? Math.min(...sessions.map((s) => s.date))
+      : p.createdAt);
+  return Math.max(0, Math.floor((Date.now() - start) / DAY_MS));
+}
+
+function dischargePct(plan: PlanOfCare | undefined): number | null {
+  if (!plan?.expectedDischargeDate) return null;
+  const total = plan.expectedDischargeDate - plan.startDate;
+  if (total <= 0) return 0;
+  const elapsed = Date.now() - plan.startDate;
+  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+}
+
+function adherencePct(cells: number[]): number {
+  if (cells.length === 0) return 0;
+  const avg = cells.reduce((a, b) => a + b, 0) / cells.length;
+  return Math.round(avg * 100);
 }
