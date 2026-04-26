@@ -9,6 +9,7 @@ import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
+import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
 import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
@@ -37,8 +38,9 @@ export default function App() {
                       <ExercisesProvider>
                         <PlansProvider>
                           <SettingsProvider>
-                            <FirstRunGuard>
-                              <Routes>
+                            <DemoBootstrap>
+                              <FirstRunGuard>
+                                <Routes>
                                 <Route path="/setup" element={<Setup />} />
                                 <Route element={<AppShell />}>
                                   <Route index element={<Dashboard />} />
@@ -51,8 +53,9 @@ export default function App() {
                                   <Route path="/exercises" element={<Exercises />} />
                                   <Route path="/settings" element={<Settings />} />
                                 </Route>
-                              </Routes>
-                            </FirstRunGuard>
+                                </Routes>
+                              </FirstRunGuard>
+                            </DemoBootstrap>
                           </SettingsProvider>
                         </PlansProvider>
                       </ExercisesProvider>
