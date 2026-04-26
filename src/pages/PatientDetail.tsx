@@ -330,6 +330,7 @@ function Overview({
   exercises: ReturnType<typeof useExercises>['exercises'];
   onDelete: () => void;
 }) {
+  const [now] = useState(() => Date.now());
   const goalsMet = plan?.goals.filter((g) => g.met).length ?? 0;
   const totalGoals = plan?.goals.length ?? 0;
   const sessionsCount = sessions.length;
@@ -345,13 +346,13 @@ function Overview({
   const adherence = useMemo(() => {
     const days = 14;
     const cells: number[] = Array.from({ length: days }, () => 0);
-    const start = startOfDay(Date.now()) - (days - 1) * DAY_MS;
+    const start = startOfDay(now) - (days - 1) * DAY_MS;
     for (const s of sessions) {
       const idx = Math.floor((startOfDay(s.date) - start) / DAY_MS);
       if (idx >= 0 && idx < days) cells[idx] = Math.min(1, cells[idx] + 0.4);
     }
     return cells.map((v) => Math.max(0.15, v));
-  }, [sessions]);
+  }, [sessions, now]);
 
   return (
     <div
