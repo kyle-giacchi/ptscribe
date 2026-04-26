@@ -84,9 +84,12 @@ Without this split, every consumer of a single global context would re-render on
 | Store                         | Key / name                                          | Contents                            |
 | ----------------------------- | --------------------------------------------------- | ----------------------------------- |
 | `localStorage`                | `ptnotes.appData`                                   | Full `AppData` JSON blob (≤ 5 MB)   |
+| `localStorage`                | `ptnotes.vault`                                     | Wrapped DEK + KDF params; tab-scoped key only       |
 | IndexedDB (`ptnotes-audio`)   | object store `recordings`, key = `sessionId`        | Raw audio Blob per session          |
 
 Defined in `src/lib/storageKeys.ts`.
+
+When the vault is unlocked, every value in `ptnotes.appData` and the `recordings`/`recording_chunks` IndexedDB stores is round-tripped through AES-GCM via `src/lib/vault/`. The recorder also owns a `'screen'` wake lock and a `visibilitychange` listener for the duration of a clip; both are released on `stop`/`reset`/unmount. Wake lock is best-effort and never blocks recording.
 
 ## AI services
 
