@@ -23,7 +23,7 @@ export function Settings() {
   const { settings, updateAi, updateUi } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
   const importRef = useRef<HTMLInputElement>(null);
-  const [showOpenAiKey, setShowOpenAiKey] = useState(false);
+  const [showCloudflareKey, setShowCloudflareKey] = useState(false);
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
 
   function handleExport() {
@@ -145,8 +145,9 @@ export function Settings() {
             style={{ color: 'var(--color-caution)' }}
           />
           <p>
-            Keys live only in this browser's localStorage and are sent directly to OpenAI / Anthropic.
-            PTScribe is not HIPAA-certified — confirm BAA terms with your providers before using PHI.
+            Keys live only in this browser's localStorage and are sent directly to Cloudflare /
+            Anthropic. PTScribe is not HIPAA-certified — confirm BAA terms with your providers
+            before using PHI.
           </p>
         </div>
 
@@ -163,14 +164,14 @@ export function Settings() {
                 })
               }
             >
-              <option value="openai">OpenAI Whisper</option>
+              <option value="cloudflare">Cloudflare Workers AI (Whisper)</option>
               <option value="webspeech">Browser live (Web Speech)</option>
               <option value="none">Off</option>
             </Select>
           </Field>
-          <Field label="Whisper model">
+          <Field label="Whisper model" hint="Cloudflare model ID">
             <TextInput
-              placeholder="whisper-1"
+              placeholder="@cf/openai/whisper-large-v3-turbo"
               value={settings.ai.transcription.model}
               onChange={(e) =>
                 updateAi({
@@ -179,11 +180,26 @@ export function Settings() {
               }
             />
           </Field>
-          <Field label="OpenAI API key" className="sm:col-span-2">
+          <Field label="Cloudflare account ID" className="sm:col-span-2">
+            <TextInput
+              placeholder="32-character account ID"
+              value={settings.ai.transcription.accountId ?? ''}
+              onChange={(e) =>
+                updateAi({
+                  transcription: {
+                    ...settings.ai.transcription,
+                    accountId: e.target.value || undefined,
+                  },
+                })
+              }
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="Cloudflare API token" className="sm:col-span-2">
             <div className="flex gap-2">
               <TextInput
-                type={showOpenAiKey ? 'text' : 'password'}
-                placeholder="sk-..."
+                type={showCloudflareKey ? 'text' : 'password'}
+                placeholder="Workers AI API token"
                 value={settings.ai.transcription.apiKey ?? ''}
                 onChange={(e) =>
                   updateAi({
@@ -195,9 +211,9 @@ export function Settings() {
               <button
                 type="button"
                 className="btn btn-ghost text-xs"
-                onClick={() => setShowOpenAiKey((v) => !v)}
+                onClick={() => setShowCloudflareKey((v) => !v)}
               >
-                {showOpenAiKey ? 'Hide' : 'Show'}
+                {showCloudflareKey ? 'Hide' : 'Show'}
               </button>
             </div>
           </Field>

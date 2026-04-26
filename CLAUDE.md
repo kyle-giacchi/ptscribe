@@ -1,6 +1,6 @@
 # CLAUDE.md — PTScribe
 
-**PTScribe** is a 100% client-side note-taking + transcription app for physical therapists, modeled on Heidi-style "record the visit, get a structured note." Tracks patients, sessions (audio + transcript + generated note), customizable templates, an exercise library, and per-patient plans of care. Headline workflow: open a session → record (or dictate) → transcribe (Whisper) → generate a structured note (Anthropic) → finalize.
+**PTScribe** is a 100% client-side note-taking + transcription app for physical therapists, modeled on Heidi-style "record the visit, get a structured note." Tracks patients, sessions (audio + transcript + generated note), customizable templates, an exercise library, and per-patient plans of care. Headline workflow: open a session → record (or dictate) → transcribe (Cloudflare Workers AI Whisper) → generate a structured note (Anthropic) → finalize.
 
 ## Before editing
 
@@ -20,7 +20,7 @@
 | Where does load-time validation happen? | `DataRepository.load()` calls `AppDataSchema.safeParse` once ([invariants.md:48](docs/invariants.md#schema-validation-at-boundaries))                |
 | Which hook for which slice?             | Provider/mutator table at [architecture.md:58](docs/architecture.md#provider-responsibilities)                                                       |
 | Built-in templates / exercises?         | Provider-level guards make `update`/`remove` no-ops when `builtin: true`. UI shows Clone, not Edit. ([invariants.md:73](docs/invariants.md#built-in-entities)) |
-| Default models?                         | Transcription = `whisper-1`; generation = `claude-sonnet-4-6`. Both BYO key, browser-direct.                                                          |
+| Default models?                         | Transcription = `@cf/openai/whisper-large-v3-turbo` (Cloudflare Workers AI); generation = `claude-sonnet-4-6` (Anthropic). Both BYO credentials, browser-direct. Cloudflare needs Account ID **and** API Token. |
 | ID generation?                          | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                     |
 
 ## Commands
@@ -43,7 +43,7 @@ npm run test:e2e:update  Update Playwright snapshots
 
 ## Stack
 
-React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (Radix) + React Router 7. Persistence = `localStorage` for `AppData` + IndexedDB for raw audio Blobs. Validation = Zod 4 (I/O boundaries). Testing = Vitest 4 (jsdom) + Playwright. AI = OpenAI Whisper + Anthropic Messages, called browser-direct with a key the clinician pastes into Settings.
+React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (Radix) + React Router 7. Persistence = `localStorage` for `AppData` + IndexedDB for raw audio Blobs. Validation = Zod 4 (I/O boundaries). Testing = Vitest 4 (jsdom) + Playwright. AI = Cloudflare Workers AI Whisper + Anthropic Messages, called browser-direct with credentials the clinician pastes into Settings.
 
 ## Documentation
 
@@ -58,7 +58,7 @@ React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (
 ## Hard rules
 
 - **No backend.** No auth, no server, no analytics. All data is `localStorage` (`AppData`) + IndexedDB (audio) — both client-side.
-- **BYO API key.** Whisper and Anthropic calls go browser → provider directly. Anthropic requests include `anthropic-dangerous-direct-browser-access: true`. The Settings page surfaces a HIPAA disclaimer.
+- **BYO credentials.** Whisper (Cloudflare Workers AI) and Anthropic calls go browser → provider directly. Cloudflare needs both an account ID and an API token. Anthropic requests include `anthropic-dangerous-direct-browser-access: true`. The Settings page surfaces a HIPAA disclaimer.
 - **Single write path.** Components/hooks never touch `localStorage` or IndexedDB directly — go through a slice provider mutator → `updateXSlice` → `DataRepository.save`, or through `AudioRepository` for audio Blobs.
 - **Validate only at I/O boundaries.** `AppDataSchema.safeParse` runs on load and on JSON import. Skip it for in-memory state.
 - **Built-ins are read-only.** Templates and exercises with `builtin: true` cannot be edited or deleted at the provider level — UI offers Clone instead.

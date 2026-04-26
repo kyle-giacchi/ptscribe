@@ -178,9 +178,10 @@ const PlanOfCareSchema = z.object({
 const SettingsSchema = z.object({
   ai: z.object({
     transcription: z.object({
-      provider: z.enum(['openai', 'webspeech', 'none']),
+      provider: z.enum(['cloudflare', 'webspeech', 'none']),
       model: z.string(),
       apiKey: z.string().optional(),
+      accountId: z.string().optional(),
     }),
     generation: z.object({
       provider: z.enum(['anthropic', 'none']),
@@ -240,7 +241,7 @@ export function defaultAppData(): AppData {
     plans: [],
     settings: {
       ai: {
-        transcription: { provider: 'webspeech', model: 'whisper-1' },
+        transcription: { provider: 'webspeech', model: '@cf/openai/whisper-large-v3-turbo' },
         generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
       },
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },

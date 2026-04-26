@@ -5,7 +5,7 @@
 ```
 src/
   services/       DataRepository (localStorage), AudioRepository (IndexedDB),
-                  ai/transcribe.ts (Whisper), ai/generate.ts (Anthropic)
+                  ai/transcribe.ts (Cloudflare Whisper), ai/generate.ts (Anthropic)
   contexts/       AppDataProvider (root) + slice providers (one per domain)
   hooks/          useRecorder, useLiveTranscript
   pages/          Route-level components — consume hooks/contexts only
@@ -90,27 +90,18 @@ Defined in `src/lib/storageKeys.ts`.
 
 ## AI services
 
-Both AI calls run browser → provider directly using a key the clinician pastes into Settings.
+Both AI calls run browser → provider directly using credentials the clinician pastes into Settings.
 
-| Service                      | Provider           | Default model        | Endpoint                                                |
-| ---------------------------- | ------------------ | -------------------- | ------------------------------------------------------- |
-| `transcribe(blob, ai)`       | OpenAI Whisper     | `whisper-1`          | `POST https://api.openai.com/v1/audio/transcriptions`   |
-| `generateNote(prompt, ai)`   | Anthropic Messages | `claude-sonnet-4-6`  | `POST https://api.anthropic.com/v1/messages`            |
+| Service                      | Provider                     | Default model                          | Endpoint                                                                                |
+| ---------------------------- | ---------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `transcribe(blob, ai)`       | Cloudflare Workers AI        | `@cf/openai/whisper-large-v3-turbo`    | `POST https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/run/{model}`         |
+| `generateNote(prompt, ai)`   | Anthropic Messages           | `claude-sonnet-4-6`                    | `POST https://api.anthropic.com/v1/messages`                                            |
 
-Anthropic requests set `anthropic-dangerous-direct-browser-access: true`. The provider value `'none'` short-circuits the call so the workflow stays manual.
+Cloudflare requires both an **account ID** (in the URL) and an **API token** (in `Authorization: Bearer`). Audio is sent base64-encoded in the JSON body. Anthropic requests set `anthropic-dangerous-direct-browser-access: true`. The provider value `'none'` short-circuits the call so the workflow stays manual.
 
-### Whisper scaling — future architecture
+### Browser CORS caveat
 
-The direct browser → OpenAI path has known limits: 25 MB / ~25-min file cap, no chunking, no retries, hard-rate-limit at peak. The recommended evolution (deferred — not yet implemented) is an **optional Cloudflare Worker proxy** the clinician opts into in Settings:
-
-| Capability                | Direct (today) | Worker proxy (future) |
-| ------------------------- | -------------- | --------------------- |
-| 25 MB / ~25 min cap       | hard limit     | Worker chunks audio into 10-min overlapping windows, parallel-fetches Whisper, stitches segments |
-| Retries / backoff         | none           | exponential backoff at the Worker layer                                                         |
-| Key custody               | client only    | client only — Worker proxies, never stores                                                      |
-| No-key mode               | n/a            | optional swap to Cloudflare Workers AI `whisper-large-v3` (~$0.0001/min)                        |
-
-Trade-off: traffic flows through CF infrastructure when the proxy is enabled. The default stays direct so the privacy story is unchanged for clinicians who keep the toggle off.
+The Cloudflare Workers AI REST endpoint is intended for server-to-server use; if Cloudflare blocks browser origins via CORS, transcription will fail with a network error. The fall-back path (deferred) is to put a tiny Cloudflare Worker in front that adds CORS headers and re-uses the clinician's same token. That breaks the "100% client-side" rule, so it stays out of scope until a real CORS issue is reported.
 
 ## Schema validation
 
