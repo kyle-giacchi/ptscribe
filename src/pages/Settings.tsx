@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
   Download,
   Upload,
@@ -22,8 +22,6 @@ export function Settings() {
   const { settings, updateAi, updateUi } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
   const importRef = useRef<HTMLInputElement>(null);
-  const [showCloudflareKey, setShowCloudflareKey] = useState(false);
-  const [showAnthropicKey, setShowAnthropicKey] = useState(false);
 
   function handleExport() {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -138,9 +136,10 @@ export function Settings() {
         <div style={{ display: 'grid', gap: 12 }}>
           <Eyebrow>AI providers</Eyebrow>
           <DisclaimerStrip>
-            Keys live only in this browser's localStorage and are sent directly to Cloudflare /
-            Anthropic. PTScribe is not HIPAA-certified — confirm BAA terms with your providers
-            before using PHI.
+            This testing build uses hosted credentials managed on the server, so audio and
+            transcripts are proxied through our Cloudflare Worker on their way to Cloudflare
+            Workers AI (Whisper) and Anthropic. Treat anything you record as PHI in transit.
+            PTScribe is not HIPAA-certified.
           </DisclaimerStrip>
 
           <div
@@ -179,44 +178,6 @@ export function Settings() {
               />
             </Field>
           </div>
-          <Field label="Cloudflare account ID">
-            <TextInput
-              placeholder="32-character account ID"
-              value={settings.ai.transcription.accountId ?? ''}
-              onChange={(e) =>
-                updateAi({
-                  transcription: {
-                    ...settings.ai.transcription,
-                    accountId: e.target.value || undefined,
-                  },
-                })
-              }
-              autoComplete="off"
-            />
-          </Field>
-          <Field label="Cloudflare API token">
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <TextInput
-                  type={showCloudflareKey ? 'text' : 'password'}
-                  placeholder="Workers AI API token"
-                  value={settings.ai.transcription.apiKey ?? ''}
-                  onChange={(e) =>
-                    updateAi({
-                      transcription: {
-                        ...settings.ai.transcription,
-                        apiKey: e.target.value || undefined,
-                      },
-                    })
-                  }
-                  autoComplete="off"
-                />
-              </div>
-              <PtButton variant="ghost" onClick={() => setShowCloudflareKey((v) => !v)}>
-                {showCloudflareKey ? 'Hide' : 'Show'}
-              </PtButton>
-            </div>
-          </Field>
 
           <div
             style={{
@@ -253,29 +214,6 @@ export function Settings() {
               />
             </Field>
           </div>
-          <Field label="Anthropic API key">
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ flex: 1 }}>
-                <TextInput
-                  type={showAnthropicKey ? 'text' : 'password'}
-                  placeholder="sk-ant-..."
-                  value={settings.ai.generation.apiKey ?? ''}
-                  onChange={(e) =>
-                    updateAi({
-                      generation: {
-                        ...settings.ai.generation,
-                        apiKey: e.target.value || undefined,
-                      },
-                    })
-                  }
-                  autoComplete="off"
-                />
-              </div>
-              <PtButton variant="ghost" onClick={() => setShowAnthropicKey((v) => !v)}>
-                {showAnthropicKey ? 'Hide' : 'Show'}
-              </PtButton>
-            </div>
-          </Field>
         </div>
       </SurfaceCard>
 
