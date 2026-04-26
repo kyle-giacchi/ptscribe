@@ -12,6 +12,7 @@ import {
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { Field, TextInput } from '@/components/ui/Field';
+import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { duration, ease } from '@/lib/motion';
 
 type Step = 'welcome' | 'profile' | 'ai' | 'done';
@@ -22,20 +23,41 @@ export function Setup() {
   const flowIndex = FLOW.indexOf(step);
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-bg)' }}>
-      <div className="mx-auto max-w-2xl px-6 py-12">
-        <header className="mb-8 flex items-center gap-3">
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'var(--color-pt-bg)',
+        padding: '48px 24px',
+      }}
+    >
+      <div style={{ maxWidth: 640, margin: '0 auto', display: 'grid', gap: 24 }}>
+        <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent-deep)' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: 'var(--color-pt-accent-soft)',
+              color: 'var(--color-pt-accent-fg)',
+            }}
           >
-            <Stethoscope size={18} strokeWidth={1.75} />
+            <Stethoscope size={20} strokeWidth={1.75} />
           </div>
           <div>
-            <div className="font-display text-xl" style={{ color: 'var(--color-fg)' }}>
-              PT <span style={{ color: 'var(--color-accent-deep)' }}>Notes</span>
+            <div
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: 'var(--color-pt-text)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              PT <span style={{ color: 'var(--color-pt-accent-fg)' }}>Scribe</span>
             </div>
-            <div className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
               {step === 'welcome'
                 ? 'A clinical scribe that lives in your browser.'
                 : 'A few quick questions and you’re ready to record.'}
@@ -45,24 +67,22 @@ export function Setup() {
 
         {flowIndex >= 0 && step !== 'done' && <Stepper current={flowIndex} />}
 
-        <div className="mt-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -12 }}
-              transition={{ duration: duration.base, ease: ease.enter }}
-            >
-              {step === 'welcome' && <WelcomeStep onStart={() => setStep('profile')} />}
-              {step === 'profile' && <ProfileStep onNext={() => setStep('ai')} />}
-              {step === 'ai' && (
-                <AIStep onBack={() => setStep('profile')} onNext={() => setStep('done')} />
-              )}
-              {step === 'done' && <DoneStep />}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: duration.base, ease: ease.enter }}
+          >
+            {step === 'welcome' && <WelcomeStep onStart={() => setStep('profile')} />}
+            {step === 'profile' && <ProfileStep onNext={() => setStep('ai')} />}
+            {step === 'ai' && (
+              <AIStep onBack={() => setStep('profile')} onNext={() => setStep('done')} />
+            )}
+            {step === 'done' && <DoneStep />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -70,12 +90,20 @@ export function Setup() {
 
 function WelcomeStep({ onStart }: { onStart: () => void }) {
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'grid', gap: 20 }}>
       <div>
-        <h1 className="font-display text-3xl leading-tight" style={{ color: 'var(--color-fg)' }}>
+        <h1
+          style={{
+            fontSize: 30,
+            fontWeight: 700,
+            color: 'var(--color-pt-text)',
+            margin: 0,
+            letterSpacing: '-0.02em',
+          }}
+        >
           Welcome.
         </h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+        <p style={{ marginTop: 8, fontSize: 13.5, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
           Record a session, get a structured note. Patients, sessions, notes, templates, and
           exercises all live in this browser. Nothing is sent to a server we operate.
         </p>
@@ -83,9 +111,15 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
 
       <DisclaimerCard />
 
-      <button type="button" className="btn btn-primary" onClick={onStart}>
-        Get started <ArrowRight size={14} strokeWidth={2} />
-      </button>
+      <div>
+        <PtButton
+          variant="primary"
+          iconRight={<ArrowRight size={14} strokeWidth={2} />}
+          onClick={onStart}
+        >
+          Get started
+        </PtButton>
+      </div>
     </div>
   );
 }
@@ -108,46 +142,53 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'grid', gap: 20 }}>
       <StepHeading
         title="Your profile"
         subtitle="Used to label notes and the top bar. You can edit this later in Settings."
       />
-      <div className="card space-y-4">
-        <Field label="Your name">
-          <TextInput
-            placeholder="e.g., Dr. Alex Rivera"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-        <Field label="Credentials" hint="Shown after your name (e.g., DPT, OCS)">
-          <TextInput
-            placeholder="DPT, OCS"
-            value={credentials}
-            onChange={(e) => setCredentials(e.target.value)}
-          />
-        </Field>
-        <Field label="Practice name" hint="Optional">
-          <TextInput
-            placeholder="Coastline Physical Therapy"
-            value={practiceName}
-            onChange={(e) => setPracticeName(e.target.value)}
-          />
-        </Field>
-        <Field label="NPI" hint="Optional">
-          <TextInput
-            placeholder="10-digit NPI"
-            value={npi}
-            onChange={(e) => setNpi(e.target.value)}
-          />
-        </Field>
-      </div>
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Field label="Your name">
+            <TextInput
+              placeholder="e.g., Dr. Alex Rivera"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </Field>
+          <Field label="Credentials" hint="Shown after your name (e.g., DPT, OCS)">
+            <TextInput
+              placeholder="DPT, OCS"
+              value={credentials}
+              onChange={(e) => setCredentials(e.target.value)}
+            />
+          </Field>
+          <Field label="Practice name" hint="Optional">
+            <TextInput
+              placeholder="Coastline Physical Therapy"
+              value={practiceName}
+              onChange={(e) => setPracticeName(e.target.value)}
+            />
+          </Field>
+          <Field label="NPI" hint="Optional">
+            <TextInput
+              placeholder="10-digit NPI"
+              value={npi}
+              onChange={(e) => setNpi(e.target.value)}
+            />
+          </Field>
+        </div>
+      </SurfaceCard>
 
-      <div className="flex justify-end">
-        <button type="button" className="btn btn-primary" disabled={!name.trim()} onClick={handleNext}>
-          Next: AI providers <ArrowRight size={14} strokeWidth={2} />
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <PtButton
+          variant="primary"
+          disabled={!name.trim()}
+          onClick={handleNext}
+          iconRight={<ArrowRight size={14} strokeWidth={2} />}
+        >
+          Next: AI providers
+        </PtButton>
       </div>
     </div>
   );
@@ -180,61 +221,71 @@ function AIStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) 
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'grid', gap: 20 }}>
       <StepHeading
         title="AI providers (optional)"
         subtitle="Paste your credentials if you want server-quality transcription and AI-drafted notes. You can skip this and use the live web transcription, or add keys later."
       />
 
-      <div className="card space-y-4">
-        <Field
-          label="Cloudflare account ID — for Whisper transcription"
-          hint="Found in your Cloudflare dashboard. Required to call Workers AI."
-        >
-          <TextInput
-            placeholder="32-character account ID"
-            value={cloudflareAccountId}
-            onChange={(e) => setCloudflareAccountId(e.target.value)}
-            autoComplete="off"
-          />
-        </Field>
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Field
+            label="Cloudflare account ID — for Whisper transcription"
+            hint="Found in your Cloudflare dashboard. Required to call Workers AI."
+          >
+            <TextInput
+              placeholder="32-character account ID"
+              value={cloudflareAccountId}
+              onChange={(e) => setCloudflareAccountId(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
 
-        <Field
-          label="Cloudflare API token — for Whisper transcription"
-          hint="A Workers AI–scoped API token. If either field is empty, the app falls back to the browser’s built-in speech recognition."
-        >
-          <TextInput
-            type="password"
-            placeholder="Workers AI API token"
-            value={cloudflareToken}
-            onChange={(e) => setCloudflareToken(e.target.value)}
-            autoComplete="off"
-          />
-        </Field>
+          <Field
+            label="Cloudflare API token — for Whisper transcription"
+            hint="A Workers AI–scoped API token. If either field is empty, the app falls back to the browser’s built-in speech recognition."
+          >
+            <TextInput
+              type="password"
+              placeholder="Workers AI API token"
+              value={cloudflareToken}
+              onChange={(e) => setCloudflareToken(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
 
-        <Field
-          label="Anthropic API key — for note generation"
-          hint="Used to turn the transcript into a structured SOAP / Eval / Progress note. If empty, you can still type notes manually."
-        >
-          <TextInput
-            type="password"
-            placeholder="sk-ant-..."
-            value={anthropicKey}
-            onChange={(e) => setAnthropicKey(e.target.value)}
-            autoComplete="off"
-          />
-        </Field>
-      </div>
+          <Field
+            label="Anthropic API key — for note generation"
+            hint="Used to turn the transcript into a structured SOAP / Eval / Progress note. If empty, you can still type notes manually."
+          >
+            <TextInput
+              type="password"
+              placeholder="sk-ant-..."
+              value={anthropicKey}
+              onChange={(e) => setAnthropicKey(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+      </SurfaceCard>
 
       <DisclaimerCard />
 
-      <div className="flex justify-between">
-        <button type="button" className="btn btn-ghost" onClick={onBack}>
-          <ArrowLeft size={14} strokeWidth={2} /> Back
-        </button>
-        <button type="button" className="btn btn-primary" onClick={handleNext}>
-          Finish setup <ArrowRight size={14} strokeWidth={2} />
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <PtButton
+          variant="ghost"
+          iconLeft={<ArrowLeft size={14} strokeWidth={2} />}
+          onClick={onBack}
+        >
+          Back
+        </PtButton>
+        <PtButton
+          variant="primary"
+          iconRight={<ArrowRight size={14} strokeWidth={2} />}
+          onClick={handleNext}
+        >
+          Finish setup
+        </PtButton>
       </div>
     </div>
   );
@@ -243,29 +294,24 @@ function AIStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) 
 function DoneStep() {
   const navigate = useNavigate();
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'grid', gap: 20 }}>
       <StepHeading
         title="You’re all set"
         subtitle="Add your first patient from the Patients page, or jump straight into a session."
       />
-      <div className="flex gap-3">
-        <button
-          type="button"
-          className="btn btn-primary"
+      <div style={{ display: 'flex', gap: 10 }}>
+        <PtButton
+          variant="primary"
           onClick={() => {
             toast.success('Setup complete');
             navigate('/patients', { replace: true });
           }}
         >
           Add a patient
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => navigate('/', { replace: true })}
-        >
+        </PtButton>
+        <PtButton variant="ghost" onClick={() => navigate('/', { replace: true })}>
           Go to dashboard
-        </button>
+        </PtButton>
       </div>
     </div>
   );
@@ -274,29 +320,36 @@ function DoneStep() {
 function DisclaimerCard() {
   return (
     <div
-      className="flex gap-3 rounded-xl border p-4 text-xs leading-relaxed"
       style={{
-        borderColor: 'var(--color-border)',
-        background: 'var(--color-surface-2)',
-        color: 'var(--color-fg-muted)',
+        display: 'flex',
+        gap: 12,
+        padding: 14,
+        borderRadius: 12,
+        border: '1px solid var(--color-pt-border)',
+        background: 'var(--color-pt-surface-mut)',
+        fontSize: 12,
+        lineHeight: 1.55,
+        color: 'var(--color-pt-text-2)',
       }}
     >
       <ShieldAlert
         size={16}
         strokeWidth={1.75}
-        className="mt-0.5 shrink-0"
-        style={{ color: 'var(--color-caution)' }}
+        style={{ marginTop: 2, flexShrink: 0, color: 'var(--color-pt-amber)' }}
       />
-      <div className="space-y-1.5">
-        <p>
-          <strong style={{ color: 'var(--color-fg)' }}>Privacy &amp; HIPAA.</strong> PTScribe runs
-          entirely in your browser. Patient data lives in this device’s local storage. Enabling AI
-          transcription or note generation sends audio and transcripts directly to the provider you
-          configured (Cloudflare / Anthropic) using your credentials.
+      <div style={{ display: 'grid', gap: 6 }}>
+        <p style={{ margin: 0 }}>
+          <strong style={{ color: 'var(--color-pt-text)' }}>Privacy &amp; HIPAA.</strong> PTScribe
+          runs entirely in your browser. Patient data lives in this device’s local storage. Enabling
+          AI transcription or note generation sends audio and transcripts directly to the provider
+          you configured (Cloudflare / Anthropic) using your credentials.
         </p>
-        <p>
-          Nothing is sent to a server we operate. <strong>PTScribe is not HIPAA-certified
-          software</strong> — confirm BAA terms with your providers before using it with PHI.
+        <p style={{ margin: 0 }}>
+          Nothing is sent to a server we operate.{' '}
+          <strong style={{ color: 'var(--color-pt-text)' }}>
+            PTScribe is not HIPAA-certified software
+          </strong>{' '}
+          — confirm BAA terms with your providers before using it with PHI.
         </p>
       </div>
     </div>
@@ -306,32 +359,49 @@ function DisclaimerCard() {
 function Stepper({ current }: { current: number }) {
   const steps = ['Profile', 'AI', 'Done'];
   return (
-    <ol className="flex items-center gap-2">
+    <ol style={{ display: 'flex', alignItems: 'center', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
       {steps.map((label, i) => {
         const done = i < current;
         const active = i === current;
         return (
-          <li key={label} className="flex flex-1 items-center gap-2">
+          <li key={label} style={{ display: 'flex', flex: 1, alignItems: 'center', gap: 8 }}>
             <span
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium transition-colors"
               style={{
-                background: done || active ? 'var(--color-accent)' : 'var(--color-surface-2)',
-                color: done || active ? 'white' : 'var(--color-fg-subtle)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                fontSize: 12,
+                fontWeight: 600,
+                background:
+                  done || active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
+                color: done || active ? '#ffffff' : 'var(--color-pt-text-3)',
+                flexShrink: 0,
+                transition: 'background 120ms ease',
               }}
             >
               {done ? <Check size={12} strokeWidth={2.5} /> : i + 1}
             </span>
             <span
-              className="text-xs"
-              style={{ color: active ? 'var(--color-fg)' : 'var(--color-fg-subtle)' }}
+              style={{
+                fontSize: 12,
+                color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-3)',
+                fontWeight: active ? 600 : 400,
+              }}
             >
               {label}
             </span>
             {i < steps.length - 1 && (
               <span
-                className="ml-1 h-px flex-1"
-                style={{ background: 'var(--color-border)' }}
                 aria-hidden
+                style={{
+                  marginLeft: 4,
+                  height: 1,
+                  flex: 1,
+                  background: 'var(--color-pt-border)',
+                }}
               />
             )}
           </li>
@@ -344,10 +414,19 @@ function Stepper({ current }: { current: number }) {
 function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div>
-      <h1 className="font-display text-2xl" style={{ color: 'var(--color-fg)' }}>
+      <Eyebrow>Step</Eyebrow>
+      <h1
+        style={{
+          marginTop: 4,
+          fontSize: 22,
+          fontWeight: 700,
+          color: 'var(--color-pt-text)',
+          letterSpacing: '-0.01em',
+        }}
+      >
         {title}
       </h1>
-      <p className="mt-1 text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+      <p style={{ marginTop: 6, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
         {subtitle}
       </p>
     </div>
