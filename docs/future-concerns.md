@@ -11,6 +11,7 @@ Living list of issues we knowingly punted when we moved AI calls behind a Cloudf
 
 - **Public URL is reachable to anyone.** The 6-digit gate is a soft UX gate, not security. Anyone who completes the gate can see the code in DevTools network panel; anyone who finds the deploy URL can also brute-force 1M combinations against `/api/*` if they want.
 - **No rate limiting.** Add Cloudflare rate-limiting rules (or a simple in-memory counter keyed by IP in the Worker) before this is exposed to anyone outside the trusted-test group. 10 bad gate attempts per minute per IP is a sensible starting cap.
+- **AI-call caps are client-side only.** `Session.tsx` enforces a 3 s cooldown and a 10 transcribes / 10 generates cap per mounted session against accidental double-clicks and casual abuse. These reset on reload and can be bypassed trivially from DevTools — they are NOT a hard cap. Move to a server-side rate limit (KV counter or Durable Object keyed off the gate code or IP) before any wider exposure. While we're at it, also enforce a per-day Anthropic / Workers AI ceiling at the Worker so a leaked gate can't drain the account.
 - **No structured audit log.** We have observability enabled but no separate "who hit /api with what gate code" trail. If the URL leaks we can't tell who did what.
 
 ## Privacy / PHI

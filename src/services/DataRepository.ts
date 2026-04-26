@@ -16,6 +16,12 @@ function looksLikeEnvelope(raw: string): boolean {
   }
 }
 
+/**
+ * Persistence boundary for `AppData`. When the vault is unlocked, every
+ * read/write here round-trips through AES-GCM — callers always see plaintext.
+ * Do not add a second persistence path that writes to `ptnotes.appData`
+ * outside this module; see docs/invariants.md#vault-and-at-rest-encryption.
+ */
 export const dataRepository = {
   async load(): Promise<AppData | null> {
     const raw = safeLocalStorage.getItem(STORAGE_KEYS.appData);

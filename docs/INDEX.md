@@ -14,7 +14,9 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | First-run guard rules (`/setup` redirect)                                | [invariants.md:81](invariants.md#first-run-guard)                           |
 | 5 MB localStorage cap + audio offload to IndexedDB                       | [invariants.md:89](invariants.md#storage-cap-and-audio-offload)             |
 | ID generation (`newId()` / UUID)                                         | [invariants.md:95](invariants.md#id-generation)                             |
-| BYO API key model (no server proxy)                                      | [invariants.md:101](invariants.md#byo-api-key--no-server-proxy)             |
+| AI calls via Worker proxy (`/api/transcribe`, `/api/generate`)           | [invariants.md](invariants.md#ai-calls-go-through-the-worker-proxy)         |
+| Vault / at-rest encryption boundary (Repository layer)                   | [invariants.md](invariants.md#vault-and-at-rest-encryption)                 |
+| Recorder lifecycle (wake lock + visibility)                              | [invariants.md](invariants.md#recorder-lifecycle-wake-lock--visibility)     |
 | Adding a domain field (4-step ripple)                                    | [invariants.md:111](invariants.md#type-changes-ripple)                      |
 | Boot sequence (load → migrate → safeParse → fallback)                    | [architecture.md:34](architecture.md#boot-sequence)                         |
 | Units (ms timestamps, minutes, UUIDs, Markdown)                          | [architecture.md:48](architecture.md#units-and-coordinate-systems)          |
@@ -58,7 +60,9 @@ Non-obvious rules that fail silently if violated. **Read first before any cross-
 | First-run guard                 | Redirect rule keyed on empty `clinician.name`; tolerate one frame of empty state.                             |
 | Storage cap + audio offload     | 5 MB localStorage cap; audio Blobs go to IndexedDB via `AudioRepository`.                                     |
 | ID generation                   | Always `newId()` (UUID); never timestamps/counters.                                                           |
-| BYO API key                     | Browser → Cloudflare Whisper / Anthropic directly; HIPAA disclaimer on Settings.                              |
+| Worker-proxied AI              | All AI calls go through our Cloudflare Worker; gate code in `x-ptscribe-key` is obscurity, not auth.          |
+| Vault and at-rest encryption    | Repository layer round-trips AppData + audio through AES-GCM; tab-lifetime DEK; no passphrase recovery.       |
+| Recorder lifecycle              | `useRecorder` owns wake lock + `visibilitychange` listener; release on every exit path.                       |
 | Type changes ripple             | 4-step checklist: types + schema + default + migration.                                                       |
 
 ### [docs/style-guide.md](style-guide.md)

@@ -39,6 +39,13 @@ function pickMimeType(): string | undefined {
   return undefined;
 }
 
+/**
+ * Owns three resources for the lifetime of each clip: the `MediaRecorder`,
+ * a `'screen'` `WakeLockSentinel`, and a `visibilitychange` listener. All
+ * three must be released on every exit path (stop, reset, error, unmount)
+ * via `teardown()`. Wake lock is best-effort and never blocks recording.
+ * See docs/invariants.md#recorder-lifecycle-wake-lock--visibility.
+ */
 export function useRecorder(): UseRecorder {
   const [status, setStatus] = useState<RecorderStatus>('idle');
   const [error, setError] = useState<string | null>(null);
