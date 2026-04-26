@@ -10,12 +10,18 @@ import {
   TrendingUp,
   ClipboardCheck,
   Check,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput } from '@/components/ui/Field';
+import {
+  Avatar,
+  Eyebrow,
+  PtButton,
+  SurfaceCard,
+} from '@/components/design';
 import { duration, ease } from '@/lib/motion';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -93,7 +99,6 @@ export function NewSession() {
       );
   }, [patients, query]);
 
-  // Templates scoped to the current visit type. Built-ins surface first.
   const visitTemplates = useMemo(() => {
     const fmt = TYPE_TO_FORMAT[sessionType];
     return templates
@@ -153,106 +158,163 @@ export function NewSession() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <Link to="/" className="btn btn-ghost w-fit">
-        <ArrowLeft size={14} strokeWidth={2} /> Dashboard
-      </Link>
-
-      <PageHeader
-        title="New session"
-        subtitle="Pick a patient, choose the visit type, then start recording."
-        Icon={Mic}
-      />
+    <div style={{ padding: 22, display: 'grid', gap: 16, maxWidth: 880, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Link
+          to="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--color-pt-text-3)',
+            textDecoration: 'none',
+          }}
+        >
+          <ArrowLeft size={14} strokeWidth={2} /> Dashboard
+        </Link>
+        <Eyebrow>New session</Eyebrow>
+      </div>
 
       {patients.length === 0 ? (
-        <div className="card flex flex-col items-center gap-3 py-10 text-center">
-          <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-            You need a patient before you can start a session.
-          </p>
-          <Link to="/patients" className="btn btn-primary">
-            <Plus size={14} strokeWidth={2} /> Add a patient
-          </Link>
-        </div>
+        <SurfaceCard padding={28}>
+          <div
+            style={{
+              display: 'grid',
+              justifyItems: 'center',
+              gap: 12,
+              textAlign: 'center',
+            }}
+          >
+            <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
+              You need a patient before you can start a session.
+            </p>
+            <Link to="/patients" style={{ textDecoration: 'none' }}>
+              <PtButton variant="primary" iconLeft={<Plus size={14} strokeWidth={2} />}>
+                Add a patient
+              </PtButton>
+            </Link>
+          </div>
+        </SurfaceCard>
       ) : (
         <>
-          <section className="card space-y-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-                Patient
-              </h2>
-              <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                {filteredPatients.length}{' '}
-                {filteredPatients.length === 1 ? 'patient' : 'patients'}
-              </span>
+          <SurfaceCard padding={18}>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <Eyebrow>Patient</Eyebrow>
+                <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                  {filteredPatients.length}{' '}
+                  {filteredPatients.length === 1 ? 'patient' : 'patients'}
+                </span>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <Search
+                  size={14}
+                  style={{
+                    position: 'absolute',
+                    left: 12,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--color-pt-text-3)',
+                  }}
+                />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search patients…"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px 9px 32px',
+                    borderRadius: 9,
+                    border: '1px solid var(--color-pt-border)',
+                    fontSize: 13,
+                    color: 'var(--color-pt-text)',
+                    background: 'var(--color-pt-surface)',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+              {filteredPatients.length === 0 ? (
+                <div
+                  style={{
+                    padding: '20px 12px',
+                    border: '1px dashed var(--color-pt-border)',
+                    borderRadius: 10,
+                    textAlign: 'center',
+                    fontSize: 12.5,
+                    color: 'var(--color-pt-text-3)',
+                  }}
+                >
+                  No matching patients.
+                </div>
+              ) : (
+                <ul
+                  role="radiogroup"
+                  aria-label="Patient"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                    gap: 8,
+                    maxHeight: 280,
+                    overflowY: 'auto',
+                    listStyle: 'none',
+                    margin: 0,
+                    padding: 0,
+                  }}
+                >
+                  {filteredPatients.map((p) => (
+                    <PatientChip
+                      key={p.id}
+                      patient={p}
+                      selected={p.id === patientId}
+                      onSelect={() => setPatientId(p.id)}
+                    />
+                  ))}
+                </ul>
+              )}
             </div>
-            <TextInput
-              placeholder="Search patients…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {filteredPatients.length === 0 ? (
+          </SurfaceCard>
+
+          <SurfaceCard padding={18}>
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <Eyebrow>Visit type</Eyebrow>
+                <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                  Drives the note structure
+                </span>
+              </div>
+
               <div
-                className="rounded-lg border border-dashed py-6 text-center text-sm"
+                role="radiogroup"
+                aria-label="Visit type"
                 style={{
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-fg-subtle)',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 8,
                 }}
               >
-                No matching patients.
-              </div>
-            ) : (
-              <ul
-                className="grid max-h-72 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2"
-                role="radiogroup"
-                aria-label="Patient"
-              >
-                {filteredPatients.map((p) => (
-                  <PatientChip
-                    key={p.id}
-                    patient={p}
-                    selected={p.id === patientId}
-                    onSelect={() => setPatientId(p.id)}
+                {VISIT_TYPES.map((vt) => (
+                  <VisitTypeCard
+                    key={vt.type}
+                    visitType={vt}
+                    selected={vt.type === sessionType}
+                    onSelect={() => chooseVisitType(vt.type)}
                   />
                 ))}
-              </ul>
-            )}
-          </section>
+              </div>
 
-          <section className="card space-y-4">
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-                Visit type
-              </h2>
-              <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                Drives the note structure
-              </span>
+              <TemplateSection
+                sessionType={sessionType}
+                visitTemplates={visitTemplates}
+                effectiveTemplateId={effectiveTemplateId}
+                showAllTemplates={showAllTemplates}
+                onPickTemplate={setTemplateId}
+                onShowAll={() => setShowAllTemplates(true)}
+                onCreate={() => setCreatingTemplate(true)}
+              />
             </div>
-
-            <div
-              className="grid gap-2 sm:grid-cols-2"
-              role="radiogroup"
-              aria-label="Visit type"
-            >
-              {VISIT_TYPES.map((vt) => (
-                <VisitTypeCard
-                  key={vt.type}
-                  visitType={vt}
-                  selected={vt.type === sessionType}
-                  onSelect={() => chooseVisitType(vt.type)}
-                />
-              ))}
-            </div>
-
-            <TemplateSection
-              sessionType={sessionType}
-              visitTemplates={visitTemplates}
-              effectiveTemplateId={effectiveTemplateId}
-              showAllTemplates={showAllTemplates}
-              onPickTemplate={setTemplateId}
-              onShowAll={() => setShowAllTemplates(true)}
-              onCreate={() => setCreatingTemplate(true)}
-            />
-          </section>
+          </SurfaceCard>
 
           <StartBar
             patient={selectedPatient}
@@ -286,6 +348,7 @@ function PatientChip({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const fullName = `${patient.firstName} ${patient.lastName}`;
   return (
     <li>
       <button
@@ -293,31 +356,66 @@ function PatientChip({
         role="radio"
         aria-checked={selected}
         onClick={onSelect}
-        className="relative flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg border px-3 py-2 pr-7 text-left transition-colors hover:bg-[var(--color-surface-2)] focus-visible:outline-none focus-visible:ring-2"
         style={{
-          borderColor: selected ? 'var(--color-accent)' : 'var(--color-border-soft)',
-          background: selected ? 'var(--color-accent-soft)' : 'var(--color-bg)',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          width: '100%',
+          padding: '9px 12px',
+          paddingRight: 28,
+          borderRadius: 10,
+          border: `1px solid ${selected ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
+          background: selected ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+          textAlign: 'left',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          transition: 'background 120ms ease, border-color 120ms ease',
         }}
       >
-        <span
-          className="block w-full truncate text-sm font-medium"
-          style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)' }}
-        >
-          {patient.lastName}, {patient.firstName}
-        </span>
-        <span
-          className="block w-full truncate text-xs"
-          style={{
-            color: selected ? 'var(--color-fg-muted)' : 'var(--color-fg-subtle)',
-          }}
-        >
-          {patient.primaryDiagnosis ?? 'No primary diagnosis'}
-        </span>
+        <Avatar name={fullName} size={32} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {patient.lastName}, {patient.firstName}
+          </div>
+          <div
+            style={{
+              fontSize: 11.5,
+              color: 'var(--color-pt-text-3)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              marginTop: 1,
+            }}
+          >
+            {patient.primaryDiagnosis ?? 'No primary diagnosis'}
+          </div>
+        </div>
         {selected && (
           <span
-            className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full"
-            style={{ background: 'var(--color-accent)', color: 'oklch(0.99 0 0)' }}
             aria-hidden
+            style={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              background: 'var(--color-pt-accent)',
+              color: '#ffffff',
+            }}
           >
             <Check size={10} strokeWidth={3} />
           </span>
@@ -343,33 +441,53 @@ function VisitTypeCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className="group flex items-start gap-3 rounded-xl border p-3 text-left transition-all duration-200 hover:bg-[var(--color-surface-2)] focus-visible:outline-none focus-visible:ring-2"
       style={{
-        borderColor: selected ? 'var(--color-accent)' : 'var(--color-border-soft)',
-        background: selected ? 'var(--color-accent-soft)' : 'var(--color-bg)',
-        boxShadow: selected ? 'var(--shadow-sm)' : undefined,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        padding: 12,
+        borderRadius: 12,
+        border: `1px solid ${selected ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
+        background: selected ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+        textAlign: 'left',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        transition: 'background 120ms ease, border-color 120ms ease',
       }}
     >
       <span
-        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
         style={{
-          background: selected ? 'var(--color-accent)' : 'var(--color-surface-2)',
-          color: selected ? 'oklch(0.99 0 0)' : 'var(--color-fg-muted)',
+          marginTop: 2,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: selected ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
+          color: selected ? '#ffffff' : 'var(--color-pt-text-2)',
+          flexShrink: 0,
         }}
       >
         <Icon size={16} strokeWidth={2} />
       </span>
-      <span className="min-w-0 flex-1">
+      <span style={{ minWidth: 0, flex: 1 }}>
         <span
-          className="block text-sm font-medium"
-          style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)' }}
+          style={{
+            display: 'block',
+            fontSize: 13.5,
+            fontWeight: 600,
+            color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
+          }}
         >
           {title}
         </span>
         <span
-          className="mt-0.5 block text-xs"
           style={{
-            color: selected ? 'var(--color-fg-muted)' : 'var(--color-fg-subtle)',
+            display: 'block',
+            fontSize: 12,
+            color: 'var(--color-pt-text-3)',
+            marginTop: 2,
           }}
         >
           {description}
@@ -401,7 +519,12 @@ function TemplateSection({
   const compactTemplate =
     visitTemplates.find((t) => t.id === effectiveTemplateId) ?? visitTemplates[0];
   return (
-    <div className="border-t pt-4" style={{ borderColor: 'var(--color-border-soft)' }}>
+    <div
+      style={{
+        borderTop: '1px solid var(--color-pt-border)',
+        paddingTop: 14,
+      }}
+    >
       <AnimatePresence mode="wait">
         <motion.div
           key={sessionType}
@@ -409,29 +532,36 @@ function TemplateSection({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: duration.base, ease: ease.enter }}
-          className="space-y-3"
+          style={{ display: 'grid', gap: 10 }}
         >
-          <div className="flex items-baseline justify-between">
-            <h3 className="text-sm font-medium" style={{ color: 'var(--color-fg)' }}>
-              Template
-            </h3>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <Eyebrow>Template</Eyebrow>
             <button
               type="button"
               onClick={onCreate}
-              className="text-xs hover:underline"
-              style={{ color: 'var(--color-accent-fg)' }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 11.5,
+                color: 'var(--color-pt-accent-fg)',
+                cursor: 'pointer',
+                padding: 0,
+                fontFamily: 'inherit',
+              }}
             >
-              <Plus size={11} strokeWidth={2} className="mr-0.5 inline" />
+              <Plus size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 2, verticalAlign: 'middle' }} />
               New custom template
             </button>
           </div>
 
           {isEmpty && (
             <div
-              className="rounded-lg border border-dashed p-3 text-xs"
               style={{
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-fg-muted)',
+                border: '1px dashed var(--color-pt-border)',
+                borderRadius: 10,
+                padding: 12,
+                fontSize: 12,
+                color: 'var(--color-pt-text-3)',
               }}
             >
               No templates available for this visit type. Create one to continue, or
@@ -448,7 +578,7 @@ function TemplateSection({
           )}
 
           {!isEmpty && !showCompact && (
-            <ul className="space-y-1.5">
+            <ul style={{ display: 'grid', gap: 6, listStyle: 'none', margin: 0, padding: 0 }}>
               {visitTemplates.map((t) => (
                 <TemplateOption
                   key={t.id}
@@ -480,34 +610,58 @@ function TemplateOption({
         type="button"
         onClick={onSelect}
         aria-pressed={selected}
-        className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)]"
         style={{
-          borderColor: selected ? 'var(--color-accent)' : 'var(--color-border-soft)',
-          background: selected ? 'var(--color-accent-soft)' : undefined,
+          display: 'flex',
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '8px 12px',
+          borderRadius: 10,
+          border: `1px solid ${selected ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
+          background: selected ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+          textAlign: 'left',
+          fontSize: 13,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
         }}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span style={{ display: 'flex', minWidth: 0, flex: 1, alignItems: 'center', gap: 8 }}>
           <span
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
-            style={{
-              borderColor: selected ? 'var(--color-accent)' : 'var(--color-border)',
-              background: selected ? 'var(--color-accent)' : 'transparent',
-              color: 'oklch(0.99 0 0)',
-            }}
             aria-hidden
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              border: `1px solid ${selected ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
+              background: selected ? 'var(--color-pt-accent)' : 'transparent',
+              color: '#ffffff',
+              flexShrink: 0,
+            }}
           >
             {selected && <Check size={10} strokeWidth={3} />}
           </span>
           <span
-            className="truncate font-medium"
-            style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)' }}
+            style={{
+              fontWeight: 600,
+              color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
           >
             {template.name}
           </span>
         </span>
         <span
-          className="shrink-0 text-xs"
-          style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg-muted)' }}
+          style={{
+            flexShrink: 0,
+            fontSize: 11.5,
+            color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
+          }}
         >
           {template.builtin ? 'Built-in' : 'Custom'} · {template.sections.length} sections
         </span>
@@ -528,39 +682,55 @@ function CompactTemplate({
   if (!template) return null;
   return (
     <div
-      className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
       style={{
-        borderColor: 'var(--color-border-soft)',
-        background: 'var(--color-surface-2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '10px 12px',
+        borderRadius: 10,
+        border: '1px solid var(--color-pt-border)',
+        background: 'var(--color-pt-surface-mut)',
       }}
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium" style={{ color: 'var(--color-fg)' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--color-pt-text)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {template.name}
           </span>
           <span
-            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
             style={{
-              background: 'var(--color-accent-soft)',
-              color: 'var(--color-accent-fg)',
+              flexShrink: 0,
+              padding: '2px 7px',
+              borderRadius: 999,
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              background: 'var(--color-pt-accent-soft)',
+              color: 'var(--color-pt-accent-fg)',
             }}
           >
             {template.builtin ? 'Built-in' : 'Custom'}
           </span>
         </div>
-        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+        <div style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
           {template.sections.length} sections
         </div>
       </div>
       {hasMore && (
-        <button
-          type="button"
-          onClick={onChange}
-          className="btn btn-secondary shrink-0 px-2.5 py-1 text-xs"
-        >
+        <PtButton variant="ghost" onClick={onChange} style={{ padding: '6px 10px', fontSize: 12 }}>
           Change
-        </button>
+        </PtButton>
       )}
     </div>
   );
@@ -578,35 +748,39 @@ function StartBar({
   onStart: () => void;
 }) {
   return (
-    <div
-      className="flex flex-col-reverse items-stretch gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
-      style={{
-        borderColor: 'var(--color-border-soft)',
-        background: 'var(--color-surface)',
-      }}
-    >
-      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
-        {patient ? (
-          <>
-            Starting{' '}
-            <span style={{ color: 'var(--color-fg)' }}>
-              {patient.firstName} {patient.lastName}
-            </span>{' '}
-            · {visitTitle.toLowerCase()}
-          </>
-        ) : (
-          <>Pick a patient to continue.</>
-        )}
-      </p>
-      <button
-        type="button"
-        className="btn btn-primary justify-center sm:w-auto"
-        disabled={disabled}
-        onClick={onStart}
+    <SurfaceCard padding={14}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
       >
-        <Mic size={14} strokeWidth={2} /> Start session
-      </button>
-    </div>
+        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+          {patient ? (
+            <>
+              Starting{' '}
+              <span style={{ color: 'var(--color-pt-text)', fontWeight: 600 }}>
+                {patient.firstName} {patient.lastName}
+              </span>{' '}
+              · {visitTitle.toLowerCase()}
+            </>
+          ) : (
+            <>Pick a patient to continue.</>
+          )}
+        </p>
+        <PtButton
+          variant="primary"
+          disabled={disabled}
+          onClick={onStart}
+          iconLeft={<Mic size={14} strokeWidth={2} />}
+        >
+          Start session
+        </PtButton>
+      </div>
+    </SurfaceCard>
   );
 }
 
@@ -632,7 +806,7 @@ function NewTemplateModal({
       title="New custom template"
       size="sm"
     >
-      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+      <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
         Saved as a {visitTypeLabel.toLowerCase()} template. You can edit
         sections and the AI prompt later from the Templates page.
       </p>
@@ -650,20 +824,18 @@ function NewTemplateModal({
           }}
         />
       </Field>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost"
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <PtButton
+          variant="ghost"
           onClick={() => {
             setName('');
             onClose();
           }}
         >
           Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
+        </PtButton>
+        <PtButton
+          variant="primary"
           disabled={!name.trim()}
           onClick={() => {
             onCreate(name);
@@ -671,7 +843,7 @@ function NewTemplateModal({
           }}
         >
           Create
-        </button>
+        </PtButton>
       </div>
     </Modal>
   );

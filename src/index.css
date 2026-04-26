@@ -1,54 +1,99 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Ground — cool blue-gray page so white cards visibly raise off the canvas */
-  --color-bg: oklch(0.97 0.012 240);
-  --color-surface: oklch(0.995 0.004 240);
-  --color-surface-2: oklch(0.94 0.016 240);
-  --color-border: oklch(0.9 0.02 240);
-  --color-border-soft: oklch(0.93 0.015 240);
+  /* === Design tokens (PTScribe spec) ===================================== */
 
-  /* Text — three distinct tiers, each clearing WCAG AA on bg/surface/surface-2/accent-soft */
-  --color-fg: oklch(0.28 0.03 250);
-  --color-fg-muted: oklch(0.42 0.025 245);
-  --color-fg-subtle: oklch(0.5 0.025 245);
+  /* Surfaces */
+  --color-pt-bg: #1a2030; /* outer dark backdrop */
+  --color-pt-surface: #ffffff; /* cards, header */
+  --color-pt-surface-alt: #f4f6f9; /* app canvas inside framed card */
+  --color-pt-surface-mut: #fafbfc; /* integrity strip, list rows */
+  --color-pt-border: #e4e8ee;
+  --color-pt-border-strong: #d6dce5;
 
-  /* Accent — soft orange, deepened so white text on primary buttons reads */
-  --color-accent: oklch(0.6 0.17 55);
-  --color-accent-soft: oklch(0.92 0.06 65);
-  --color-accent-fg: oklch(0.3 0.08 50);
-  --color-accent-deep: oklch(0.5 0.18 50);
+  /* Text */
+  --color-pt-text: #1a2030;
+  --color-pt-text-2: #5a6577;
+  --color-pt-text-3: #8893a5;
 
-  /* Semantic — desaturated */
-  --color-positive: oklch(0.72 0.1 165);
-  --color-caution: oklch(0.8 0.1 85);
-  --color-negative: oklch(0.62 0.12 25);
-  --color-info: oklch(0.7 0.07 235);
+  /* Accent — cyan-teal */
+  --color-pt-accent: #0ea5a8;
+  --color-pt-accent-soft: #e6f7f6;
+  --color-pt-accent-border: #9fdcdc;
+  --color-pt-accent-fg: #0a6d70;
 
-  /* Legacy aliases (kept until full migration sweep) */
-  --color-muted: oklch(0.94 0.016 240);
-  --color-muted-fg: oklch(0.42 0.025 245);
-  --color-primary: oklch(0.6 0.17 55);
-  --color-primary-fg: oklch(0.3 0.08 50);
-  --color-success: oklch(0.72 0.1 165);
-  --color-warning: oklch(0.8 0.1 85);
-  --color-danger: oklch(0.62 0.12 25);
+  /* Semantic — red */
+  --color-pt-red: #dc2942;
+  --color-pt-red-soft: #fdecee;
+  --color-pt-red-border: #f5b8bf;
+  --color-pt-red-fg: #9b1d2e;
 
-  /* Radii — soft */
-  --radius-sm: 0.5rem;
-  --radius: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
+  /* Semantic — amber */
+  --color-pt-amber: #c47a09;
+  --color-pt-amber-soft: #fdf3df;
+  --color-pt-amber-border: #f0d495;
+  --color-pt-amber-fg: #7a4c04;
 
-  /* Shadows — blue-cast */
-  --shadow-sm: 0 1px 2px oklch(0.3 0.03 250 / 0.04);
-  --shadow-md: 0 4px 16px -4px oklch(0.3 0.03 250 / 0.08);
-  --shadow-lg: 0 12px 32px -8px oklch(0.3 0.03 250 / 0.1);
+  /* Semantic — violet */
+  --color-pt-violet: #6f5acc;
+  --color-pt-violet-soft: #eeebfa;
+  --color-pt-violet-border: #cfc6ee;
+  --color-pt-violet-fg: #4a3aa3;
+
+  /* Semantic — slate (neutral pill) */
+  --color-pt-slate: #7c8699;
+  --color-pt-slate-soft: #f1f3f7;
+  --color-pt-slate-border: #dde2ea;
+  --color-pt-slate-fg: #374055;
+
+  /* === Legacy aliases (kept until full migration sweep) =================== */
+  /* These map old --color-* names to the new palette so un-redesigned pages
+     pick up the new look automatically. Remove during phase 4 sweep. */
+  --color-bg: var(--color-pt-surface-alt);
+  --color-surface: var(--color-pt-surface);
+  --color-surface-2: var(--color-pt-surface-mut);
+  --color-border: var(--color-pt-border);
+  --color-border-soft: var(--color-pt-border);
+  --color-fg: var(--color-pt-text);
+  --color-fg-muted: var(--color-pt-text-2);
+  --color-fg-subtle: var(--color-pt-text-3);
+  --color-accent: var(--color-pt-accent);
+  --color-accent-soft: var(--color-pt-accent-soft);
+  --color-accent-fg: var(--color-pt-accent-fg);
+  --color-accent-deep: var(--color-pt-accent-fg);
+  --color-positive: var(--color-pt-accent);
+  --color-caution: var(--color-pt-amber);
+  --color-negative: var(--color-pt-red);
+  --color-info: var(--color-pt-violet);
+  --color-muted: var(--color-pt-surface-mut);
+  --color-muted-fg: var(--color-pt-text-2);
+  --color-primary: var(--color-pt-accent);
+  --color-primary-fg: var(--color-pt-accent-fg);
+  --color-success: var(--color-pt-accent);
+  --color-warning: var(--color-pt-amber);
+  --color-danger: var(--color-pt-red);
+
+  /* Radii */
+  --radius-sm: 0.5rem; /* 8 — buttons */
+  --radius: 0.625rem; /* 10 — back button */
+  --radius-md: 0.75rem; /* 12 — section cards */
+  --radius-lg: 0.875rem; /* 14 — outer dashboard cards */
+  --radius-xl: 1rem; /* 16 — outer frame */
+  --radius-2xl: 1.5rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(26, 32, 48, 0.06);
+  --shadow-md: 0 4px 12px -2px rgba(26, 32, 48, 0.08);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.18);
+  --shadow-banner:
+    0 18px 50px rgba(26, 32, 48, 0.18), 0 2px 6px rgba(26, 32, 48, 0.06);
 
   /* Fonts */
-  --font-display: 'Fraunces', ui-serif, Georgia, serif;
   --font-sans:
-    'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
@@ -58,92 +103,113 @@ body,
 }
 
 body {
-  background: var(--color-bg);
-  color: var(--color-fg);
+  background: var(--color-pt-bg);
+  color: var(--color-pt-text);
   font-family: var(--font-sans);
-  font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Tabular numerals for any element marked as a money figure */
+/* Tabular numerals for timers, counts, IDs */
 .tnum,
-.font-display {
-  font-feature-settings: 'tnum' 1, 'cv11' 1;
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
 }
 
 .font-display {
   font-family: var(--font-display);
-  font-variation-settings: 'opsz' 96, 'SOFT' 100;
-  font-weight: 400;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 @layer components {
   .card {
     @apply rounded-xl border p-6;
-    background: var(--color-surface);
-    border-color: var(--color-border);
+    background: var(--color-pt-surface);
+    border-color: var(--color-pt-border);
     box-shadow: var(--shadow-sm);
   }
   .card-hero {
     @apply rounded-2xl border p-8;
-    background: var(--color-surface);
-    border-color: var(--color-border);
+    background: var(--color-pt-surface);
+    border-color: var(--color-pt-border);
     box-shadow:
       var(--shadow-md),
-      inset 0 1px 0 oklch(1 0 0 / 0.6);
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
   .btn {
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium;
     transition:
-      background-color 200ms cubic-bezier(0.32, 0.08, 0.24, 1),
-      color 200ms cubic-bezier(0.32, 0.08, 0.24, 1),
-      border-color 200ms cubic-bezier(0.32, 0.08, 0.24, 1);
+      background-color 120ms ease-out,
+      color 120ms ease-out,
+      border-color 120ms ease-out;
   }
   .btn-primary {
-    background: var(--color-accent);
-    color: oklch(0.99 0 0);
+    background: var(--color-pt-accent);
+    color: #ffffff;
   }
   .btn-primary:hover {
-    background: var(--color-accent-deep);
+    background: var(--color-pt-accent-fg);
   }
   .btn-secondary {
-    background: var(--color-surface-2);
-    color: var(--color-fg);
-    border: 1px solid var(--color-border);
+    background: var(--color-pt-surface);
+    color: var(--color-pt-text);
+    border: 1px solid var(--color-pt-border);
   }
   .btn-secondary:hover {
-    background: var(--color-surface);
+    background: var(--color-pt-surface-mut);
   }
   .btn-ghost {
-    color: var(--color-fg-muted);
+    color: var(--color-pt-text-2);
   }
   .btn-ghost:hover {
-    background: var(--color-surface-2);
-    color: var(--color-fg);
+    background: var(--color-pt-surface-mut);
+    color: var(--color-pt-text);
+  }
+  .btn-danger {
+    background: var(--color-pt-red);
+    color: #ffffff;
+  }
+  .btn-danger:hover {
+    background: var(--color-pt-red-fg);
   }
   .input {
     @apply w-full rounded-lg px-3 py-2 text-sm;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border-soft);
-    color: var(--color-fg);
-    transition: border-color 120ms cubic-bezier(0.32, 0.08, 0.24, 1);
+    background: var(--color-pt-surface);
+    border: 1px solid var(--color-pt-border);
+    color: var(--color-pt-text);
+    transition: border-color 120ms ease-out;
   }
   .input:focus {
     outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px oklch(0.6 0.17 55 / 0.22);
+    border-color: var(--color-pt-accent);
+    box-shadow: 0 0 0 3px rgba(14, 165, 168, 0.22);
   }
   .input::placeholder {
-    color: var(--color-fg-subtle);
+    color: var(--color-pt-text-3);
   }
 }
 
 *:focus-visible {
-  outline: 2px solid oklch(0.6 0.17 55 / 0.55);
+  outline: 2px solid rgba(14, 165, 168, 0.55);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Pulse ring for live status dots */
+@keyframes pts-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
 }
 
 /* TipTap ProseMirror styles for note section editors */
@@ -152,7 +218,7 @@ body {
   outline: none;
   font-size: 0.875rem;
   line-height: 1.55;
-  color: var(--color-fg);
+  color: var(--color-pt-text);
 }
 .tiptap-content p {
   margin: 0 0 0.4rem;
@@ -164,13 +230,13 @@ body {
   font-size: 1rem;
   font-weight: 600;
   margin: 0.5rem 0 0.25rem;
-  color: var(--color-fg);
+  color: var(--color-pt-text);
 }
 .tiptap-content h3 {
   font-size: 0.9rem;
   font-weight: 600;
   margin: 0.4rem 0 0.2rem;
-  color: var(--color-fg);
+  color: var(--color-pt-text);
 }
 .tiptap-content ul,
 .tiptap-content ol {
@@ -188,13 +254,13 @@ body {
 }
 .tiptap-content strong {
   font-weight: 600;
-  color: var(--color-fg);
+  color: var(--color-pt-text);
 }
 .tiptap-content em {
   font-style: italic;
 }
 .tiptap-content[contenteditable='false'] {
-  color: var(--color-fg-muted);
+  color: var(--color-pt-text-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

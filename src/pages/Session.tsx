@@ -17,8 +17,15 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { Field, Select } from '@/components/ui/Field';
+import {
+  Avatar,
+  MicStatusPill,
+  PtButton,
+  StatusBadge,
+  type MicState,
+  type StatusTone,
+} from '@/components/design';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -239,71 +246,260 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     navigate('/', { replace: true });
   }
 
+  const micState = deriveMicState(recorder.status);
+  const sessionStatusBadge = deriveSessionBadge(session.status, !!session.audioRef);
+  const fullName = `${patient.firstName} ${patient.lastName}`.trim();
+
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <Link to={`/patients/${patient.id}`} className="btn btn-ghost w-fit">
-        <ArrowLeft size={14} strokeWidth={2} /> {patient.firstName} {patient.lastName}
-      </Link>
-
-      <PageHeader
-        title={`${patient.firstName} ${patient.lastName}`}
-        subtitle={`${labelForType(session.type)} · ${new Date(session.date).toLocaleString()}`}
-        Icon={Mic}
-        actions={
-          <button
-            type="button"
-            className="btn btn-ghost text-xs"
-            style={{ color: 'var(--color-negative)' }}
-            onClick={handleDeleteSession}
-          >
-            <Trash2 size={12} strokeWidth={2} /> Delete session
-          </button>
-        }
-      />
-
-      <ErrorBanner message={error} onDismiss={() => setError(null)} />
-
-      <RecordingPanel
-        recorder={recorder}
-        live={live}
-        sessionId={session.id}
-        webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
-        cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
-        hasAudio={!!session.audioRef}
-        busy={busy}
-        onStart={handleStartRecording}
-        onStop={handleStopRecording}
-        onPauseResume={handlePauseResume}
-        onTranscribe={handleTranscribe}
-      />
-
-      <TranscriptPanel
-        transcript={transcript}
-        onChange={setTranscript}
-        onCommit={() =>
-          updateSession(session.id, {
-            transcript,
-            transcriptSource: session.transcriptSource ?? 'manual',
-          })
-        }
-      />
-
-      <NotePanel
-        session={session}
+    <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', minHeight: '100%' }}>
+      <SessionHeader
         patient={patient}
-        note={note}
-        template={template}
-        templates={templates}
-        transcript={transcript}
-        busy={busy}
-        onTemplateChange={(id) => updateSession(session.id, { templateId: id })}
-        onGenerate={handleGenerate}
+        fullName={fullName}
+        sessionDate={session.date}
+        sessionType={session.type}
+        statusBadge={sessionStatusBadge}
+        micState={micState}
+        elapsedSec={recorder.durationSec}
+        canFinalize={!!note && !note.finalized}
+        finalized={!!note?.finalized}
         onFinalize={handleFinalize}
         onUnfinalize={handleUnfinalize}
-        onSectionChange={handleSectionChange}
+        onDelete={handleDeleteSession}
       />
+
+      <div
+        style={{
+          padding: 22,
+          background: 'var(--color-pt-surface-alt)',
+          overflow: 'auto',
+          display: 'grid',
+          gap: 18,
+          alignContent: 'start',
+        }}
+      >
+        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+
+        <RecordingPanel
+          recorder={recorder}
+          live={live}
+          sessionId={session.id}
+          webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
+          cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
+          hasAudio={!!session.audioRef}
+          busy={busy}
+          onStart={handleStartRecording}
+          onStop={handleStopRecording}
+          onPauseResume={handlePauseResume}
+          onTranscribe={handleTranscribe}
+        />
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
+            gap: 18,
+            alignItems: 'start',
+          }}
+        >
+          <NotePanel
+            session={session}
+            patient={patient}
+            note={note}
+            template={template}
+            templates={templates}
+            transcript={transcript}
+            busy={busy}
+            onTemplateChange={(id) => updateSession(session.id, { templateId: id })}
+            onGenerate={handleGenerate}
+            onFinalize={handleFinalize}
+            onUnfinalize={handleUnfinalize}
+            onSectionChange={handleSectionChange}
+          />
+
+          <TranscriptPanel
+            transcript={transcript}
+            onChange={setTranscript}
+            onCommit={() =>
+              updateSession(session.id, {
+                transcript,
+                transcriptSource: session.transcriptSource ?? 'manual',
+              })
+            }
+          />
+        </div>
+      </div>
     </div>
   );
+}
+
+function SessionHeader({
+  patient,
+  fullName,
+  sessionDate,
+  sessionType,
+  statusBadge,
+  micState,
+  elapsedSec,
+  canFinalize,
+  finalized,
+  onFinalize,
+  onUnfinalize,
+  onDelete,
+}: {
+  patient: Patient;
+  fullName: string;
+  sessionDate: number;
+  sessionType: string;
+  statusBadge: { tone: StatusTone; label: string };
+  micState: MicState;
+  elapsedSec: number;
+  canFinalize: boolean;
+  finalized: boolean;
+  onFinalize: () => void;
+  onUnfinalize: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      style={{
+        background: 'var(--color-pt-surface)',
+        borderBottom: '1px solid var(--color-pt-border)',
+        padding: '16px 22px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        flexWrap: 'wrap',
+      }}
+    >
+      <Link
+        to={`/patients/${patient.id}`}
+        aria-label="Back to patient chart"
+        style={{
+          color: 'var(--color-pt-text-2)',
+          padding: 8,
+          borderRadius: 8,
+          border: '1px solid var(--color-pt-border)',
+          display: 'inline-flex',
+          alignItems: 'center',
+        }}
+      >
+        <ArrowLeft size={14} strokeWidth={2} />
+      </Link>
+      <Avatar name={fullName || '?'} size={40} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: 'var(--color-pt-text)',
+              letterSpacing: '-0.2px',
+            }}
+          >
+            {fullName || 'Unnamed patient'}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              color: 'var(--color-pt-text-3)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            PT-{patient.id.slice(0, 5).toUpperCase()}
+          </span>
+          <StatusBadge tone={statusBadge.tone} label={statusBadge.label} />
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--color-pt-text-2)',
+            marginTop: 2,
+          }}
+        >
+          {labelForType(sessionType)} · {new Date(sessionDate).toLocaleString()}
+        </div>
+      </div>
+      <MicStatusPill state={micState} elapsedSec={elapsedSec} />
+      {finalized ? (
+        <PtButton
+          variant="ghost"
+          iconLeft={<RefreshCw size={14} strokeWidth={2} />}
+          onClick={onUnfinalize}
+        >
+          Unlock note
+        </PtButton>
+      ) : (
+        <PtButton
+          variant="primary"
+          iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
+          disabled={!canFinalize}
+          onClick={onFinalize}
+        >
+          End &amp; sign
+        </PtButton>
+      )}
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Delete session"
+        className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+        style={{
+          padding: 8,
+          borderRadius: 8,
+          border: '1px solid var(--color-pt-border)',
+          background: 'var(--color-pt-surface)',
+          color: 'var(--color-pt-red)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <Trash2 size={14} strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
+
+function deriveMicState(status: string): MicState {
+  switch (status) {
+    case 'recording':
+      return 'connected';
+    case 'paused':
+      return 'paused';
+    case 'error':
+      return 'disconnected';
+    default:
+      return 'idle';
+  }
+}
+
+function deriveSessionBadge(
+  status: string,
+  hasAudio: boolean
+): { tone: StatusTone; label: string } {
+  switch (status) {
+    case 'recording':
+      return { tone: 'live', label: 'Recording' };
+    case 'transcribing':
+      return { tone: 'next', label: 'Transcribing' };
+    case 'generating':
+      return { tone: 'next', label: 'Generating' };
+    case 'ready':
+      return { tone: 'plateau', label: 'Awaiting sign' };
+    case 'finalized':
+      return { tone: 'done', label: 'Signed' };
+    default:
+      return hasAudio
+        ? { tone: 'on-track', label: 'Ready to transcribe' }
+        : { tone: 'new', label: 'New' };
+  }
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
