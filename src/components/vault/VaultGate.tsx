@@ -4,12 +4,15 @@ import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { vault } from '@/lib/vault/vault';
 import { PASSPHRASE_MIN_CHARS } from '@/lib/vault/crypto';
 import { migrateLegacyPlaintext } from '@/lib/vault/migration';
+import { isDemoMode, getDemoPassphrase } from '@/lib/demoMode';
 
 type Mode = 'setup' | 'unlock';
 
 export function VaultGate({ children }: { children: ReactNode }) {
+  const demoMode = isDemoMode();
   const [mode] = useState<Mode>(() => (vault.isInitialized() ? 'unlock' : 'setup'));
   const [unlocked, setUnlocked] = useState<boolean>(vault.isUnlocked());
+  const [autoUnlockTried, setAutoUnlockTried] = useState<boolean>(!demoMode);
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
@@ -17,10 +20,36 @@ export function VaultGate({ children }: { children: ReactNode }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!demoMode || unlocked || autoUnlockTried) return;
+    let cancelled = false;
+    void (async () => {
+      const demoPass = getDemoPassphrase();
+      try {
+        if (vault.isInitialized()) {
+          const result = await vault.unlock(demoPass);
+          if (!cancelled && result.ok) setUnlocked(true);
+        } else {
+          await vault.setup(demoPass);
+          await migrateLegacyPlaintext();
+          if (!cancelled) setUnlocked(true);
+        }
+      } catch {
+        // fall through — user will see the regular vault UI as a recovery path
+      }
+      if (!cancelled) setAutoUnlockTried(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode, unlocked, autoUnlockTried]);
+
+  useEffect(() => {
+    if (demoMode && !autoUnlockTried) return;
     if (!unlocked) inputRef.current?.focus();
-  }, [unlocked, mode]);
+  }, [unlocked, mode, demoMode, autoUnlockTried]);
 
   if (unlocked) return <>{children}</>;
+  if (demoMode && !autoUnlockTried) return null;
 
   async function handleSetup(e: FormEvent) {
     e.preventDefault();
