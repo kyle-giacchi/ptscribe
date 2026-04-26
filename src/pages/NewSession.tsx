@@ -21,7 +21,7 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { newId } from '@/utils/ids';
-import type { NoteFormat, NoteTemplate, Session, SessionType } from '@/types';
+import type { NoteFormat, NoteTemplate, Patient, Session, SessionType } from '@/types';
 
 const TYPE_TO_FORMAT: Record<SessionType, NoteFormat> = {
   evaluation: 'evaluation',
@@ -75,6 +75,11 @@ export function NewSession() {
   const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [query, setQuery] = useState('');
+
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p.id === patientId),
+    [patients, patientId],
+  );
 
   const filteredPatients = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -171,50 +176,46 @@ export function NewSession() {
       ) : (
         <>
           <section className="card space-y-3">
-            <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-              Patient
-            </h2>
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
+                Patient
+              </h2>
+              <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+                {filteredPatients.length}{' '}
+                {filteredPatients.length === 1 ? 'patient' : 'patients'}
+              </span>
+            </div>
             <TextInput
               placeholder="Search patients…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <ul
-              className="max-h-72 divide-y overflow-y-auto rounded-lg border"
-              style={{ borderColor: 'var(--color-border-soft)' }}
-            >
-              {filteredPatients.length === 0 && (
-                <li
-                  className="px-3 py-4 text-center text-sm"
-                  style={{ color: 'var(--color-fg-subtle)' }}
-                >
-                  No matching patients.
-                </li>
-              )}
-              {filteredPatients.map((p) => {
-                const selected = p.id === patientId;
-                return (
-                  <li key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => setPatientId(p.id)}
-                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-2)]"
-                      style={{
-                        background: selected ? 'var(--color-accent-soft)' : undefined,
-                        color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)',
-                      }}
-                    >
-                      <span className="font-medium">
-                        {p.lastName}, {p.firstName}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                        {p.primaryDiagnosis ?? '—'}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            {filteredPatients.length === 0 ? (
+              <div
+                className="rounded-lg border border-dashed py-6 text-center text-sm"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-fg-subtle)',
+                }}
+              >
+                No matching patients.
+              </div>
+            ) : (
+              <ul
+                className="grid max-h-72 grid-cols-1 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2"
+                role="radiogroup"
+                aria-label="Patient"
+              >
+                {filteredPatients.map((p) => (
+                  <PatientChip
+                    key={p.id}
+                    patient={p}
+                    selected={p.id === patientId}
+                    onSelect={() => setPatientId(p.id)}
+                  />
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="card space-y-4">
@@ -232,184 +233,35 @@ export function NewSession() {
               role="radiogroup"
               aria-label="Visit type"
             >
-              {VISIT_TYPES.map(({ type, title, description, Icon }) => {
-                const selected = type === sessionType;
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => chooseVisitType(type)}
-                    className="group flex items-start gap-3 rounded-xl border p-3 text-left transition-all duration-200 hover:bg-[var(--color-surface-2)] focus-visible:outline-none focus-visible:ring-2"
-                    style={{
-                      borderColor: selected
-                        ? 'var(--color-accent)'
-                        : 'var(--color-border-soft)',
-                      background: selected
-                        ? 'var(--color-accent-soft)'
-                        : 'var(--color-surface)',
-                      boxShadow: selected ? 'var(--shadow-sm)' : undefined,
-                    }}
-                  >
-                    <span
-                      className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                      style={{
-                        background: selected
-                          ? 'var(--color-accent)'
-                          : 'var(--color-surface-2)',
-                        color: selected
-                          ? 'oklch(0.99 0 0)'
-                          : 'var(--color-fg-muted)',
-                      }}
-                    >
-                      <Icon size={16} strokeWidth={2} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className="block text-sm font-medium"
-                        style={{
-                          color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)',
-                        }}
-                      >
-                        {title}
-                      </span>
-                      <span
-                        className="mt-0.5 block text-xs"
-                        style={{ color: 'var(--color-fg-subtle)' }}
-                      >
-                        {description}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+              {VISIT_TYPES.map((vt) => (
+                <VisitTypeCard
+                  key={vt.type}
+                  visitType={vt}
+                  selected={vt.type === sessionType}
+                  onSelect={() => chooseVisitType(vt.type)}
+                />
+              ))}
             </div>
 
-            <div
-              className="border-t pt-4"
-              style={{ borderColor: 'var(--color-border-soft)' }}
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={sessionType}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: duration.base, ease: ease.enter }}
-                  className="space-y-3"
-                >
-                  <div className="flex items-baseline justify-between">
-                    <h3
-                      className="text-sm font-medium"
-                      style={{ color: 'var(--color-fg)' }}
-                    >
-                      Template
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setCreatingTemplate(true)}
-                      className="text-xs hover:underline"
-                      style={{ color: 'var(--color-accent-fg)' }}
-                    >
-                      <Plus size={11} strokeWidth={2} className="mr-0.5 inline" />
-                      New custom template
-                    </button>
-                  </div>
-
-                  {visitTemplates.length === 0 ? (
-                    <div
-                      className="rounded-lg border border-dashed p-3 text-xs"
-                      style={{
-                        borderColor: 'var(--color-border)',
-                        color: 'var(--color-fg-subtle)',
-                      }}
-                    >
-                      No templates available for this visit type. Create one to
-                      continue, or start without a template.
-                    </div>
-                  ) : visitTemplates.length === 1 || !showAllTemplates ? (
-                    <CompactTemplate
-                      template={
-                        visitTemplates.find((t) => t.id === effectiveTemplateId) ??
-                        visitTemplates[0]
-                      }
-                      hasMore={visitTemplates.length > 1}
-                      onChange={() => setShowAllTemplates(true)}
-                    />
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {visitTemplates.map((t) => {
-                        const selected = t.id === effectiveTemplateId;
-                        return (
-                          <li key={t.id}>
-                            <button
-                              type="button"
-                              onClick={() => setTemplateId(t.id)}
-                              className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)]"
-                              style={{
-                                borderColor: selected
-                                  ? 'var(--color-accent)'
-                                  : 'var(--color-border-soft)',
-                                background: selected
-                                  ? 'var(--color-accent-soft)'
-                                  : undefined,
-                              }}
-                            >
-                              <span className="flex min-w-0 flex-1 items-center gap-2">
-                                <span
-                                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
-                                  style={{
-                                    borderColor: selected
-                                      ? 'var(--color-accent)'
-                                      : 'var(--color-border)',
-                                    background: selected
-                                      ? 'var(--color-accent)'
-                                      : 'transparent',
-                                    color: 'oklch(0.99 0 0)',
-                                  }}
-                                >
-                                  {selected && <Check size={10} strokeWidth={3} />}
-                                </span>
-                                <span
-                                  className="truncate font-medium"
-                                  style={{
-                                    color: selected
-                                      ? 'var(--color-accent-fg)'
-                                      : 'var(--color-fg)',
-                                  }}
-                                >
-                                  {t.name}
-                                </span>
-                              </span>
-                              <span
-                                className="shrink-0 text-xs"
-                                style={{ color: 'var(--color-fg-subtle)' }}
-                              >
-                                {t.builtin ? 'Built-in' : 'Custom'} ·{' '}
-                                {t.sections.length} sections
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
+            <TemplateSection
+              sessionType={sessionType}
+              visitTemplates={visitTemplates}
+              effectiveTemplateId={effectiveTemplateId}
+              showAllTemplates={showAllTemplates}
+              onPickTemplate={setTemplateId}
+              onShowAll={() => setShowAllTemplates(true)}
+              onCreate={() => setCreatingTemplate(true)}
+            />
           </section>
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!patientId}
-              onClick={handleStart}
-            >
-              <Mic size={14} strokeWidth={2} /> Start session
-            </button>
-          </div>
+          <StartBar
+            patient={selectedPatient}
+            visitTitle={
+              VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''
+            }
+            disabled={!patientId}
+            onStart={handleStart}
+          />
         </>
       )}
 
@@ -422,6 +274,245 @@ export function NewSession() {
         onCreate={handleCreateTemplate}
       />
     </div>
+  );
+}
+
+function PatientChip({
+  patient,
+  selected,
+  onSelect,
+}: {
+  patient: Patient;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        onClick={onSelect}
+        className="relative flex min-h-11 w-full flex-col items-start gap-0.5 rounded-lg border px-3 py-2 pr-7 text-left transition-colors hover:bg-[var(--color-surface-2)] focus-visible:outline-none focus-visible:ring-2"
+        style={{
+          borderColor: selected ? 'var(--color-accent)' : 'var(--color-border-soft)',
+          background: selected ? 'var(--color-accent-soft)' : 'var(--color-bg)',
+        }}
+      >
+        <span
+          className="block w-full truncate text-sm font-medium"
+          style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)' }}
+        >
+          {patient.lastName}, {patient.firstName}
+        </span>
+        <span
+          className="block w-full truncate text-xs"
+          style={{
+            color: selected ? 'var(--color-fg-muted)' : 'var(--color-fg-subtle)',
+          }}
+        >
+          {patient.primaryDiagnosis ?? 'No primary diagnosis'}
+        </span>
+        {selected && (
+          <span
+            className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full"
+            style={{ background: 'var(--color-accent)', color: 'oklch(0.99 0 0)' }}
+            aria-hidden
+          >
+            <Check size={10} strokeWidth={3} />
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
+function VisitTypeCard({
+  visitType,
+  selected,
+  onSelect,
+}: {
+  visitType: (typeof VISIT_TYPES)[number];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { title, description, Icon } = visitType;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className="group flex items-start gap-3 rounded-xl border p-3 text-left transition-all duration-200 hover:bg-[var(--color-surface-2)] focus-visible:outline-none focus-visible:ring-2"
+      style={{
+        borderColor: selected ? 'var(--color-accent)' : 'var(--color-border-soft)',
+        background: selected ? 'var(--color-accent-soft)' : 'var(--color-bg)',
+        boxShadow: selected ? 'var(--shadow-sm)' : undefined,
+      }}
+    >
+      <span
+        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+        style={{
+          background: selected ? 'var(--color-accent)' : 'var(--color-surface-2)',
+          color: selected ? 'oklch(0.99 0 0)' : 'var(--color-fg-muted)',
+        }}
+      >
+        <Icon size={16} strokeWidth={2} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className="block text-sm font-medium"
+          style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)' }}
+        >
+          {title}
+        </span>
+        <span
+          className="mt-0.5 block text-xs"
+          style={{
+            color: selected ? 'var(--color-fg-muted)' : 'var(--color-fg-subtle)',
+          }}
+        >
+          {description}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function TemplateSection({
+  sessionType,
+  visitTemplates,
+  effectiveTemplateId,
+  showAllTemplates,
+  onPickTemplate,
+  onShowAll,
+  onCreate,
+}: {
+  sessionType: SessionType;
+  visitTemplates: NoteTemplate[];
+  effectiveTemplateId: string;
+  showAllTemplates: boolean;
+  onPickTemplate: (id: string) => void;
+  onShowAll: () => void;
+  onCreate: () => void;
+}) {
+  const isEmpty = visitTemplates.length === 0;
+  const showCompact = !isEmpty && (visitTemplates.length === 1 || !showAllTemplates);
+  const compactTemplate =
+    visitTemplates.find((t) => t.id === effectiveTemplateId) ?? visitTemplates[0];
+  return (
+    <div className="border-t pt-4" style={{ borderColor: 'var(--color-border-soft)' }}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={sessionType}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: duration.base, ease: ease.enter }}
+          className="space-y-3"
+        >
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-sm font-medium" style={{ color: 'var(--color-fg)' }}>
+              Template
+            </h3>
+            <button
+              type="button"
+              onClick={onCreate}
+              className="text-xs hover:underline"
+              style={{ color: 'var(--color-accent-fg)' }}
+            >
+              <Plus size={11} strokeWidth={2} className="mr-0.5 inline" />
+              New custom template
+            </button>
+          </div>
+
+          {isEmpty && (
+            <div
+              className="rounded-lg border border-dashed p-3 text-xs"
+              style={{
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-fg-muted)',
+              }}
+            >
+              No templates available for this visit type. Create one to continue, or
+              start without a template.
+            </div>
+          )}
+
+          {showCompact && (
+            <CompactTemplate
+              template={compactTemplate}
+              hasMore={visitTemplates.length > 1}
+              onChange={onShowAll}
+            />
+          )}
+
+          {!isEmpty && !showCompact && (
+            <ul className="space-y-1.5">
+              {visitTemplates.map((t) => (
+                <TemplateOption
+                  key={t.id}
+                  template={t}
+                  selected={t.id === effectiveTemplateId}
+                  onSelect={() => onPickTemplate(t.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function TemplateOption({
+  template,
+  selected,
+  onSelect,
+}: {
+  template: NoteTemplate;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        className="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)]"
+        style={{
+          borderColor: selected ? 'var(--color-accent)' : 'var(--color-border-soft)',
+          background: selected ? 'var(--color-accent-soft)' : undefined,
+        }}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+            style={{
+              borderColor: selected ? 'var(--color-accent)' : 'var(--color-border)',
+              background: selected ? 'var(--color-accent)' : 'transparent',
+              color: 'oklch(0.99 0 0)',
+            }}
+            aria-hidden
+          >
+            {selected && <Check size={10} strokeWidth={3} />}
+          </span>
+          <span
+            className="truncate font-medium"
+            style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg)' }}
+          >
+            {template.name}
+          </span>
+        </span>
+        <span
+          className="shrink-0 text-xs"
+          style={{ color: selected ? 'var(--color-accent-fg)' : 'var(--color-fg-muted)' }}
+        >
+          {template.builtin ? 'Built-in' : 'Custom'} · {template.sections.length} sections
+        </span>
+      </button>
+    </li>
   );
 }
 
@@ -445,23 +536,20 @@ function CompactTemplate({
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span
-            className="text-sm font-medium"
-            style={{ color: 'var(--color-fg)' }}
-          >
+          <span className="truncate text-sm font-medium" style={{ color: 'var(--color-fg)' }}>
             {template.name}
           </span>
           <span
-            className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide"
+            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
             style={{
-              background: 'var(--color-surface)',
-              color: 'var(--color-fg-subtle)',
+              background: 'var(--color-accent-soft)',
+              color: 'var(--color-accent-fg)',
             }}
           >
             {template.builtin ? 'Built-in' : 'Custom'}
           </span>
         </div>
-        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+        <div className="mt-0.5 text-xs" style={{ color: 'var(--color-fg-muted)' }}>
           {template.sections.length} sections
         </div>
       </div>
@@ -469,12 +557,55 @@ function CompactTemplate({
         <button
           type="button"
           onClick={onChange}
-          className="text-xs hover:underline"
-          style={{ color: 'var(--color-accent-fg)' }}
+          className="btn btn-secondary shrink-0 px-2.5 py-1 text-xs"
         >
           Change
         </button>
       )}
+    </div>
+  );
+}
+
+function StartBar({
+  patient,
+  visitTitle,
+  disabled,
+  onStart,
+}: {
+  patient: Patient | undefined;
+  visitTitle: string;
+  disabled: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-col-reverse items-stretch gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between"
+      style={{
+        borderColor: 'var(--color-border-soft)',
+        background: 'var(--color-surface)',
+      }}
+    >
+      <p className="text-xs" style={{ color: 'var(--color-fg-muted)' }}>
+        {patient ? (
+          <>
+            Starting{' '}
+            <span style={{ color: 'var(--color-fg)' }}>
+              {patient.firstName} {patient.lastName}
+            </span>{' '}
+            · {visitTitle.toLowerCase()}
+          </>
+        ) : (
+          <>Pick a patient to continue.</>
+        )}
+      </p>
+      <button
+        type="button"
+        className="btn btn-primary justify-center sm:w-auto"
+        disabled={disabled}
+        onClick={onStart}
+      >
+        <Mic size={14} strokeWidth={2} /> Start session
+      </button>
     </div>
   );
 }
