@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 2;
+export const APP_DATA_VERSION = 3;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -49,6 +49,30 @@ export type SessionStatus =
   | 'finalized';
 export type TranscriptSource = 'whisper' | 'webspeech' | 'manual';
 
+/**
+ * One discrete audio take inside a session. A session is a sequence of these.
+ * `id` doubles as the AudioRepository key (both for the consolidated Blob in
+ * `recordings` and for the per-chunk WAL rows in `recording_chunks`).
+ */
+export type ClipStatus =
+  | 'pending'      // recording in flight; no consolidated Blob yet
+  | 'ready'        // audio saved, awaiting transcription
+  | 'transcribing' // Whisper request in flight
+  | 'transcribed'  // transcript text populated
+  | 'failed';      // last transcription attempt failed
+
+export interface SessionClip {
+  id: ID;
+  index: number;
+  durationSec: number;
+  status: ClipStatus;
+  transcript?: string;
+  transcriptedAt?: number;
+  errorMessage?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Session {
   id: ID;
   patientId: ID;
@@ -56,7 +80,7 @@ export interface Session {
   date: number;
   durationMin?: number;
   status: SessionStatus;
-  audioRef?: ID; // key into AudioRepository
+  clips: SessionClip[];
   transcript?: string;
   transcriptSource?: TranscriptSource;
   noteId?: ID;

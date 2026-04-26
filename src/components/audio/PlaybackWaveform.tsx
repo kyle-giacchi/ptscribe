@@ -4,10 +4,11 @@ import { Play, Pause } from 'lucide-react';
 import { audioRepository } from '@/services/AudioRepository';
 
 interface PlaybackWaveformProps {
-  sessionId: string;
+  /** Key into AudioRepository — usually a SessionClip.id (for legacy single-clip sessions, equals the sessionId). */
+  audioKey: string;
 }
 
-export function PlaybackWaveform({ sessionId }: PlaybackWaveformProps) {
+export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WaveSurfer | null>(null);
   const [ready, setReady] = useState(false);
@@ -22,7 +23,7 @@ export function PlaybackWaveform({ sessionId }: PlaybackWaveformProps) {
 
     async function load() {
       try {
-        const blob = await audioRepository.load(sessionId);
+        const blob = await audioRepository.load(audioKey);
         if (!blob || cancelled || !containerRef.current) return;
         blobUrl = URL.createObjectURL(blob);
 
@@ -64,7 +65,7 @@ export function PlaybackWaveform({ sessionId }: PlaybackWaveformProps) {
       wsRef.current = null;
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-  }, [sessionId]);
+  }, [audioKey]);
 
   function toggle() {
     wsRef.current?.playPause();
