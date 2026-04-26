@@ -127,6 +127,7 @@ export function NewSession() {
       type: sessionType,
       date: now,
       status: 'draft',
+      clips: [],
       templateId: effectiveTemplateId || undefined,
       createdAt: now,
       updatedAt: now,
