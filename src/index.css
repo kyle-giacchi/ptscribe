@@ -1,23 +1,23 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Ground — soft gray-blue */
-  --color-bg: oklch(0.985 0.008 240);
+  /* Ground — near-white so cards visibly raise off the page */
+  --color-bg: oklch(0.995 0.004 240);
   --color-surface: oklch(0.97 0.012 240);
   --color-surface-2: oklch(0.945 0.016 240);
   --color-border: oklch(0.9 0.02 240);
   --color-border-soft: oklch(0.93 0.015 240);
 
-  /* Text */
+  /* Text — subtle darkened so secondary copy clears WCAG AA on every surface */
   --color-fg: oklch(0.28 0.03 250);
   --color-fg-muted: oklch(0.5 0.025 245);
-  --color-fg-subtle: oklch(0.65 0.02 245);
+  --color-fg-subtle: oklch(0.52 0.025 245);
 
-  /* Accent — soft orange */
-  --color-accent: oklch(0.78 0.13 60);
+  /* Accent — soft orange, deepened so white text on primary buttons reads */
+  --color-accent: oklch(0.6 0.17 55);
   --color-accent-soft: oklch(0.92 0.06 65);
   --color-accent-fg: oklch(0.3 0.08 50);
-  --color-accent-deep: oklch(0.62 0.16 55);
+  --color-accent-deep: oklch(0.5 0.18 50);
 
   /* Semantic — desaturated */
   --color-positive: oklch(0.72 0.1 165);
@@ -28,7 +28,7 @@
   /* Legacy aliases (kept until full migration sweep) */
   --color-muted: oklch(0.945 0.016 240);
   --color-muted-fg: oklch(0.5 0.025 245);
-  --color-primary: oklch(0.78 0.13 60);
+  --color-primary: oklch(0.6 0.17 55);
   --color-primary-fg: oklch(0.3 0.08 50);
   --color-success: oklch(0.72 0.1 165);
   --color-warning: oklch(0.8 0.1 85);
@@ -133,7 +133,7 @@ body {
   .input:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px oklch(0.78 0.13 60 / 0.18);
+    box-shadow: 0 0 0 3px oklch(0.6 0.17 55 / 0.22);
   }
   .input::placeholder {
     color: var(--color-fg-subtle);
@@ -141,7 +141,7 @@ body {
 }
 
 *:focus-visible {
-  outline: 2px solid oklch(0.78 0.13 60 / 0.5);
+  outline: 2px solid oklch(0.6 0.17 55 / 0.55);
   outline-offset: 2px;
   border-radius: 4px;
 }
