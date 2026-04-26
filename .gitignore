@@ -29,6 +29,10 @@ coverage/
 !.vscode/settings.json
 !.vscode/extensions.json
 *.swp
+.claude/
+
+# Design reference handoffs (extracted prototypes — not production code)
+.design-handoff/
 
 # Env
 .env
