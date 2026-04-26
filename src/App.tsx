@@ -9,6 +9,7 @@ import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
+import { AppGate } from '@/components/common/AppGate';
 import { AppShell } from '@/components/common/AppShell';
 import { Setup } from '@/pages/Setup';
 import { Dashboard } from '@/pages/Dashboard';
@@ -23,6 +24,7 @@ import { Settings } from '@/pages/Settings';
 
 export default function App() {
   return (
+    <AppGate>
     <BrowserRouter>
       <AppDataProvider>
         <ClinicianProvider>
@@ -59,5 +61,6 @@ export default function App() {
         </ClinicianProvider>
       </AppDataProvider>
     </BrowserRouter>
+    </AppGate>
   );
 }

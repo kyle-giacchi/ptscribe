@@ -340,8 +340,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         blob,
         provider: settings.ai.transcription.provider,
         model: settings.ai.transcription.model,
-        apiKey: settings.ai.transcription.apiKey,
-        accountId: settings.ai.transcription.accountId,
       });
       return { ok: true, text: result.text };
     } catch (e) {
@@ -352,7 +350,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function handleTranscribeAll() {
     if (!session) return;
     if (settings.ai.transcription.provider !== 'cloudflare') {
-      toast.error('Cloudflare account ID + API token required. Set them in Settings.');
+      toast.error('Switch transcription to Cloudflare in Settings to transcribe saved clips.');
       return;
     }
     const targets = session.clips.filter(
@@ -437,8 +435,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       toast.error('Add a transcript first.');
       return;
     }
-    if (settings.ai.generation.provider !== 'anthropic' || !settings.ai.generation.apiKey) {
-      toast.error('Anthropic API key required. Add one in Settings.');
+    if (settings.ai.generation.provider !== 'anthropic') {
+      toast.error('Enable Anthropic generation in Settings to draft a note.');
       return;
     }
     setError(null);
@@ -448,7 +446,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       const result = await generateNote({
         provider: settings.ai.generation.provider,
         model: settings.ai.generation.model,
-        apiKey: settings.ai.generation.apiKey,
         template,
         transcript,
         patient: patient!,

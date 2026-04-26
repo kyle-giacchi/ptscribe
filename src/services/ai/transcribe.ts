@@ -5,8 +5,6 @@ export interface TranscribeArgs {
   blob: Blob;
   provider: TranscriptionProvider;
   model: string;
-  apiKey?: string;
-  accountId?: string;
   signal?: AbortSignal;
 }
 
@@ -17,14 +15,7 @@ export interface TranscribeResult {
 
 export async function transcribe(args: TranscribeArgs): Promise<TranscribeResult> {
   if (args.provider === 'cloudflare') {
-    if (!args.accountId || !args.apiKey) {
-      throw new Error(
-        'Cloudflare provider selected but account ID or API token is missing in Settings.',
-      );
-    }
     const out = await transcribeWithCloudflare({
-      accountId: args.accountId,
-      apiToken: args.apiKey,
       model: args.model || '@cf/openai/whisper-large-v3-turbo',
       audio: args.blob,
       signal: args.signal,
