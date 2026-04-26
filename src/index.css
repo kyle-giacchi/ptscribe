@@ -1,17 +1,17 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Ground — near-white so cards visibly raise off the page */
-  --color-bg: oklch(0.995 0.004 240);
-  --color-surface: oklch(0.97 0.012 240);
-  --color-surface-2: oklch(0.945 0.016 240);
+  /* Ground — cool blue-gray page so white cards visibly raise off the canvas */
+  --color-bg: oklch(0.97 0.012 240);
+  --color-surface: oklch(0.995 0.004 240);
+  --color-surface-2: oklch(0.94 0.016 240);
   --color-border: oklch(0.9 0.02 240);
   --color-border-soft: oklch(0.93 0.015 240);
 
-  /* Text — subtle darkened so secondary copy clears WCAG AA on every surface */
+  /* Text — three distinct tiers, each clearing WCAG AA on bg/surface/surface-2/accent-soft */
   --color-fg: oklch(0.28 0.03 250);
-  --color-fg-muted: oklch(0.5 0.025 245);
-  --color-fg-subtle: oklch(0.52 0.025 245);
+  --color-fg-muted: oklch(0.42 0.025 245);
+  --color-fg-subtle: oklch(0.5 0.025 245);
 
   /* Accent — soft orange, deepened so white text on primary buttons reads */
   --color-accent: oklch(0.6 0.17 55);
@@ -26,8 +26,8 @@
   --color-info: oklch(0.7 0.07 235);
 
   /* Legacy aliases (kept until full migration sweep) */
-  --color-muted: oklch(0.945 0.016 240);
-  --color-muted-fg: oklch(0.5 0.025 245);
+  --color-muted: oklch(0.94 0.016 240);
+  --color-muted-fg: oklch(0.42 0.025 245);
   --color-primary: oklch(0.6 0.17 55);
   --color-primary-fg: oklch(0.3 0.08 50);
   --color-success: oklch(0.72 0.1 165);
