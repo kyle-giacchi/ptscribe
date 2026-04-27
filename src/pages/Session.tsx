@@ -20,6 +20,8 @@ import {
   Clock,
   Upload,
   ChevronDown,
+  Eye,
+  Cloud,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, Select } from '@/components/ui/Field';
@@ -47,6 +49,8 @@ import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
+import { wordCount, formatDuration } from '@/utils/format';
+import { labelForType } from '@/utils/labels';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { MAX_CLIP_DURATION_SEC, WARN_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 import { newId } from '@/utils/ids';
@@ -59,6 +63,7 @@ import type {
   Patient,
   Session,
   SessionClip,
+  TranscriptionProvider,
 } from '@/types';
 
 type Busy = null | 'transcribing' | 'generating';
@@ -486,23 +491,25 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     }
     let successes = 0;
     let failures = 0;
-    for (const clip of pending) {
-      const result = await transcribeClipBlob(clip);
-      if (result.ok) {
-        successes += 1;
-        textByClip.set(clip.id, result.text);
-        patchClip(clip.id, {
-          status: 'transcribed',
-          transcript: result.text,
-          // eslint-disable-next-line react-hooks/purity
-          transcriptedAt: Date.now(),
-          errorMessage: undefined,
-        });
-      } else {
-        failures += 1;
-        patchClip(clip.id, { status: 'failed', errorMessage: result.error });
-      }
-    }
+    await Promise.allSettled(
+      pending.map(async (clip) => {
+        const result = await transcribeClipBlob(clip);
+        if (result.ok) {
+          successes += 1;
+          textByClip.set(clip.id, result.text);
+          patchClip(clip.id, {
+            status: 'transcribed',
+            transcript: result.text,
+            // eslint-disable-next-line react-hooks/purity
+            transcriptedAt: Date.now(),
+            errorMessage: undefined,
+          });
+        } else {
+          failures += 1;
+          patchClip(clip.id, { status: 'failed', errorMessage: result.error });
+        }
+      }),
+    );
     return { textByClip, successes, failures };
   }
 
@@ -694,13 +701,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function handleDeleteSession() {
     if (!confirm('Delete this session, its audio, and any draft note?')) return;
     if (note) removeNote(note.id);
-    for (const clip of session?.clips ?? []) {
-      try {
-        await audioRepository.remove(clip.id);
-      } catch {
-        /* ignore */
-      }
-    }
+    await Promise.all((session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})));
     removeSession(session!.id);
     navigate('/', { replace: true });
   }
@@ -730,6 +731,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       : 'var(--color-fg-subtle)';
 
   const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
+  const hasReadyClip = sortedClips.some(
+    (c) => c.status === 'ready' || c.status === 'failed' || c.status === 'transcribed',
+  );
 
   // Collapsed-header summaries
   const clipSummary =
@@ -810,16 +814,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             recorder={recorder}
             live={live}
             clips={sortedClips}
-            webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
-            cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
-            transcriptionModel={settings.ai.transcription.model}
-            busy={busy}
-            transcribeUsed={transcribeUsed}
-            transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
             onStart={handleStartRecording}
             onStop={handleStopRecording}
             onPauseResume={handlePauseResume}
-            onCreateTranscript={handleCreateTranscript}
             onDeleteClip={handleDeleteClip}
             onUpload={handleUploadAudio}
             wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
@@ -843,6 +840,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           <TranscriptPanel
             transcript={transcript}
             canRemerge={hasTranscribedClip}
+            canTranscribe={hasReadyClip && !isRecording && settings.ai.transcription.provider === 'cloudflare'}
+            transcribing={busy === 'transcribing'}
+            transcribeUsed={transcribeUsed}
+            transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
             onChange={setTranscript}
             onCommit={() =>
               patchSession({
@@ -851,6 +852,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               })
             }
             onRemerge={handleRemergeFromClips}
+            onCreateTranscript={handleCreateTranscript}
           />
         </AccordionSection>
 
@@ -1132,16 +1134,9 @@ interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
   clips: SessionClip[];
-  webspeechProvider: boolean;
-  cloudflareProvider: boolean;
-  transcriptionModel: string;
-  busy: Busy;
-  transcribeUsed: number;
-  transcribeCap: number;
   onStart: () => void;
   onStop: () => void;
   onPauseResume: () => void;
-  onCreateTranscript: () => void;
   onDeleteClip: (clipId: string) => void;
   onUpload: (file: File) => void;
   wasBackgrounded: boolean;
@@ -1152,35 +1147,27 @@ function RecordingPanel({
   recorder,
   live,
   clips,
-  webspeechProvider,
-  cloudflareProvider,
-  transcriptionModel,
-  busy,
-  transcribeUsed,
-  transcribeCap,
   onStart,
   onStop,
   onPauseResume,
-  onCreateTranscript,
   onDeleteClip,
   onUpload,
   wasBackgrounded,
   onDismissBackgroundWarning,
 }: RecordingPanelProps) {
+  const { settings, updateAi } = useSettings();
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
-
-  const hasReadyClip = clips.some(
-    (c) => c.status === 'ready' || c.status === 'failed' || c.status === 'transcribed',
-  );
-  const transcribing = busy === 'transcribing';
-  const transcriptionLabel = cloudflareProvider
-    ? modelLabel('cloudflare', transcriptionModel)
-    : undefined;
+  const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
 
   return (
     <div className="space-y-3">
+      <TranscriptionModePicker
+        provider={settings.ai.transcription.provider}
+        onSelect={(provider, model) => updateAi({ transcription: { provider, model } })}
+      />
+
       {wasBackgrounded && (
         <div
           role="status"
@@ -1214,15 +1201,9 @@ function RecordingPanel({
         recording={recording}
         paused={recorder.status === 'paused'}
         hasClips={clips.length > 0}
-        canTranscribe={hasReadyClip && !recording && cloudflareProvider}
-        transcribing={transcribing}
-        transcribeUsed={transcribeUsed}
-        transcribeCap={transcribeCap}
-        transcriptionLabel={transcriptionLabel}
         onStart={onStart}
         onPauseResume={onPauseResume}
         onStop={onStop}
-        onCreateTranscript={onCreateTranscript}
         onUpload={onUpload}
       />
 
@@ -1244,33 +1225,20 @@ function RecordingControlRow({
   idle,
   paused,
   hasClips,
-  canTranscribe,
-  transcribing,
-  transcribeUsed,
-  transcribeCap,
-  transcriptionLabel,
   onStart,
   onPauseResume,
   onStop,
-  onCreateTranscript,
   onUpload,
 }: {
   idle: boolean;
   recording: boolean;
   paused: boolean;
   hasClips: boolean;
-  canTranscribe: boolean;
-  transcribing: boolean;
-  transcribeUsed: number;
-  transcribeCap: number;
-  transcriptionLabel?: string;
   onStart: () => void;
   onPauseResume: () => void;
   onStop: () => void;
-  onCreateTranscript: () => void;
   onUpload: (file: File) => void;
 }) {
-  const transcribeBudgetSpent = transcribeUsed >= transcribeCap;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {idle ? (
@@ -1293,24 +1261,6 @@ function RecordingControlRow({
         </>
       ) : (
         <ActiveRecordingControls paused={paused} onPauseResume={onPauseResume} onStop={onStop} />
-      )}
-      {canTranscribe && (
-        <CreateTranscriptButton
-          busy={transcribing}
-          disabled={transcribeBudgetSpent}
-          used={transcribeUsed}
-          cap={transcribeCap}
-          onClick={onCreateTranscript}
-        />
-      )}
-      {transcriptionLabel && (
-        <span
-          className="text-[11px]"
-          style={{ color: 'var(--color-fg-subtle)' }}
-          title="Transcription model"
-        >
-          {transcriptionLabel} · Cloudflare
-        </span>
       )}
     </div>
   );
@@ -1397,6 +1347,106 @@ function ActiveRecordingControls({
         <Square size={14} strokeWidth={2} /> Stop
       </button>
     </>
+  );
+}
+
+function TranscriptionModePicker({
+  provider,
+  onSelect,
+}: {
+  provider: TranscriptionProvider;
+  onSelect: (provider: TranscriptionProvider, model: string) => void;
+}) {
+  const isLive = provider === 'webspeech';
+  const isNova3 = provider === 'cloudflare';
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>
+        Transcription
+      </span>
+      <div
+        className="flex overflow-hidden rounded-md border text-xs"
+        style={{ borderColor: 'var(--color-pt-border)' }}
+      >
+        <button
+          type="button"
+          onClick={() => onSelect('webspeech', '')}
+          className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
+          style={{
+            background: isLive ? 'var(--color-primary)' : 'var(--color-pt-surface)',
+            color: isLive ? '#fff' : 'var(--color-fg-muted)',
+            fontWeight: isLive ? 500 : 400,
+          }}
+        >
+          <Mic size={12} strokeWidth={2} /> Browser
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelect('cloudflare', '@cf/deepgram/nova-3')}
+          className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
+          style={{
+            background: isNova3 ? 'var(--color-primary)' : 'var(--color-pt-surface)',
+            color: isNova3 ? '#fff' : 'var(--color-fg-muted)',
+            fontWeight: isNova3 ? 500 : 400,
+            borderLeft: '1px solid var(--color-pt-border)',
+          }}
+        >
+          <Cloud size={12} strokeWidth={2} /> Nova 3
+        </button>
+      </div>
+      <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+        {isLive ? 'Live captions' : isNova3 ? 'Transcribes after recording' : ''}
+      </span>
+    </div>
+  );
+}
+
+function PromptModal({
+  templateName,
+  systemPrompt,
+  onClose,
+}: {
+  templateName: string;
+  systemPrompt: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[70vh] w-full max-w-lg flex-col rounded-xl shadow-xl"
+        style={{ background: 'var(--color-pt-surface)', border: '1px solid var(--color-pt-border)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center justify-between border-b px-4 py-3"
+          style={{ borderColor: 'var(--color-pt-border)' }}
+        >
+          <span className="text-sm font-semibold" style={{ color: 'var(--color-fg)' }}>
+            {templateName} — System Prompt
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost p-1.5"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <XCircle size={16} strokeWidth={2} />
+          </button>
+        </div>
+        <div className="overflow-auto p-4">
+          <pre
+            className="whitespace-pre-wrap text-xs leading-relaxed"
+            style={{ color: 'var(--color-fg-muted)', fontFamily: 'var(--font-mono, monospace)' }}
+          >
+            {systemPrompt}
+          </pre>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1673,23 +1723,44 @@ function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
 function TranscriptPanel({
   transcript,
   canRemerge,
+  canTranscribe,
+  transcribing,
+  transcribeUsed,
+  transcribeCap,
   onChange,
   onCommit,
   onRemerge,
+  onCreateTranscript,
 }: {
   transcript: string;
   canRemerge: boolean;
+  canTranscribe: boolean;
+  transcribing: boolean;
+  transcribeUsed: number;
+  transcribeCap: number;
   onChange: (next: string) => void;
   onCommit: () => void;
   onRemerge: () => void;
+  onCreateTranscript: () => void;
 }) {
   return (
     <div className="space-y-3">
-      {canRemerge && (
-        <div>
-          <button type="button" className="btn btn-ghost" onClick={onRemerge}>
-            <Layers size={14} strokeWidth={2} /> Re-merge from clips
-          </button>
+      {(canTranscribe || canRemerge) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {canTranscribe && (
+            <CreateTranscriptButton
+              busy={transcribing}
+              disabled={transcribeUsed >= transcribeCap}
+              used={transcribeUsed}
+              cap={transcribeCap}
+              onClick={onCreateTranscript}
+            />
+          )}
+          {canRemerge && (
+            <button type="button" className="btn btn-ghost" onClick={onRemerge}>
+              <Layers size={14} strokeWidth={2} /> Re-merge from clips
+            </button>
+          )}
         </div>
       )}
       <textarea
@@ -1741,6 +1812,7 @@ function NotePanel({
   onUnfinalize,
   onSectionChange,
 }: NotePanelProps) {
+  const [showPrompt, setShowPrompt] = useState(false);
   const sections: NoteSection[] =
     note?.sections ??
     template?.sections.map((s) => ({ key: s.key, label: s.label, body: '' })) ??
@@ -1754,19 +1826,31 @@ function NotePanel({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Field label="" className="!space-y-0">
-          <Select
-            value={template?.id ?? ''}
-            onChange={(e) => onTemplateChange(e.target.value)}
-            className="text-xs"
-          >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        <div className="flex items-center gap-1.5">
+          <Field label="" className="!space-y-0">
+            <Select
+              value={template?.id ?? ''}
+              onChange={(e) => onTemplateChange(e.target.value)}
+              className="text-xs"
+            >
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          {template?.systemPrompt && (
+            <button
+              type="button"
+              className="btn btn-ghost p-1.5"
+              title="View generation prompt"
+              onClick={() => setShowPrompt(true)}
+            >
+              <Eye size={14} strokeWidth={2} />
+            </button>
+          )}
+        </div>
         <NoteActions
           note={note}
           busy={busy}
@@ -1779,6 +1863,14 @@ function NotePanel({
           onUnfinalize={onUnfinalize}
         />
       </div>
+
+      {showPrompt && template && (
+        <PromptModal
+          templateName={template.name}
+          systemPrompt={template.systemPrompt}
+          onClose={() => setShowPrompt(false)}
+        />
+      )}
 
       {note?.finalized && (
         <div
@@ -2241,36 +2333,12 @@ function PulseDot() {
   );
 }
 
-function wordCount(s: string): number {
-  return s.trim() === '' ? 0 : s.trim().split(/\s+/).length;
-}
-
-function formatDuration(sec: number): string {
-  if (!Number.isFinite(sec) || sec <= 0) return '00:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 function mergeClipTranscripts(clips: SessionClip[]): string {
   return clips
     .filter((c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0)
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((c) => c.transcript!.trim())
     .join('\n\n');
-}
-
-function labelForType(t: string): string {
-  switch (t) {
-    case 'evaluation':
-      return 'Initial Evaluation';
-    case 'progress':
-      return 'Progress note';
-    case 'discharge':
-      return 'Discharge';
-    default:
-      return 'Follow-up';
-  }
 }
 
 // Strips provider prefixes for a compact display label.

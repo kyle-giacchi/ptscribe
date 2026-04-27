@@ -30,7 +30,7 @@ describe('migrate v2 → v3', () => {
 
     const result = migrate(data);
 
-    expect(result.version).toBe(3);
+    expect(result.version).toBe(4);
     expect(result.sessions).toHaveLength(1);
     const session = result.sessions[0];
     expect((session as { audioRef?: unknown }).audioRef).toBeUndefined();
