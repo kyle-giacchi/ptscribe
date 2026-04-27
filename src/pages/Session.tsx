@@ -659,6 +659,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         template,
         transcript,
         patient: patient!,
+        sessionType: session!.type,
       });
       if (note) {
         updateNote(note.id, {
