@@ -29,7 +29,7 @@ export function Sidebar() {
   const items: Array<NavEntry & { badge?: Badge }> = [
     { to: '/', label: 'Today', Icon: Calendar, end: true },
     { to: '/patients', label: 'Patients', Icon: Users },
-    { to: '/sessions/new', label: 'Active session', Icon: Mic },
+    { to: '/sessions/new', label: 'Record Session', Icon: Mic },
     {
       to: '/notes',
       label: 'Review queue',
