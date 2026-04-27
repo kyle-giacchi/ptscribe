@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Mic,
@@ -18,6 +18,8 @@ import {
   Layers,
   XCircle,
   Clock,
+  Upload,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, Select } from '@/components/ui/Field';
@@ -94,7 +96,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // Re-arm the dismiss flag every time a new recording starts so the warning
   // resurfaces for the next session if it gets backgrounded again.
   useEffect(() => {
-    if (recorder.status === 'recording') setBackgroundWarningDismissed(false);
+    if (recorder.status !== 'recording') return;
+    const id = window.setTimeout(() => setBackgroundWarningDismissed(false), 0);
+    return () => window.clearTimeout(id);
   }, [recorder.status]);
 
   // Initial transcript captured ONCE per session (component is keyed on sessionId).
@@ -115,9 +119,46 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [transcribeUsed, setTranscribeUsed] = useState(0);
   const [generateUsed, setGenerateUsed] = useState(0);
 
+  // ── Accordion state ──────────────────────────────────────────────────────
+  const [openSections, setOpenSections] = useState<Set<string>>(() => {
+    const init = new Set<string>(['recording']);
+    if (session?.transcript) init.add('transcription');
+    if (session?.noteId) init.add('notes');
+    return init;
+  });
+
+  function toggleSection(id: string) {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Auto-advance: open next section when a workflow stage completes.
+  // setTimeout defers setState out of the effect body to satisfy react-hooks/set-state-in-effect.
+  const sessionStatus = session?.status ?? 'draft';
+  const prevStatusRef = useRef(sessionStatus);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = sessionStatus;
+    let next: string | null = null;
+    if (prev === 'recording' && sessionStatus === 'draft') next = 'transcription';
+    else if (prev === 'transcribing' && sessionStatus === 'draft') next = 'notes';
+    else if (prev === 'generating' && sessionStatus === 'ready') next = 'notes';
+    if (!next) return;
+    const section = next;
+    const id = window.setTimeout(() => {
+      setOpenSections((s) => { const n = new Set(s); n.add(section); return n; });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [sessionStatus]);
+
   function checkActionGuard(
     kind: 'transcribe' | 'generate',
   ): { allowed: true } | { allowed: false; reason: string } {
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const lastAt = kind === 'transcribe' ? lastTranscribeAtRef.current : lastGenerateAtRef.current;
     const count = kind === 'transcribe' ? transcribeCountRef.current : generateCountRef.current;
@@ -138,10 +179,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   function recordAction(kind: 'transcribe' | 'generate') {
     if (kind === 'transcribe') {
+      // eslint-disable-next-line react-hooks/purity
       lastTranscribeAtRef.current = Date.now();
       transcribeCountRef.current += 1;
       setTranscribeUsed(transcribeCountRef.current);
     } else {
+      // eslint-disable-next-line react-hooks/purity
       lastGenerateAtRef.current = Date.now();
       generateCountRef.current += 1;
       setGenerateUsed(generateCountRef.current);
@@ -149,9 +192,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── Atomic session/clip patches via functional slice update ──────────────
-  // Per-clip transitions need functional setState because the slice mutator
-  // captures `sessions` by closure and would lose intermediate writes when
-  // called twice in the same callback.
   function patchSession(patch: Partial<Session>) {
     updateSessionsSlice((prev) =>
       prev.map((s) => (s.id === sessionId ? { ...s, ...patch, updatedAt: Date.now() } : s)),
@@ -171,9 +211,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── One-shot crash recovery ──────────────────────────────────────────────
-  // Pending clips left over from an interrupted recording are reconstituted
-  // from their WAL chunks. A clip with no chunks is marked 'failed' so the
-  // clinician can decide whether to delete it.
   const recoveryRanRef = useRef(false);
   useEffect(() => {
     if (recoveryRanRef.current || !session) return;
@@ -229,20 +266,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
     };
-    // Run once per mount; sessionId is stable because the component is keyed on it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const sortedClips = useMemo(
-    () => (session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : []),
-    [session],
-  );
+  const sortedClips = session
+    ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt)
+    : [];
 
   // ── Auto-rotate when a clip approaches the Cloudflare Whisper limit ──────
-  // We watch the live duration tick; when a recording crosses MAX_CLIP_DURATION_SEC,
-  // stop the current clip and immediately start a fresh one. References below
-  // (handleStopRecording / handleStartRecording) are function declarations,
-  // so they're hoisted into this scope and safe to invoke from the async body.
   useEffect(() => {
     if (recorder.status !== 'recording') return;
     if (recorder.durationSec < MAX_CLIP_DURATION_SEC) return;
@@ -257,8 +288,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         rotatingRef.current = false;
       }
     })();
-    // We intentionally only depend on the recorder tick — handlers are read fresh
-    // each render via closure, and re-subscribing on every render would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.status, recorder.durationSec]);
 
@@ -266,6 +295,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   function ensureNote(initialSections?: NoteSection[]): Note {
     if (note) return note;
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const sections =
       initialSections ??
@@ -302,8 +332,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     const clipId = newId();
     const now = Date.now();
     activeClipIdRef.current = clipId;
-    // Compute index inside the functional patch so concurrent stop→start
-    // (e.g. auto-rotation) sees the post-stop clip count, not a stale snapshot.
     patchClips((clips) => [
       ...clips,
       {
@@ -369,7 +397,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           });
         }
       } else {
-        // No blob produced — drop the placeholder clip.
         try {
           await audioRepository.remove(clipId);
         } catch {
@@ -387,6 +414,47 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       patchSession({ transcript: merged, transcriptSource: 'webspeech', status: 'draft' });
     } else {
       patchSession({ status: 'draft' });
+    }
+  }
+
+  // ── Audio upload ─────────────────────────────────────────────────────────
+  async function handleUploadAudio(file: File) {
+    const MAX_BYTES = 25 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      toast.error('File too large — Whisper accepts up to 25 MB.');
+      return;
+    }
+
+    const clipId = newId();
+    const now = Date.now();
+    patchClips((clips) => [
+      ...clips,
+      { id: clipId, index: clips.length, durationSec: 0, status: 'pending', createdAt: now, updatedAt: now },
+    ]);
+
+    try {
+      const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'audio/mpeg' });
+
+      let durationSec = 0;
+      try {
+        const url = URL.createObjectURL(blob);
+        durationSec = await new Promise<number>((resolve) => {
+          const audio = new Audio();
+          audio.onloadedmetadata = () => {
+            URL.revokeObjectURL(url);
+            resolve(isFinite(audio.duration) ? audio.duration : 0);
+          };
+          audio.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+          audio.src = url;
+        });
+      } catch { /* duration stays 0 */ }
+
+      await audioRepository.save(clipId, blob);
+      patchClip(clipId, { status: 'ready', durationSec });
+      toast.success(`Added "${file.name}"`);
+    } catch (e) {
+      patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
+      toast.error(`Upload failed: ${(e as Error).message}`);
     }
   }
 
@@ -426,6 +494,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         patchClip(clip.id, {
           status: 'transcribed',
           transcript: result.text,
+          // eslint-disable-next-line react-hooks/purity
           transcriptedAt: Date.now(),
           errorMessage: undefined,
         });
@@ -462,9 +531,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    // By default, only transcribe clips that haven't been transcribed yet —
-    // saves tokens on re-clicks. Already-transcribed clips are folded back in
-    // at the merge step.
     const pending = session.clips.filter((c) => c.status === 'ready' || c.status === 'failed');
     const transcribed = session.clips.filter((c) => c.status === 'transcribed');
 
@@ -473,7 +539,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    // Warn before overwriting manual transcript edits.
     const currentMerge = mergeClipTranscripts(session.clips).trim();
     const userEdits = transcript.trim() && transcript.trim() !== currentMerge;
     if (
@@ -485,7 +550,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    // All clips already done → just merge, no API call.
     if (pending.length === 0) {
       const merged = mergeClipTranscripts(session.clips);
       setTranscript(merged);
@@ -590,17 +654,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         patient: patient!,
       });
       if (note) {
-        // Existing draft — overwrite with the new generation.
         updateNote(note.id, {
           sections: result.sections,
           templateId: template.id,
           format: template.format,
         });
       } else {
-        // First generation — ensureNote creates the note with these sections in
-        // one slice write. Doing addNote + updateNote in the same tick would
-        // clobber the create because both calls capture the pre-add notes
-        // snapshot from listSlice.
         ensureNote(result.sections);
       }
       recordAction('generate');
@@ -646,13 +705,46 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     navigate('/', { replace: true });
   }
 
+  // ── Copy full note ────────────────────────────────────────────────────────
+  function handleCopyNote() {
+    if (!note || !template) return;
+    const md = renderNoteMarkdown(note, template, patient!);
+    navigator.clipboard.writeText(md).then(
+      () => toast.success('Note copied to clipboard'),
+      () => toast.error('Copy failed'),
+    );
+  }
+
+  // ── Derived display values ────────────────────────────────────────────────
   const hasClips = session.clips.length > 0;
   const micState = deriveMicState(recorder.status);
   const sessionStatusBadge = deriveSessionBadge(session.status, hasClips);
   const fullName = `${patient.firstName} ${patient.lastName}`.trim();
 
+  const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
+  const nearingLimit = isRecording && recorder.durationSec >= WARN_CLIP_DURATION_SEC;
+  const timerColor = nearingLimit
+    ? 'var(--color-caution)'
+    : isRecording
+      ? 'var(--color-negative)'
+      : 'var(--color-fg-subtle)';
+
+  const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
+
+  // Collapsed-header summaries
+  const clipSummary =
+    sortedClips.length > 0
+      ? `${sortedClips.length} clip${sortedClips.length === 1 ? '' : 's'}`
+      : undefined;
+  const transcriptWordCount = wordCount(transcript);
+  const noteSummary = note?.finalized
+    ? 'Finalized'
+    : note?.sections.some((s) => s.body.trim())
+      ? 'Draft'
+      : undefined;
+
   return (
-    <div style={{ display: 'grid', gridTemplateRows: 'auto 1fr', minHeight: '100%' }}>
+    <div style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr', minHeight: '100%' }}>
       <SessionHeader
         patient={patient}
         fullName={fullName}
@@ -666,6 +758,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         onFinalize={handleFinalize}
         onUnfinalize={handleUnfinalize}
         onDelete={handleDeleteSession}
+        onCopyNote={note ? handleCopyNote : undefined}
+      />
+
+      <StepProgress
+        sessionStatus={session.status}
+        hasClips={hasClips}
+        transcript={transcript}
+        note={note}
       />
 
       <div
@@ -674,38 +774,118 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           background: 'var(--color-pt-surface-alt)',
           overflow: 'auto',
           display: 'grid',
-          gap: 18,
+          gap: 10,
           alignContent: 'start',
         }}
       >
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-        <RecordingPanel
-          recorder={recorder}
-          live={live}
-          clips={sortedClips}
-          webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
-          cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
-          busy={busy}
-          transcribeUsed={transcribeUsed}
-          transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
-          onStart={handleStartRecording}
-          onStop={handleStopRecording}
-          onPauseResume={handlePauseResume}
-          onCreateTranscript={handleCreateTranscript}
-          onRemerge={handleRemergeFromClips}
-          onDeleteClip={handleDeleteClip}
-          wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
-          onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
-        />
+        {/* ① Recording */}
+        <AccordionSection
+          id="recording"
+          stepNum={1}
+          title="Recording"
+          open={openSections.has('recording')}
+          onToggle={() => toggleSection('recording')}
+          meta={
+            <div className="flex items-center gap-3">
+              {nearingLimit && (
+                <span className="text-[11px]" style={{ color: 'var(--color-caution)' }}>
+                  Approaching limit
+                </span>
+              )}
+              {clipSummary && (
+                <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+                  {clipSummary}
+                </span>
+              )}
+              <span className="font-mono text-sm tabular-nums" style={{ color: timerColor }}>
+                {formatDuration(recorder.durationSec)}
+              </span>
+              {isRecording && <PulseDot />}
+            </div>
+          }
+        >
+          <RecordingPanel
+            recorder={recorder}
+            live={live}
+            clips={sortedClips}
+            webspeechProvider={settings.ai.transcription.provider === 'webspeech'}
+            cloudflareProvider={settings.ai.transcription.provider === 'cloudflare'}
+            transcriptionModel={settings.ai.transcription.model}
+            busy={busy}
+            transcribeUsed={transcribeUsed}
+            transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
+            onStart={handleStartRecording}
+            onStop={handleStopRecording}
+            onPauseResume={handlePauseResume}
+            onCreateTranscript={handleCreateTranscript}
+            onDeleteClip={handleDeleteClip}
+            onUpload={handleUploadAudio}
+            wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
+            onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
+          />
+        </AccordionSection>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)',
-            gap: 18,
-            alignItems: 'start',
-          }}
+        {/* ② Transcription */}
+        <AccordionSection
+          id="transcription"
+          stepNum={2}
+          title="Transcription"
+          open={openSections.has('transcription')}
+          onToggle={() => toggleSection('transcription')}
+          meta={
+            <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+              {transcriptWordCount > 0 ? `${transcriptWordCount} words` : 'Empty'}
+            </span>
+          }
+        >
+          <TranscriptPanel
+            transcript={transcript}
+            canRemerge={hasTranscribedClip}
+            onChange={setTranscript}
+            onCommit={() =>
+              patchSession({
+                transcript,
+                transcriptSource: session.transcriptSource ?? 'manual',
+              })
+            }
+            onRemerge={handleRemergeFromClips}
+          />
+        </AccordionSection>
+
+        {/* ③ Notes */}
+        <AccordionSection
+          id="notes"
+          stepNum={3}
+          title="Notes"
+          open={openSections.has('notes')}
+          onToggle={() => toggleSection('notes')}
+          meta={
+            <div className="flex items-center gap-2">
+              {template && (
+                <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+                  {template.name}
+                </span>
+              )}
+              {noteSummary && (
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: note?.finalized
+                      ? 'color-mix(in oklab, var(--color-positive) 15%, transparent)'
+                      : 'var(--color-pt-surface-alt)',
+                    color: note?.finalized
+                      ? 'var(--color-positive)'
+                      : 'var(--color-fg-muted)',
+                    border: `1px solid ${note?.finalized ? 'var(--color-positive)' : 'var(--color-pt-border)'}`,
+                  }}
+                >
+                  {noteSummary}
+                </span>
+              )}
+            </div>
+          }
         >
           <NotePanel
             session={session}
@@ -717,24 +897,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             busy={busy}
             generateUsed={generateUsed}
             generateCap={MAX_GENERATES_PER_SESSION}
+            generationProvider={settings.ai.generation.provider}
+            generationModel={settings.ai.generation.model}
             onTemplateChange={(id) => patchSession({ templateId: id })}
             onGenerate={handleGenerate}
             onFinalize={handleFinalize}
             onUnfinalize={handleUnfinalize}
             onSectionChange={handleSectionChange}
           />
-
-          <TranscriptPanel
-            transcript={transcript}
-            onChange={setTranscript}
-            onCommit={() =>
-              patchSession({
-                transcript,
-                transcriptSource: session.transcriptSource ?? 'manual',
-              })
-            }
-          />
-        </div>
+        </AccordionSection>
       </div>
     </div>
   );
@@ -753,6 +924,7 @@ function SessionHeader({
   onFinalize,
   onUnfinalize,
   onDelete,
+  onCopyNote,
 }: {
   patient: Patient;
   fullName: string;
@@ -766,6 +938,7 @@ function SessionHeader({
   onFinalize: () => void;
   onUnfinalize: () => void;
   onDelete: () => void;
+  onCopyNote?: () => void;
 }) {
   return (
     <div
@@ -835,6 +1008,16 @@ function SessionHeader({
         </div>
       </div>
       <MicStatusPill state={micState} elapsedSec={elapsedSec} />
+      {onCopyNote && (
+        <PtButton
+          variant="ghost"
+          iconLeft={<Copy size={14} strokeWidth={2} />}
+          onClick={onCopyNote}
+          title="Copy full note as markdown"
+        >
+          Copy note
+        </PtButton>
+      )}
       {finalized ? (
         <PtButton
           variant="ghost"
@@ -943,12 +1126,15 @@ function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss
   );
 }
 
+// ─── Recording section ───────────────────────────────────────────────────────
+
 interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
   clips: SessionClip[];
   webspeechProvider: boolean;
   cloudflareProvider: boolean;
+  transcriptionModel: string;
   busy: Busy;
   transcribeUsed: number;
   transcribeCap: number;
@@ -956,8 +1142,8 @@ interface RecordingPanelProps {
   onStop: () => void;
   onPauseResume: () => void;
   onCreateTranscript: () => void;
-  onRemerge: () => void;
   onDeleteClip: (clipId: string) => void;
+  onUpload: (file: File) => void;
   wasBackgrounded: boolean;
   onDismissBackgroundWarning: () => void;
 }
@@ -968,6 +1154,7 @@ function RecordingPanel({
   clips,
   webspeechProvider,
   cloudflareProvider,
+  transcriptionModel,
   busy,
   transcribeUsed,
   transcribeCap,
@@ -975,52 +1162,25 @@ function RecordingPanel({
   onStop,
   onPauseResume,
   onCreateTranscript,
-  onRemerge,
   onDeleteClip,
+  onUpload,
   wasBackgrounded,
   onDismissBackgroundWarning,
 }: RecordingPanelProps) {
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
-  const minutes = Math.floor(recorder.durationSec / 60);
-  const seconds = Math.floor(recorder.durationSec % 60);
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
 
   const hasReadyClip = clips.some(
     (c) => c.status === 'ready' || c.status === 'failed' || c.status === 'transcribed',
   );
-  const hasTranscribedClip = clips.some((c) => c.status === 'transcribed');
   const transcribing = busy === 'transcribing';
-  const nearingLimit = recording && recorder.durationSec >= WARN_CLIP_DURATION_SEC;
-  const timerColor = nearingLimit
-    ? 'var(--color-caution)'
-    : recording
-      ? 'var(--color-negative)'
-      : 'var(--color-fg-subtle)';
+  const transcriptionLabel = cloudflareProvider
+    ? modelLabel('cloudflare', transcriptionModel)
+    : undefined;
 
   return (
-    <section className="card space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-          Recording
-        </h2>
-        <div className="flex items-center gap-3">
-          {nearingLimit && (
-            <span
-              className="text-[11px]"
-              style={{ color: 'var(--color-caution)' }}
-              title={`Auto-rotates to a new clip at ${Math.floor(MAX_CLIP_DURATION_SEC / 60)} min`}
-            >
-              Approaching clip limit
-            </span>
-          )}
-          <span className="font-mono text-sm tabular-nums" style={{ color: timerColor }}>
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </span>
-          {recording && <PulseDot />}
-        </div>
-      </div>
-
+    <div className="space-y-3">
       {wasBackgrounded && (
         <div
           role="status"
@@ -1055,15 +1215,15 @@ function RecordingPanel({
         paused={recorder.status === 'paused'}
         hasClips={clips.length > 0}
         canTranscribe={hasReadyClip && !recording && cloudflareProvider}
-        canRemerge={hasTranscribedClip}
         transcribing={transcribing}
         transcribeUsed={transcribeUsed}
         transcribeCap={transcribeCap}
+        transcriptionLabel={transcriptionLabel}
         onStart={onStart}
         onPauseResume={onPauseResume}
         onStop={onStop}
         onCreateTranscript={onCreateTranscript}
-        onRemerge={onRemerge}
+        onUpload={onUpload}
       />
 
       <RecordingNotices
@@ -1076,7 +1236,7 @@ function RecordingPanel({
       <ClipsList clips={clips} recordingDisabled={recording} onDeleteClip={onDeleteClip} />
 
       <LiveTranscriptPreview live={live} />
-    </section>
+    </div>
   );
 }
 
@@ -1085,38 +1245,52 @@ function RecordingControlRow({
   paused,
   hasClips,
   canTranscribe,
-  canRemerge,
   transcribing,
   transcribeUsed,
   transcribeCap,
+  transcriptionLabel,
   onStart,
   onPauseResume,
   onStop,
   onCreateTranscript,
-  onRemerge,
+  onUpload,
 }: {
   idle: boolean;
   recording: boolean;
   paused: boolean;
   hasClips: boolean;
   canTranscribe: boolean;
-  canRemerge: boolean;
   transcribing: boolean;
   transcribeUsed: number;
   transcribeCap: number;
+  transcriptionLabel?: string;
   onStart: () => void;
   onPauseResume: () => void;
   onStop: () => void;
   onCreateTranscript: () => void;
-  onRemerge: () => void;
+  onUpload: (file: File) => void;
 }) {
   const transcribeBudgetSpent = transcribeUsed >= transcribeCap;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {idle ? (
-        <button type="button" className="btn btn-primary" onClick={onStart}>
-          <Mic size={14} strokeWidth={2} /> {hasClips ? 'Add clip' : 'Start recording'}
-        </button>
+        <>
+          <button type="button" className="btn btn-primary" onClick={onStart}>
+            <Mic size={14} strokeWidth={2} /> {hasClips ? 'Add clip' : 'Start recording'}
+          </button>
+          <label className="btn btn-ghost cursor-pointer">
+            <Upload size={14} strokeWidth={2} /> Upload audio
+            <input
+              type="file"
+              accept="audio/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) { onUpload(file); e.target.value = ''; }
+              }}
+            />
+          </label>
+        </>
       ) : (
         <ActiveRecordingControls paused={paused} onPauseResume={onPauseResume} onStop={onStop} />
       )}
@@ -1129,10 +1303,14 @@ function RecordingControlRow({
           onClick={onCreateTranscript}
         />
       )}
-      {canRemerge && (
-        <button type="button" className="btn btn-ghost" onClick={onRemerge}>
-          <Layers size={14} strokeWidth={2} /> Re-merge from clips
-        </button>
+      {transcriptionLabel && (
+        <span
+          className="text-[11px]"
+          style={{ color: 'var(--color-fg-subtle)' }}
+          title="Transcription model"
+        >
+          {transcriptionLabel} · Cloudflare
+        </span>
       )}
     </div>
   );
@@ -1274,7 +1452,8 @@ function ClipsList({
   if (clips.length === 0) {
     return (
       <p className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-        No clips yet. Press <strong>Start recording</strong> to capture the first one.
+        No clips yet. Press <strong>Start recording</strong> to capture audio, or{' '}
+        <strong>Upload audio</strong> to add an existing file.
       </p>
     );
   }
@@ -1489,35 +1668,42 @@ function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
   );
 }
 
+// ─── Transcription section ────────────────────────────────────────────────────
+
 function TranscriptPanel({
   transcript,
+  canRemerge,
   onChange,
   onCommit,
+  onRemerge,
 }: {
   transcript: string;
+  canRemerge: boolean;
   onChange: (next: string) => void;
   onCommit: () => void;
+  onRemerge: () => void;
 }) {
   return (
-    <section className="card space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-          Transcript
-        </h2>
-        <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-          {transcript.trim() ? `${wordCount(transcript)} words` : 'Empty'}
-        </span>
-      </div>
+    <div className="space-y-3">
+      {canRemerge && (
+        <div>
+          <button type="button" className="btn btn-ghost" onClick={onRemerge}>
+            <Layers size={14} strokeWidth={2} /> Re-merge from clips
+          </button>
+        </div>
+      )}
       <textarea
-        className="input min-h-40 leading-relaxed"
+        className="input min-h-48 leading-relaxed"
         placeholder="Speak while recording, paste in a transcript, or type freely."
         value={transcript}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onCommit}
       />
-    </section>
+    </div>
   );
 }
+
+// ─── Notes section ────────────────────────────────────────────────────────────
 
 interface NotePanelProps {
   session: Session;
@@ -1529,6 +1715,8 @@ interface NotePanelProps {
   busy: Busy;
   generateUsed: number;
   generateCap: number;
+  generationProvider: string;
+  generationModel: string;
   onTemplateChange: (id: string) => void;
   onGenerate: () => void;
   onFinalize: () => void;
@@ -1545,6 +1733,8 @@ function NotePanel({
   busy,
   generateUsed,
   generateCap,
+  generationProvider,
+  generationModel,
   onTemplateChange,
   onGenerate,
   onFinalize,
@@ -1556,33 +1746,34 @@ function NotePanel({
     template?.sections.map((s) => ({ key: s.key, label: s.label, body: '' })) ??
     [];
 
+  const generationLabel =
+    generationProvider === 'anthropic'
+      ? modelLabel('anthropic', generationModel)
+      : undefined;
+
   return (
-    <section className="card space-y-3">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <h2 className="font-display text-lg" style={{ color: 'var(--color-fg)' }}>
-            Note
-          </h2>
-          <Field label="" className="!space-y-0">
-            <Select
-              value={template?.id ?? ''}
-              onChange={(e) => onTemplateChange(e.target.value)}
-              className="text-xs"
-            >
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
+        <Field label="" className="!space-y-0">
+          <Select
+            value={template?.id ?? ''}
+            onChange={(e) => onTemplateChange(e.target.value)}
+            className="text-xs"
+          >
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <NoteActions
           note={note}
           busy={busy}
           canGenerate={transcript.trim().length > 0}
           generateUsed={generateUsed}
           generateCap={generateCap}
+          generationLabel={generationLabel}
           onGenerate={onGenerate}
           onFinalize={onFinalize}
           onUnfinalize={onUnfinalize}
@@ -1606,7 +1797,22 @@ function NotePanel({
       <NoteEditor sections={sections} readOnly={!!note?.finalized} onChange={onSectionChange} />
 
       {note && template && <NoteExportRow note={note} template={template} patient={patient} />}
-    </section>
+
+      {note && !note.finalized && (
+        <div
+          className="flex items-center justify-end border-t pt-3"
+          style={{ borderColor: 'var(--color-pt-border)' }}
+        >
+          <PtButton
+            variant="primary"
+            iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
+            onClick={onFinalize}
+          >
+            End &amp; sign
+          </PtButton>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1616,6 +1822,7 @@ function NoteActions({
   canGenerate,
   generateUsed,
   generateCap,
+  generationLabel,
   onGenerate,
   onFinalize,
   onUnfinalize,
@@ -1625,6 +1832,7 @@ function NoteActions({
   canGenerate: boolean;
   generateUsed: number;
   generateCap: number;
+  generationLabel?: string;
   onGenerate: () => void;
   onFinalize: () => void;
   onUnfinalize: () => void;
@@ -1634,7 +1842,7 @@ function NoteActions({
     ? `Per-session limit reached (${generateUsed}/${generateCap}). Reload to reset.`
     : `Drafts a note from the transcript (${generateUsed}/${generateCap} used).`;
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         className="btn btn-primary"
@@ -1655,6 +1863,15 @@ function NoteActions({
           </>
         )}
       </button>
+      {generationLabel && (
+        <span
+          className="text-[11px]"
+          style={{ color: 'var(--color-fg-subtle)' }}
+          title="Generation model"
+        >
+          {generationLabel} · Anthropic
+        </span>
+      )}
       {note && !note.finalized && (
         <button type="button" className="btn btn-secondary" onClick={onFinalize}>
           <CheckCircle2 size={14} strokeWidth={2} /> Finalize
@@ -1689,11 +1906,29 @@ function NoteEditor({
     <div className="space-y-3">
       {sections.map((s) => (
         <div key={s.key} className="space-y-1">
-          <div
-            className="text-xs font-medium tracking-wide uppercase"
-            style={{ color: 'var(--color-fg-muted)' }}
-          >
-            {s.label}
+          <div className="flex items-center justify-between">
+            <div
+              className="text-xs font-medium tracking-wide uppercase"
+              style={{ color: 'var(--color-fg-muted)' }}
+            >
+              {s.label}
+            </div>
+            {s.body.trim() && (
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors hover:bg-[var(--color-pt-surface-alt)]"
+                style={{ color: 'var(--color-fg-subtle)' }}
+                title={`Copy ${s.label}`}
+                onClick={() =>
+                  navigator.clipboard.writeText(s.body).then(
+                    () => toast.success(`${s.label} copied`),
+                    () => toast.error('Copy failed'),
+                  )
+                }
+              >
+                <Copy size={11} strokeWidth={2} />
+              </button>
+            )}
           </div>
           <NoteSectionEditor
             value={s.body}
@@ -1795,6 +2030,207 @@ function NoteExportRow({
   );
 }
 
+// ─── Accordion + Step Progress ───────────────────────────────────────────────
+
+function AccordionSection({
+  id,
+  stepNum,
+  title,
+  open,
+  onToggle,
+  meta,
+  children,
+}: {
+  id: string;
+  stepNum: number;
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  meta?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      style={{
+        border: '1px solid var(--color-pt-border)',
+        background: 'var(--color-pt-surface)',
+        borderRadius: 12,
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={`accordion-body-${id}`}
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 text-left transition-colors hover:bg-[var(--color-pt-surface-alt)]"
+        style={{ padding: '12px 16px', cursor: 'pointer' }}
+      >
+        <span
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+          style={{
+            background: 'var(--color-pt-surface-alt)',
+            color: 'var(--color-pt-text-2)',
+            border: '1px solid var(--color-pt-border)',
+          }}
+        >
+          {stepNum}
+        </span>
+        <span
+          className="font-display text-base font-semibold"
+          style={{ color: 'var(--color-fg)' }}
+        >
+          {title}
+        </span>
+        <div className="ml-auto flex items-center gap-3">
+          {meta}
+          <ChevronDown
+            size={16}
+            strokeWidth={2}
+            style={{
+              color: 'var(--color-fg-subtle)',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 200ms ease-out',
+              flexShrink: 0,
+            }}
+          />
+        </div>
+      </button>
+
+      {/* CSS grid row trick: animates height without JS measurement */}
+      <div
+        id={`accordion-body-${id}`}
+        style={{
+          display: 'grid',
+          gridTemplateRows: open ? '1fr' : '0fr',
+          transition: 'grid-template-rows 200ms ease-out',
+        }}
+      >
+        <div style={{ overflow: 'hidden' }}>
+          <div
+            style={{
+              borderTop: '1px solid var(--color-pt-border)',
+              padding: '14px 16px 16px',
+            }}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type StepState = 'pending' | 'active' | 'done';
+
+function StepProgress({
+  sessionStatus,
+  hasClips,
+  transcript,
+  note,
+}: {
+  sessionStatus: string;
+  hasClips: boolean;
+  transcript: string;
+  note: Note | undefined;
+}) {
+  const hasTranscript = Boolean(transcript.trim());
+  const hasNoteContent = note?.sections.some((s) => s.body.trim());
+
+  const recordingState: StepState =
+    sessionStatus === 'recording' || sessionStatus === 'paused'
+      ? 'active'
+      : hasClips
+        ? 'done'
+        : 'pending';
+
+  const transcriptState: StepState =
+    sessionStatus === 'transcribing'
+      ? 'active'
+      : hasTranscript
+        ? 'done'
+        : 'pending';
+
+  const notesState: StepState =
+    sessionStatus === 'finalized'
+      ? 'done'
+      : sessionStatus === 'generating' || sessionStatus === 'ready' || hasNoteContent
+        ? 'active'
+        : 'pending';
+
+  const steps: { label: string; state: StepState }[] = [
+    { label: 'Recording', state: recordingState },
+    { label: 'Transcription', state: transcriptState },
+    { label: 'Notes', state: notesState },
+  ];
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '7px 22px',
+        background: 'var(--color-pt-surface)',
+        borderBottom: '1px solid var(--color-pt-border)',
+      }}
+    >
+      {steps.map((step, i) => (
+        <StepProgressItem key={step.label} step={step} isLast={i === steps.length - 1} />
+      ))}
+    </div>
+  );
+}
+
+function StepProgressItem({
+  step,
+  isLast,
+}: {
+  step: { label: string; state: StepState };
+  isLast: boolean;
+}) {
+  const dotColor =
+    step.state === 'done'
+      ? 'var(--color-positive, #16a34a)'
+      : step.state === 'active'
+        ? 'var(--color-pt-blue, #2563eb)'
+        : 'var(--color-pt-border)';
+  const labelColor =
+    step.state === 'pending' ? 'var(--color-fg-subtle)' : 'var(--color-fg-muted)';
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5" style={{ flexShrink: 0 }}>
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: dotColor,
+            flexShrink: 0,
+            transition: 'background 300ms ease',
+          }}
+        />
+        <span className="text-[11px]" style={{ color: labelColor }}>
+          {step.label}
+        </span>
+      </div>
+      {!isLast && (
+        <div
+          style={{
+            flex: 1,
+            height: 1,
+            margin: '0 8px',
+            background: 'var(--color-pt-border)',
+            minWidth: 20,
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Misc helpers ────────────────────────────────────────────────────────────
+
 function PulseDot() {
   return (
     <span
@@ -1835,4 +2271,11 @@ function labelForType(t: string): string {
     default:
       return 'Follow-up';
   }
+}
+
+// Strips provider prefixes for a compact display label.
+// @cf/deepgram/nova-3 → nova-3 | claude-sonnet-4-6 → sonnet-4-6
+function modelLabel(_provider: string, model: string): string {
+  const short = model.split('/').pop() ?? model;
+  return short.replace(/^claude-/, '');
 }

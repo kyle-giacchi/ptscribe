@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Mic, Pencil, Trash2, Calendar, MessageSquare, Plus } from 'lucide-react';
+import { Mic, Pencil, Trash2, Calendar, MessageSquare, Plus, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
@@ -53,6 +53,7 @@ export function PatientDetail() {
   const patient = getPatient(id);
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
+  const [sameDaySessions, setSameDaySessions] = useState<Session[] | null>(null);
 
   const sessions = useMemo(
     () => (patient ? sessionsFor(patient.id) : []),
@@ -87,6 +88,19 @@ export function PatientDetail() {
   ]
     .filter(Boolean)
     .join(' · ');
+
+  function handleStartSession() {
+    if (!patient) return;
+    const today = Date.now();
+    const todaySessions = sessions.filter(
+      (s) => s.status !== 'finalized' && isSameDayLocal(s.date, today),
+    );
+    if (todaySessions.length > 0) {
+      setSameDaySessions(todaySessions);
+    } else {
+      navigate(`/sessions/new?patientId=${patient.id}`);
+    }
+  }
 
   function handleStartPlan() {
     if (!patient) return;
@@ -134,6 +148,7 @@ export function PatientDetail() {
         tab={tab}
         onTab={setTab}
         onEdit={() => setEditing(true)}
+        onStartSession={handleStartSession}
       />
 
       <div
@@ -184,6 +199,17 @@ export function PatientDetail() {
           setEditing(false);
         }}
       />
+
+      <PatientSameDayModal
+        sessions={sameDaySessions}
+        patient={patient}
+        onClose={() => setSameDaySessions(null)}
+        onContinue={(sessionId) => navigate(`/sessions/${sessionId}`)}
+        onCreateNew={() => {
+          setSameDaySessions(null);
+          navigate(`/sessions/new?patientId=${patient.id}`);
+        }}
+      />
     </div>
   );
 }
@@ -197,6 +223,7 @@ function PatientHeader({
   tab,
   onTab,
   onEdit,
+  onStartSession,
 }: {
   patient: Patient;
   age: number | null;
@@ -206,6 +233,7 @@ function PatientHeader({
   tab: Tab;
   onTab: (t: Tab) => void;
   onEdit: () => void;
+  onStartSession: () => void;
 }) {
   const idLine = [
     `PT-${patient.id.slice(0, 5).toUpperCase()}`,
@@ -275,11 +303,13 @@ function PatientHeader({
           <PtButton variant="ghost" iconLeft={<Pencil size={14} strokeWidth={2} />} onClick={onEdit}>
             Edit
           </PtButton>
-          <Link to={`/sessions/new?patientId=${patient.id}`}>
-            <PtButton variant="primary" iconLeft={<Mic size={14} strokeWidth={2} />}>
-              Start session
-            </PtButton>
-          </Link>
+          <PtButton
+            variant="primary"
+            iconLeft={<Mic size={14} strokeWidth={2} />}
+            onClick={onStartSession}
+          >
+            Start session
+          </PtButton>
         </div>
       </div>
 
@@ -1280,4 +1310,89 @@ function adherencePct(cells: number[]): number {
   if (cells.length === 0) return 0;
   const avg = cells.reduce((a, b) => a + b, 0) / cells.length;
   return Math.round(avg * 100);
+}
+
+function isSameDayLocal(tsA: number, tsB: number): boolean {
+  const a = new Date(tsA);
+  const b = new Date(tsB);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function PatientSameDayModal({
+  sessions,
+  patient,
+  onClose,
+  onContinue,
+  onCreateNew,
+}: {
+  sessions: Session[] | null;
+  patient: Patient;
+  onClose: () => void;
+  onContinue: (sessionId: string) => void;
+  onCreateNew: () => void;
+}) {
+  if (!sessions) return null;
+  const name = `${patient.firstName} ${patient.lastName}`;
+  return (
+    <Modal open onClose={onClose} title="Session already started today" size="sm">
+      <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: 0 }}>
+        You have {sessions.length === 1 ? 'an open session' : `${sessions.length} open sessions`} for{' '}
+        <strong>{name}</strong> today. Continue where you left off, or start fresh.
+      </p>
+
+      <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
+        {sessions.map((s) => {
+          const time = new Date(s.date).toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onContinue(s.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 14px',
+                border: '1px solid var(--color-pt-accent-border)',
+                borderRadius: 10,
+                background: 'var(--color-pt-accent-soft)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-accent-fg)' }}>
+                  {labelForType(s.type)}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}>
+                  Started at {time}
+                </div>
+              </div>
+              <ExternalLink size={14} color="var(--color-pt-accent)" strokeWidth={2} />
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+        <PtButton variant="ghost" onClick={onCreateNew}>
+          Start new session anyway
+        </PtButton>
+        {sessions.length === 1 && (
+          <PtButton variant="primary" onClick={() => onContinue(sessions[0].id)}>
+            Continue session
+          </PtButton>
+        )}
+      </div>
+    </Modal>
+  );
 }
