@@ -1,3 +1,21 @@
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function isSameDay(tsA: number, tsB: number): boolean {
+  const a = new Date(tsA);
+  const b = new Date(tsB);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function startOfDay(ts: number): number {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export function fmtIsoDate(ts: number): string {
   return new Date(ts).toISOString().slice(0, 10);
 }
