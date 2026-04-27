@@ -47,6 +47,8 @@ import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
+import { wordCount, formatDuration } from '@/utils/format';
+import { labelForType } from '@/utils/labels';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { MAX_CLIP_DURATION_SEC, WARN_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 import { newId } from '@/utils/ids';
@@ -486,23 +488,25 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     }
     let successes = 0;
     let failures = 0;
-    for (const clip of pending) {
-      const result = await transcribeClipBlob(clip);
-      if (result.ok) {
-        successes += 1;
-        textByClip.set(clip.id, result.text);
-        patchClip(clip.id, {
-          status: 'transcribed',
-          transcript: result.text,
-          // eslint-disable-next-line react-hooks/purity
-          transcriptedAt: Date.now(),
-          errorMessage: undefined,
-        });
-      } else {
-        failures += 1;
-        patchClip(clip.id, { status: 'failed', errorMessage: result.error });
-      }
-    }
+    await Promise.allSettled(
+      pending.map(async (clip) => {
+        const result = await transcribeClipBlob(clip);
+        if (result.ok) {
+          successes += 1;
+          textByClip.set(clip.id, result.text);
+          patchClip(clip.id, {
+            status: 'transcribed',
+            transcript: result.text,
+            // eslint-disable-next-line react-hooks/purity
+            transcriptedAt: Date.now(),
+            errorMessage: undefined,
+          });
+        } else {
+          failures += 1;
+          patchClip(clip.id, { status: 'failed', errorMessage: result.error });
+        }
+      }),
+    );
     return { textByClip, successes, failures };
   }
 
@@ -694,13 +698,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function handleDeleteSession() {
     if (!confirm('Delete this session, its audio, and any draft note?')) return;
     if (note) removeNote(note.id);
-    for (const clip of session?.clips ?? []) {
-      try {
-        await audioRepository.remove(clip.id);
-      } catch {
-        /* ignore */
-      }
-    }
+    await Promise.all((session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})));
     removeSession(session!.id);
     navigate('/', { replace: true });
   }
@@ -2241,36 +2239,12 @@ function PulseDot() {
   );
 }
 
-function wordCount(s: string): number {
-  return s.trim() === '' ? 0 : s.trim().split(/\s+/).length;
-}
-
-function formatDuration(sec: number): string {
-  if (!Number.isFinite(sec) || sec <= 0) return '00:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 function mergeClipTranscripts(clips: SessionClip[]): string {
   return clips
     .filter((c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0)
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((c) => c.transcript!.trim())
     .join('\n\n');
-}
-
-function labelForType(t: string): string {
-  switch (t) {
-    case 'evaluation':
-      return 'Initial Evaluation';
-    case 'progress':
-      return 'Progress note';
-    case 'discharge':
-      return 'Discharge';
-    default:
-      return 'Follow-up';
-  }
 }
 
 // Strips provider prefixes for a compact display label.

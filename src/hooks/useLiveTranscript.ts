@@ -48,11 +48,13 @@ export function useLiveTranscript(): UseLiveTranscript {
   const [interimText, setInterimText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
+  const isMountedRef = useRef(true);
   const Ctor = getCtor();
   const supported = Ctor !== null;
 
   useEffect(
     () => () => {
+      isMountedRef.current = false;
       try {
         recRef.current?.abort();
       } catch {
@@ -74,6 +76,7 @@ export function useLiveTranscript(): UseLiveTranscript {
     rec.interimResults = true;
     rec.lang = 'en-US';
     rec.onresult = (e) => {
+      if (!isMountedRef.current) return;
       let interim = '';
       let appended = '';
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
@@ -85,8 +88,12 @@ export function useLiveTranscript(): UseLiveTranscript {
       if (appended) setFinalText((prev) => (prev + ' ' + appended).trim());
       setInterimText(interim);
     };
-    rec.onerror = (ev) => setError(ev.error || 'speech error');
+    rec.onerror = (ev) => {
+      if (!isMountedRef.current) return;
+      setError(ev.error || 'speech error');
+    };
     rec.onend = () => {
+      if (!isMountedRef.current) return;
       setListening(false);
       setInterimText('');
     };

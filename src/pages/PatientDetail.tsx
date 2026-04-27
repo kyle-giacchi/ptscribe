@@ -19,7 +19,8 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { usePlans } from '@/contexts/PlansProvider';
 import { useExercises } from '@/contexts/ExercisesProvider';
 import { newId } from '@/utils/ids';
-import { fmtIsoDateOptional, parseIsoDate, relativeFromNow } from '@/utils/dates';
+import { DAY_MS, fmtIsoDateOptional, isSameDay, parseIsoDate, relativeFromNow, startOfDay } from '@/utils/dates';
+import { labelForType } from '@/utils/labels';
 import type {
   Note,
   Patient,
@@ -93,7 +94,7 @@ export function PatientDetail() {
     if (!patient) return;
     const today = Date.now();
     const todaySessions = sessions.filter(
-      (s) => s.status !== 'finalized' && isSameDayLocal(s.date, today),
+      (s) => s.status !== 'finalized' && isSameDay(s.date, today),
     );
     if (todaySessions.length > 0) {
       setSameDaySessions(todaySessions);
@@ -1243,13 +1244,6 @@ function EditPatientModal({
   );
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-function startOfDay(ts: number): number {
-  const d = new Date(ts);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
 function ageFromDob(dob?: number): number | null {
   if (!dob) return null;
   return Math.floor((Date.now() - dob) / (365.25 * DAY_MS));
@@ -1260,19 +1254,6 @@ function labelForSex(s?: Sex): string {
   if (s === 'M') return 'M';
   if (s === 'X') return 'X';
   return '';
-}
-
-function labelForType(t: string): string {
-  switch (t) {
-    case 'evaluation':
-      return 'Initial Evaluation';
-    case 'progress':
-      return 'Progress note';
-    case 'discharge':
-      return 'Discharge';
-    default:
-      return 'Follow-up';
-  }
 }
 
 function derivePatientBadge(
@@ -1310,16 +1291,6 @@ function adherencePct(cells: number[]): number {
   if (cells.length === 0) return 0;
   const avg = cells.reduce((a, b) => a + b, 0) / cells.length;
   return Math.round(avg * 100);
-}
-
-function isSameDayLocal(tsA: number, tsB: number): boolean {
-  const a = new Date(tsA);
-  const b = new Date(tsB);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 function PatientSameDayModal({

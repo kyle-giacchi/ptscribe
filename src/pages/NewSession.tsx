@@ -28,26 +28,9 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { newId } from '@/utils/ids';
+import { isSameDay } from '@/utils/dates';
+import { labelForType } from '@/utils/labels';
 import type { NoteFormat, NoteTemplate, Patient, Session, SessionType } from '@/types';
-
-function isSameDay(tsA: number, tsB: number): boolean {
-  const a = new Date(tsA);
-  const b = new Date(tsB);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function labelForSessionType(t: SessionType): string {
-  switch (t) {
-    case 'evaluation': return 'Initial evaluation';
-    case 'progress':   return 'Progress note';
-    case 'discharge':  return 'Discharge';
-    default:           return 'Follow-up';
-  }
-}
 
 const TYPE_TO_FORMAT: Record<SessionType, NoteFormat> = {
   evaluation: 'evaluation',
@@ -939,7 +922,7 @@ function SameDayModal({
             >
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-accent-fg)' }}>
-                  {labelForSessionType(s.type)}
+                  {labelForType(s.type)}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}>
                   Started at {time}
