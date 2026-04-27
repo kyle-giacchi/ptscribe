@@ -61,7 +61,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const scheduleSave = useCallback((next: AppData) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      void dataRepository.save(next);
+      dataRepository.save(next).catch((err) => {
+        console.error('AppData save failed', err);
+      });
     }, SAVE_DEBOUNCE_MS);
   }, []);
 

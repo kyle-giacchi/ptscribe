@@ -114,6 +114,11 @@ export function useRecorder(): UseRecorder {
       wakeLockRef.current = null;
       void releaseWakeLock(sentinel);
     }
+    // Resolve any in-flight stop() Promise so callers don't hang on reset/error/unmount.
+    if (stopResolveRef.current) {
+      stopResolveRef.current(null);
+      stopResolveRef.current = null;
+    }
     detachVisibilityHandler();
   }, [detachVisibilityHandler]);
 

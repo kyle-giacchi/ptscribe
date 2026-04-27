@@ -206,12 +206,8 @@ export const audioRepository = {
       'readonly',
       (store) => store.getAll(chunkRangeFor(sessionId)) as IDBRequest<(Blob | ArrayBuffer)[]>,
     );
-    const decoded: Blob[] = [];
-    for (const item of stored) {
-      const out = await maybeDecrypt(item, RECORDING_MIME);
-      if (out) decoded.push(out);
-    }
-    return decoded;
+    const results = await Promise.all(stored.map((item) => maybeDecrypt(item, RECORDING_MIME)));
+    return results.filter((b): b is Blob => b !== null);
   },
 
   async hasChunks(sessionId: string): Promise<boolean> {
