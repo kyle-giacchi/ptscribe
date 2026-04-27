@@ -1,4 +1,4 @@
-import type { GenerationProvider, NoteSection, NoteTemplate, Note, Patient } from '@/types';
+import type { GenerationProvider, NoteSection, NoteTemplate, Note, Patient, SessionType } from '@/types';
 import { callAnthropic } from './client/anthropic';
 import { buildUserPrompt } from '@/lib/clinical/prompts';
 
@@ -9,6 +9,7 @@ export interface GenerateNoteArgs {
   transcript: string;
   patient: Patient;
   priorNote?: Note;
+  sessionType?: SessionType;
   signal?: AbortSignal;
 }
 
@@ -34,6 +35,7 @@ export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNote
     transcript: args.transcript,
     patient: args.patient,
     priorNote: args.priorNote,
+    sessionType: args.sessionType,
   });
 
   const result = await callAnthropic({

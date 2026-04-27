@@ -48,16 +48,33 @@ describe('buildUserPrompt', () => {
     expect(result).toContain(baseTranscript);
   });
 
-  it('lists all section keys in the output instruction', () => {
+  it('includes session type when provided', () => {
+    const result = buildUserPrompt({
+      template: baseTemplate,
+      transcript: baseTranscript,
+      patient: basePatient,
+      sessionType: 'follow_up',
+    });
+    expect(result).toContain('Session type: Follow-up');
+  });
+
+  it('omits session type line when not provided', () => {
     const result = buildUserPrompt({
       template: baseTemplate,
       transcript: baseTranscript,
       patient: basePatient,
     });
-    expect(result).toContain('"subjective"');
-    expect(result).toContain('"objective"');
-    expect(result).toContain('"assessment"');
-    expect(result).toContain('"plan"');
+    expect(result).not.toContain('Session type:');
+  });
+
+  it('uses correct label for evaluation session type', () => {
+    const result = buildUserPrompt({
+      template: baseTemplate,
+      transcript: baseTranscript,
+      patient: basePatient,
+      sessionType: 'evaluation',
+    });
+    expect(result).toContain('Session type: Initial Evaluation');
   });
 
   it('includes a prior note block when priorNote is provided', () => {
@@ -124,12 +141,4 @@ describe('buildUserPrompt', () => {
     expect(result).toContain('(no transcript provided)');
   });
 
-  it('instructs the model to return JSON only', () => {
-    const result = buildUserPrompt({
-      template: baseTemplate,
-      transcript: baseTranscript,
-      patient: basePatient,
-    });
-    expect(result).toContain('Return JSON only');
-  });
 });
