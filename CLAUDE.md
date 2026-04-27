@@ -45,7 +45,7 @@ npm run test:e2e:update  Update Playwright snapshots
 
 ## Stack
 
-React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (Radix) + React Router 7. Persistence = `localStorage` for `AppData` + IndexedDB for raw audio Blobs. Validation = Zod 4 (I/O boundaries). Testing = Vitest 4 (jsdom) + Playwright. AI = Cloudflare Workers AI Whisper + Anthropic Messages, called browser-direct with credentials the clinician pastes into Settings.
+React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (Radix) + React Router 7. Persistence = `localStorage` for `AppData` + IndexedDB for raw audio Blobs. Validation = Zod 4 (I/O boundaries). Testing = Vitest 4 (jsdom) + Playwright. AI = Cloudflare Workers AI Whisper + Anthropic Messages, both proxied through our Cloudflare Worker (`/api/transcribe`, `/api/generate`) — credentials are server-side secrets; the browser never sees them.
 
 ## Documentation
 
@@ -56,6 +56,13 @@ React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (
 - [docs/clinical-model.md](docs/clinical-model.md) — domain entities, session state machine, AI prompt shape
 - [docs/style-guide.md](docs/style-guide.md) — UI conventions
 - [docs/superpowers/specs/](docs/superpowers/specs/) — design specs
+
+## Git workflow
+
+- Default branch for all feature/design/bugfix/refactor work: **`main`**.
+- Only touch `cloudflare-deployment` when explicitly asked ("push to cloudflare", "deploy this", "update the cloudflare branch"). To propagate: `git checkout cloudflare-deployment && git merge main && git push` (fast-forward expected — that branch is `main` + two deploy-config commits).
+- Deploy-config changes (`wrangler.jsonc`, `.github/workflows/deploy.yml`) go on `cloudflare-deployment` directly.
+- Files under `docs/superpowers/plans/` and `docs/superpowers/specs/` stay **untracked** — do not commit them.
 
 ## Hard rules
 

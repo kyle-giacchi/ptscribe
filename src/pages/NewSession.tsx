@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   Check,
   Search,
+  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,6 +29,25 @@ import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { newId } from '@/utils/ids';
 import type { NoteFormat, NoteTemplate, Patient, Session, SessionType } from '@/types';
+
+function isSameDay(tsA: number, tsB: number): boolean {
+  const a = new Date(tsA);
+  const b = new Date(tsB);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function labelForSessionType(t: SessionType): string {
+  switch (t) {
+    case 'evaluation': return 'Initial evaluation';
+    case 'progress':   return 'Progress note';
+    case 'discharge':  return 'Discharge';
+    default:           return 'Follow-up';
+  }
+}
 
 const TYPE_TO_FORMAT: Record<SessionType, NoteFormat> = {
   evaluation: 'evaluation',
@@ -72,7 +92,7 @@ export function NewSession() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { patients } = usePatients();
-  const { addSession } = useSessions();
+  const { forPatient: sessionsForPatient, addSession } = useSessions();
   const { templates, addTemplate } = useTemplates();
 
   const [patientId, setPatientId] = useState(params.get('patientId') ?? '');
@@ -81,6 +101,7 @@ export function NewSession() {
   const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [query, setQuery] = useState('');
+  const [sameDayModal, setSameDayModal] = useState<Session[] | null>(null);
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === patientId),
@@ -118,8 +139,7 @@ export function NewSession() {
     setShowAllTemplates(false);
   }
 
-  function handleStart() {
-    if (!patientId) return;
+  function doCreateSession() {
     const now = Date.now();
     const session: Session = {
       id: newId(),
@@ -134,6 +154,18 @@ export function NewSession() {
     };
     addSession(session);
     navigate(`/sessions/${session.id}`);
+  }
+
+  function handleStart() {
+    if (!patientId) return;
+    const todaySessions = sessionsForPatient(patientId).filter(
+      (s) => s.status !== 'finalized' && isSameDay(s.date, Date.now()),
+    );
+    if (todaySessions.length > 0) {
+      setSameDayModal(todaySessions);
+    } else {
+      doCreateSession();
+    }
   }
 
   function handleCreateTemplate(name: string) {
@@ -335,6 +367,14 @@ export function NewSession() {
         }
         onClose={() => setCreatingTemplate(false)}
         onCreate={handleCreateTemplate}
+      />
+
+      <SameDayModal
+        sessions={sameDayModal}
+        patient={selectedPatient}
+        onClose={() => setSameDayModal(null)}
+        onContinue={(sessionId) => navigate(`/sessions/${sessionId}`)}
+        onCreateNew={() => { setSameDayModal(null); doCreateSession(); }}
       />
     </div>
   );
@@ -845,6 +885,81 @@ function NewTemplateModal({
         >
           Create
         </PtButton>
+      </div>
+    </Modal>
+  );
+}
+
+function SameDayModal({
+  sessions,
+  patient,
+  onClose,
+  onContinue,
+  onCreateNew,
+}: {
+  sessions: Session[] | null;
+  patient: Patient | undefined;
+  onClose: () => void;
+  onContinue: (sessionId: string) => void;
+  onCreateNew: () => void;
+}) {
+  if (!sessions) return null;
+  const name = patient ? `${patient.firstName} ${patient.lastName}` : 'this patient';
+  return (
+    <Modal open onClose={onClose} title="Session already started today" size="sm">
+      <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: 0 }}>
+        You have {sessions.length === 1 ? 'an open session' : `${sessions.length} open sessions`} for{' '}
+        <strong>{name}</strong> today. Continue where you left off, or start fresh.
+      </p>
+
+      <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
+        {sessions.map((s) => {
+          const time = new Date(s.date).toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          });
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onContinue(s.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 14px',
+                border: '1px solid var(--color-pt-accent-border)',
+                borderRadius: 10,
+                background: 'var(--color-pt-accent-soft)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-accent-fg)' }}>
+                  {labelForSessionType(s.type)}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}>
+                  Started at {time}
+                </div>
+              </div>
+              <ExternalLink size={14} color="var(--color-pt-accent)" strokeWidth={2} />
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+        <PtButton variant="ghost" onClick={onCreateNew}>
+          Start new session anyway
+        </PtButton>
+        {sessions.length === 1 && (
+          <PtButton variant="primary" onClick={() => onContinue(sessions[0].id)}>
+            Continue session
+          </PtButton>
+        )}
       </div>
     </Modal>
   );
