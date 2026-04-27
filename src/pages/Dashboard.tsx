@@ -108,7 +108,7 @@ export function Dashboard() {
                 note{draftNotes.length === 1 ? '' : 's'} awaiting sign-off
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
+            <div className="hidden items-center gap-2.5 md:flex">
               <Link to="/notes" style={{ textDecoration: 'none' }}>
                 <PtButton variant="ghost" iconLeft={<Inbox size={14} strokeWidth={1.75} />}>
                   Open inbox
@@ -124,7 +124,7 @@ export function Dashboard() {
         </SurfaceCard>
 
         {/* Stat row */}
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
           <StatCard
             eyebrow="Sessions today"
             value={todaysSessions.length}
@@ -152,7 +152,7 @@ export function Dashboard() {
         </div>
 
         {/* Body */}
-        <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1fr 360px' }}>
+        <div className="grid grid-cols-1 gap-[18px] md:grid-cols-[1fr_360px]">
           <ScheduleCard sessions={todaysSessions} patients={patients} />
           <div className="flex flex-col gap-3.5">
             <SignOffRail notes={draftNotes} patients={patients} />
