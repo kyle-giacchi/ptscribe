@@ -17,6 +17,14 @@ const ML_ASSETS: Record<string, { file: string; contentType: string }> = {
     file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
     contentType: 'text/javascript',
   },
+  '/ort-wasm-simd-threaded.jsep.wasm': {
+    file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
+    contentType: 'application/wasm',
+  },
+  '/ort-wasm-simd-threaded.jsep.mjs': {
+    file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+    contentType: 'text/javascript',
+  },
 };
 
 function serveMLAssetsDev(): Plugin {
@@ -57,6 +65,16 @@ export default defineConfig({
           src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
           dest: '.',
           rename: 'ort-wasm-simd-threaded.mjs',
+        },
+        {
+          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
+          dest: '.',
+          rename: 'ort-wasm-simd-threaded.jsep.wasm',
+        },
+        {
+          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+          dest: '.',
+          rename: 'ort-wasm-simd-threaded.jsep.mjs',
         },
       ],
     }),
