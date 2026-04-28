@@ -3,6 +3,7 @@ import { useAppData } from './AppDataProvider';
 import type {
   AISettings,
   AnalysisMode,
+  AudioSettings,
   PageKey,
   Settings,
 } from '@/types';
@@ -11,6 +12,7 @@ export interface SettingsContextValue {
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
   updateAi: (patch: Partial<AISettings>) => void;
+  updateAudio: (patch: Partial<AudioSettings>) => void;
   updateUi: (patch: Partial<Settings['ui']>) => void;
   // Per-page detail-level toggle (kept from prior app for the dashboard etc.).
   // We persist this in localStorage directly because it isn't part of the
@@ -51,6 +53,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateSettings: (patch) => updateSettingsSlice({ ...settings, ...patch }),
       updateAi: (patch) =>
         updateSettingsSlice({ ...settings, ai: { ...settings.ai, ...patch } }),
+      updateAudio: (patch) =>
+        updateSettingsSlice({ ...settings, audio: { ...settings.audio, ...patch } }),
       updateUi: (patch) =>
         updateSettingsSlice({ ...settings, ui: { ...settings.ui, ...patch } }),
       getPageMode: (key) => readPageModes()[key] ?? 'simple',
