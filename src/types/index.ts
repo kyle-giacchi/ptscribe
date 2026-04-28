@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 4;
+export const APP_DATA_VERSION = 5;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -262,8 +262,21 @@ export interface AISettings {
   };
 }
 
+export type SilenceSensitivity = 'low' | 'medium' | 'high';
+
+export interface SilenceDetectionSettings {
+  enabled: boolean;
+  sensitivity: SilenceSensitivity;
+  padMs: number;
+}
+
+export interface AudioSettings {
+  silenceDetection: SilenceDetectionSettings;
+}
+
 export interface Settings {
   ai: AISettings;
+  audio: AudioSettings;
   ui: {
     sidebarCollapsed: boolean;
     densityMode: DensityMode;

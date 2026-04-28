@@ -17,6 +17,8 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   to `@cf/deepgram/nova-3` for built-in speaker diarization. User overrides preserved.
  *   Also backfills the new "Premium Prompt 1" built-in template (only seeded by
  *   `defaultAppData()` on first-run, so existing users would otherwise miss it).
+ * - v4 → v5: Adds `Settings.audio.silenceDetection` (default OFF) for opt-in client-side
+ *   silence trimming before transcription.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -39,6 +41,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 3) {
     working = migrateV3ToV4(working);
+  }
+  if ((working as { version?: number }).version === 4) {
+    working = migrateV4ToV5(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -131,5 +136,36 @@ function migrateV2ToV3(input: Record<string, unknown>): Record<string, unknown> 
     return out;
   });
 
+  return next;
+}
+
+function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 5 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingAudio =
+    (settings.audio as { silenceDetection?: unknown } | undefined) ?? undefined;
+  const existingSd =
+    (existingAudio?.silenceDetection as Record<string, unknown> | undefined) ?? undefined;
+
+  next.settings = {
+    ...settings,
+    audio: {
+      silenceDetection: {
+        enabled: typeof existingSd?.enabled === 'boolean' ? existingSd.enabled : false,
+        sensitivity:
+          existingSd?.sensitivity === 'low' ||
+          existingSd?.sensitivity === 'medium' ||
+          existingSd?.sensitivity === 'high'
+            ? existingSd.sensitivity
+            : 'medium',
+        padMs:
+          typeof existingSd?.padMs === 'number' &&
+          existingSd.padMs >= 0 &&
+          existingSd.padMs <= 2000
+            ? existingSd.padMs
+            : 400,
+      },
+    },
+  };
   return next;
 }
