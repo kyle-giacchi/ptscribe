@@ -17,7 +17,7 @@
 | What unit are dates?                    | ms timestamp (`number`) — `Date.now()`-style                                                                                                          |
 | What unit is `Session.durationMin`?     | Minutes (number)                                                                                                                                      |
 | Adding a new domain field?              | 4-step ripple: types → schema → defaultAppData → migration ([invariants.md:111](docs/invariants.md#type-changes-ripple))                             |
-| Where does load-time validation happen? | `DataRepository.load()` calls `AppDataSchema.safeParse` once ([invariants.md:48](docs/invariants.md#schema-validation-at-boundaries))                |
+| Where does load-time validation happen? | `DataRepository.load()` calls `safeParse()` on `AppDataSchema` once ([invariants.md:48](docs/invariants.md#schema-validation-at-boundaries))           |
 | Which hook for which slice?             | Provider/mutator table at [architecture.md:58](docs/architecture.md#provider-responsibilities)                                                       |
 | Built-in templates / exercises?         | Provider-level guards make `update`/`remove` no-ops when `builtin: true`. UI shows Clone, not Edit. ([invariants.md:73](docs/invariants.md#built-in-entities)) |
 | Default models?                         | Transcription = `@cf/deepgram/nova-3` (Cloudflare Workers AI, with speaker diarization); generation = `claude-sonnet-4-6` (Anthropic). Both reached through our Worker proxy at `/api/transcribe` and `/api/generate`; the browser never sees provider credentials. |
@@ -45,7 +45,7 @@ npm run test:e2e:update  Update Playwright snapshots
 
 ## Stack
 
-React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (Radix) + React Router 7. Persistence = `localStorage` for `AppData` + IndexedDB for raw audio Blobs. Validation = Zod 4 (I/O boundaries). Testing = Vitest 4 (jsdom) + Playwright. AI = Cloudflare Workers AI Whisper + Anthropic Messages, both proxied through our Cloudflare Worker (`/api/transcribe`, `/api/generate`) — credentials are server-side secrets; the browser never sees them.
+See [README.md](README.md) for the full stack overview. Key agent-relevant detail: AI calls go through our Cloudflare Worker proxy (`/api/transcribe`, `/api/generate`) — credentials are server-side secrets; the browser never sees them.
 
 ## Documentation
 
@@ -68,8 +68,8 @@ React 19 + TypeScript 6 + Vite 8 (rolldown + oxc) + Tailwind CSS 4 + shadcn/ui (
 
 - **No backend.** No auth, no server, no analytics. All data is `localStorage` (`AppData`) + IndexedDB (audio) — both client-side.
 - **AI calls go through our Worker proxy.** Whisper and Anthropic are reached via `POST /api/transcribe` and `POST /api/generate` on our Cloudflare Worker; provider credentials are server-side secrets the browser never sees. Requests carry the `AppGate` 6-digit code in `x-ptscribe-key` (obscurity, not auth — abuse caps live server-side). Settings still surfaces a HIPAA disclaimer because data still leaves the device.
-- **Single write path.** Components/hooks never touch `localStorage` or IndexedDB directly — go through a slice provider mutator → `updateXSlice` → `DataRepository.save`, or through `AudioRepository` for audio Blobs.
-- **Validate only at I/O boundaries.** `AppDataSchema.safeParse` runs on load and on JSON import. Skip it for in-memory state.
+- **Single write path.** Components/hooks never touch `localStorage` or IndexedDB directly — go through a slice provider mutator → `updateXSlice` → `DataRepository.save()`, or through `AudioRepository` for audio Blobs.
+- **Validate only at I/O boundaries.** `AppDataSchema.safeParse()` runs on load and on JSON import. Skip it for in-memory state.
 - **Built-ins are read-only.** Templates and exercises with `builtin: true` cannot be edited or deleted at the provider level — UI offers Clone instead.
 - **Encryption is enforced inside the Repository layer.** When the vault is unlocked, `DataRepository` and `AudioRepository` round-trip every byte through AES-GCM. Do not add a second persistence path that bypasses them. Tab close evicts the in-memory key; there is no passphrase recovery. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))
 - **Recorder owns wake lock + visibility.** `useRecorder` holds a `'screen'` wake lock and a `visibilitychange` listener for the lifetime of each clip; both must be released on every exit path (stop, reset, error, unmount). ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))
