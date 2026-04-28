@@ -45,6 +45,7 @@ import { audioRepository } from '@/services/AudioRepository';
 import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { transcribe } from '@/services/ai/transcribe';
+import { trimSilence } from '@/lib/audio/silenceTrim';
 import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
@@ -464,18 +465,41 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── Transcription ────────────────────────────────────────────────────────
-  async function transcribeClipBlob(
-    clip: SessionClip,
-  ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  async function transcribeClipBlob(clip: SessionClip): Promise<
+    | { ok: true; text: string; trimReport?: { droppedSec: number; originalSec: number } }
+    | { ok: false; error: string }
+  > {
     try {
-      const blob = await audioRepository.load(clip.id);
-      if (!blob) return { ok: false, error: 'No audio found for this clip.' };
+      const original = await audioRepository.load(clip.id);
+      if (!original) return { ok: false, error: 'No audio found for this clip.' };
+
+      let blobToSend: Blob = original;
+      let trimReport: { droppedSec: number; originalSec: number } | undefined;
+
+      const sd = settings.audio.silenceDetection;
+      if (sd.enabled) {
+        try {
+          const trimResult = await trimSilence(original, {
+            sensitivity: sd.sensitivity,
+            padMs: sd.padMs,
+          });
+          blobToSend = trimResult.trimmed;
+          trimReport = {
+            droppedSec: trimResult.report.droppedSec,
+            originalSec: trimResult.report.originalSec,
+          };
+        } catch {
+          // Trim failure must never block transcription — fall back to original.
+          blobToSend = original;
+        }
+      }
+
       const result = await transcribe({
-        blob,
+        blob: blobToSend,
         provider: settings.ai.transcription.provider,
         model: settings.ai.transcription.model,
       });
-      return { ok: true, text: result.text };
+      return { ok: true, text: result.text, trimReport };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
@@ -484,19 +508,31 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function runTranscribeLoop(
     pending: SessionClip[],
     transcribed: SessionClip[],
-  ): Promise<{ textByClip: Map<string, string>; successes: number; failures: number }> {
+  ): Promise<{
+    textByClip: Map<string, string>;
+    successes: number;
+    failures: number;
+    totalDroppedSec: number;
+    totalOriginalSec: number;
+  }> {
     const textByClip = new Map<string, string>();
     for (const c of transcribed) {
       if (c.transcript) textByClip.set(c.id, c.transcript);
     }
     let successes = 0;
     let failures = 0;
+    let totalDroppedSec = 0;
+    let totalOriginalSec = 0;
     await Promise.allSettled(
       pending.map(async (clip) => {
         const result = await transcribeClipBlob(clip);
         if (result.ok) {
           successes += 1;
           textByClip.set(clip.id, result.text);
+          if (result.trimReport) {
+            totalDroppedSec += result.trimReport.droppedSec;
+            totalOriginalSec += result.trimReport.originalSec;
+          }
           patchClip(clip.id, {
             status: 'transcribed',
             transcript: result.text,
@@ -510,7 +546,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         }
       }),
     );
-    return { textByClip, successes, failures };
+    return { textByClip, successes, failures, totalDroppedSec, totalOriginalSec };
   }
 
   function reportTranscribeOutcome(successes: number, failures: number) {
@@ -580,7 +616,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       ),
     );
 
-    const { textByClip, successes, failures } = await runTranscribeLoop(pending, transcribed);
+    const { textByClip, successes, failures, totalDroppedSec, totalOriginalSec } =
+      await runTranscribeLoop(pending, transcribed);
 
     const merged = [...session.clips]
       .sort((a, b) => a.createdAt - b.createdAt)
@@ -598,6 +635,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction('transcribe');
     setBusy(null);
     reportTranscribeOutcome(successes, failures);
+    if (totalDroppedSec > 1) {
+      const pct = Math.round((totalDroppedSec / Math.max(totalOriginalSec, 1)) * 100);
+      toast.info(
+        `Silence trimming saved ${Math.round(totalDroppedSec)}s (~${pct}%) before transcription.`,
+      );
+    }
   }
 
   // ── Clip management ──────────────────────────────────────────────────────
