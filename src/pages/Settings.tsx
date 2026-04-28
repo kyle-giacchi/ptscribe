@@ -14,7 +14,7 @@ import { downloadFile } from '@/utils/download';
 
 export function Settings() {
   const { clinician, setClinician } = useClinician();
-  const { settings, updateAi, updateUi } = useSettings();
+  const { settings, updateAi, updateAudio, updateUi } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -269,6 +269,73 @@ export function Settings() {
                 <option value="compact">Compact</option>
               </Select>
             </Field>
+          </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Eyebrow>Audio processing (experimental)</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            Trim sustained silent regions from a recording before sending it to Cloudflare Whisper.
+            Recordings stay intact in this browser; only the copy uploaded for transcription is
+            trimmed. Default is off — turn on if your visits have long quiet stretches.
+          </p>
+          <div style={{ maxWidth: 280, display: 'grid', gap: 12 }}>
+            <Field label="Silence trimming">
+              <Select
+                value={settings.audio.silenceDetection.enabled ? 'on' : 'off'}
+                onChange={(e) =>
+                  updateAudio({
+                    silenceDetection: {
+                      ...settings.audio.silenceDetection,
+                      enabled: e.target.value === 'on',
+                    },
+                  })
+                }
+              >
+                <option value="off">Off</option>
+                <option value="on">On</option>
+              </Select>
+            </Field>
+
+            {settings.audio.silenceDetection.enabled && (
+              <>
+                <Field label="Sensitivity">
+                  <Select
+                    value={settings.audio.silenceDetection.sensitivity}
+                    onChange={(e) =>
+                      updateAudio({
+                        silenceDetection: {
+                          ...settings.audio.silenceDetection,
+                          sensitivity: e.target.value as 'low' | 'medium' | 'high',
+                        },
+                      })
+                    }
+                  >
+                    <option value="low">Low — drop only obvious dead air</option>
+                    <option value="medium">Medium — recommended</option>
+                    <option value="high">High — drop near-silent breathing too</option>
+                  </Select>
+                </Field>
+
+                <Field label="Padding (ms before/after each spoken segment)">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    max={2000}
+                    step={50}
+                    value={String(settings.audio.silenceDetection.padMs)}
+                    onChange={(e) => {
+                      const n = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
+                      updateAudio({
+                        silenceDetection: { ...settings.audio.silenceDetection, padMs: n },
+                      });
+                    }}
+                  />
+                </Field>
+              </>
+            )}
           </div>
         </div>
       </SurfaceCard>
