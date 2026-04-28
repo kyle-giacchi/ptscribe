@@ -1654,10 +1654,10 @@ function AudioPreviewSection({ clips }: { clips: SessionClip[] }) {
   const [silenceError, setSilenceError] = useState<CompileError | null>(null);
   const [speedError, setSpeedError] = useState<CompileError | null>(null);
 
-  // Fall back to first available clip if the selection is gone
+  // Fall back to latest available clip if the selection is gone
   const activeId = playableClips.some((c) => c.id === selectedId)
     ? selectedId
-    : (playableClips[0]?.id ?? '');
+    : (playableClips.at(-1)?.id ?? '');
 
   // Derived — automatically invalidated when clip changes, no effects needed
   const activeSilenced = silenced?.forId === activeId ? silenced : null;
@@ -1717,27 +1717,27 @@ function AudioPreviewSection({ clips }: { clips: SessionClip[] }) {
         <span className="text-xs font-semibold" style={{ color: 'var(--color-pt-text)' }}>
           Audio Preview
         </span>
-        {playableClips.length > 1 && (
-          <select
-            value={activeId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            style={{
-              background: 'var(--color-pt-surface-alt)',
-              color: 'var(--color-pt-text)',
-              border: '1px solid var(--color-pt-border)',
-              borderRadius: 6,
-              padding: '2px 8px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
-            {playableClips.map((c) => (
-              <option key={c.id} value={c.id}>
-                Clip {ordinalOf(c.id)}
-              </option>
-            ))}
-          </select>
-        )}
+        <select
+          value={activeId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          disabled={playableClips.length <= 1}
+          style={{
+            background: 'var(--color-pt-surface-alt)',
+            color: 'var(--color-pt-text)',
+            border: '1px solid var(--color-pt-border)',
+            borderRadius: 6,
+            padding: '2px 8px',
+            fontSize: 12,
+            cursor: playableClips.length > 1 ? 'pointer' : 'default',
+            opacity: playableClips.length <= 1 ? 0.6 : 1,
+          }}
+        >
+          {playableClips.map((c) => (
+            <option key={c.id} value={c.id}>
+              Clip {ordinalOf(c.id)}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-2">

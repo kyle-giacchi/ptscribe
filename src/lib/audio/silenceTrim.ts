@@ -1,11 +1,7 @@
 import { encodeOpusWebm } from './opusEncoder';
 import { mixToMono } from './pcm';
-import {
-  DEFAULT_VAD_OPTIONS,
-  findSpeechRanges,
-  type SpeechRange,
-  type VadOptions,
-} from './vad';
+import { DEFAULT_VAD_OPTIONS, type SpeechRange, type VadOptions } from './vad';
+import { findSpeechRangesML } from './vadML';
 
 export interface TrimReport {
   originalSec: number;
@@ -63,7 +59,7 @@ export async function trimSilence(
   const totalSec = mono.length / sampleRate;
 
   const vadOpts: VadOptions = { ...DEFAULT_VAD_OPTIONS, ...options };
-  const ranges = findSpeechRanges(mono, sampleRate, vadOpts);
+  const ranges = await findSpeechRangesML(mono, sampleRate, vadOpts);
 
   // No speech detected — keep original to avoid sending empty audio.
   if (ranges.length === 0) {
