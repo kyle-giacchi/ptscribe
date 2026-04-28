@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
+    "@ricky0123/vad-web": "^0.0.30",
     "@tiptap/pm": "^3.22.4",
     "@tiptap/react": "^3.22.4",
     "@tiptap/starter-kit": "^3.22.4",
@@ -35,6 +36,7 @@
     "cmdk": "^1.1.1",
     "lucide-react": "^1.8.0",
     "motion": "^12.38.0",
+    "onnxruntime-web": "^1.24.3",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -43,6 +45,7 @@
     "soundtouchjs": "^0.3.0",
     "tailwind-merge": "^3.5.0",
     "tiptap-markdown": "^0.9.0",
+    "vite-plugin-static-copy": "^4.1.0",
     "wavesurfer.js": "^7.12.6",
     "webm-muxer": "^5.1.4",
     "zod": "^4.3.6"
