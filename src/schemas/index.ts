@@ -204,6 +204,10 @@ const SettingsSchema = z.object({
       sensitivity: z.enum(['low', 'medium', 'high']),
       padMs: z.number().int().min(0).max(2000),
     }),
+    speedUp: z.object({
+      enabled: z.boolean(),
+      speed: z.union([z.literal(1.25), z.literal(1.5), z.literal(1.75)]),
+    }),
   }),
   ui: z.object({
     sidebarCollapsed: z.boolean(),
@@ -262,6 +266,7 @@ export function defaultAppData(): AppData {
       },
       audio: {
         silenceDetection: { enabled: false, sensitivity: 'medium', padMs: 400 },
+        speedUp: { enabled: false, speed: 1.5 },
       },
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },
       retention: {},
