@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 5;
+export const APP_DATA_VERSION = 6;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -270,8 +270,17 @@ export interface SilenceDetectionSettings {
   padMs: number;
 }
 
+export const SUPPORTED_SPEEDS = [1.25, 1.5, 1.75] as const;
+export type SpeedFactor = (typeof SUPPORTED_SPEEDS)[number];
+
+export interface SpeedUpSettings {
+  enabled: boolean;
+  speed: SpeedFactor;
+}
+
 export interface AudioSettings {
   silenceDetection: SilenceDetectionSettings;
+  speedUp: SpeedUpSettings;
 }
 
 export interface Settings {

@@ -30,7 +30,7 @@ describe('migrate v2 → v3', () => {
 
     const result = migrate(data);
 
-    expect(result.version).toBe(5);
+    expect(result.version).toBe(6);
     expect(result.sessions).toHaveLength(1);
     const session = result.sessions[0];
     expect((session as { audioRef?: unknown }).audioRef).toBeUndefined();
@@ -96,8 +96,22 @@ function v4AppData(overrides: Record<string, unknown> = {}): Record<string, unkn
     version: 4,
     settings: {
       ...seed.settings,
-      // Strip the v5 audio block to simulate persisted v4 data.
+      // Strip the v5/v6 audio block to simulate persisted v4 data.
       audio: undefined,
+    } as unknown,
+    ...overrides,
+  };
+}
+
+function v5AppData(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const seed = defaultAppData();
+  return {
+    ...seed,
+    version: 5,
+    settings: {
+      ...seed.settings,
+      // Strip speedUp to simulate persisted v5 data (no speedUp field yet).
+      audio: { silenceDetection: seed.settings.audio.silenceDetection },
     } as unknown,
     ...overrides,
   };
@@ -108,7 +122,7 @@ describe('migrate v4 → v5', () => {
     const data = v4AppData();
     const result = migrate(data);
 
-    expect(result.version).toBe(5);
+    expect(result.version).toBe(6);
     expect(result.settings.audio.silenceDetection).toEqual({
       enabled: false,
       sensitivity: 'medium',
@@ -137,6 +151,60 @@ describe('migrate v4 → v5', () => {
 
   it('produces output that passes AppDataSchema.safeParse', () => {
     const data = v4AppData();
+    const result = migrate(data);
+    const parsed = AppDataSchema.safeParse(result);
+    expect(parsed.success).toBe(true);
+  });
+});
+
+describe('migrate v5 → v6', () => {
+  it('injects default audio.speedUp (disabled, 1.5×) when missing', () => {
+    const data = v5AppData();
+    const result = migrate(data);
+
+    expect(result.version).toBe(6);
+    expect(result.settings.audio.speedUp).toEqual({ enabled: false, speed: 1.5 });
+  });
+
+  it('preserves an existing audio.speedUp block if one is somehow present', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 5,
+      settings: {
+        ...seed.settings,
+        audio: {
+          silenceDetection: seed.settings.audio.silenceDetection,
+          speedUp: { enabled: true, speed: 1.75 },
+        },
+      } as unknown,
+    };
+
+    const result = migrate(data);
+    expect(result.settings.audio.speedUp).toEqual({ enabled: true, speed: 1.75 });
+  });
+
+  it('preserves silenceDetection through the v5→v6 migration', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 5,
+      settings: {
+        ...seed.settings,
+        audio: { silenceDetection: { enabled: true, sensitivity: 'high', padMs: 600 } },
+      } as unknown,
+    };
+
+    const result = migrate(data);
+    expect(result.settings.audio.silenceDetection).toEqual({
+      enabled: true,
+      sensitivity: 'high',
+      padMs: 600,
+    });
+  });
+
+  it('produces output that passes AppDataSchema.safeParse', () => {
+    const data = v5AppData();
     const result = migrate(data);
     const parsed = AppDataSchema.safeParse(result);
     expect(parsed.success).toBe(true);

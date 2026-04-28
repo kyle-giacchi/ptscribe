@@ -19,6 +19,8 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   `defaultAppData()` on first-run, so existing users would otherwise miss it).
  * - v4 → v5: Adds `Settings.audio.silenceDetection` (default OFF) for opt-in client-side
  *   silence trimming before transcription.
+ * - v5 → v6: Adds `Settings.audio.speedUp` (default OFF, 1.5×) for opt-in pitch-preserving
+ *   time-stretch before transcription.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -44,6 +46,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 4) {
     working = migrateV4ToV5(working);
+  }
+  if ((working as { version?: number }).version === 5) {
+    working = migrateV5ToV6(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -164,6 +169,29 @@ function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> 
           existingSd.padMs <= 2000
             ? existingSd.padMs
             : 400,
+      },
+    },
+  };
+  return next;
+}
+
+function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 6 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingAudio = (settings.audio as Record<string, unknown> | undefined) ?? {};
+  const existingSu =
+    (existingAudio.speedUp as Record<string, unknown> | undefined) ?? undefined;
+
+  next.settings = {
+    ...settings,
+    audio: {
+      ...existingAudio,
+      speedUp: {
+        enabled: typeof existingSu?.enabled === 'boolean' ? existingSu.enabled : false,
+        speed:
+          existingSu?.speed === 1.25 || existingSu?.speed === 1.5 || existingSu?.speed === 1.75
+            ? existingSu.speed
+            : 1.5,
       },
     },
   };
