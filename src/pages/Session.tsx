@@ -43,8 +43,11 @@ import { useRecorder, type UseRecorder } from '@/hooks/useRecorder';
 import { useLiveTranscript, type UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import { audioRepository } from '@/services/AudioRepository';
 import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
+import { BlobWaveform } from '@/components/audio/BlobWaveform';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { transcribe } from '@/services/ai/transcribe';
+import { trimSilence } from '@/lib/audio/silenceTrim';
+import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
@@ -464,18 +467,61 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── Transcription ────────────────────────────────────────────────────────
-  async function transcribeClipBlob(
-    clip: SessionClip,
-  ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  async function transcribeClipBlob(clip: SessionClip): Promise<
+    | {
+        ok: true;
+        text: string;
+        trimReport?: { droppedSec: number; originalSec: number };
+        speedReport?: { savedSec: number; originalSec: number };
+      }
+    | { ok: false; error: string }
+  > {
     try {
-      const blob = await audioRepository.load(clip.id);
-      if (!blob) return { ok: false, error: 'No audio found for this clip.' };
+      const original = await audioRepository.load(clip.id);
+      if (!original) return { ok: false, error: 'No audio found for this clip.' };
+
+      let blobToSend: Blob = original;
+      let trimReport: { droppedSec: number; originalSec: number } | undefined;
+      let speedReport: { savedSec: number; originalSec: number } | undefined;
+
+      const sd = settings.audio.silenceDetection;
+      if (sd.enabled) {
+        try {
+          const trimResult = await trimSilence(original, {
+            sensitivity: sd.sensitivity,
+            padMs: sd.padMs,
+          });
+          blobToSend = trimResult.trimmed;
+          trimReport = {
+            droppedSec: trimResult.report.droppedSec,
+            originalSec: trimResult.report.originalSec,
+          };
+        } catch {
+          // Trim failure must never block transcription — fall back to original.
+          blobToSend = original;
+        }
+      }
+
+      const su = settings.audio.speedUp;
+      if (su.enabled) {
+        try {
+          const speedResult = await speedUpAudio(blobToSend, su.speed as SpeedFactor);
+          blobToSend = speedResult.result;
+          speedReport = {
+            savedSec: speedResult.report.savedSec,
+            originalSec: speedResult.report.originalSec,
+          };
+        } catch {
+          // Speed-up failure must never block transcription — fall back as-is.
+        }
+      }
+
       const result = await transcribe({
-        blob,
+        blob: blobToSend,
         provider: settings.ai.transcription.provider,
         model: settings.ai.transcription.model,
       });
-      return { ok: true, text: result.text };
+      return { ok: true, text: result.text, trimReport, speedReport };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
@@ -484,19 +530,39 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function runTranscribeLoop(
     pending: SessionClip[],
     transcribed: SessionClip[],
-  ): Promise<{ textByClip: Map<string, string>; successes: number; failures: number }> {
+  ): Promise<{
+    textByClip: Map<string, string>;
+    successes: number;
+    failures: number;
+    totalDroppedSec: number;
+    totalOriginalSec: number;
+    totalSpeedSavedSec: number;
+    totalSpeedOriginalSec: number;
+  }> {
     const textByClip = new Map<string, string>();
     for (const c of transcribed) {
       if (c.transcript) textByClip.set(c.id, c.transcript);
     }
     let successes = 0;
     let failures = 0;
+    let totalDroppedSec = 0;
+    let totalOriginalSec = 0;
+    let totalSpeedSavedSec = 0;
+    let totalSpeedOriginalSec = 0;
     await Promise.allSettled(
       pending.map(async (clip) => {
         const result = await transcribeClipBlob(clip);
         if (result.ok) {
           successes += 1;
           textByClip.set(clip.id, result.text);
+          if (result.trimReport) {
+            totalDroppedSec += result.trimReport.droppedSec;
+            totalOriginalSec += result.trimReport.originalSec;
+          }
+          if (result.speedReport) {
+            totalSpeedSavedSec += result.speedReport.savedSec;
+            totalSpeedOriginalSec += result.speedReport.originalSec;
+          }
           patchClip(clip.id, {
             status: 'transcribed',
             transcript: result.text,
@@ -510,7 +576,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         }
       }),
     );
-    return { textByClip, successes, failures };
+    return {
+      textByClip,
+      successes,
+      failures,
+      totalDroppedSec,
+      totalOriginalSec,
+      totalSpeedSavedSec,
+      totalSpeedOriginalSec,
+    };
   }
 
   function reportTranscribeOutcome(successes: number, failures: number) {
@@ -580,7 +654,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       ),
     );
 
-    const { textByClip, successes, failures } = await runTranscribeLoop(pending, transcribed);
+    const {
+      textByClip,
+      successes,
+      failures,
+      totalDroppedSec,
+      totalOriginalSec,
+      totalSpeedSavedSec,
+      totalSpeedOriginalSec,
+    } = await runTranscribeLoop(pending, transcribed);
 
     const merged = [...session.clips]
       .sort((a, b) => a.createdAt - b.createdAt)
@@ -598,6 +680,18 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction('transcribe');
     setBusy(null);
     reportTranscribeOutcome(successes, failures);
+    if (totalDroppedSec > 1) {
+      const pct = Math.round((totalDroppedSec / Math.max(totalOriginalSec, 1)) * 100);
+      toast.info(
+        `Silence trimming saved ${Math.round(totalDroppedSec)}s (~${pct}%) before transcription.`,
+      );
+    }
+    if (totalSpeedSavedSec > 1) {
+      const pct = Math.round((totalSpeedSavedSec / Math.max(totalSpeedOriginalSec, 1)) * 100);
+      toast.info(
+        `Audio speed-up saved ${Math.round(totalSpeedSavedSec)}s (~${pct}%) before transcription.`,
+      );
+    }
   }
 
   // ── Clip management ──────────────────────────────────────────────────────
@@ -659,6 +753,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         template,
         transcript,
         patient: patient!,
+        sessionType: session!.type,
       });
       if (note) {
         updateNote(note.id, {
@@ -1216,6 +1311,8 @@ function RecordingPanel({
 
       <ClipsList clips={clips} recordingDisabled={recording} onDeleteClip={onDeleteClip} />
 
+      <AudioPreviewSection clips={clips} />
+
       <LiveTranscriptPreview live={live} />
     </div>
   );
@@ -1487,6 +1584,262 @@ function CreateTranscriptButton({
         </>
       )}
     </button>
+  );
+}
+
+function AudioTrackRow({
+  label,
+  savedSec,
+  note,
+  children,
+}: {
+  label: string;
+  savedSec?: number | null;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-md border"
+      style={{
+        borderColor: 'var(--color-pt-border)',
+        background: 'var(--color-pt-surface-alt)',
+        padding: 10,
+      }}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span
+          className="text-[11px] font-semibold tracking-wide uppercase"
+          style={{ color: 'var(--color-pt-text-2)' }}
+        >
+          {label}
+        </span>
+        {savedSec != null && savedSec > 0 && (
+          <span
+            className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+            style={{
+              background: 'color-mix(in oklab, var(--color-pt-accent) 12%, transparent)',
+              color: 'var(--color-pt-accent-fg)',
+              border: '1px solid var(--color-pt-accent-border)',
+            }}
+          >
+            −{savedSec.toFixed(1)}s saved
+          </span>
+        )}
+        {note && (
+          <span className="text-[10px]" style={{ color: 'var(--color-pt-text-3)' }}>
+            {note}
+          </span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+type CompiledAudio = { blob: Blob; forId: string; savedSec: number };
+type CompileError = { msg: string; forId: string };
+
+function AudioPreviewSection({ clips }: { clips: SessionClip[] }) {
+  const { settings } = useSettings();
+  const playableClips = clips.filter(
+    (c) => c.status === 'ready' || c.status === 'transcribing' || c.status === 'transcribed',
+  );
+
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [silenced, setSilenced] = useState<CompiledAudio | null>(null);
+  const [spedup, setSpecdup] = useState<CompiledAudio | null>(null);
+  const [compilingSilence, setCompilingSilence] = useState(false);
+  const [compilingSpeed, setCompilingSpeed] = useState(false);
+  const [silenceError, setSilenceError] = useState<CompileError | null>(null);
+  const [speedError, setSpeedError] = useState<CompileError | null>(null);
+
+  // Fall back to first available clip if the selection is gone
+  const activeId = playableClips.some((c) => c.id === selectedId)
+    ? selectedId
+    : (playableClips[0]?.id ?? '');
+
+  // Derived — automatically invalidated when clip changes, no effects needed
+  const activeSilenced = silenced?.forId === activeId ? silenced : null;
+  const activeSpedup = spedup?.forId === activeId ? spedup : null;
+  const activeSilenceError = silenceError?.forId === activeId ? silenceError.msg : null;
+  const activeSpeedError = speedError?.forId === activeId ? speedError.msg : null;
+
+  async function compileSilence() {
+    if (!activeId) return;
+    setCompilingSilence(true);
+    setSilenceError(null);
+    try {
+      const original = await audioRepository.load(activeId);
+      if (!original) throw new Error('Audio not found');
+      const sd = settings.audio.silenceDetection;
+      const result = await trimSilence(original, { sensitivity: sd.sensitivity, padMs: sd.padMs });
+      setSilenced({ blob: result.trimmed, forId: activeId, savedSec: result.report.droppedSec });
+      setSpecdup(null); // speed is stale whenever silence source changes
+      setSpeedError(null);
+    } catch (e) {
+      setSilenceError({ msg: (e as Error).message, forId: activeId });
+    } finally {
+      setCompilingSilence(false);
+    }
+  }
+
+  async function compileSpeed() {
+    if (!activeSilenced) return;
+    setCompilingSpeed(true);
+    setSpeedError(null);
+    try {
+      const su = settings.audio.speedUp;
+      const result = await speedUpAudio(activeSilenced.blob, su.speed as SpeedFactor);
+      setSpecdup({ blob: result.result, forId: activeId, savedSec: result.report.savedSec });
+    } catch (e) {
+      setSpeedError({ msg: (e as Error).message, forId: activeId });
+    } finally {
+      setCompilingSpeed(false);
+    }
+  }
+
+  if (playableClips.length === 0) return null;
+
+  const ordinalOf = (clipId: string) => clips.findIndex((c) => c.id === clipId) + 1;
+  const speedLabel = `Speed Up (${settings.audio.speedUp.speed}×)`;
+
+  return (
+    <div
+      className="rounded-lg border"
+      style={{
+        borderColor: 'var(--color-pt-border)',
+        background: 'var(--color-pt-surface)',
+        padding: 12,
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+          Audio Preview
+        </span>
+        {playableClips.length > 1 && (
+          <select
+            value={activeId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            style={{
+              background: 'var(--color-pt-surface-alt)',
+              color: 'var(--color-pt-text)',
+              border: '1px solid var(--color-pt-border)',
+              borderRadius: 6,
+              padding: '2px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            {playableClips.map((c) => (
+              <option key={c.id} value={c.id}>
+                Clip {ordinalOf(c.id)}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <AudioTrackRow label="Full Audio">
+          {activeId && <PlaybackWaveform audioKey={activeId} />}
+        </AudioTrackRow>
+
+        <AudioTrackRow label="Silence Removed" savedSec={activeSilenced?.savedSec}>
+          {activeSilenced ? (
+            <div className="space-y-1.5">
+              <BlobWaveform blob={activeSilenced.blob} />
+              <button
+                type="button"
+                onClick={() => { setSilenced(null); setSpecdup(null); setSpeedError(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  textDecoration: 'underline',
+                  color: 'var(--color-pt-text-3)',
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <button
+                type="button"
+                className="btn btn-secondary text-xs"
+                disabled={compilingSilence || !activeId}
+                onClick={() => void compileSilence()}
+              >
+                {compilingSilence ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" /> Compiling…
+                  </>
+                ) : (
+                  'Compile'
+                )}
+              </button>
+              {activeSilenceError && (
+                <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
+                  {activeSilenceError}
+                </p>
+              )}
+            </div>
+          )}
+        </AudioTrackRow>
+
+        <AudioTrackRow
+          label={speedLabel}
+          savedSec={activeSpedup?.savedSec}
+          note={!activeSilenced ? 'Compile silence removed first' : undefined}
+        >
+          {activeSpedup ? (
+            <div className="space-y-1.5">
+              <BlobWaveform blob={activeSpedup.blob} />
+              <button
+                type="button"
+                onClick={() => { setSpecdup(null); setSpeedError(null); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  textDecoration: 'underline',
+                  color: 'var(--color-pt-text-3)',
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <button
+                type="button"
+                className="btn btn-secondary text-xs"
+                disabled={compilingSpeed || !activeSilenced}
+                onClick={() => void compileSpeed()}
+              >
+                {compilingSpeed ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" /> Compiling…
+                  </>
+                ) : (
+                  'Compile'
+                )}
+              </button>
+              {activeSpeedError && (
+                <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
+                  {activeSpeedError}
+                </p>
+              )}
+            </div>
+          )}
+        </AudioTrackRow>
+      </div>
+    </div>
   );
 }
 

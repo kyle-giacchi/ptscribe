@@ -1,21 +1,23 @@
-import type { NoteTemplate, Patient, Note } from '@/types';
+import type { NoteTemplate, Patient, Note, SessionType } from '@/types';
 
 export interface BuildPromptArgs {
   template: NoteTemplate;
   transcript: string;
   patient: Patient;
   priorNote?: Note;
+  sessionType?: SessionType;
 }
 
 /**
  * Build the user message that pairs with `template.systemPrompt`.
  * The transcript is the primary signal; patient + prior note give context.
+ * Output format is fully specified by the system prompt — no redundant instruction here.
  */
 export function buildUserPrompt({
-  template,
   transcript,
   patient,
   priorNote,
+  sessionType,
 }: BuildPromptArgs): string {
   const lines: string[] = [];
 
@@ -29,6 +31,15 @@ export function buildUserPrompt({
   if (patient.primaryDiagnosis) lines.push(`Primary diagnosis: ${patient.primaryDiagnosis}`);
   if (patient.icd10) lines.push(`ICD-10: ${patient.icd10}`);
   if (patient.notes) lines.push(`Patient notes: ${patient.notes}`);
+  if (sessionType) {
+    const sessionTypeLabel: Record<SessionType, string> = {
+      evaluation: 'Initial Evaluation',
+      follow_up: 'Follow-up',
+      progress: 'Progress Note',
+      discharge: 'Discharge',
+    };
+    lines.push(`Session type: ${sessionTypeLabel[sessionType]}`);
+  }
 
   if (priorNote) {
     lines.push('');
@@ -42,13 +53,6 @@ export function buildUserPrompt({
   lines.push('');
   lines.push('# Today\'s session transcript');
   lines.push(transcript || '(no transcript provided)');
-
-  lines.push('');
-  lines.push('# Output');
-  lines.push(
-    `Produce JSON with these section keys: ${template.sections.map((s) => `"${s.key}"`).join(', ')}.`,
-  );
-  lines.push('Return JSON only, no surrounding prose.');
 
   return lines.join('\n');
 }

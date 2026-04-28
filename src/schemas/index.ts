@@ -198,6 +198,17 @@ const SettingsSchema = z.object({
       model: z.string(),
     }),
   }),
+  audio: z.object({
+    silenceDetection: z.object({
+      enabled: z.boolean(),
+      sensitivity: z.enum(['low', 'medium', 'high']),
+      padMs: z.number().int().min(0).max(2000),
+    }),
+    speedUp: z.object({
+      enabled: z.boolean(),
+      speed: z.union([z.literal(1.25), z.literal(1.5), z.literal(1.75)]),
+    }),
+  }),
   ui: z.object({
     sidebarCollapsed: z.boolean(),
     densityMode: z.enum(['cozy', 'compact']),
@@ -252,6 +263,10 @@ export function defaultAppData(): AppData {
       ai: {
         transcription: { provider: 'cloudflare', model: '@cf/deepgram/nova-3' },
         generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+      },
+      audio: {
+        silenceDetection: { enabled: false, sensitivity: 'medium', padMs: 400 },
+        speedUp: { enabled: false, speed: 1.5 },
       },
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },
       retention: {},

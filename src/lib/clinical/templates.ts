@@ -21,7 +21,7 @@ subjective (plain prose, no bullets, no labels). Include only the items below th
 - Progression: how symptoms have changed or evolved over time.
 - Associated symptoms: focal and systemic symptoms that accompany the chief complaints.
 
-objective (bulleted list, one finding per line, no leading "- " — use plain hyphen-prefixed lines exactly like "- Observed ..."). Group related findings into a single bullet when natural. Include only what's in the transcript:
+objective (bulleted list — one finding per line, each line starting with "- "). Group related findings into a single bullet when natural. Include only what's in the transcript:
 - Physical examination details.
 - Postural and gait observations, tests, and measurements performed by the therapist.
 
@@ -42,6 +42,7 @@ Hard rules:
 - Do not include section labels or headers inside the body — the UI renders the labels separately.
 - Do not output Markdown fences. Return raw JSON only.
 - If the transcript truly contains no information for a section, return an empty string ("") for that section. Never write filler such as "No data available" or "N/A".
+- If the transcript is very short or unclear, write only what can be supported and return "" for sections with no usable content — never pad with filler phrases.
 - Speaker labels (e.g. "Speaker 0:", "Speaker 1:") in the transcript identify turns from a diarized recording. Treat the clinician's questions and observations as objective/intervention content and the patient's reports as subjective content — infer roles from context.`;
 
 const SOAP_PROMPT = `You are a physical therapist's clinical scribe. Given a session transcript and patient context, produce a SOAP-format progress note.

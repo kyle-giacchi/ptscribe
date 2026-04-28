@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import {
   Calendar,
   Users,
@@ -21,7 +22,12 @@ interface NavEntry {
 
 type Badge = { kind: 'live' } | { kind: 'count'; value: number };
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+  className?: string;
+}
+
+export function Sidebar({ onClose, className }: SidebarProps) {
   const { notes } = useNotes();
   const { clinician } = useClinician();
   const pendingReviewCount = notes.filter((n) => !n.finalized).length;
@@ -53,7 +59,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className="grid h-full overflow-hidden"
+      className={cn('grid h-full overflow-hidden', className)}
       style={{
         background: 'var(--color-pt-surface)',
         borderRight: '1px solid var(--color-pt-border)',
@@ -99,7 +105,7 @@ export function Sidebar() {
         style={{ padding: '4px 10px', gap: 2, overflowY: 'auto' }}
       >
         {items.map((item) => (
-          <NavItem key={item.to} {...item} />
+          <NavItem key={item.to} {...item} onClose={onClose} />
         ))}
       </nav>
 
@@ -143,6 +149,7 @@ export function Sidebar() {
         <NavLink
           to="/settings"
           aria-label="Settings"
+          onClick={onClose}
           className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
           style={{
             width: 28,
@@ -164,11 +171,13 @@ function NavItem({
   Icon,
   end,
   badge,
-}: NavEntry & { badge?: Badge }) {
+  onClose,
+}: NavEntry & { badge?: Badge; onClose?: () => void }) {
   return (
     <NavLink
       to={to}
       end={end}
+      onClick={onClose}
       className={({ isActive }) =>
         `flex items-center transition-colors ${
           isActive ? '' : 'hover:bg-[var(--color-pt-surface-mut)]'

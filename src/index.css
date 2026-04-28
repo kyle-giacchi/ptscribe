@@ -263,6 +263,16 @@ body {
   color: var(--color-pt-text-2);
 }
 
+.app-shell-grid {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .app-shell-grid {
+    grid-template-columns: 220px 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
