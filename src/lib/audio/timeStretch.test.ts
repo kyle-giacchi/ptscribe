@@ -104,15 +104,17 @@ function makeBuffer(samples: Float32Array, sampleRate: number) {
 }
 
 describe('speedUpAudio orchestrator', () => {
-  it('returns savedSec === 0 when speed is effectively 1', async () => {
+  it('encodes via WAV fallback and reports savings when WebCodecs unavailable (jsdom)', async () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' });
     const sr = 16000;
     const samples = new Float32Array(sr).fill(0.1);
     const result = await speedUpAudio(blob, 1.25 as SpeedFactor, {
       audioContextFactory: fakeCtxFactory(makeBuffer(samples, sr)),
     });
-    // WebCodecs unavailable in jsdom → falls through → savedSec = 0
-    expect(result.report.savedSec).toBe(0);
+    // WAV fallback succeeds → savedSec > 0, result is a new WAV blob (not the original)
+    expect(result.report.savedSec).toBeGreaterThan(0);
+    expect(result.result).not.toBe(blob);
+    expect(result.result.type).toBe('audio/wav');
   });
 
   it('falls through to original blob when decodeAudioData throws', async () => {
@@ -130,15 +132,16 @@ describe('speedUpAudio orchestrator', () => {
     expect(result.report.savedSec).toBe(0);
   });
 
-  it('falls through to original blob when WebCodecs is unavailable (jsdom)', async () => {
+  it('returns a WAV blob (not original) when WebCodecs is unavailable (jsdom)', async () => {
     const blob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/webm' });
     const sr = 16000;
     const samples = new Float32Array(sr).fill(0.1);
     const result = await speedUpAudio(blob, 1.5, {
       audioContextFactory: fakeCtxFactory(makeBuffer(samples, sr)),
     });
-    expect(result.result).toBe(blob);
-    expect(result.report.savedSec).toBe(0);
+    expect(result.result).not.toBe(blob);
+    expect(result.result.type).toBe('audio/wav');
+    expect(result.report.savedSec).toBeGreaterThan(0);
   });
 
   it('reports originalSec from the decoded buffer length / sample rate', async () => {

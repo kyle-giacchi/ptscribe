@@ -30,10 +30,12 @@ describe('framePcm', () => {
 });
 
 describe('encodeOpusWebm', () => {
-  it('returns ok=false when WebCodecs is unavailable (jsdom)', async () => {
-    // jsdom has no AudioEncoder global, so this exercises the fallback path.
-    const result = await encodeOpusWebm(new Float32Array(4800), 48000);
-    expect(result.ok).toBe(false);
-    expect(result.blob.type).toBe('audio/webm');
+  it('falls back to WAV (ok=true) when WebCodecs is unavailable (jsdom)', async () => {
+    // jsdom has no AudioEncoder global — exercises the WAV fallback path.
+    const samples = new Float32Array(4800);
+    const result = await encodeOpusWebm(samples, 48000);
+    expect(result.ok).toBe(true);
+    expect(result.blob.type).toBe('audio/wav');
+    expect(result.blob.size).toBe(44 + samples.length * 2); // header + 16-bit PCM
   });
 });
