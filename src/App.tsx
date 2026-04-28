@@ -23,50 +23,59 @@ import { Notes } from '@/pages/Notes';
 import { Templates } from '@/pages/Templates';
 import { Exercises } from '@/pages/Exercises';
 import { Settings } from '@/pages/Settings';
+import { Login } from '@/pages/Login';
 
 export default function App() {
   return (
-    <AppGate>
-      <VaultGate>
-        <BrowserRouter>
-          <AppDataProvider>
-            <ClinicianProvider>
-              <PatientsProvider>
-                <SessionsProvider>
-                  <NotesProvider>
-                    <TemplatesProvider>
-                      <ExercisesProvider>
-                        <PlansProvider>
-                          <SettingsProvider>
-                            <DemoBootstrap>
-                              <FirstRunGuard>
-                                <Routes>
-                                <Route path="/setup" element={<Setup />} />
-                                <Route element={<AppShell />}>
-                                  <Route index element={<Dashboard />} />
-                                  <Route path="/patients" element={<Patients />} />
-                                  <Route path="/patients/:id" element={<PatientDetail />} />
-                                  <Route path="/sessions/new" element={<NewSession />} />
-                                  <Route path="/sessions/:id" element={<SessionPage />} />
-                                  <Route path="/notes" element={<Notes />} />
-                                  <Route path="/templates" element={<Templates />} />
-                                  <Route path="/exercises" element={<Exercises />} />
-                                  <Route path="/settings" element={<Settings />} />
-                                </Route>
-                                </Routes>
-                              </FirstRunGuard>
-                            </DemoBootstrap>
-                          </SettingsProvider>
-                        </PlansProvider>
-                      </ExercisesProvider>
-                    </TemplatesProvider>
-                  </NotesProvider>
-                </SessionsProvider>
-              </PatientsProvider>
-            </ClinicianProvider>
-          </AppDataProvider>
-        </BrowserRouter>
-      </VaultGate>
-    </AppGate>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="*"
+          element={
+            <AppGate>
+              <VaultGate>
+                <AppDataProvider>
+                  <ClinicianProvider>
+                    <PatientsProvider>
+                      <SessionsProvider>
+                        <NotesProvider>
+                          <TemplatesProvider>
+                            <ExercisesProvider>
+                              <PlansProvider>
+                                <SettingsProvider>
+                                  <DemoBootstrap>
+                                    <FirstRunGuard>
+                                      <Routes>
+                                        <Route path="/setup" element={<Setup />} />
+                                        <Route element={<AppShell />}>
+                                          <Route index element={<Dashboard />} />
+                                          <Route path="/patients" element={<Patients />} />
+                                          <Route path="/patients/:id" element={<PatientDetail />} />
+                                          <Route path="/sessions/new" element={<NewSession />} />
+                                          <Route path="/sessions/:id" element={<SessionPage />} />
+                                          <Route path="/notes" element={<Notes />} />
+                                          <Route path="/templates" element={<Templates />} />
+                                          <Route path="/exercises" element={<Exercises />} />
+                                          <Route path="/settings" element={<Settings />} />
+                                        </Route>
+                                      </Routes>
+                                    </FirstRunGuard>
+                                  </DemoBootstrap>
+                                </SettingsProvider>
+                              </PlansProvider>
+                            </ExercisesProvider>
+                          </TemplatesProvider>
+                        </NotesProvider>
+                      </SessionsProvider>
+                    </PatientsProvider>
+                  </ClinicianProvider>
+                </AppDataProvider>
+              </VaultGate>
+            </AppGate>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }

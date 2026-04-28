@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { checkGateCode, getStoredGateCode, storeGateCode } from '@/lib/gate';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { checkGateCode, clearGateCode, getStoredGateCode, storeGateCode } from '@/lib/gate';
+import { GateContext } from '@/contexts/GateContext';
 import { Landing } from '@/pages/Landing';
 
 type Status = 'locked' | 'unlocked';
@@ -24,7 +25,13 @@ export function AppGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (status === 'unlocked') return <>{children}</>;
+  const logout = useCallback(() => {
+    clearGateCode();
+    setStatus('locked');
+  }, []);
+
+  if (status === 'unlocked')
+    return <GateContext.Provider value={{ logout }}>{children}</GateContext.Provider>;
 
   async function handleSignIn(code: string): Promise<{ ok: boolean; error?: string }> {
     const ok = await checkGateCode(code);

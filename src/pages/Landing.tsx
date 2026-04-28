@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Play, Lock, AlertTriangle } from 'lucide-react';
 import { Waveform } from '@/components/design';
 
 const SOAP = [
@@ -14,6 +15,7 @@ interface LandingProps {
 }
 
 export function Landing({ onSignIn }: LandingProps) {
+  const navigate = useNavigate();
   const [elapsed, setElapsed] = useState(0);
   const [visibleLines, setVisibleLines] = useState(0);
   const [mode, setMode] = useState<null | 'demo' | 'signup'>(null);
@@ -270,7 +272,7 @@ export function Landing({ onSignIn }: LandingProps) {
 
                 {/* Set up your account */}
                 <button
-                  onClick={() => openMode('signup')}
+                  onClick={() => navigate('/login')}
                   style={{
                     all: 'unset',
                     display: 'flex',
@@ -377,6 +379,30 @@ export function Landing({ onSignIn }: LandingProps) {
               <span style={{ fontSize: 11.5, color: '#8893a5' }}>
                 HIPAA-aligned · audio never leaves your device unencrypted
               </span>
+            </div>
+
+            {/* Disclaimers */}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                paddingTop: 8,
+                borderTop: '1px solid #f1f3f7',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <AlertTriangle size={11} color="#b45309" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 11, color: '#b45309', lineHeight: 1.45 }}>
+                  <strong>Not compliance-certified</strong> — PTScribe is in active development and has not been independently audited for HIPAA or any other regulatory compliance. Use at your own discretion.
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <AlertTriangle size={11} color="#b45309" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span style={{ fontSize: 11, color: '#b45309', lineHeight: 1.45 }}>
+                  <strong>Patient consent required</strong> — always obtain explicit verbal or written consent from patients before recording any session.
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -573,7 +599,7 @@ export function Landing({ onSignIn }: LandingProps) {
         <span>
           Already have an account?{' '}
           <button
-            onClick={() => openMode('signup')}
+            onClick={() => navigate('/login')}
             style={{
               all: 'unset',
               color: '#0ea5a8',
