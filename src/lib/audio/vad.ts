@@ -100,11 +100,14 @@ export function findSpeechRanges(
     endSec: Math.min(totalSec, r.endSec + padSec),
   }));
 
-  // 6. Merge runs whose silent gap is below minSilenceSec.
+  // 6. Merge runs whose original (pre-pad) silent gap is below minSilenceSec.
+  // r.startSec / last.endSec are already padded by ±padSec, so add 2*padSec back
+  // to recover the original gap before comparing — otherwise the effective threshold
+  // is minSilenceSec + 2*padSec, which silently swallows most conversational pauses.
   const merged: SpeechRange[] = [];
   for (const r of padded) {
     const last = merged[merged.length - 1];
-    if (last && r.startSec - last.endSec < opts.minSilenceSec) {
+    if (last && r.startSec - last.endSec + 2 * padSec < opts.minSilenceSec) {
       last.endSec = Math.max(last.endSec, r.endSec);
     } else {
       merged.push({ ...r });
