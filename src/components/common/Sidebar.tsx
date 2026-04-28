@@ -7,11 +7,13 @@ import {
   CheckSquare,
   Dumbbell,
   ClipboardList,
+  LogOut,
   Settings as SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesProvider';
 import { useClinician } from '@/contexts/ClinicianProvider';
+import { useGate } from '@/contexts/GateContext';
 
 interface NavEntry {
   to: string;
@@ -30,6 +32,7 @@ interface SidebarProps {
 export function Sidebar({ onClose, className }: SidebarProps) {
   const { notes } = useNotes();
   const { clinician } = useClinician();
+  const { logout } = useGate();
   const pendingReviewCount = notes.filter((n) => !n.finalized).length;
 
   const items: Array<NavEntry & { badge?: Badge }> = [
@@ -160,6 +163,23 @@ export function Sidebar({ onClose, className }: SidebarProps) {
         >
           <SettingsIcon size={15} strokeWidth={1.75} />
         </NavLink>
+        <button
+          type="button"
+          aria-label="Log out"
+          onClick={logout}
+          className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--color-pt-text-3)',
+            cursor: 'pointer',
+          }}
+        >
+          <LogOut size={15} strokeWidth={1.75} />
+        </button>
       </div>
     </aside>
   );
