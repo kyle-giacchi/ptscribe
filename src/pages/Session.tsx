@@ -45,6 +45,7 @@ import { BlobWaveform } from '@/components/audio/BlobWaveform';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { transcribe } from '@/services/ai/transcribe';
 import { trimSilence } from '@/lib/audio/silenceTrim';
+import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
@@ -113,6 +114,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [recordingSkipped, setRecordingSkipped] = useState(false);
+  const [mergedAudioBlob, setMergedAudioBlob] = useState<Blob | null>(null);
+  const [isMerging, setIsMerging] = useState(false);
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
 
@@ -664,6 +667,27 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     navigate('/', { replace: true });
   }
 
+  // ── Recording complete — merge clips + navigate to transcription ─────────
+  async function handleRecordingComplete() {
+    const readyClips = sortedClips.filter(
+      (c) => c.status === 'ready' || c.status === 'transcribed',
+    );
+    if (readyClips.length > 0) {
+      setIsMerging(true);
+      try {
+        const blobs = (
+          await Promise.all(readyClips.map((c) => audioRepository.load(c.id)))
+        ).filter((b): b is Blob => b !== null);
+        if (blobs.length > 0) setMergedAudioBlob(await mergeAudioBlobs(blobs));
+      } catch (e) {
+        toast.error(`Could not combine clips: ${(e as Error).message}`);
+      } finally {
+        setIsMerging(false);
+      }
+    }
+    openSection('transcription');
+  }
+
   // ── Skip recording step ───────────────────────────────────────────────────
   function handleSkipRecording() {
     setRecordingSkipped(true);
@@ -759,6 +783,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             onDeleteClip={handleDeleteClip}
             onUpload={handleUploadAudio}
             onSkip={handleSkipRecording}
+            onRecordingComplete={handleRecordingComplete}
+            isMerging={isMerging}
+            mergedAudioBlob={mergedAudioBlob}
             wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
             onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
           />
@@ -973,6 +1000,9 @@ interface RecordingPanelProps {
   onDeleteClip: (clipId: string) => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
+  onRecordingComplete: () => void;
+  isMerging: boolean;
+  mergedAudioBlob: Blob | null;
   wasBackgrounded: boolean;
   onDismissBackgroundWarning: () => void;
 }
@@ -1020,6 +1050,9 @@ function RecordingPanel({
   onDeleteClip,
   onUpload,
   onSkip,
+  onRecordingComplete,
+  isMerging,
+  mergedAudioBlob,
   wasBackgrounded,
   onDismissBackgroundWarning,
 }: RecordingPanelProps) {
@@ -1088,7 +1121,24 @@ function RecordingPanel({
 
       <ClipsList clips={clips} recordingDisabled={recording} onDeleteClip={onDeleteClip} />
 
-      <AudioPreviewSection clips={clips} />
+      {idle && clips.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={isMerging}
+            onClick={onRecordingComplete}
+          >
+            {isMerging ? (
+              <><Loader2 size={14} className="animate-spin" /> Combining clips…</>
+            ) : (
+              <><CheckCircle2 size={14} strokeWidth={2} /> Recording Complete</>
+            )}
+          </button>
+        </div>
+      )}
+
+      <AudioPreviewSection clips={clips} mergedAudioBlob={mergedAudioBlob} />
 
       <LiveTranscriptPreview live={live} />
     </div>
@@ -1414,7 +1464,7 @@ function AudioTrackRow({
   );
 }
 
-function AudioPreviewSection({ clips }: { clips: SessionClip[] }) {
+function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[]; mergedAudioBlob: Blob | null }) {
   const { settings } = useSettings();
   const playableClips = clips.filter(
     (c) => c.status === 'ready' || c.status === 'transcribing' || c.status === 'transcribed',
@@ -1456,34 +1506,41 @@ function AudioPreviewSection({ clips }: { clips: SessionClip[] }) {
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="text-xs font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-          Audio Preview
+          {mergedAudioBlob ? 'Combined Audio' : 'Audio Preview'}
         </span>
-        <select
-          value={activeId}
-          onChange={(e) => setSelectedId(e.target.value)}
-          disabled={playableClips.length <= 1}
-          style={{
-            background: 'var(--color-pt-surface-alt)',
-            color: 'var(--color-pt-text)',
-            border: '1px solid var(--color-pt-border)',
-            borderRadius: 6,
-            padding: '2px 8px',
-            fontSize: 12,
-            cursor: playableClips.length > 1 ? 'pointer' : 'default',
-            opacity: playableClips.length <= 1 ? 0.6 : 1,
-          }}
-        >
-          {playableClips.map((c) => (
-            <option key={c.id} value={c.id}>
-              Clip {ordinalOf(c.id)}
-            </option>
-          ))}
-        </select>
+        {!mergedAudioBlob && (
+          <select
+            value={activeId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            disabled={playableClips.length <= 1}
+            style={{
+              background: 'var(--color-pt-surface-alt)',
+              color: 'var(--color-pt-text)',
+              border: '1px solid var(--color-pt-border)',
+              borderRadius: 6,
+              padding: '2px 8px',
+              fontSize: 12,
+              cursor: playableClips.length > 1 ? 'pointer' : 'default',
+              opacity: playableClips.length <= 1 ? 0.6 : 1,
+            }}
+          >
+            {playableClips.map((c) => (
+              <option key={c.id} value={c.id}>
+                Clip {ordinalOf(c.id)}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="space-y-2">
         <AudioTrackRow label="Full Audio">
-          {activeId && <PlaybackWaveform audioKey={activeId} />}
+          {mergedAudioBlob
+            ? <BlobWaveform blob={mergedAudioBlob} />
+            : activeId
+              ? <PlaybackWaveform audioKey={activeId} />
+              : null
+          }
         </AudioTrackRow>
 
         <AudioTrackRow label="Silence Removed" savedSec={activeSilenced?.savedSec}>
