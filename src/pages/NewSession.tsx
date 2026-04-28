@@ -5,24 +5,15 @@ import {
   Mic,
   ArrowLeft,
   Plus,
-  ClipboardPlus,
-  Repeat,
-  TrendingUp,
-  ClipboardCheck,
   Check,
   Search,
   ExternalLink,
-  type LucideIcon,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput } from '@/components/ui/Field';
-import {
-  Avatar,
-  Eyebrow,
-  PtButton,
-  SurfaceCard,
-} from '@/components/design';
+import { Avatar, Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { duration, ease } from '@/lib/motion';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -39,42 +30,17 @@ const TYPE_TO_FORMAT: Record<SessionType, NoteFormat> = {
   discharge: 'discharge',
 };
 
-const VISIT_TYPES: {
-  type: SessionType;
-  title: string;
-  description: string;
-  Icon: LucideIcon;
-}[] = [
-  {
-    type: 'evaluation',
-    title: 'Initial evaluation',
-    description: 'New patient — full assessment',
-    Icon: ClipboardPlus,
-  },
-  {
-    type: 'follow_up',
-    title: 'Follow-up',
-    description: 'SOAP visit between milestones',
-    Icon: Repeat,
-  },
-  {
-    type: 'progress',
-    title: 'Progress note',
-    description: 'Re-assessment or milestone check',
-    Icon: TrendingUp,
-  },
-  {
-    type: 'discharge',
-    title: 'Discharge',
-    description: 'Final visit — outcomes summary',
-    Icon: ClipboardCheck,
-  },
+const VISIT_TYPES: { type: SessionType; title: string }[] = [
+  { type: 'evaluation', title: 'Initial eval' },
+  { type: 'follow_up', title: 'Follow-up' },
+  { type: 'progress', title: 'Progress note' },
+  { type: 'discharge', title: 'Discharge' },
 ];
 
 export function NewSession() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { patients } = usePatients();
+  const { patients, addPatient } = usePatients();
   const { forPatient: sessionsForPatient, addSession } = useSessions();
   const { templates, addTemplate } = useTemplates();
 
@@ -151,6 +117,27 @@ export function NewSession() {
     }
   }
 
+  function handleQuickAddPatient() {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    const parts = trimmed.split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ');
+    const now = Date.now();
+    const patient: Patient = {
+      id: newId(),
+      firstName,
+      lastName,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    };
+    addPatient(patient);
+    setPatientId(patient.id);
+    setQuery('');
+    toast.success(`${firstName} added — fill in details any time from Patients.`);
+  }
+
   function handleCreateTemplate(name: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -174,34 +161,28 @@ export function NewSession() {
   }
 
   return (
-    <div style={{ padding: 22, display: 'grid', gap: 16, maxWidth: 880, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+    <div style={{ padding: '20px 22px', display: 'grid', gap: 14, maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Link
           to="/"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 5,
             fontSize: 12,
             color: 'var(--color-pt-text-3)',
             textDecoration: 'none',
           }}
         >
-          <ArrowLeft size={14} strokeWidth={2} /> Dashboard
+          <ArrowLeft size={13} strokeWidth={2} /> Dashboard
         </Link>
+        <span style={{ flex: 1 }} />
         <Eyebrow>New session</Eyebrow>
       </div>
 
       {patients.length === 0 ? (
         <SurfaceCard padding={28}>
-          <div
-            style={{
-              display: 'grid',
-              justifyItems: 'center',
-              gap: 12,
-              textAlign: 'center',
-            }}
-          >
+          <div style={{ display: 'grid', justifyItems: 'center', gap: 12, textAlign: 'center' }}>
             <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
               You need a patient before you can start a session.
             </p>
@@ -214,110 +195,146 @@ export function NewSession() {
         </SurfaceCard>
       ) : (
         <>
-          <SurfaceCard padding={18}>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          {/* Patient */}
+          <SurfaceCard>
+            <div style={{ padding: '14px 16px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <Eyebrow>Patient</Eyebrow>
-                <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
-                  {filteredPatients.length}{' '}
-                  {filteredPatients.length === 1 ? 'patient' : 'patients'}
-                </span>
+                {selectedPatient && (
+                  <span style={{ fontSize: 11.5, color: 'var(--color-pt-accent-fg)', fontWeight: 500 }}>
+                    {selectedPatient.firstName} {selectedPatient.lastName}
+                  </span>
+                )}
               </div>
               <div style={{ position: 'relative' }}>
                 <Search
                   size={14}
                   style={{
                     position: 'absolute',
-                    left: 12,
+                    left: 10,
                     top: '50%',
                     transform: 'translateY(-50%)',
                     color: 'var(--color-pt-text-3)',
+                    pointerEvents: 'none',
                   }}
                 />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search patients…"
+                  autoFocus
                   style={{
                     width: '100%',
-                    padding: '9px 12px 9px 32px',
-                    borderRadius: 9,
+                    padding: '9px 10px 9px 30px',
+                    borderRadius: 8,
                     border: '1px solid var(--color-pt-border)',
                     fontSize: 13,
                     color: 'var(--color-pt-text)',
-                    background: 'var(--color-pt-surface)',
+                    background: 'var(--color-pt-surface-mut)',
                     outline: 'none',
                     fontFamily: 'inherit',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>
-              {filteredPatients.length === 0 ? (
-                <div
-                  style={{
-                    padding: '20px 12px',
-                    border: '1px dashed var(--color-pt-border)',
-                    borderRadius: 10,
-                    textAlign: 'center',
-                    fontSize: 12.5,
-                    color: 'var(--color-pt-text-3)',
-                  }}
-                >
-                  No matching patients.
-                </div>
-              ) : (
-                <ul
-                  role="radiogroup"
-                  aria-label="Patient"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                    gap: 8,
-                    maxHeight: 280,
-                    overflowY: 'auto',
-                    listStyle: 'none',
-                    margin: 0,
-                    padding: 0,
-                  }}
-                >
-                  {filteredPatients.map((p) => (
-                    <PatientChip
-                      key={p.id}
-                      patient={p}
-                      selected={p.id === patientId}
-                      onSelect={() => setPatientId(p.id)}
-                    />
-                  ))}
-                </ul>
-              )}
             </div>
-          </SurfaceCard>
 
-          <SurfaceCard padding={18}>
-            <div style={{ display: 'grid', gap: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <Eyebrow>Visit type</Eyebrow>
-                <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
-                  Drives the note structure
-                </span>
-              </div>
-
-              <div
+            {filteredPatients.length > 0 ? (
+              <ul
                 role="radiogroup"
-                aria-label="Visit type"
+                aria-label="Patient"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 8,
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 0,
+                  maxHeight: 256,
+                  overflowY: 'auto',
+                  borderTop: '1px solid var(--color-pt-border)',
                 }}
               >
-                {VISIT_TYPES.map((vt) => (
-                  <VisitTypeCard
-                    key={vt.type}
-                    visitType={vt}
-                    selected={vt.type === sessionType}
-                    onSelect={() => chooseVisitType(vt.type)}
+                {filteredPatients.map((p) => (
+                  <PatientRow
+                    key={p.id}
+                    patient={p}
+                    selected={p.id === patientId}
+                    onSelect={() => setPatientId(p.id)}
                   />
                 ))}
+              </ul>
+            ) : (
+              <div style={{ borderTop: '1px solid var(--color-pt-border)', padding: '12px 16px' }}>
+                {query.trim() ? (
+                  <button
+                    type="button"
+                    onClick={handleQuickAddPatient}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      fontSize: 13,
+                      color: 'var(--color-pt-accent-fg)',
+                      fontWeight: 500,
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <UserPlus size={14} strokeWidth={2} />
+                    Add "{query.trim()}" as a new patient
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+                    No active patients.
+                  </span>
+                )}
+              </div>
+            )}
+          </SurfaceCard>
+
+          {/* Visit type + Template */}
+          <SurfaceCard padding={16}>
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div>
+                <div style={{ marginBottom: 10 }}>
+                  <Eyebrow>Visit type</Eyebrow>
+                </div>
+                <div
+                  role="radiogroup"
+                  aria-label="Visit type"
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
+                >
+                  {VISIT_TYPES.map((vt) => {
+                    const active = vt.type === sessionType;
+                    return (
+                      <button
+                        key={vt.type}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => chooseVisitType(vt.type)}
+                        style={{
+                          padding: '7px 16px',
+                          borderRadius: 20,
+                          border: `1px solid ${active ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
+                          background: active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface)',
+                          color: active ? '#ffffff' : 'var(--color-pt-text-2)',
+                          fontSize: 13,
+                          fontWeight: active ? 600 : 400,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          transition: 'background 120ms ease, border-color 120ms ease, color 120ms ease',
+                          whiteSpace: 'nowrap',
+                          minHeight: 36,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {vt.title}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <TemplateSection
@@ -334,9 +351,7 @@ export function NewSession() {
 
           <StartBar
             patient={selectedPatient}
-            visitTitle={
-              VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''
-            }
+            visitTitle={VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''}
             disabled={!patientId}
             onStart={handleStart}
           />
@@ -345,9 +360,7 @@ export function NewSession() {
 
       <NewTemplateModal
         open={creatingTemplate}
-        visitTypeLabel={
-          VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''
-        }
+        visitTypeLabel={VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''}
         onClose={() => setCreatingTemplate(false)}
         onCreate={handleCreateTemplate}
       />
@@ -357,13 +370,16 @@ export function NewSession() {
         patient={selectedPatient}
         onClose={() => setSameDayModal(null)}
         onContinue={(sessionId) => navigate(`/sessions/${sessionId}`)}
-        onCreateNew={() => { setSameDayModal(null); doCreateSession(); }}
+        onCreateNew={() => {
+          setSameDayModal(null);
+          doCreateSession();
+        }}
       />
     </div>
   );
 }
 
-function PatientChip({
+function PatientRow({
   patient,
   selected,
   onSelect,
@@ -372,36 +388,37 @@ function PatientChip({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const fullName = `${patient.firstName} ${patient.lastName}`;
+  const displayName = patient.lastName
+    ? `${patient.lastName}, ${patient.firstName}`
+    : patient.firstName;
   return (
-    <li>
+    <li style={{ borderBottom: '1px solid var(--color-pt-border)' }}>
       <button
         type="button"
         role="radio"
         aria-checked={selected}
         onClick={onSelect}
         style={{
-          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           gap: 10,
           width: '100%',
-          padding: '9px 12px',
-          paddingRight: 28,
-          borderRadius: 10,
-          border: `1px solid ${selected ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
-          background: selected ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+          padding: '10px 16px',
+          border: 'none',
+          background: selected ? 'var(--color-pt-accent-soft)' : 'transparent',
           textAlign: 'left',
           cursor: 'pointer',
           fontFamily: 'inherit',
-          transition: 'background 120ms ease, border-color 120ms ease',
+          minHeight: 52,
+          transition: 'background 120ms ease',
+          boxSizing: 'border-box',
         }}
       >
-        <Avatar name={fullName} size={32} />
+        <Avatar name={`${patient.firstName} ${patient.lastName}`} size={32} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
-              fontSize: 13,
+              fontSize: 13.5,
               fontWeight: 600,
               color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
               overflow: 'hidden',
@@ -409,115 +426,28 @@ function PatientChip({
               whiteSpace: 'nowrap',
             }}
           >
-            {patient.lastName}, {patient.firstName}
+            {displayName}
           </div>
-          <div
-            style={{
-              fontSize: 11.5,
-              color: 'var(--color-pt-text-3)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              marginTop: 1,
-            }}
-          >
-            {patient.primaryDiagnosis ?? 'No primary diagnosis'}
-          </div>
+          {patient.primaryDiagnosis && (
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--color-pt-text-3)',
+                marginTop: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {patient.primaryDiagnosis}
+            </div>
+          )}
         </div>
         {selected && (
-          <span
-            aria-hidden
-            style={{
-              position: 'absolute',
-              right: 8,
-              top: 8,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 16,
-              height: 16,
-              borderRadius: '50%',
-              background: 'var(--color-pt-accent)',
-              color: '#ffffff',
-            }}
-          >
-            <Check size={10} strokeWidth={3} />
-          </span>
+          <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0, color: 'var(--color-pt-accent)' }} />
         )}
       </button>
     </li>
-  );
-}
-
-function VisitTypeCard({
-  visitType,
-  selected,
-  onSelect,
-}: {
-  visitType: (typeof VISIT_TYPES)[number];
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { title, description, Icon } = visitType;
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 10,
-        padding: 12,
-        borderRadius: 12,
-        border: `1px solid ${selected ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
-        background: selected ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
-        textAlign: 'left',
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        transition: 'background 120ms ease, border-color 120ms ease',
-      }}
-    >
-      <span
-        style={{
-          marginTop: 2,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          background: selected ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
-          color: selected ? '#ffffff' : 'var(--color-pt-text-2)',
-          flexShrink: 0,
-        }}
-      >
-        <Icon size={16} strokeWidth={2} />
-      </span>
-      <span style={{ minWidth: 0, flex: 1 }}>
-        <span
-          style={{
-            display: 'block',
-            fontSize: 13.5,
-            fontWeight: 600,
-            color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
-          }}
-        >
-          {title}
-        </span>
-        <span
-          style={{
-            display: 'block',
-            fontSize: 12,
-            color: 'var(--color-pt-text-3)',
-            marginTop: 2,
-          }}
-        >
-          {description}
-        </span>
-      </span>
-    </button>
   );
 }
 
@@ -543,12 +473,7 @@ function TemplateSection({
   const compactTemplate =
     visitTemplates.find((t) => t.id === effectiveTemplateId) ?? visitTemplates[0];
   return (
-    <div
-      style={{
-        borderTop: '1px solid var(--color-pt-border)',
-        paddingTop: 14,
-      }}
-    >
+    <div style={{ borderTop: '1px solid var(--color-pt-border)', paddingTop: 16 }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={sessionType}
@@ -558,7 +483,7 @@ function TemplateSection({
           transition={{ duration: duration.base, ease: ease.enter }}
           style={{ display: 'grid', gap: 10 }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Eyebrow>Template</Eyebrow>
             <button
               type="button"
@@ -571,9 +496,12 @@ function TemplateSection({
                 cursor: 'pointer',
                 padding: 0,
                 fontFamily: 'inherit',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
               }}
             >
-              <Plus size={11} strokeWidth={2} style={{ display: 'inline', marginRight: 2, verticalAlign: 'middle' }} />
+              <Plus size={11} strokeWidth={2} />
               New custom template
             </button>
           </div>
@@ -588,8 +516,7 @@ function TemplateSection({
                 color: 'var(--color-pt-text-3)',
               }}
             >
-              No templates available for this visit type. Create one to continue, or
-              start without a template.
+              No templates for this visit type. Create one, or start without a template.
             </div>
           )}
 
@@ -831,8 +758,8 @@ function NewTemplateModal({
       size="sm"
     >
       <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
-        Saved as a {visitTypeLabel.toLowerCase()} template. You can edit
-        sections and the AI prompt later from the Templates page.
+        Saved as a {visitTypeLabel.toLowerCase()} template. You can edit sections and the
+        AI prompt later from the Templates page.
       </p>
       <Field label="Template name">
         <TextInput

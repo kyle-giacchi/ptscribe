@@ -1,7 +1,11 @@
 import { useLocation, useMatch } from 'react-router-dom';
-import { Bell } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
 import { useClinician } from '@/contexts/ClinicianProvider';
+
+interface TopBarProps {
+  onMenuOpen?: () => void;
+}
 
 interface PageMeta {
   title: string;
@@ -36,7 +40,7 @@ function usePageMeta(): PageMeta {
   }
 }
 
-export function TopBar() {
+export function TopBar({ onMenuOpen }: TopBarProps) {
   const { title, subtitle } = usePageMeta();
   const { clinician } = useClinician();
 
@@ -53,7 +57,24 @@ export function TopBar() {
         padding: '16px 22px',
       }}
     >
-      <div className="min-w-0">
+      <button
+        type="button"
+        aria-label="Open menu"
+        onClick={onMenuOpen}
+        className="mr-3 flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] md:hidden"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 8,
+          border: '1px solid var(--color-pt-border)',
+          background: 'var(--color-pt-surface)',
+          color: 'var(--color-pt-text-2)',
+          flexShrink: 0,
+        }}
+      >
+        <Menu size={16} strokeWidth={1.75} />
+      </button>
+      <div className="min-w-0 flex-1">
         <div
           className="truncate"
           style={{
