@@ -1,4 +1,5 @@
 import { encodeOpusWebm } from './opusEncoder';
+import { mixToMono } from './pcm';
 import {
   DEFAULT_VAD_OPTIONS,
   findSpeechRanges,
@@ -132,13 +133,3 @@ export function summarizeTrim(totalSec: number, kept: SpeechRange[]): TrimReport
   };
 }
 
-function mixToMono(buf: AudioBuffer): Float32Array {
-  if (buf.numberOfChannels === 1) return buf.getChannelData(0).slice();
-  const out = new Float32Array(buf.length);
-  for (let ch = 0; ch < buf.numberOfChannels; ch += 1) {
-    const data = buf.getChannelData(ch);
-    for (let i = 0; i < data.length; i += 1) out[i] += data[i];
-  }
-  for (let i = 0; i < out.length; i += 1) out[i] /= buf.numberOfChannels;
-  return out;
-}
