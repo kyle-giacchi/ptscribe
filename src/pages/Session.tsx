@@ -46,6 +46,7 @@ import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { transcribe } from '@/services/ai/transcribe';
 import { trimSilence } from '@/lib/audio/silenceTrim';
+import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
@@ -466,7 +467,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   // ── Transcription ────────────────────────────────────────────────────────
   async function transcribeClipBlob(clip: SessionClip): Promise<
-    | { ok: true; text: string; trimReport?: { droppedSec: number; originalSec: number } }
+    | {
+        ok: true;
+        text: string;
+        trimReport?: { droppedSec: number; originalSec: number };
+        speedReport?: { savedSec: number; originalSec: number };
+      }
     | { ok: false; error: string }
   > {
     try {
@@ -475,6 +481,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
       let blobToSend: Blob = original;
       let trimReport: { droppedSec: number; originalSec: number } | undefined;
+      let speedReport: { savedSec: number; originalSec: number } | undefined;
 
       const sd = settings.audio.silenceDetection;
       if (sd.enabled) {
@@ -494,12 +501,26 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         }
       }
 
+      const su = settings.audio.speedUp;
+      if (su.enabled) {
+        try {
+          const speedResult = await speedUpAudio(blobToSend, su.speed as SpeedFactor);
+          blobToSend = speedResult.result;
+          speedReport = {
+            savedSec: speedResult.report.savedSec,
+            originalSec: speedResult.report.originalSec,
+          };
+        } catch {
+          // Speed-up failure must never block transcription — fall back as-is.
+        }
+      }
+
       const result = await transcribe({
         blob: blobToSend,
         provider: settings.ai.transcription.provider,
         model: settings.ai.transcription.model,
       });
-      return { ok: true, text: result.text, trimReport };
+      return { ok: true, text: result.text, trimReport, speedReport };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
@@ -514,6 +535,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     failures: number;
     totalDroppedSec: number;
     totalOriginalSec: number;
+    totalSpeedSavedSec: number;
+    totalSpeedOriginalSec: number;
   }> {
     const textByClip = new Map<string, string>();
     for (const c of transcribed) {
@@ -523,6 +546,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     let failures = 0;
     let totalDroppedSec = 0;
     let totalOriginalSec = 0;
+    let totalSpeedSavedSec = 0;
+    let totalSpeedOriginalSec = 0;
     await Promise.allSettled(
       pending.map(async (clip) => {
         const result = await transcribeClipBlob(clip);
@@ -532,6 +557,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           if (result.trimReport) {
             totalDroppedSec += result.trimReport.droppedSec;
             totalOriginalSec += result.trimReport.originalSec;
+          }
+          if (result.speedReport) {
+            totalSpeedSavedSec += result.speedReport.savedSec;
+            totalSpeedOriginalSec += result.speedReport.originalSec;
           }
           patchClip(clip.id, {
             status: 'transcribed',
@@ -546,7 +575,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         }
       }),
     );
-    return { textByClip, successes, failures, totalDroppedSec, totalOriginalSec };
+    return {
+      textByClip,
+      successes,
+      failures,
+      totalDroppedSec,
+      totalOriginalSec,
+      totalSpeedSavedSec,
+      totalSpeedOriginalSec,
+    };
   }
 
   function reportTranscribeOutcome(successes: number, failures: number) {
@@ -616,8 +653,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       ),
     );
 
-    const { textByClip, successes, failures, totalDroppedSec, totalOriginalSec } =
-      await runTranscribeLoop(pending, transcribed);
+    const {
+      textByClip,
+      successes,
+      failures,
+      totalDroppedSec,
+      totalOriginalSec,
+      totalSpeedSavedSec,
+      totalSpeedOriginalSec,
+    } = await runTranscribeLoop(pending, transcribed);
 
     const merged = [...session.clips]
       .sort((a, b) => a.createdAt - b.createdAt)
@@ -639,6 +683,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       const pct = Math.round((totalDroppedSec / Math.max(totalOriginalSec, 1)) * 100);
       toast.info(
         `Silence trimming saved ${Math.round(totalDroppedSec)}s (~${pct}%) before transcription.`,
+      );
+    }
+    if (totalSpeedSavedSec > 1) {
+      const pct = Math.round((totalSpeedSavedSec / Math.max(totalSpeedOriginalSec, 1)) * 100);
+      toast.info(
+        `Audio speed-up saved ${Math.round(totalSpeedSavedSec)}s (~${pct}%) before transcription.`,
       );
     }
   }

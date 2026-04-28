@@ -277,9 +277,9 @@ export function Settings() {
         <div style={{ display: 'grid', gap: 12 }}>
           <Eyebrow>Audio processing (experimental)</Eyebrow>
           <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
-            Trim sustained silent regions from a recording before sending it to Cloudflare Whisper.
-            Recordings stay intact in this browser; only the copy uploaded for transcription is
-            trimmed. Default is off — turn on if your visits have long quiet stretches.
+            Trim sustained silent regions and/or speed up playback before sending audio to
+            Cloudflare Whisper. Recordings stay intact in this browser; only the copy uploaded for
+            transcription is affected. Both options are off by default.
           </p>
           <div style={{ maxWidth: 280, display: 'grid', gap: 12 }}>
             <Field label="Silence trimming">
@@ -335,6 +335,40 @@ export function Settings() {
                   />
                 </Field>
               </>
+            )}
+
+            <Field label="Audio speed-up">
+              <Select
+                value={settings.audio.speedUp.enabled ? 'on' : 'off'}
+                onChange={(e) =>
+                  updateAudio({
+                    speedUp: { ...settings.audio.speedUp, enabled: e.target.value === 'on' },
+                  })
+                }
+              >
+                <option value="off">Off</option>
+                <option value="on">On</option>
+              </Select>
+            </Field>
+
+            {settings.audio.speedUp.enabled && (
+              <Field label="Speed factor">
+                <Select
+                  value={String(settings.audio.speedUp.speed)}
+                  onChange={(e) =>
+                    updateAudio({
+                      speedUp: {
+                        ...settings.audio.speedUp,
+                        speed: Number(e.target.value) as 1.25 | 1.5 | 1.75,
+                      },
+                    })
+                  }
+                >
+                  <option value="1.25">1.25× — subtle, saves ~20%</option>
+                  <option value="1.5">1.5× — recommended, saves ~33%</option>
+                  <option value="1.75">1.75× — aggressive, saves ~43%</option>
+                </Select>
+              </Field>
             )}
           </div>
         </div>
