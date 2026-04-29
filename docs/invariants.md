@@ -139,7 +139,7 @@ Legacy plaintext migration (one-shot):
 `useRecorder` owns three resources for the duration of a clip: the `MediaRecorder`, a `'screen'` `WakeLockSentinel`, and a `visibilitychange` listener. All three must be released on every exit path — `stop`, `reset`, error, and unmount — via `teardown()`.
 
 - Wake lock is acquired after `recorder.start()` and tracked in `wakeLockRef`. Browsers auto-release it on `visibilitychange → hidden`; the visibility handler re-acquires it on return-to-foreground only if `recorderRef.current?.state === 'recording'`. Any rewrite that adds a new recorder state must update this gate.
-- Wake lock is best-effort. `acquireWakeLock` returns `null` when the API is unavailable or denied. Recording must continue regardless. Do not throw on wake-lock failure or block the start path on it.
+- Wake lock is best-effort. `acquireWakeLock` returns `null` when the API is unavailable or denied. Recording must continue regardless. Do not throw on wake-lock failure or block the start path on it. **Browser support:** the Screen Wake Lock API is unavailable on iOS Safari ≤ 16.3 and on any non-secure context — those clients record without a lock and may screen-lock on long sessions; this is expected and is not a bug to chase.
 - The visibility handler also flips a sticky `wasBackgrounded` flag the first time the tab is hidden during a clip. The flag is consumed by `Session.tsx` to surface a "verify duration" warning. It is reset only by the next `start()` or `reset()` — do not clear it on `visibilitychange → visible`.
 
 ## Destructive actions use inline confirmation

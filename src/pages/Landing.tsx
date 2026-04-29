@@ -377,7 +377,7 @@ export function Landing({ onSignIn }: LandingProps) {
             >
               <Lock size={11} color="#8893a5" strokeWidth={2} />
               <span style={{ fontSize: 11.5, color: '#8893a5' }}>
-                HIPAA-aligned · audio never leaves your device unencrypted
+                Encrypted at rest · audio + transcripts sent to Cloudflare AI and Anthropic over TLS
               </span>
             </div>
 

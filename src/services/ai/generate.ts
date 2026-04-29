@@ -1,4 +1,11 @@
-import type { GenerationProvider, NoteSection, NoteTemplate, Note, Patient, SessionType } from '@/types';
+import type {
+  GenerationProvider,
+  NoteSection,
+  NoteTemplate,
+  Note,
+  Patient,
+  SessionType,
+} from '@/types';
 import { callAnthropic } from './client/anthropic';
 import { buildUserPrompt } from '@/lib/clinical/prompts';
 
@@ -17,41 +24,49 @@ export interface GenerateNoteResult {
   sections: NoteSection[];
 }
 
+type GenerateBackend = (args: GenerateNoteArgs) => Promise<GenerateNoteResult>;
+
+const generateBackends: Record<GenerationProvider, GenerateBackend> = {
+  anthropic: async (args) => {
+    const userPrompt = buildUserPrompt({
+      template: args.template,
+      transcript: args.transcript,
+      patient: args.patient,
+      priorNote: args.priorNote,
+      sessionType: args.sessionType,
+    });
+
+    const result = await callAnthropic({
+      model: args.model || 'claude-sonnet-4-6',
+      system: args.template.systemPrompt,
+      user: userPrompt,
+      signal: args.signal,
+    });
+
+    const parsed = extractJson(result.text);
+    const sections: NoteSection[] = args.template.sections.map((s) => ({
+      key: s.key,
+      label: s.label,
+      body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
+    }));
+    return { sections };
+  },
+  none: () => {
+    throw new Error('AI generation is disabled. Pick a provider in Settings.');
+  },
+};
+
 /**
  * Send the transcript + context to the configured provider and parse the
  * JSON response into `NoteSection[]`. The response shape is fixed by the
  * template's system prompt — keys must match `template.sections[*].key`.
- *
- * Failures fall back to an "empty note" with the section keys preserved so
- * the user can still type something in.
  */
 export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNoteResult> {
-  if (args.provider !== 'anthropic') {
-    throw new Error('AI generation is disabled. Pick a provider in Settings.');
+  const backend = generateBackends[args.provider];
+  if (!backend) {
+    throw new Error(`Unknown generation provider: ${args.provider}`);
   }
-
-  const userPrompt = buildUserPrompt({
-    template: args.template,
-    transcript: args.transcript,
-    patient: args.patient,
-    priorNote: args.priorNote,
-    sessionType: args.sessionType,
-  });
-
-  const result = await callAnthropic({
-    model: args.model || 'claude-sonnet-4-6',
-    system: args.template.systemPrompt,
-    user: userPrompt,
-    signal: args.signal,
-  });
-
-  const parsed = extractJson(result.text);
-  const sections: NoteSection[] = args.template.sections.map((s) => ({
-    key: s.key,
-    label: s.label,
-    body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
-  }));
-  return { sections };
+  return backend(args);
 }
 
 /**

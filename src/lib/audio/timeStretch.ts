@@ -89,28 +89,57 @@ export function applyTempoSoundTouch(
   return out;
 }
 
+/** Long-lived pooled worker. Lazily spawned on first use, kept alive for the
+ *  page lifetime, and reset on crash. Concurrent callers are demultiplexed by
+ *  request id so they don't collide on the shared message channel. */
+type Pending = { resolve: (out: Float32Array) => void; reject: (err: Error) => void };
+let pooledWorker: Worker | null = null;
+let nextRequestId = 0;
+const pendingRequests = new Map<number, Pending>();
+
+function getPooledWorker(): Worker {
+  if (pooledWorker) return pooledWorker;
+  const w = new Worker(new URL('./timeStretch.worker.ts', import.meta.url), { type: 'module' });
+  w.addEventListener(
+    'message',
+    (e: MessageEvent<{ id: number; result?: Float32Array; error?: string }>) => {
+      const entry = pendingRequests.get(e.data.id);
+      if (!entry) return;
+      pendingRequests.delete(e.data.id);
+      if (e.data.error) entry.reject(new Error(e.data.error));
+      else if (e.data.result) entry.resolve(e.data.result);
+      else entry.reject(new Error('Worker returned no data'));
+    },
+  );
+  w.addEventListener('error', (e) => {
+    const err = new Error(e.message ?? 'Worker error');
+    for (const [id, entry] of pendingRequests) {
+      entry.reject(err);
+      pendingRequests.delete(id);
+    }
+    pooledWorker?.terminate();
+    pooledWorker = null;
+  });
+  pooledWorker = w;
+  return w;
+}
+
 /** Run SoundTouch in a Worker so the main thread stays responsive.
  *  Falls back to the synchronous path if Worker spawning fails. */
 async function stretchOffThread(samples: Float32Array, tempo: number): Promise<Float32Array> {
+  let worker: Worker;
   try {
-    return await new Promise<Float32Array>((resolve, reject) => {
-      const worker = new Worker(new URL('./timeStretch.worker.ts', import.meta.url), { type: 'module' });
-      worker.addEventListener('message', (e: MessageEvent<{ result?: Float32Array; error?: string }>) => {
-        worker.terminate();
-        if (e.data.error) reject(new Error(e.data.error));
-        else if (e.data.result) resolve(e.data.result);
-        else reject(new Error('Worker returned no data'));
-      });
-      worker.addEventListener('error', (e) => {
-        worker.terminate();
-        reject(new Error(e.message ?? 'Worker error'));
-      });
-      // Copy (not transfer) so `samples` stays usable if the Worker errors before postMessage
-      worker.postMessage({ samples, tempo });
-    });
+    worker = getPooledWorker();
   } catch {
     return applyTempoSoundTouch(samples, 0, tempo);
   }
+
+  const id = ++nextRequestId;
+  return new Promise<Float32Array>((resolve, reject) => {
+    pendingRequests.set(id, { resolve, reject });
+    // Copy (not transfer) so `samples` stays usable if the Worker errors before postMessage.
+    worker.postMessage({ id, samples, tempo });
+  });
 }
 
 /** Pitch-preserved time-stretch a recorded audio Blob and re-encode as
