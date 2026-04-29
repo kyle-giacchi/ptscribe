@@ -6,6 +6,7 @@ import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { newId } from '@/utils/ids';
+import { useToggle } from '@/hooks/useToggle';
 import type { NoteFormat, NoteTemplate, NoteTemplateSection } from '@/types';
 
 const FORMAT_LABEL: Record<NoteFormat, string> = {
@@ -22,7 +23,7 @@ const SELECTABLE_FORMATS: NoteFormat[] = ['evaluation', 'soap', 'progress', 'dis
 export function Templates() {
   const { templates, addTemplate, updateTemplate, cloneTemplate, removeTemplate } = useTemplates();
   const [editing, setEditing] = useState<NoteTemplate | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, startCreating, stopCreating] = useToggle();
 
   const grouped = useMemo(() => {
     const buckets: Record<NoteFormat, NoteTemplate[]> = {
@@ -61,7 +62,7 @@ export function Templates() {
     };
     addTemplate(blank);
     setEditing(blank);
-    setCreating(false);
+    stopCreating();
   }
 
   return (
@@ -76,7 +77,7 @@ export function Templates() {
         <PtButton
           variant="primary"
           iconLeft={<Plus size={14} strokeWidth={2} />}
-          onClick={() => setCreating(true)}
+          onClick={() => startCreating()}
         >
           New template
         </PtButton>
@@ -192,7 +193,7 @@ export function Templates() {
         })}
       </div>
 
-      {creating && <CreateTemplateModal onClose={() => setCreating(false)} onCreate={handleCreate} />}
+      {creating && <CreateTemplateModal onClose={() => stopCreating()} onCreate={handleCreate} />}
 
       {editing && (
         <TemplateEditorModal

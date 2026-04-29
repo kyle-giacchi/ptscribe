@@ -15,6 +15,7 @@ import {
   SurfaceCard,
   type StatusTone,
 } from '@/components/design';
+import { shortLabelForType } from '@/utils/labels';
 import type { Session, SessionStatus, Patient } from '@/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -281,7 +282,7 @@ function ScheduleCard({
                       className="truncate"
                       style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}
                     >
-                      {labelForType(s.type)}
+                      {shortLabelForType(s.type)}
                       {patient?.primaryDiagnosis ? ` · ${patient.primaryDiagnosis}` : ''}
                     </div>
                   </div>
@@ -309,20 +310,6 @@ function scheduleTone(
   return 'upcoming';
 }
 
-function labelForType(t: string): string {
-  switch (t) {
-    case 'evaluation':
-      return 'Initial Eval';
-    case 'follow_up':
-      return 'Follow-up';
-    case 'progress':
-      return 'Progress';
-    case 'discharge':
-      return 'Discharge';
-    default:
-      return t;
-  }
-}
 
 function labelForStatus(s: SessionStatus): string {
   switch (s) {

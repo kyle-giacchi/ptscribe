@@ -21,6 +21,8 @@ import { useExercises } from '@/contexts/ExercisesProvider';
 import { newId } from '@/utils/ids';
 import { DAY_MS, fmtIsoDateOptional, isSameDay, parseIsoDate, relativeFromNow, startOfDay } from '@/utils/dates';
 import { labelForType } from '@/utils/labels';
+import { ageFromDob } from '@/utils/patients';
+import { useToggle } from '@/hooks/useToggle';
 import type {
   Note,
   Patient,
@@ -52,7 +54,7 @@ export function PatientDetail() {
   const { exercises } = useExercises();
 
   const patient = getPatient(id);
-  const [editing, setEditing] = useState(false);
+  const [editing, startEditing, stopEditing] = useToggle();
   const [tab, setTab] = useState<Tab>('overview');
   const [sameDaySessions, setSameDaySessions] = useState<Session[] | null>(null);
 
@@ -148,7 +150,7 @@ export function PatientDetail() {
         status={status}
         tab={tab}
         onTab={setTab}
-        onEdit={() => setEditing(true)}
+        onEdit={() => startEditing()}
         onStartSession={handleStartSession}
       />
 
@@ -194,10 +196,10 @@ export function PatientDetail() {
       <EditPatientModal
         open={editing}
         patient={patient}
-        onClose={() => setEditing(false)}
+        onClose={() => stopEditing()}
         onSave={(patch) => {
           updatePatient(patient.id, patch);
-          setEditing(false);
+          stopEditing();
         }}
       />
 
@@ -1244,10 +1246,6 @@ function EditPatientModal({
   );
 }
 
-function ageFromDob(dob?: number): number | null {
-  if (!dob) return null;
-  return Math.floor((Date.now() - dob) / (365.25 * DAY_MS));
-}
 
 function labelForSex(s?: Sex): string {
   if (s === 'F') return 'F';
