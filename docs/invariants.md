@@ -142,6 +142,30 @@ Legacy plaintext migration (one-shot):
 - Wake lock is best-effort. `acquireWakeLock` returns `null` when the API is unavailable or denied. Recording must continue regardless. Do not throw on wake-lock failure or block the start path on it.
 - The visibility handler also flips a sticky `wasBackgrounded` flag the first time the tab is hidden during a clip. The flag is consumed by `Session.tsx` to surface a "verify duration" warning. It is reset only by the next `start()` or `reset()` — do not clear it on `visibilitychange → visible`.
 
+## Destructive actions use inline confirmation
+
+Never call `window.confirm()`. All destructive or overwrite actions use an inline caution banner rendered in place of (or adjacent to) the triggering button.
+
+Banner anatomy:
+```tsx
+<div
+  className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
+  style={{
+    borderColor: 'var(--color-caution)',
+    background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
+  }}
+>
+  <AlertTriangle size={13} strokeWidth={2} style={{ color: 'var(--color-caution)', flexShrink: 0 }} />
+  <span style={{ color: 'var(--color-caution)' }}>Descriptive warning text.</span>
+  <div className="ml-auto flex items-center gap-1.5">
+    <button className="btn btn-ghost py-0.5 text-xs" onClick={cancel}>Cancel</button>
+    <button className="btn btn-primary py-0.5 text-xs" onClick={confirm}>Yes, [action]</button>
+  </div>
+</div>
+```
+
+The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is local `useState` in the component that owns the action. Confirm handlers clear the guard then call the actual action. Cancel handlers clear the guard only. This pattern is used in `ClipsList` (delete clip), `TranscriptPanel` (overwrite transcript, re-merge), `NotePanel` (replace draft), and `Session` (delete session).
+
 ## Type changes ripple
 
 Adding a new field to a domain type requires all four of:
