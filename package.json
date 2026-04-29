@@ -21,6 +21,7 @@
     "cf:tail": "wrangler tail"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@react-pdf/renderer": "^4.5.1",
     "@ricky0123/vad-web": "^0.0.30",
     "@tiptap/pm": "^3.22.4",

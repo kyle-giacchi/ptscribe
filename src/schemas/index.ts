@@ -48,6 +48,7 @@ const SessionClipSchema = z.object({
   durationSec: z.number().min(0),
   status: z.enum(['pending', 'ready', 'transcribing', 'transcribed', 'failed']),
   transcript: z.string().optional(),
+  liveTranscript: z.string().optional(),
   transcriptedAt: z.number().int().optional(),
   errorMessage: z.string().optional(),
   createdAt: z.number().int(),
@@ -70,6 +71,7 @@ const SessionSchema = z.object({
   ]),
   clips: z.array(SessionClipSchema),
   transcript: z.string().optional(),
+  liveTranscript: z.string().optional(),
   transcriptSource: z.enum(['whisper', 'webspeech', 'manual']).optional(),
   noteId: z.string().optional(),
   templateId: z.string().optional(),
@@ -190,7 +192,7 @@ const PlanOfCareSchema = z.object({
 const SettingsSchema = z.object({
   ai: z.object({
     transcription: z.object({
-      provider: z.enum(['cloudflare', 'webspeech', 'none']),
+      provider: z.enum(['cloudflare', 'webspeech', 'local', 'none']),
       model: z.string(),
     }),
     generation: z.object({

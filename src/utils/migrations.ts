@@ -21,6 +21,8 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   silence trimming before transcription.
  * - v5 → v6: Adds `Settings.audio.speedUp` (default OFF, 1.5×) for opt-in pitch-preserving
  *   time-stretch before transcription.
+ * - v6 → v7: Adds optional `liveTranscript` field to Session and SessionClip for per-clip
+ *   Web Speech capture. No structural changes — new fields default to absent.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -49,6 +51,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 5) {
     working = migrateV5ToV6(working);
+  }
+  if ((working as { version?: number }).version === 6) {
+    working = migrateV6ToV7(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -173,6 +178,10 @@ function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> 
     },
   };
   return next;
+}
+
+function migrateV6ToV7(input: Record<string, unknown>): Record<string, unknown> {
+  return { ...input, version: 7 };
 }
 
 function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> {

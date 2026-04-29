@@ -89,6 +89,30 @@ export function applyTempoSoundTouch(
   return out;
 }
 
+/** Run SoundTouch in a Worker so the main thread stays responsive.
+ *  Falls back to the synchronous path if Worker spawning fails. */
+async function stretchOffThread(samples: Float32Array, tempo: number): Promise<Float32Array> {
+  try {
+    return await new Promise<Float32Array>((resolve, reject) => {
+      const worker = new Worker(new URL('./timeStretch.worker.ts', import.meta.url), { type: 'module' });
+      worker.addEventListener('message', (e: MessageEvent<{ result?: Float32Array; error?: string }>) => {
+        worker.terminate();
+        if (e.data.error) reject(new Error(e.data.error));
+        else if (e.data.result) resolve(e.data.result);
+        else reject(new Error('Worker returned no data'));
+      });
+      worker.addEventListener('error', (e) => {
+        worker.terminate();
+        reject(new Error(e.message ?? 'Worker error'));
+      });
+      // Copy (not transfer) so `samples` stays usable if the Worker errors before postMessage
+      worker.postMessage({ samples, tempo });
+    });
+  } catch {
+    return applyTempoSoundTouch(samples, 0, tempo);
+  }
+}
+
 /** Pitch-preserved time-stretch a recorded audio Blob and re-encode as
  *  audio/webm; codecs=opus. The original Blob is never mutated. Any failure
  *  in decoding, stretching, or encoding falls through to returning the input
@@ -129,7 +153,7 @@ export async function speedUpAudio(
 
   let stretched: Float32Array;
   try {
-    stretched = applyTempoSoundTouch(mono, sampleRate, speed);
+    stretched = await stretchOffThread(mono, speed);
   } catch {
     if ('close' in ctx) ctx.close().catch(() => undefined);
     return {
