@@ -30,7 +30,7 @@ describe('migrate v2 → v3', () => {
 
     const result = migrate(data);
 
-    expect(result.version).toBe(6);
+    expect(result.version).toBe(7);
     expect(result.sessions).toHaveLength(1);
     const session = result.sessions[0];
     expect((session as { audioRef?: unknown }).audioRef).toBeUndefined();
@@ -122,7 +122,7 @@ describe('migrate v4 → v5', () => {
     const data = v4AppData();
     const result = migrate(data);
 
-    expect(result.version).toBe(6);
+    expect(result.version).toBe(7);
     expect(result.settings.audio.silenceDetection).toEqual({
       enabled: false,
       sensitivity: 'medium',
@@ -162,7 +162,7 @@ describe('migrate v5 → v6', () => {
     const data = v5AppData();
     const result = migrate(data);
 
-    expect(result.version).toBe(6);
+    expect(result.version).toBe(7);
     expect(result.settings.audio.speedUp).toEqual({ enabled: false, speed: 1.5 });
   });
 

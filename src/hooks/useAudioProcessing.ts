@@ -42,12 +42,14 @@ export function useAudioProcessing(activeId: string) {
   }
 
   async function compileSpeed() {
-    if (!activeSilenced) return;
+    if (!activeId) return;
     setCompilingSpeed(true);
     setSpeedError(null);
     try {
       const su = settings.audio.speedUp;
-      const result = await speedUpAudio(activeSilenced.blob, su.speed as SpeedFactor);
+      const source = activeSilenced?.blob ?? (await audioRepository.load(activeId));
+      if (!source) throw new Error('Audio not found');
+      const result = await speedUpAudio(source, su.speed as SpeedFactor);
       setSpedup({ blob: result.result, forId: activeId, savedSec: result.report.savedSec });
     } catch (e) {
       setSpeedError({ msg: (e as Error).message, forId: activeId });
