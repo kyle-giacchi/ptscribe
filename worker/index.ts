@@ -59,24 +59,24 @@ export default {
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
+    return apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
   }
 
   const gate = request.headers.get('x-ptscribe-key') ?? '';
   const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
   if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
-    return json({ error: 'Unauthorized' }, 401);
+    return apiError('UNAUTHORIZED', 'Unauthorized', 401);
   }
 
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   const rateLimitResult = await checkRateLimit(env, ip);
   if (!rateLimitResult.allowed) {
-    return json({ error: 'Rate limit exceeded' }, 429);
+    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
   }
 
   if (url.pathname === '/api/transcribe') return handleTranscribe(request, env);
   if (url.pathname === '/api/generate') return handleGenerate(request, env);
-  return json({ error: 'Not found' }, 404);
+  return apiError('NOT_FOUND', 'Not found', 404);
 }
 
 async function handleTranscribe(request: Request, env: Env): Promise<Response> {
@@ -86,26 +86,26 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
   const contentType = request.headers.get('Content-Type') || 'audio/webm';
 
   if (!ALLOWED_TRANSCRIBE_MODELS.has(model)) {
-    return json({ error: `Model not allowed: ${model}` }, 400);
+    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${model}`, 400);
   }
 
   const contentLength = Number(request.headers.get('Content-Length') ?? NaN);
   if (!isNaN(contentLength) && contentLength > MAX_AUDIO_BYTES) {
-    return json({ error: 'Payload too large' }, 413);
+    return apiError('PAYLOAD_TOO_LARGE', 'Payload too large', 413);
   }
 
   let audio: Uint8Array;
   try {
     const buf = await request.arrayBuffer();
     if (buf.byteLength > MAX_AUDIO_BYTES) {
-      return json({ error: 'Payload too large' }, 413);
+      return apiError('PAYLOAD_TOO_LARGE', 'Payload too large', 413);
     }
     audio = new Uint8Array(buf);
   } catch {
-    return json({ error: 'Failed to read audio body' }, 400);
+    return apiError('INVALID_AUDIO', 'Failed to read audio body', 400);
   }
   if (audio.byteLength === 0) {
-    return json({ error: 'Empty audio body' }, 400);
+    return apiError('EMPTY_AUDIO', 'Empty audio body', 400);
   }
 
   if (model.startsWith('@cf/deepgram/')) {
@@ -137,11 +137,12 @@ async function runDeepgram(
     } as never)) as DeepgramResponse;
 
     const text = extractDeepgramText(result);
-    if (!text) return json({ error: 'Nova-3 returned no text' }, 502);
+    if (!text) return apiError('EMPTY_TEXT', 'Nova-3 returned no text', 502);
     return json({ text });
   } catch (err) {
-    return json(
-      { error: `Workers AI Nova-3 failed: ${(err as Error).message || 'unknown'}` },
+    return apiError(
+      'UPSTREAM_FAILED',
+      `Workers AI Nova-3 failed: ${(err as Error).message || 'unknown'}`,
       502,
     );
   }
@@ -165,11 +166,12 @@ async function runWhisper(
     } as never)) as { text?: string };
 
     const text = typeof result?.text === 'string' ? result.text : '';
-    if (!text) return json({ error: 'Whisper returned no text' }, 502);
+    if (!text) return apiError('EMPTY_TEXT', 'Whisper returned no text', 502);
     return json({ text });
   } catch (err) {
-    return json(
-      { error: `Workers AI Whisper failed: ${(err as Error).message || 'unknown'}` },
+    return apiError(
+      'UPSTREAM_FAILED',
+      `Workers AI Whisper failed: ${(err as Error).message || 'unknown'}`,
       502,
     );
   }
@@ -256,20 +258,20 @@ function fromWordTags(alt: DeepgramAlt): string {
 
 async function handleGenerate(request: Request, env: Env): Promise<Response> {
   if (!env.ANTHROPIC_API_KEY) {
-    return json({ error: 'Server is missing ANTHROPIC_API_KEY secret' }, 500);
+    return apiError('MISSING_API_KEY', 'Server is missing ANTHROPIC_API_KEY secret', 500);
   }
 
   let body: GenerateBody;
   try {
     body = (await request.json()) as GenerateBody;
   } catch {
-    return json({ error: 'Invalid JSON body' }, 400);
+    return apiError('INVALID_JSON', 'Invalid JSON body', 400);
   }
   if (!body.model || !body.system || !body.user) {
-    return json({ error: 'Missing model/system/user' }, 400);
+    return apiError('MISSING_FIELDS', 'Missing model/system/user', 400);
   }
   if (!ALLOWED_GENERATE_MODELS.has(body.model)) {
-    return json({ error: `Model not allowed: ${body.model}` }, 400);
+    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
   }
 
   const cacheSystem = body.cacheSystem !== false;
@@ -297,8 +299,9 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
 
   if (!upstream.ok) {
     const errBody = await safeText(upstream);
-    return json(
-      { error: `Anthropic request failed (${upstream.status}): ${errBody || upstream.statusText}` },
+    return apiError(
+      'UPSTREAM_FAILED',
+      `Anthropic request failed (${upstream.status}): ${errBody || upstream.statusText}`,
       upstream.status >= 500 ? 502 : upstream.status,
     );
   }
@@ -310,7 +313,7 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     .filter((b) => b.type === 'text' && typeof b.text === 'string')
     .map((b) => b.text as string)
     .join('');
-  if (!text) return json({ error: 'Anthropic response had no text content' }, 502);
+  if (!text) return apiError('EMPTY_TEXT', 'Anthropic response had no text content', 502);
   return json({ text });
 }
 
@@ -354,6 +357,25 @@ function json(payload: unknown, status = 200): Response {
   });
 }
 
+type ErrorCode =
+  | 'METHOD_NOT_ALLOWED'
+  | 'UNAUTHORIZED'
+  | 'RATE_LIMITED'
+  | 'NOT_FOUND'
+  | 'MODEL_NOT_ALLOWED'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'INVALID_AUDIO'
+  | 'EMPTY_AUDIO'
+  | 'INVALID_JSON'
+  | 'MISSING_FIELDS'
+  | 'MISSING_API_KEY'
+  | 'EMPTY_TEXT'
+  | 'UPSTREAM_FAILED';
+
+function apiError(code: ErrorCode, error: string, status: number): Response {
+  return json({ code, error }, status);
+}
+
 async function safeText(res: Response): Promise<string> {
   try {
     return await res.text();
@@ -384,10 +406,14 @@ async function sha256Hex(input: string): Promise<string> {
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // Both inputs are SHA-256 hex (64 chars). Iterate a fixed length so an
+  // attacker probing length differences sees the same wall-clock cost.
+  const FIXED_LEN = 64;
+  let mismatch = a.length ^ b.length;
+  for (let i = 0; i < FIXED_LEN; i += 1) {
+    const ca = i < a.length ? a.charCodeAt(i) : 0;
+    const cb = i < b.length ? b.charCodeAt(i) : 0;
+    mismatch |= ca ^ cb;
   }
   return mismatch === 0;
 }
