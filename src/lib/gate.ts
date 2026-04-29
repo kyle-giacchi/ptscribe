@@ -8,7 +8,6 @@
  * value the API client sends as that header.
  */
 
-// SHA-256 of "112233". Keep the plaintext OUT of source.
 const GATE_HASH = 'e0bc60c82713f64ef8a57c0c40d02ce24fd0141d5cc3086259c19b1e62a62bea';
 
 const STORAGE_KEY = 'ptnotes.gate';
@@ -19,18 +18,23 @@ export async function checkGateCode(code: string): Promise<boolean> {
   return timingSafeEqualHex(hash, GATE_HASH);
 }
 
-export function getStoredGateCode(): string | null {
+export function checkStoredGateHash(hash: string): boolean {
+  return timingSafeEqualHex(hash, GATE_HASH);
+}
+
+export function getStoredGateHash(): string | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw && /^\d{6}$/.test(raw) ? raw : null;
+    return raw && /^[0-9a-f]{64}$/.test(raw) ? raw : null;
   } catch {
     return null;
   }
 }
 
-export function storeGateCode(code: string): void {
+export async function storeGateCode(code: string): Promise<void> {
   try {
-    localStorage.setItem(STORAGE_KEY, code);
+    const hash = await sha256Hex(code);
+    localStorage.setItem(STORAGE_KEY, hash);
   } catch {
     /* ignore — gate prompts again next reload */
   }
