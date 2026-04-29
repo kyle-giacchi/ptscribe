@@ -1,10 +1,18 @@
+import { argon2id } from 'hash-wasm';
+
 export const VAULT_VERSION = 1;
-export const PBKDF2_ITERATIONS = 600_000;
-export const PBKDF2_HASH = 'SHA-256' as const;
 export const AES_KEY_BITS = 256;
 export const SALT_BYTES = 16;
 export const IV_BYTES = 12;
 export const PASSPHRASE_MIN_CHARS = 12;
+
+// Argon2id parameters. OWASP "moderate" defaults for interactive auth:
+// 64 MiB memory, t=3 iterations, p=1 parallelism, 32-byte output.
+// Memory dominates cost — far harder to brute-force on GPUs/ASICs than PBKDF2.
+export const ARGON2_MEMORY_KIB = 64 * 1024;
+export const ARGON2_ITERATIONS = 3;
+export const ARGON2_PARALLELISM = 1;
+export const ARGON2_HASH_LENGTH = 32;
 
 const subtle = (): SubtleCrypto => {
   const c = (globalThis as unknown as { crypto?: Crypto }).crypto;
@@ -34,21 +42,18 @@ export function base64ToBytes(b64: string): Uint8Array {
 }
 
 export async function deriveKek(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
-  const baseKey = await subtle().importKey(
+  const raw = await argon2id({
+    password: passphrase,
+    salt,
+    parallelism: ARGON2_PARALLELISM,
+    iterations: ARGON2_ITERATIONS,
+    memorySize: ARGON2_MEMORY_KIB,
+    hashLength: ARGON2_HASH_LENGTH,
+    outputType: 'binary',
+  });
+  return subtle().importKey(
     'raw',
-    new TextEncoder().encode(passphrase),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey'],
-  );
-  return subtle().deriveKey(
-    {
-      name: 'PBKDF2',
-      hash: PBKDF2_HASH,
-      iterations: PBKDF2_ITERATIONS,
-      salt: salt as BufferSource,
-    },
-    baseKey,
+    raw as BufferSource,
     { name: 'AES-GCM', length: AES_KEY_BITS },
     false,
     ['wrapKey', 'unwrapKey'],

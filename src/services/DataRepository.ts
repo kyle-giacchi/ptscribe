@@ -16,6 +16,14 @@ function looksLikeEnvelope(raw: string): boolean {
   }
 }
 
+function quarantineCorrupt(raw: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.appDataCorrupt, raw);
+  } catch {
+    // If we can't quarantine (e.g. quota), just log — don't throw.
+  }
+}
+
 /**
  * Persistence boundary for `AppData`. When the vault is unlocked, every
  * read/write here round-trips through AES-GCM — callers always see plaintext.
@@ -40,16 +48,21 @@ export const dataRepository = {
       const result = AppDataSchema.safeParse(migrated);
       if (!result.success) {
         console.error('AppData failed schema validation', result.error);
+        quarantineCorrupt(raw);
         return null;
       }
       return result.data;
     } catch (e) {
       console.error('Failed to load AppData', e);
+      quarantineCorrupt(raw);
       return null;
     }
   },
 
   async save(data: AppData): Promise<void> {
+    if (vault.isTwoTabConflict()) {
+      throw new Error('vault: open in another tab — save blocked to prevent plaintext overwriting encrypted data');
+    }
     const json = JSON.stringify(data);
     // AES-GCM + base64 adds ~37% overhead; cap plaintext to keep the
     // encrypted envelope safely under the 5 MB safeStorage guard.
@@ -62,5 +75,13 @@ export const dataRepository = {
 
   clear(): void {
     safeLocalStorage.removeItem(STORAGE_KEYS.appData);
+  },
+
+  hasCorruptData(): boolean {
+    return safeLocalStorage.getItem(STORAGE_KEYS.appDataCorrupt) !== null;
+  },
+
+  clearCorruptData(): void {
+    safeLocalStorage.removeItem(STORAGE_KEYS.appDataCorrupt);
   },
 };

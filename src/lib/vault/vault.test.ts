@@ -31,7 +31,10 @@ describe('vault.setup', () => {
     expect(vault.isUnlocked()).toBe(true);
     const env = JSON.parse(localStorage.getItem(STORAGE_KEYS.vault) ?? 'null');
     expect(env.v).toBe(1);
-    expect(env.kdf.iterations).toBe(600_000);
+    expect(env.kdf.name).toBe('Argon2id');
+    expect(env.kdf.memoryKib).toBeGreaterThanOrEqual(64 * 1024);
+    expect(env.kdf.iterations).toBeGreaterThanOrEqual(3);
+    expect(env.kdf.parallelism).toBeGreaterThanOrEqual(1);
     expect(typeof env.kdf.salt).toBe('string');
     expect(typeof env.wrappedDek.iv).toBe('string');
     expect(typeof env.wrappedDek.ciphertext).toBe('string');
