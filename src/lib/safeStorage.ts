@@ -1,4 +1,7 @@
-export const MAX_OBJECT_BYTES = 5 * 1024 * 1024; // 5 MB
+// 5 MB cap on the stored (post-encryption) value. For vault-encrypted AppData,
+// DataRepository.save() pre-checks the plaintext at 3.5 MB so the encrypted
+// envelope (~4.8 MB) stays safely under this limit.
+export const MAX_OBJECT_BYTES = 5 * 1024 * 1024;
 
 function isAvailable(): boolean {
   try {

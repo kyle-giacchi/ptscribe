@@ -47,7 +47,8 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   }
 
   const gate = request.headers.get('x-ptscribe-key') ?? '';
-  if (!env.PTSCRIBE_GATE || !timingSafeEqual(gate, env.PTSCRIBE_GATE)) {
+  const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
+  if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
     return json({ error: 'Unauthorized' }, 401);
   }
 
@@ -302,6 +303,14 @@ function bytesToBase64(bytes: Uint8Array): string {
     );
   }
   return btoa(binary);
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
