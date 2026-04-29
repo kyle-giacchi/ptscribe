@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CheckCircle2, Clock, Loader2, Trash2, XCircle } from 'lucide-react';
 import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { formatDuration, wordCount } from '@/utils/format';
@@ -46,6 +47,8 @@ function ClipRow({
   recordingDisabled: boolean;
   onDelete: () => void;
 }) {
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const blocked = recordingDisabled || clip.status === 'transcribing';
   const showWaveform =
     clip.status === 'ready' ||
     clip.status === 'transcribing' ||
@@ -96,25 +99,48 @@ function ClipRow({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          aria-label="Delete clip"
-          onClick={onDelete}
-          disabled={recordingDisabled || clip.status === 'transcribing'}
-          className="transition-colors hover:bg-[var(--color-pt-surface-mut)] disabled:opacity-40"
-          style={{
-            padding: 6,
-            borderRadius: 6,
-            border: '1px solid var(--color-pt-border)',
-            background: 'var(--color-pt-surface)',
-            color: 'var(--color-pt-red)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            cursor: recordingDisabled || clip.status === 'transcribing' ? 'not-allowed' : 'pointer',
-          }}
-        >
-          <Trash2 size={12} strokeWidth={2} />
-        </button>
+        {pendingDelete ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              className="btn btn-ghost py-0.5 text-xs"
+              onClick={() => setPendingDelete(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost py-0.5 text-xs"
+              style={{ color: 'var(--color-negative)' }}
+              onClick={() => {
+                setPendingDelete(false);
+                onDelete();
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            aria-label="Delete clip"
+            onClick={() => setPendingDelete(true)}
+            disabled={blocked}
+            className="transition-colors hover:bg-[var(--color-pt-surface-mut)] disabled:opacity-40"
+            style={{
+              padding: 6,
+              borderRadius: 6,
+              border: '1px solid var(--color-pt-border)',
+              background: 'var(--color-pt-surface)',
+              color: 'var(--color-pt-red)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              cursor: blocked ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <Trash2 size={12} strokeWidth={2} />
+          </button>
+        )}
       </div>
       {showWaveform && (
         <div className="mt-2">
