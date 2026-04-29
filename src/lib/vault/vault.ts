@@ -1,5 +1,8 @@
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import {
+  ARGON2_ITERATIONS,
+  ARGON2_MEMORY_KIB,
+  ARGON2_PARALLELISM,
   base64ToBytes,
   bytesToBase64,
   decryptBytes,
@@ -8,8 +11,6 @@ import {
   generateDek,
   IV_BYTES,
   PASSPHRASE_MIN_CHARS,
-  PBKDF2_HASH,
-  PBKDF2_ITERATIONS,
   randomBytes,
   SALT_BYTES,
   unwrapDek,
@@ -19,7 +20,13 @@ import {
 
 interface VaultEnvelope {
   v: 1;
-  kdf: { name: 'PBKDF2'; hash: 'SHA-256'; iterations: number; salt: string };
+  kdf: {
+    name: 'Argon2id';
+    memoryKib: number;
+    iterations: number;
+    parallelism: number;
+    salt: string;
+  };
   wrappedDek: { iv: string; ciphertext: string };
 }
 
@@ -32,6 +39,39 @@ interface DataEnvelope {
 export type UnlockResult = { ok: true } | { ok: false; reason: 'bad_passphrase' | 'corrupt' };
 
 let dek: CryptoKey | null = null;
+
+// ── Two-tab conflict detection ────────────────────────────────────────────────
+// If another tab has the vault unlocked while we don't, our saves would write
+// plaintext over encrypted data. BroadcastChannel lets tabs coordinate.
+
+type VaultMsg = { type: 'vault:unlocked' } | { type: 'vault:locked' } | { type: 'vault:query' };
+type ConflictHandler = (conflicted: boolean) => void;
+
+let otherTabHasVault = false;
+const conflictHandlers = new Set<ConflictHandler>();
+let bc: BroadcastChannel | null = null;
+
+function notifyConflict(conflicted: boolean): void {
+  conflictHandlers.forEach((h) => h(conflicted));
+}
+
+if (typeof BroadcastChannel !== 'undefined') {
+  bc = new BroadcastChannel('ptnotes-vault');
+  bc.onmessage = (e: MessageEvent<VaultMsg>) => {
+    if (e.data.type === 'vault:unlocked') {
+      otherTabHasVault = true;
+      if (dek === null) notifyConflict(true);
+    } else if (e.data.type === 'vault:locked') {
+      otherTabHasVault = false;
+      notifyConflict(false);
+    } else if (e.data.type === 'vault:query') {
+      if (dek !== null) bc?.postMessage({ type: 'vault:unlocked' });
+    }
+  };
+  // Ask existing tabs if they already have the vault open
+  bc.postMessage({ type: 'vault:query' });
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function readEnvelope(): VaultEnvelope | null {
   try {
@@ -77,9 +117,10 @@ export const vault = {
     writeEnvelope({
       v: VAULT_VERSION,
       kdf: {
-        name: 'PBKDF2',
-        hash: PBKDF2_HASH,
-        iterations: PBKDF2_ITERATIONS,
+        name: 'Argon2id',
+        memoryKib: ARGON2_MEMORY_KIB,
+        iterations: ARGON2_ITERATIONS,
+        parallelism: ARGON2_PARALLELISM,
         salt: bytesToBase64(salt),
       },
       wrappedDek: {
@@ -88,6 +129,7 @@ export const vault = {
       },
     });
     dek = newDek;
+    bc?.postMessage({ type: 'vault:unlocked' });
   },
 
   async unlock(passphrase: string): Promise<UnlockResult> {
@@ -106,6 +148,7 @@ export const vault = {
     try {
       const kek = await deriveKek(passphrase, salt);
       dek = await unwrapDek({ iv, ciphertext }, kek);
+      bc?.postMessage({ type: 'vault:unlocked' });
       return { ok: true };
     } catch {
       dek = null;
@@ -115,6 +158,8 @@ export const vault = {
 
   lock(): void {
     dek = null;
+    bc?.postMessage({ type: 'vault:locked' });
+    otherTabHasVault = false;
   },
 
   async encryptUtf8(plaintext: string): Promise<string> {
@@ -155,5 +200,14 @@ export const vault = {
     const buf = await blob.arrayBuffer();
     const plain = await decryptBytes(buf, key);
     return new Blob([plain], { type: mimeType });
+  },
+
+  isTwoTabConflict(): boolean {
+    return otherTabHasVault && dek === null;
+  },
+
+  onConflictChange(handler: ConflictHandler): () => void {
+    conflictHandlers.add(handler);
+    return () => conflictHandlers.delete(handler);
   },
 };

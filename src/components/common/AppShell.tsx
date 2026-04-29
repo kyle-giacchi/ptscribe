@@ -16,7 +16,7 @@ export function AppShell() {
 
   return (
     <div
-      className="h-screen w-screen overflow-hidden md:p-3.5"
+      className="h-[100dvh] w-[100dvw] overflow-hidden md:p-3.5"
       style={{ background: 'var(--color-pt-bg)' }}
     >
       <div
@@ -35,7 +35,12 @@ export function AppShell() {
           <TopBar onMenuOpen={() => setSidebarOpen(true)} />
           <main
             className="overflow-auto"
-            style={{ background: 'var(--color-pt-surface-alt)' }}
+            style={{
+              background: 'var(--color-pt-surface-alt)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              paddingLeft: 'env(safe-area-inset-left)',
+              paddingRight: 'env(safe-area-inset-right)',
+            }}
           >
             <AnimatePresence mode="wait" initial={false}>
               <motion.div

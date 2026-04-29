@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppDataProvider } from '@/contexts/AppDataProvider';
 import { ClinicianProvider } from '@/contexts/ClinicianProvider';
@@ -14,16 +15,35 @@ import { AppGate } from '@/components/common/AppGate';
 import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
 import { Setup } from '@/pages/Setup';
-import { Dashboard } from '@/pages/Dashboard';
-import { Patients } from '@/pages/Patients';
-import { PatientDetail } from '@/pages/PatientDetail';
-import { NewSession } from '@/pages/NewSession';
-import { SessionPage } from '@/pages/Session';
-import { Notes } from '@/pages/Notes';
-import { Templates } from '@/pages/Templates';
-import { Exercises } from '@/pages/Exercises';
-import { Settings } from '@/pages/Settings';
 import { Login } from '@/pages/Login';
+
+const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })));
+const Patients = lazy(() => import('@/pages/Patients').then((m) => ({ default: m.Patients })));
+const PatientDetail = lazy(() =>
+  import('@/pages/PatientDetail').then((m) => ({ default: m.PatientDetail })),
+);
+const NewSession = lazy(() =>
+  import('@/pages/NewSession').then((m) => ({ default: m.NewSession })),
+);
+const SessionPage = lazy(() =>
+  import('@/pages/Session').then((m) => ({ default: m.SessionPage })),
+);
+const Notes = lazy(() => import('@/pages/Notes').then((m) => ({ default: m.Notes })));
+const Templates = lazy(() =>
+  import('@/pages/Templates').then((m) => ({ default: m.Templates })),
+);
+const Exercises = lazy(() =>
+  import('@/pages/Exercises').then((m) => ({ default: m.Exercises })),
+);
+const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
+
+function PageLoader() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-slate-300" />
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -46,20 +66,31 @@ export default function App() {
                                 <SettingsProvider>
                                   <DemoBootstrap>
                                     <FirstRunGuard>
-                                      <Routes>
-                                        <Route path="/setup" element={<Setup />} />
-                                        <Route element={<AppShell />}>
-                                          <Route index element={<Dashboard />} />
-                                          <Route path="/patients" element={<Patients />} />
-                                          <Route path="/patients/:id" element={<PatientDetail />} />
-                                          <Route path="/sessions/new" element={<NewSession />} />
-                                          <Route path="/sessions/:id" element={<SessionPage />} />
-                                          <Route path="/notes" element={<Notes />} />
-                                          <Route path="/templates" element={<Templates />} />
-                                          <Route path="/exercises" element={<Exercises />} />
-                                          <Route path="/settings" element={<Settings />} />
-                                        </Route>
-                                      </Routes>
+                                      <Suspense fallback={<PageLoader />}>
+                                        <Routes>
+                                          <Route path="/setup" element={<Setup />} />
+                                          <Route element={<AppShell />}>
+                                            <Route index element={<Dashboard />} />
+                                            <Route path="/patients" element={<Patients />} />
+                                            <Route
+                                              path="/patients/:id"
+                                              element={<PatientDetail />}
+                                            />
+                                            <Route
+                                              path="/sessions/new"
+                                              element={<NewSession />}
+                                            />
+                                            <Route
+                                              path="/sessions/:id"
+                                              element={<SessionPage />}
+                                            />
+                                            <Route path="/notes" element={<Notes />} />
+                                            <Route path="/templates" element={<Templates />} />
+                                            <Route path="/exercises" element={<Exercises />} />
+                                            <Route path="/settings" element={<Settings />} />
+                                          </Route>
+                                        </Routes>
+                                      </Suspense>
                                     </FirstRunGuard>
                                   </DemoBootstrap>
                                 </SettingsProvider>

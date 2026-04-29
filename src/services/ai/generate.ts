@@ -58,7 +58,7 @@ export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNote
  * Pull the first JSON object out of the model's reply. Models occasionally
  * wrap JSON in markdown fences or add a leading sentence; this is forgiving.
  */
-function extractJson(text: string): Record<string, unknown> {
+export function extractJson(text: string): Record<string, unknown> {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = fenced ? fenced[1] : text;
   const start = candidate.indexOf('{');
