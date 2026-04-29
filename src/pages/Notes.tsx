@@ -13,6 +13,7 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { relativeFromNow } from '@/utils/dates';
+import { shortLabelForType } from '@/utils/labels';
 
 type StatusFilter = 'all' | 'draft' | 'finalized';
 
@@ -152,7 +153,7 @@ export function Notes() {
                       }}
                     >
                       {note.format.toUpperCase()}
-                      {session ? ` · ${labelForType(session.type)}` : ''}
+                      {session ? ` · ${shortLabelForType(session.type)}` : ''}
                     </div>
                   </div>
                   <div
@@ -213,18 +214,6 @@ function noteTone(
   return 'next';
 }
 
-function labelForType(t: string): string {
-  switch (t) {
-    case 'evaluation':
-      return 'Eval';
-    case 'progress':
-      return 'Progress';
-    case 'discharge':
-      return 'Discharge';
-    default:
-      return 'Follow-up';
-  }
-}
 
 function snippet(text?: string): string {
   if (!text) return '';
