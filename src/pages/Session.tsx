@@ -14,6 +14,7 @@ import {
   Download,
   FileText,
   AlertTriangle,
+  Info,
   RefreshCw,
   Layers,
   XCircle,
@@ -25,7 +26,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Field, Select } from '@/components/ui/Field';
+import { Field, Select, TextInput } from '@/components/ui/Field';
 import {
   MicStatusPill,
   PtButton,
@@ -65,6 +66,7 @@ import type {
   Patient,
   Session,
   SessionClip,
+  TranscriptSource,
   TranscriptionProvider,
 } from '@/types';
 import { useActionGuard, MAX_TRANSCRIBES_PER_SESSION, MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
@@ -186,13 +188,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setError(null);
     if (!session) return;
 
-    if (settings.ai.transcription.provider === 'webspeech' && !live.supported) {
-      toast.error(
-        "This browser doesn't support live transcription. Switch transcription to Cloudflare in Settings before recording.",
-      );
-      return;
-    }
-
     const clipId = newId();
     const now = Date.now();
     activeClipIdRef.current = clipId;
@@ -217,7 +212,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    if (settings.ai.transcription.provider === 'webspeech' && live.supported) {
+    if (live.supported) {
       live.reset();
       live.start();
     }
@@ -229,9 +224,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       live.stop();
     } else if (recorder.status === 'paused') {
       recorder.resume();
-      if (settings.ai.transcription.provider === 'webspeech' && live.supported) {
-        live.start();
-      }
+      if (live.supported) live.start();
     }
   }
 
@@ -272,13 +265,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       }
     }
 
-    if (live.finalText.trim()) {
-      const merged = `${transcript} ${live.finalText}`.replace(/\s+/g, ' ').trim();
-      setTranscript(merged);
-      patchSession({ transcript: merged, transcriptSource: 'webspeech', status: 'draft' });
-    } else {
-      patchSession({ status: 'draft' });
+    if (clipId && live.finalText.trim()) {
+      patchClip(clipId, { liveTranscript: live.finalText.trim() });
     }
+    live.reset();
+    patchSession({ status: 'draft' });
   }
 
   // ── Audio upload ─────────────────────────────────────────────────────────
@@ -296,6 +287,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       { id: clipId, index: clips.length, durationSec: 0, status: 'pending', createdAt: now, updatedAt: now },
     ]);
 
+    const tid = toast.loading('Uploading file…', { duration: Infinity });
     try {
       const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'audio/mpeg' });
 
@@ -315,15 +307,41 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
       await audioRepository.save(clipId, blob);
       patchClip(clipId, { status: 'ready', durationSec });
-      toast.success(`Added "${file.name}"`);
+
+      const { provider } = settings.ai.transcription;
+      if (provider === 'cloudflare' || provider === 'local') {
+        toast.loading('Transcribing…', { id: tid, duration: Infinity });
+        patchClip(clipId, { status: 'transcribing', updatedAt: Date.now() });
+        const clipObj: SessionClip = {
+          id: clipId, index: session?.clips.length ?? 0, durationSec,
+          status: 'transcribing', createdAt: now, updatedAt: Date.now(),
+        };
+        const result = await transcribeClipBlob(clipObj);
+        if (result.ok) {
+          patchClip(clipId, {
+            status: 'transcribed', transcript: result.text,
+            transcriptedAt: Date.now(), errorMessage: undefined,
+          });
+          const prior = mergeClipTranscripts(session?.clips ?? []);
+          const merged = [prior, result.text.trim()].filter(Boolean).join('\n\n');
+          setTranscript(merged);
+          patchSession({ transcript: merged, transcriptSource: 'whisper' });
+          toast.success('Done.', { id: tid });
+        } else {
+          patchClip(clipId, { status: 'failed', errorMessage: result.error });
+          toast.error(`Transcription failed: ${result.error}`, { id: tid });
+        }
+      } else {
+        toast.success(`Added "${file.name}"`, { id: tid });
+      }
     } catch (e) {
       patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
-      toast.error(`Upload failed: ${(e as Error).message}`);
+      toast.error(`Upload failed: ${(e as Error).message}`, { id: tid });
     }
   }
 
   // ── Transcription ────────────────────────────────────────────────────────
-  async function transcribeClipBlob(clip: SessionClip): Promise<
+  async function transcribeClipBlob(clip: SessionClip, onProgress?: (msg: string) => void): Promise<
     | {
         ok: true;
         text: string;
@@ -376,6 +394,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         blob: blobToSend,
         provider: settings.ai.transcription.provider,
         model: settings.ai.transcription.model,
+        onProgress,
       });
       return { ok: true, text: result.text, trimReport, speedReport };
     } catch (e) {
@@ -574,6 +593,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     toast.success('Transcript re-merged from clips.');
   }
 
+  function handleRevertToLive() {
+    if (!session?.liveTranscript) return;
+    setTranscript(session.liveTranscript);
+    patchSession({ transcript: session.liveTranscript, transcriptSource: 'webspeech' });
+    toast.success('Reverted to live transcription.');
+  }
+
   // ── Note generation / lifecycle ──────────────────────────────────────────
   async function handleGenerate() {
     if (!template) return;
@@ -667,7 +693,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     navigate('/', { replace: true });
   }
 
-  // ── Recording complete — merge clips + navigate to transcription ─────────
+  // ── Recording complete — merge clips + compile live transcripts ──────────
   async function handleRecordingComplete() {
     const readyClips = sortedClips.filter(
       (c) => c.status === 'ready' || c.status === 'transcribed',
@@ -685,6 +711,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         setIsMerging(false);
       }
     }
+
+    const liveTexts = sortedClips
+      .filter((c) => c.liveTranscript?.trim())
+      .map((c) => c.liveTranscript!.trim());
+    if (liveTexts.length > 0) {
+      const merged = liveTexts.join('\n\n');
+      setTranscript(merged);
+      patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
+    }
+
     openSection('transcription');
   }
 
@@ -807,6 +843,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         >
           <TranscriptPanel
             transcript={transcript}
+            transcriptSource={session.transcriptSource}
+            liveTranscript={session.liveTranscript}
             clips={sortedClips}
             canRemerge={hasTranscribedClip}
             canTranscribe={hasReadyClip && !isRecording && settings.ai.transcription.provider === 'cloudflare'}
@@ -822,6 +860,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             }
             onRemerge={handleRemergeFromClips}
             onCreateTranscript={handleCreateTranscript}
+            onRevertToLive={handleRevertToLive}
           />
         </AccordionSection>
 
@@ -1145,6 +1184,143 @@ function RecordingPanel({
   );
 }
 
+function SilenceParams() {
+  const { settings, updateAudio } = useSettings();
+  const sd = settings.audio.silenceDetection;
+  return (
+    <div
+      className="rounded-md border px-3 py-2"
+      style={{ borderColor: 'var(--color-pt-border)', background: 'var(--color-pt-surface)' }}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sd.enabled}
+            onChange={(e) => updateAudio({ silenceDetection: { ...sd, enabled: e.target.checked } })}
+          />
+          <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
+            Silence trimming
+          </span>
+        </label>
+
+        <span
+          title={
+            'Silence trimming removes quiet gaps from your audio before it is sent for transcription. ' +
+            'The original recording is never changed — only the copy uploaded to Whisper is affected.\n\n' +
+            'Sensitivity controls how aggressively silence is detected:\n' +
+            '  • Aggressive — drops more audio; best when there are long dead-air gaps between speakers.\n' +
+            '  • Balanced — recommended for most PT sessions; skips obvious pauses while keeping natural speech rhythm.\n' +
+            '  • Relaxed — only drops very long, obvious silences; safest if you are unsure.\n\n' +
+            'Pad (ms) adds a buffer of audio kept before and after each spoken segment so words at the edges are not clipped. ' +
+            'Increase this if the transcript is cutting off the beginnings or ends of sentences (try 400–600 ms).'
+          }
+          className="cursor-help"
+          style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
+        >
+          <Info size={13} />
+        </span>
+
+        {sd.enabled && (
+          <>
+            <label className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Sensitivity</span>
+              <Select
+                value={sd.sensitivity}
+                className="py-0 text-xs h-7"
+                onChange={(e) =>
+                  updateAudio({
+                    silenceDetection: {
+                      ...sd,
+                      sensitivity: e.target.value as 'low' | 'medium' | 'high',
+                    },
+                  })
+                }
+              >
+                <option value="low">Aggressive</option>
+                <option value="medium">Balanced</option>
+                <option value="high">Relaxed</option>
+              </Select>
+            </label>
+
+            <label className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Pad (ms)</span>
+              <TextInput
+                type="number"
+                min={0}
+                max={2000}
+                step={50}
+                value={String(sd.padMs)}
+                className="w-20 py-0 text-xs h-7"
+                onChange={(e) => {
+                  const n = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
+                  updateAudio({ silenceDetection: { ...sd, padMs: n } });
+                }}
+              />
+            </label>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpeedParams() {
+  const { settings, updateAudio } = useSettings();
+  const su = settings.audio.speedUp;
+  return (
+    <div
+      className="rounded-md border px-3 py-2"
+      style={{ borderColor: 'var(--color-pt-border)', background: 'var(--color-pt-surface)' }}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={su.enabled}
+            onChange={(e) => updateAudio({ speedUp: { ...su, enabled: e.target.checked } })}
+          />
+          <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
+            Speed up
+          </span>
+        </label>
+
+        <span
+          title={
+            'Speed up compresses playback time by removing inter-word gaps and shortening pauses. ' +
+            'The original recording is never changed — only the processed copy is affected.\n\n' +
+            'Speed factor controls how much faster the audio plays:\n' +
+            '  • 1.25× — subtle; saves ~20% of playback time.\n' +
+            '  • 1.5× — recommended for most sessions; saves ~33%.\n' +
+            '  • 1.75× — aggressive; saves ~43%; may feel rushed.'
+          }
+          className="cursor-help"
+          style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
+        >
+          <Info size={13} />
+        </span>
+
+        {su.enabled && (
+          <label className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Speed</span>
+            <Select
+              value={String(su.speed)}
+              className="py-0 text-xs h-7"
+              onChange={(e) =>
+                updateAudio({ speedUp: { ...su, speed: Number(e.target.value) as 1.25 | 1.5 | 1.75 } })
+              }
+            >
+              <option value="1.25">1.25× — subtle</option>
+              <option value="1.5">1.5× — recommended</option>
+              <option value="1.75">1.75× — aggressive</option>
+            </Select>
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RecordingControlRow({
   idle,
   paused,
@@ -1389,7 +1565,7 @@ function CreateTranscriptButton({
 }) {
   const title = disabled
     ? `Per-session limit reached (${used}/${cap}). Reload to reset.`
-    : `Transcribes saved clips and merges into the transcript (${used}/${cap} used).`;
+    : `Transcribes clips with Nova3 AI and replaces the transcript (${used}/${cap} used).`;
   return (
     <button
       type="button"
@@ -1404,7 +1580,7 @@ function CreateTranscriptButton({
         </>
       ) : (
         <>
-          <FileText size={14} strokeWidth={2} /> Create transcript
+          <Sparkles size={14} strokeWidth={2} /> Generate with AI
           <span className="ml-1 text-[10px] tabular-nums opacity-60">
             {used}/{cap}
           </span>
@@ -1543,6 +1719,8 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
           }
         </AudioTrackRow>
 
+        <SilenceParams />
+
         <AudioTrackRow label="Silence Removed" savedSec={activeSilenced?.savedSec}>
           {activeSilenced ? (
             <div className="space-y-1.5">
@@ -1588,10 +1766,12 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
           )}
         </AudioTrackRow>
 
+        <SpeedParams />
+
         <AudioTrackRow
           label={speedLabel}
           savedSec={activeSpedup?.savedSec}
-          note={!activeSilenced ? 'Compile silence removed first' : undefined}
+          note={!activeSilenced ? 'Uses full audio (no silence-removed clip)' : undefined}
         >
           {activeSpedup ? (
             <div className="space-y-1.5">
@@ -1617,7 +1797,7 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
               <button
                 type="button"
                 className="btn btn-secondary text-xs"
-                disabled={compilingSpeed || !activeSilenced}
+                disabled={compilingSpeed}
                 onClick={() => void compileSpeed()}
               >
                 {compilingSpeed ? (
@@ -1661,7 +1841,7 @@ function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
         </span>
       )}
       <p className="mt-1 text-[10px]" style={{ color: 'var(--color-fg-subtle)' }}>
-        Stops will append to the transcript automatically.
+        Saved per clip — combined into the transcript when you click Recording Complete.
       </p>
     </div>
   );
@@ -1671,6 +1851,8 @@ function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
 
 function TranscriptPanel({
   transcript,
+  transcriptSource,
+  liveTranscript,
   clips,
   canRemerge,
   canTranscribe,
@@ -1681,8 +1863,11 @@ function TranscriptPanel({
   onCommit,
   onRemerge,
   onCreateTranscript,
+  onRevertToLive,
 }: {
   transcript: string;
+  transcriptSource?: TranscriptSource;
+  liveTranscript?: string;
   clips: SessionClip[];
   canRemerge: boolean;
   canTranscribe: boolean;
@@ -1693,6 +1878,7 @@ function TranscriptPanel({
   onCommit: () => void;
   onRemerge: () => void;
   onCreateTranscript: (clipId?: string) => void;
+  onRevertToLive: () => void;
 }) {
   const transcribableClips = clips.filter(
     (c) => c.status === 'ready' || c.status === 'failed',
@@ -1703,8 +1889,49 @@ function TranscriptPanel({
     ? selectedClipId
     : latestId;
 
+  const sourceLabel =
+    transcriptSource === 'webspeech'
+      ? 'Live Transcription'
+      : transcriptSource === 'whisper'
+        ? 'AI Transcription (Nova3)'
+        : transcriptSource === 'manual'
+          ? 'Manually Entered'
+          : null;
+  const canRevert = !!liveTranscript && transcriptSource !== 'webspeech';
+
   return (
     <div className="space-y-3">
+      {sourceLabel && (
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium"
+            style={{
+              background:
+                transcriptSource === 'webspeech'
+                  ? 'color-mix(in srgb, var(--color-info) 12%, transparent)'
+                  : 'var(--color-surface-2)',
+              color: 'var(--color-fg-muted)',
+            }}
+          >
+            {transcriptSource === 'webspeech' ? (
+              <Mic size={11} strokeWidth={2} />
+            ) : (
+              <Sparkles size={11} strokeWidth={2} />
+            )}
+            {sourceLabel}
+          </span>
+          {canRevert && (
+            <button
+              type="button"
+              className="btn btn-ghost py-0.5 text-xs"
+              onClick={onRevertToLive}
+              title="Replace current transcript with the live audio transcription"
+            >
+              <RefreshCw size={11} strokeWidth={2} /> Revert to live
+            </button>
+          )}
+        </div>
+      )}
       {(canTranscribe || canRemerge) && (
         <div className="flex flex-wrap items-center gap-2">
           {canTranscribe && (

@@ -201,21 +201,37 @@ export function Settings() {
                 }
               >
                 <option value="cloudflare">Cloudflare Workers AI (Nova-3 with diarization)</option>
+                <option value="local">Local Whisper (no API credits, first use downloads ~150 MB)</option>
                 <option value="webspeech">Browser live (Web Speech, no speaker labels)</option>
                 <option value="none">Off</option>
               </Select>
             </Field>
-            <Field label="Transcription model" hint="Cloudflare model ID">
-              <TextInput
-                placeholder="@cf/deepgram/nova-3"
-                value={settings.ai.transcription.model}
-                onChange={(e) =>
-                  updateAi({
-                    transcription: { ...settings.ai.transcription, model: e.target.value },
-                  })
-                }
-              />
-            </Field>
+            {settings.ai.transcription.provider === 'cloudflare' && (
+              <Field label="Transcription model" hint="Cloudflare model ID">
+                <TextInput
+                  placeholder="@cf/deepgram/nova-3"
+                  value={settings.ai.transcription.model}
+                  onChange={(e) =>
+                    updateAi({
+                      transcription: { ...settings.ai.transcription, model: e.target.value },
+                    })
+                  }
+                />
+              </Field>
+            )}
+            {settings.ai.transcription.provider === 'local' && (
+              <Field label="Local model" hint="HuggingFace model ID — tiny.en is fastest, base.en is more accurate">
+                <TextInput
+                  placeholder="onnx-community/whisper-tiny.en"
+                  value={settings.ai.transcription.model}
+                  onChange={(e) =>
+                    updateAi({
+                      transcription: { ...settings.ai.transcription, model: e.target.value },
+                    })
+                  }
+                />
+              </Field>
+            )}
           </div>
 
           <div
@@ -313,9 +329,9 @@ export function Settings() {
                       })
                     }
                   >
-                    <option value="low">Low — drop only obvious dead air</option>
-                    <option value="medium">Medium — recommended</option>
-                    <option value="high">High — drop near-silent breathing too</option>
+                    <option value="low">Aggressive — drops more silence</option>
+                    <option value="medium">Balanced — recommended</option>
+                    <option value="high">Relaxed — only obvious dead air</option>
                   </Select>
                 </Field>
 

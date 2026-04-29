@@ -1,11 +1,13 @@
 import type { TranscriptionProvider } from '@/types';
 import { transcribeWithCloudflare } from './client/cloudflare';
+import { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } from './client/localWhisper';
 
 export interface TranscribeArgs {
   blob: Blob;
   provider: TranscriptionProvider;
   model: string;
   signal?: AbortSignal;
+  onProgress?: (msg: string) => void;
 }
 
 export interface TranscribeResult {
@@ -21,6 +23,9 @@ export async function transcribe(args: TranscribeArgs): Promise<TranscribeResult
       signal: args.signal,
     });
     return { text: out.text, source: 'whisper' };
+  }
+  if (args.provider === 'local') {
+    return transcribeLocally(args.blob, args.model || LOCAL_WHISPER_DEFAULT_MODEL, args.onProgress);
   }
   if (args.provider === 'webspeech') {
     // Live web-speech transcription accumulates separately via the
