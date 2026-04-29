@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NonRealTimeVAD } from '@ricky0123/vad-web';
 import { findSpeechRanges } from './vad';
-import { findSpeechRangesML } from './vadML';
+import { findSpeechRangesML, __resetVadCacheForTests } from './vadML';
 import type { VadOptions } from './vad';
 
 vi.mock('@ricky0123/vad-web', () => ({
@@ -36,6 +36,8 @@ function makeOpts(overrides: Partial<VadOptions> = {}): VadOptions {
 }
 
 beforeEach(() => {
+  __resetVadCacheForTests();
+  vi.mocked(NonRealTimeVAD.new).mockReset();
   vi.mocked(NonRealTimeVAD.new).mockResolvedValue({
     run: () => makeSegments([]),
   } as unknown as NonRealTimeVAD);
@@ -88,5 +90,32 @@ describe('findSpeechRangesML', () => {
 
     expect(vi.mocked(findSpeechRanges)).toHaveBeenCalledWith(SAMPLES, SAMPLE_RATE, makeOpts());
     expect(result).toEqual([{ startSec: 0, endSec: 10 }]);
+  });
+
+  it('reuses a cached VAD instance for repeated calls with the same options', async () => {
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts());
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts());
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts());
+    expect(vi.mocked(NonRealTimeVAD.new)).toHaveBeenCalledTimes(1);
+  });
+
+  it('builds a separate VAD per (sensitivity, redemptionMs) tuple', async () => {
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts({ sensitivity: 'low' }));
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts({ sensitivity: 'high' }));
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts({ sensitivity: 'low' }));
+    expect(vi.mocked(NonRealTimeVAD.new)).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts a failed init from the cache so the next call retries', async () => {
+    vi.mocked(NonRealTimeVAD.new).mockRejectedValueOnce(new Error('WASM unavailable'));
+    await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts());
+
+    vi.mocked(NonRealTimeVAD.new).mockResolvedValueOnce({
+      run: () => makeSegments([{ start: 1000, end: 2000 }]),
+    } as unknown as NonRealTimeVAD);
+    const result = await findSpeechRangesML(SAMPLES, SAMPLE_RATE, makeOpts({ padMs: 0 }));
+
+    expect(vi.mocked(NonRealTimeVAD.new)).toHaveBeenCalledTimes(2);
+    expect(result).toEqual([{ startSec: 1, endSec: 2 }]);
   });
 });

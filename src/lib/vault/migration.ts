@@ -1,14 +1,10 @@
 import { vault } from './vault';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { audioRepository } from '@/services/AudioRepository';
-
-const WEBM_MAGIC = [0x1a, 0x45, 0xdf, 0xa3];
+import { isPlaintextAudio } from '@/lib/audio/sniff';
 
 export function isLikelyEncryptedAudio(buf: Uint8Array): boolean {
-  for (let i = 0; i < WEBM_MAGIC.length; i += 1) {
-    if (buf[i] !== WEBM_MAGIC[i]) return true;
-  }
-  return false;
+  return !isPlaintextAudio(buf);
 }
 
 export interface MigrationResult {

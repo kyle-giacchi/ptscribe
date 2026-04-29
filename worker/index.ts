@@ -16,6 +16,7 @@ interface Env {
   ASSETS: Fetcher;
   ANTHROPIC_API_KEY: string;
   PTSCRIBE_GATE: string;
+  RATE_LIMIT?: KVNamespace;
 }
 
 interface GenerateBody {
@@ -28,6 +29,21 @@ interface GenerateBody {
 }
 
 const DEFAULT_TRANSCRIBE_MODEL = '@cf/deepgram/nova-3';
+
+const ALLOWED_TRANSCRIBE_MODELS = new Set([
+  '@cf/deepgram/nova-3',
+  '@cf/openai/whisper',
+  '@cf/openai/whisper-large-v3-turbo',
+  '@cf/openai/whisper-sherpa',
+]);
+
+const ALLOWED_GENERATE_MODELS = new Set([
+  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-6',
+  'claude-opus-4-7',
+]);
+
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -52,6 +68,12 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     return json({ error: 'Unauthorized' }, 401);
   }
 
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const rateLimitResult = await checkRateLimit(env, ip);
+  if (!rateLimitResult.allowed) {
+    return json({ error: 'Rate limit exceeded' }, 429);
+  }
+
   if (url.pathname === '/api/transcribe') return handleTranscribe(request, env);
   if (url.pathname === '/api/generate') return handleGenerate(request, env);
   return json({ error: 'Not found' }, 404);
@@ -63,9 +85,21 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     request.headers.get('x-ptscribe-model')?.trim() || DEFAULT_TRANSCRIBE_MODEL;
   const contentType = request.headers.get('Content-Type') || 'audio/webm';
 
+  if (!ALLOWED_TRANSCRIBE_MODELS.has(model)) {
+    return json({ error: `Model not allowed: ${model}` }, 400);
+  }
+
+  const contentLength = Number(request.headers.get('Content-Length') ?? NaN);
+  if (!isNaN(contentLength) && contentLength > MAX_AUDIO_BYTES) {
+    return json({ error: 'Payload too large' }, 413);
+  }
+
   let audio: Uint8Array;
   try {
     const buf = await request.arrayBuffer();
+    if (buf.byteLength > MAX_AUDIO_BYTES) {
+      return json({ error: 'Payload too large' }, 413);
+    }
     audio = new Uint8Array(buf);
   } catch {
     return json({ error: 'Failed to read audio body' }, 400);
@@ -234,6 +268,9 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   if (!body.model || !body.system || !body.user) {
     return json({ error: 'Missing model/system/user' }, 400);
   }
+  if (!ALLOWED_GENERATE_MODELS.has(body.model)) {
+    return json({ error: `Model not allowed: ${body.model}` }, 400);
+  }
 
   const cacheSystem = body.cacheSystem !== false;
   const systemBlocks = [
@@ -277,10 +314,43 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   return json({ text });
 }
 
+const RATE_LIMIT_PER_MIN = 10;
+const RATE_LIMIT_PER_DAY = 100;
+
+async function checkRateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
+  if (!env.RATE_LIMIT) return { allowed: true };
+
+  const now = Date.now();
+  const minuteKey = `rl:min:${ip}:${Math.floor(now / 60_000)}`;
+  const dayKey = `rl:day:${ip}:${Math.floor(now / 86_400_000)}`;
+
+  const [minRaw, dayRaw] = await Promise.all([
+    env.RATE_LIMIT.get(minuteKey),
+    env.RATE_LIMIT.get(dayKey),
+  ]);
+
+  const minCount = minRaw ? parseInt(minRaw, 10) : 0;
+  const dayCount = dayRaw ? parseInt(dayRaw, 10) : 0;
+
+  if (minCount >= RATE_LIMIT_PER_MIN || dayCount >= RATE_LIMIT_PER_DAY) {
+    return { allowed: false };
+  }
+
+  await Promise.all([
+    env.RATE_LIMIT.put(minuteKey, String(minCount + 1), { expirationTtl: 120 }),
+    env.RATE_LIMIT.put(dayKey, String(dayCount + 1), { expirationTtl: 172800 }),
+  ]);
+
+  return { allowed: true };
+}
+
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    },
   });
 }
 

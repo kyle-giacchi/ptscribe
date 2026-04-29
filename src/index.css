@@ -142,7 +142,7 @@ body {
       inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium;
+    @apply inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-sm font-medium;
     transition:
       background-color 120ms ease-out,
       color 120ms ease-out,

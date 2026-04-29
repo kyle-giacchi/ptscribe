@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  PBKDF2_ITERATIONS,
+  ARGON2_ITERATIONS,
+  ARGON2_MEMORY_KIB,
   IV_BYTES,
   SALT_BYTES,
   bytesToBase64,
@@ -40,8 +41,8 @@ describe('randomBytes', () => {
   });
 });
 
-describe('PBKDF2 derivation', () => {
-  it('uses 600k iterations and is deterministic for the same passphrase + salt', async () => {
+describe('Argon2id derivation', () => {
+  it('is deterministic for the same passphrase + salt', async () => {
     const salt = new Uint8Array(SALT_BYTES);
     const k1 = await deriveKek('correct horse battery staple', salt);
     const k2 = await deriveKek('correct horse battery staple', salt);
@@ -52,16 +53,20 @@ describe('PBKDF2 derivation', () => {
     const enc = await encryptBytes(probe.buffer, dek);
     const dec = await decryptBytes(enc, dek2);
     expect(new TextDecoder().decode(dec)).toBe('probe');
-    expect(PBKDF2_ITERATIONS).toBe(600_000);
+  });
+
+  it('uses memory-hard parameters (≥64 MiB, ≥3 iterations)', () => {
+    expect(ARGON2_MEMORY_KIB).toBeGreaterThanOrEqual(64 * 1024);
+    expect(ARGON2_ITERATIONS).toBeGreaterThanOrEqual(3);
   });
 
   it('different passphrase or salt yields a key that fails to unwrap', async () => {
     const salt1 = new Uint8Array(SALT_BYTES);
     const salt2 = new Uint8Array(SALT_BYTES);
     salt2[0] = 1;
-    const kekA = await deriveKek('alpha', salt1);
-    const kekB = await deriveKek('beta', salt1);
-    const kekC = await deriveKek('alpha', salt2);
+    const kekA = await deriveKek('alpha-passphrase', salt1);
+    const kekB = await deriveKek('beta-passphrase', salt1);
+    const kekC = await deriveKek('alpha-passphrase', salt2);
     const dek = await generateDek();
     const wrapped = await wrapDek(dek, kekA);
     await expect(unwrapDek(wrapped, kekB)).rejects.toThrow();

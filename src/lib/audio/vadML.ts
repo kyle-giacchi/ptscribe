@@ -7,25 +7,53 @@ const SENSITIVITY_THRESHOLDS = {
   high:   { positiveSpeechThreshold: 0.35, negativeSpeechThreshold: 0.2  },
 } as const;
 
+// Loading the Silero ONNX model + spinning up an ort wasm session is ~tens of
+// MB of allocations. Cache one instance per (sensitivity, redemptionMs) tuple
+// so repeated transcribes reuse the same session instead of paying that cost
+// each time. We cache the in-flight Promise so concurrent callers share one
+// initialization; failed initializations are evicted so the next call retries.
+const vadCache = new Map<string, Promise<NonRealTimeVAD>>();
+
+function cacheKey(sensitivity: VadOptions['sensitivity'], redemptionMs: number): string {
+  return `${sensitivity}:${redemptionMs}`;
+}
+
+async function getOrCreateVad(
+  sensitivity: VadOptions['sensitivity'],
+  redemptionMs: number,
+): Promise<NonRealTimeVAD> {
+  const key = cacheKey(sensitivity, redemptionMs);
+  const existing = vadCache.get(key);
+  if (existing) return existing;
+
+  const promise = NonRealTimeVAD.new({
+    ...SENSITIVITY_THRESHOLDS[sensitivity],
+    redemptionMs,
+    modelURL: '/silero_vad_legacy.onnx',
+    ortConfig: (ort) => {
+      // Non-threaded execution — no COOP/COEP headers required.
+      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.wasmPaths = '/';
+    },
+  });
+  vadCache.set(key, promise);
+  promise.catch(() => vadCache.delete(key));
+  return promise;
+}
+
+/** Test-only: drop the cached VAD instances so each test starts fresh. */
+export function __resetVadCacheForTests(): void {
+  vadCache.clear();
+}
+
 export async function findSpeechRangesML(
   samples: Float32Array,
   sampleRate: number,
   opts: VadOptions,
 ): Promise<SpeechRange[]> {
   try {
-    const thresholds = SENSITIVITY_THRESHOLDS[opts.sensitivity];
     const redemptionMs = Math.round(opts.minSilenceSec * 1000);
-
-    const vad = await NonRealTimeVAD.new({
-      ...thresholds,
-      redemptionMs,
-      modelURL: '/silero_vad_legacy.onnx',
-      ortConfig: (ort) => {
-        // Non-threaded execution — no COOP/COEP headers required.
-        ort.env.wasm.numThreads = 1;
-        ort.env.wasm.wasmPaths = '/';
-      },
-    });
+    const vad = await getOrCreateVad(opts.sensitivity, redemptionMs);
 
     const totalSec = samples.length / sampleRate;
     const runs: SpeechRange[] = [];

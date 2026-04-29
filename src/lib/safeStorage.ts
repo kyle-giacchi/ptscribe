@@ -38,7 +38,15 @@ export const safeLocalStorage = {
   setItem(key: string, value: string): void {
     if (!isAvailable()) return;
     validateObjectSize(value);
-    window.localStorage.setItem(key, value);
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (e) {
+      const name = (e as DOMException)?.name;
+      if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+        throw new Error('QuotaExceeded: localStorage is full');
+      }
+      throw e;
+    }
   },
   removeItem(key: string): void {
     if (!isAvailable()) return;

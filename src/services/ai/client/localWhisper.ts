@@ -19,7 +19,7 @@ const _pending = new Map<number, PendingEntry>();
 
 function getWorker(): Worker {
   if (_worker) return _worker;
-  _worker = new Worker(new URL('../../lib/audio/whisper.worker.ts', import.meta.url), { type: 'module' });
+  _worker = new Worker(new URL('../../../lib/audio/whisper.worker.ts', import.meta.url), { type: 'module' });
   _worker.onmessage = (e: MessageEvent<OutMsg>) => {
     const msg = e.data;
     const entry = _pending.get(msg.id);
