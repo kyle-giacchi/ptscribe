@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 6;
+export const APP_DATA_VERSION = 7;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -67,6 +67,7 @@ export interface SessionClip {
   durationSec: number;
   status: ClipStatus;
   transcript?: string;
+  liveTranscript?: string;
   transcriptedAt?: number;
   errorMessage?: string;
   createdAt: number;
@@ -82,6 +83,7 @@ export interface Session {
   status: SessionStatus;
   clips: SessionClip[];
   transcript?: string;
+  liveTranscript?: string;
   transcriptSource?: TranscriptSource;
   noteId?: ID;
   templateId?: ID;
@@ -247,7 +249,7 @@ export interface PlanOfCare {
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
-export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'none';
+export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'local' | 'none';
 export type GenerationProvider = 'anthropic' | 'none';
 export type DensityMode = 'cozy' | 'compact';
 
