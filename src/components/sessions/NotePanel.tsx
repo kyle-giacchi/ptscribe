@@ -1,14 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  Loader2,
-  Copy,
-  Download,
-  FileText,
-  Eye,
-  Sparkles,
-  XCircle,
-  AlertTriangle,
-} from 'lucide-react';
+import { Loader2, Copy, Download, FileText, Eye, Sparkles, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { Field, Select } from '@/components/ui/Field';
@@ -16,6 +7,7 @@ import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
+import { ConfirmBanner } from './ConfirmBanner';
 import type { Note, NoteSection, NoteTemplate, Patient } from '@/types';
 
 type Busy = null | 'transcribing' | 'generating';
@@ -63,7 +55,10 @@ function PromptModal({
     >
       <div
         className="flex max-h-[70vh] w-full max-w-lg flex-col rounded-xl shadow-xl"
-        style={{ background: 'var(--color-pt-surface)', border: '1px solid var(--color-pt-border)' }}
+        style={{
+          background: 'var(--color-pt-surface)',
+          border: '1px solid var(--color-pt-border)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -84,7 +79,7 @@ function PromptModal({
         </div>
         <div className="overflow-auto p-4">
           <pre
-            className="whitespace-pre-wrap text-xs leading-relaxed"
+            className="text-xs leading-relaxed whitespace-pre-wrap"
             style={{ color: 'var(--color-fg-muted)', fontFamily: 'var(--font-mono, monospace)' }}
           >
             {systemPrompt}
@@ -119,9 +114,7 @@ export function NotePanel({
     [];
 
   const generationLabel =
-    generationProvider === 'anthropic'
-      ? modelLabel('anthropic', generationModel)
-      : undefined;
+    generationProvider === 'anthropic' ? modelLabel('anthropic', generationModel) : undefined;
 
   return (
     <div className="space-y-3">
@@ -236,41 +229,15 @@ function NoteActions({
 
   if (pendingReplace) {
     return (
-      <div
-        className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
-        style={{
-          borderColor: 'var(--color-caution)',
-          background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
+      <ConfirmBanner
+        message="This will replace the existing note draft."
+        confirmLabel="Yes, replace"
+        onCancel={() => setPendingReplace(false)}
+        onConfirm={() => {
+          setPendingReplace(false);
+          onGenerate();
         }}
-      >
-        <AlertTriangle
-          size={13}
-          strokeWidth={2}
-          style={{ color: 'var(--color-caution)', flexShrink: 0 }}
-        />
-        <span style={{ color: 'var(--color-caution)' }}>
-          This will replace the existing note draft.
-        </span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            className="btn btn-ghost py-0.5 text-xs"
-            onClick={() => setPendingReplace(false)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary py-0.5 text-xs"
-            onClick={() => {
-              setPendingReplace(false);
-              onGenerate();
-            }}
-          >
-            Yes, replace
-          </button>
-        </div>
-      </div>
+      />
     );
   }
 
@@ -294,10 +261,7 @@ function NoteActions({
             </>
           )}
         </button>
-        <span
-          className="text-[10px] tabular-nums"
-          style={{ color: 'var(--color-fg-subtle)' }}
-        >
+        <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-fg-subtle)' }}>
           {generateUsed}/{generateCap}
         </span>
         {generationLabel && (
@@ -351,7 +315,7 @@ function NoteEditor({
         <div key={s.key} className="space-y-1">
           <div className="flex items-center justify-between">
             <div
-              className="text-xs font-medium uppercase tracking-wide"
+              className="text-xs font-medium tracking-wide uppercase"
               style={{ color: 'var(--color-fg-muted)' }}
             >
               {s.label}

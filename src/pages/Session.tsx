@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Loader2, LockOpen, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  LockOpen,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { MicStatusPill, PtButton, type MicState } from '@/components/design';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -24,18 +32,21 @@ import { WARN_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 import { newId } from '@/utils/ids';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import type { ClipStatus, Note, NoteFormat, NoteSection, Session, SessionClip } from '@/types';
-import { useActionGuard, MAX_TRANSCRIBES_PER_SESSION, MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
+import {
+  useActionGuard,
+  MAX_TRANSCRIBES_PER_SESSION,
+  MAX_GENERATES_PER_SESSION,
+} from '@/hooks/useActionGuard';
 import { useAccordionSections } from '@/hooks/useAccordionSections';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
-import { mergeClipTranscripts } from '@/utils/clips';
+import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
 import { AccordionSection } from '@/components/sessions/AccordionSection';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
 
 type Busy = null | 'transcribing' | 'generating';
-
 
 export function SessionPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -109,11 +120,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   useAudioRecovery(sessionId, session, patchClips);
 
-  const sortedClips = session
-    ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt)
-    : [];
+  const sortedClips = session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : [];
 
-  useAutoRotateClip(recorder.status, recorder.durationSec, handleStopRecording, handleStartRecording);
+  useAutoRotateClip(
+    recorder.status,
+    recorder.durationSec,
+    handleStopRecording,
+    handleStartRecording,
+  );
 
   if (!session || !patient) return <NotFound />;
 
@@ -247,7 +261,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     const now = Date.now();
     patchClips((clips) => [
       ...clips,
-      { id: clipId, index: clips.length, durationSec: 0, status: 'pending', createdAt: now, updatedAt: now },
+      {
+        id: clipId,
+        index: clips.length,
+        durationSec: 0,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
     ]);
 
     const tid = toast.loading('Uploading file…', { duration: Infinity });
@@ -263,10 +284,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             URL.revokeObjectURL(url);
             resolve(isFinite(audio.duration) ? audio.duration : 0);
           };
-          audio.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+          audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(0);
+          };
           audio.src = url;
         });
-      } catch { /* duration stays 0 */ }
+      } catch {
+        /* duration stays 0 */
+      }
 
       await audioRepository.save(clipId, blob);
       patchClip(clipId, { status: 'ready', durationSec });
@@ -274,7 +300,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       toast.success(`Added "${file.name}"`, { id: tid });
       runLocalTranscription(clipId, blob);
     } catch (e) {
-      patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
+      patchClips((clips) =>
+        clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
+      );
       toast.error(`Upload failed: ${(e as Error).message}`, { id: tid });
     }
   }
@@ -308,7 +336,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── Transcription ────────────────────────────────────────────────────────
-  async function transcribeClipBlob(clip: SessionClip, onProgress?: (msg: string) => void, useNova?: boolean): Promise<
+  async function transcribeClipBlob(
+    clip: SessionClip,
+    onProgress?: (msg: string) => void,
+    useNova?: boolean,
+  ): Promise<
     | {
         ok: true;
         text: string;
@@ -451,12 +483,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     }
 
     // Include locally-transcribed clips (localTranscript === transcript means nova hasn't run yet)
-    const pending = session.clips.filter(
-      (c) =>
-        (c.status === 'ready' ||
-          c.status === 'failed' ||
-          (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript)) &&
-        (clipId == null || c.id === clipId),
+    const pending = getTranscribableClips(session.clips).filter(
+      (c) => clipId == null || c.id === clipId,
     );
     const transcribed = session.clips.filter(
       (c) => c.status === 'transcribed' && !pending.some((p) => p.id === c.id),
@@ -568,7 +596,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     toast.success('Transcript re-merged from clips.');
   }
 
-
   // ── Note generation / lifecycle ──────────────────────────────────────────
   async function handleGenerate() {
     if (!template) return;
@@ -639,7 +666,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   async function handleDeleteSession() {
     if (isDemoMode() && session?.patientId === DEMO_PATIENT_ID) {
-      await Promise.all((session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})));
+      await Promise.all(
+        (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})),
+      );
       if (note) removeNote(note.id);
       patchSession({ clips: [], status: 'draft', transcript: undefined, noteId: undefined });
       setTranscript('');
@@ -648,7 +677,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       return;
     }
     if (note) removeNote(note.id);
-    await Promise.all((session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})));
+    await Promise.all(
+      (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})),
+    );
     removeSession(session!.id);
     navigate('/', { replace: true });
   }
@@ -661,9 +692,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (readyClips.length > 0) {
       setIsMerging(true);
       try {
-        const blobs = (
-          await Promise.all(readyClips.map((c) => audioRepository.load(c.id)))
-        ).filter((b): b is Blob => b !== null);
+        const blobs = (await Promise.all(readyClips.map((c) => audioRepository.load(c.id)))).filter(
+          (b): b is Blob => b !== null,
+        );
         if (blobs.length > 0) setMergedAudioBlob(await mergeAudioBlobs(blobs));
       } catch (e) {
         toast.error(`Could not combine clips: ${(e as Error).message}`);
@@ -715,12 +746,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
   const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
   // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
-  const novaEligible = !isRecording && sortedClips.some(
-    (c) =>
-      c.status === 'ready' ||
-      c.status === 'failed' ||
-      (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript),
-  );
+  const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
 
   // Collapsed-header summaries
   const clipSummary =
@@ -843,7 +869,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           meta={
             <div className="flex items-center gap-2">
               {busy === 'generating' && (
-                <Loader2 size={12} className="animate-spin" style={{ color: 'var(--color-fg-subtle)' }} />
+                <Loader2
+                  size={12}
+                  className="animate-spin"
+                  style={{ color: 'var(--color-fg-subtle)' }}
+                />
               )}
               {template && (
                 <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
@@ -857,9 +887,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     background: note?.finalized
                       ? 'color-mix(in oklab, var(--color-positive) 15%, transparent)'
                       : 'var(--color-pt-surface-alt)',
-                    color: note?.finalized
-                      ? 'var(--color-positive)'
-                      : 'var(--color-fg-muted)',
+                    color: note?.finalized ? 'var(--color-positive)' : 'var(--color-fg-muted)',
                     border: `1px solid ${note?.finalized ? 'var(--color-positive)' : 'var(--color-pt-border)'}`,
                   }}
                 >

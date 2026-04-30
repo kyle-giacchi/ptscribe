@@ -36,17 +36,14 @@ export function Sidebar({ onClose, className }: SidebarProps) {
   const pendingReviewCount = notes.filter((n) => !n.finalized).length;
 
   const items: Array<NavEntry & { badge?: Badge }> = [
-    { to: '/', label: 'Today', Icon: Calendar, end: true },
+    { to: '/today', label: 'Today', Icon: Calendar },
     { to: '/patients', label: 'Patients', Icon: Users },
     { to: '/sessions/new', label: 'Record Session', Icon: Mic },
     {
       to: '/notes',
       label: 'Review queue',
       Icon: CheckSquare,
-      badge:
-        pendingReviewCount > 0
-          ? { kind: 'count', value: pendingReviewCount }
-          : undefined,
+      badge: pendingReviewCount > 0 ? { kind: 'count', value: pendingReviewCount } : undefined,
     },
     { to: '/exercises', label: 'Exercise library', Icon: Dumbbell },
     { to: '/templates', label: 'Templates', Icon: ClipboardList },
@@ -103,10 +100,7 @@ export function Sidebar({ onClose, className }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav
-        className="flex flex-col"
-        style={{ padding: '4px 10px', gap: 2, overflowY: 'auto' }}
-      >
+      <nav className="flex flex-col" style={{ padding: '4px 10px', gap: 2, overflowY: 'auto' }}>
         {items.map((item) => (
           <NavItem key={item.to} {...item} onClose={onClose} />
         ))}
@@ -141,10 +135,7 @@ export function Sidebar({ onClose, className }: SidebarProps) {
           >
             {clinician.name || 'Clinician'}
           </div>
-          <div
-            className="truncate"
-            style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
-          >
+          <div className="truncate" style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
             {[clinician.credentials, clinician.practiceName].filter(Boolean).join(' · ') ||
               'PTScribe'}
           </div>

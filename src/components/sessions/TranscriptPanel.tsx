@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, Layers, Info, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Sparkles, Loader2, Layers, Info, RotateCcw } from 'lucide-react';
 import type { SessionClip } from '@/types';
+import { getTranscribableClips } from '@/utils/clips';
+import { ConfirmBanner } from './ConfirmBanner';
 
 function CreateTranscriptButton({
   busy,
@@ -37,10 +39,7 @@ function CreateTranscriptButton({
           </>
         )}
       </button>
-      <span
-        className="text-[10px] tabular-nums"
-        style={{ color: 'var(--color-fg-subtle)' }}
-      >
+      <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-fg-subtle)' }}>
         {used}/{cap}
       </span>
       <button
@@ -89,12 +88,7 @@ export function TranscriptPanel({
 }) {
   const [pendingOverwrite, setPendingOverwrite] = useState(false);
   const [pendingRemerge, setPendingRemerge] = useState(false);
-  const transcribableClips = clips.filter(
-    (c) =>
-      c.status === 'ready' ||
-      c.status === 'failed' ||
-      (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript),
-  );
+  const transcribableClips = getTranscribableClips(clips);
   const latestId = transcribableClips.at(-1)?.id ?? '';
   const [selectedClipId, setSelectedClipId] = useState(latestId);
   const activeClipId = transcribableClips.some((c) => c.id === selectedClipId)
@@ -119,81 +113,30 @@ export function TranscriptPanel({
     }
   }
 
-  const cautionBannerStyle = {
-    borderColor: 'var(--color-caution)',
-    background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
-  };
-
   const showActionRow = canTranscribe || canRemerge || hasLocalTranscript;
 
   return (
     <div className="space-y-3">
       {pendingOverwrite ? (
-        <div
-          className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
-          style={cautionBannerStyle}
-        >
-          <AlertTriangle
-            size={13}
-            strokeWidth={2}
-            style={{ color: 'var(--color-caution)', flexShrink: 0 }}
-          />
-          <span style={{ color: 'var(--color-caution)' }}>
-            This will replace your edited transcript.
-          </span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              className="btn btn-ghost py-0.5 text-xs"
-              onClick={() => setPendingOverwrite(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary py-0.5 text-xs"
-              onClick={() => {
-                setPendingOverwrite(false);
-                onCreateTranscript(transcribableClips.length > 1 ? activeClipId : undefined);
-              }}
-            >
-              Yes, replace
-            </button>
-          </div>
-        </div>
+        <ConfirmBanner
+          message="This will replace your edited transcript."
+          confirmLabel="Yes, replace"
+          onCancel={() => setPendingOverwrite(false)}
+          onConfirm={() => {
+            setPendingOverwrite(false);
+            onCreateTranscript(transcribableClips.length > 1 ? activeClipId : undefined);
+          }}
+        />
       ) : pendingRemerge ? (
-        <div
-          className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
-          style={cautionBannerStyle}
-        >
-          <AlertTriangle
-            size={13}
-            strokeWidth={2}
-            style={{ color: 'var(--color-caution)', flexShrink: 0 }}
-          />
-          <span style={{ color: 'var(--color-caution)' }}>
-            This will replace the current transcript.
-          </span>
-          <div className="ml-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              className="btn btn-ghost py-0.5 text-xs"
-              onClick={() => setPendingRemerge(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary py-0.5 text-xs"
-              onClick={() => {
-                setPendingRemerge(false);
-                onRemerge();
-              }}
-            >
-              Yes, replace
-            </button>
-          </div>
-        </div>
+        <ConfirmBanner
+          message="This will replace the current transcript."
+          confirmLabel="Yes, replace"
+          onCancel={() => setPendingRemerge(false)}
+          onConfirm={() => {
+            setPendingRemerge(false);
+            onRemerge();
+          }}
+        />
       ) : showActionRow ? (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
