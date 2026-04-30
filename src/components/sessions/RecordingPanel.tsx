@@ -48,7 +48,7 @@ function RecordingBlankOptions({
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-wrap justify-center gap-2 py-2">
+    <div className="flex flex-wrap gap-2 py-2">
       <button type="button" className="btn btn-primary" onClick={onStart}>
         <Mic size={14} strokeWidth={2} /> Record
       </button>
@@ -119,7 +119,7 @@ export function RecordingPanel({
           <button
             type="button"
             onClick={onDismissBackgroundWarning}
-            className="shrink-0 underline"
+            className="btn btn-ghost shrink-0 py-0.5 text-xs"
             style={{ color: 'var(--color-caution)' }}
           >
             Dismiss
@@ -131,7 +131,6 @@ export function RecordingPanel({
         idle={idle}
         recording={recording}
         paused={recorder.status === 'paused'}
-        hasClips={clips.length > 0}
         onStart={onStart}
         onPauseResume={onPauseResume}
         onStop={onStop}
@@ -172,147 +171,10 @@ export function RecordingPanel({
   );
 }
 
-function SilenceParams() {
-  const { settings, updateAudio } = useSettings();
-  const sd = settings.audio.silenceDetection;
-  return (
-    <div
-      className="rounded-md border px-3 py-2"
-      style={{ borderColor: 'var(--color-pt-border)', background: 'var(--color-pt-surface)' }}
-    >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sd.enabled}
-            onChange={(e) => updateAudio({ silenceDetection: { ...sd, enabled: e.target.checked } })}
-          />
-          <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
-            Silence trimming
-          </span>
-        </label>
-
-        <span
-          title={
-            'Silence trimming removes quiet gaps from your audio before it is sent for transcription. ' +
-            'The original recording is never changed — only the copy uploaded to Whisper is affected.\n\n' +
-            'Sensitivity controls how aggressively silence is detected:\n' +
-            '  • Aggressive — drops more audio; best when there are long dead-air gaps between speakers.\n' +
-            '  • Balanced — recommended for most PT sessions; skips obvious pauses while keeping natural speech rhythm.\n' +
-            '  • Relaxed — only drops very long, obvious silences; safest if you are unsure.\n\n' +
-            'Pad (ms) adds a buffer of audio kept before and after each spoken segment so words at the edges are not clipped. ' +
-            'Increase this if the transcript is cutting off the beginnings or ends of sentences (try 400–600 ms).'
-          }
-          className="cursor-help"
-          style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
-        >
-          <Info size={13} />
-        </span>
-
-        {sd.enabled && (
-          <>
-            <label className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Sensitivity</span>
-              <Select
-                value={sd.sensitivity}
-                className="h-7 py-0 text-xs"
-                onChange={(e) =>
-                  updateAudio({
-                    silenceDetection: {
-                      ...sd,
-                      sensitivity: e.target.value as 'low' | 'medium' | 'high',
-                    },
-                  })
-                }
-              >
-                <option value="low">Aggressive</option>
-                <option value="medium">Balanced</option>
-                <option value="high">Relaxed</option>
-              </Select>
-            </label>
-
-            <label className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Pad (ms)</span>
-              <TextInput
-                type="number"
-                min={0}
-                max={2000}
-                step={50}
-                value={String(sd.padMs)}
-                className="h-7 w-20 py-0 text-xs"
-                onChange={(e) => {
-                  const n = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
-                  updateAudio({ silenceDetection: { ...sd, padMs: n } });
-                }}
-              />
-            </label>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SpeedParams() {
-  const { settings, updateAudio } = useSettings();
-  const su = settings.audio.speedUp;
-  return (
-    <div
-      className="rounded-md border px-3 py-2"
-      style={{ borderColor: 'var(--color-pt-border)', background: 'var(--color-pt-surface)' }}
-    >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={su.enabled}
-            onChange={(e) => updateAudio({ speedUp: { ...su, enabled: e.target.checked } })}
-          />
-          <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
-            Speed up
-          </span>
-        </label>
-
-        <span
-          title={
-            'Speed up compresses playback time by removing inter-word gaps and shortening pauses. ' +
-            'The original recording is never changed — only the processed copy is affected.\n\n' +
-            'Speed factor controls how much faster the audio plays:\n' +
-            '  • 1.25× — subtle; saves ~20% of playback time.\n' +
-            '  • 1.5× — recommended for most sessions; saves ~33%.\n' +
-            '  • 1.75× — aggressive; saves ~43%; may feel rushed.'
-          }
-          className="cursor-help"
-          style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
-        >
-          <Info size={13} />
-        </span>
-
-        {su.enabled && (
-          <label className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Speed</span>
-            <Select
-              value={String(su.speed)}
-              className="h-7 py-0 text-xs"
-              onChange={(e) =>
-                updateAudio({ speedUp: { ...su, speed: Number(e.target.value) as 1.25 | 1.5 | 1.75 } })
-              }
-            >
-              <option value="1.25">1.25× — subtle</option>
-              <option value="1.5">1.5× — recommended</option>
-              <option value="1.75">1.75× — aggressive</option>
-            </Select>
-          </label>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function RecordingControlRow({
   idle,
   paused,
-  hasClips,
   onStart,
   onPauseResume,
   onStop,
@@ -321,7 +183,6 @@ function RecordingControlRow({
   idle: boolean;
   recording: boolean;
   paused: boolean;
-  hasClips: boolean;
   onStart: () => void;
   onPauseResume: () => void;
   onStop: () => void;
@@ -331,8 +192,8 @@ function RecordingControlRow({
     <div className="flex flex-wrap items-center gap-2">
       {idle ? (
         <>
-          <button type="button" className="btn btn-primary" onClick={onStart}>
-            <Mic size={14} strokeWidth={2} /> {hasClips ? 'Add clip' : 'Start recording'}
+          <button type="button" className="btn btn-secondary" onClick={onStart}>
+            <Mic size={14} strokeWidth={2} /> Add clip
           </button>
           <label className="btn btn-ghost cursor-pointer">
             <Upload size={14} strokeWidth={2} /> Upload audio
@@ -496,7 +357,7 @@ function AudioTrackRow({
 }
 
 function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[]; mergedAudioBlob: Blob | null }) {
-  const { settings } = useSettings();
+  const { settings, updateAudio } = useSettings();
   const playableClips = clips.filter(
     (c) => c.status === 'ready' || c.status === 'transcribing' || c.status === 'transcribed',
   );
@@ -528,8 +389,9 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
 
   if (playableClips.length === 0) return null;
 
+  const sd = settings.audio.silenceDetection;
+  const su = settings.audio.speedUp;
   const ordinalOf = (clipId: string) => clips.findIndex((c) => c.id === clipId) + 1;
-  const speedLabel = `Speed Up (${settings.audio.speedUp.speed}×)`;
 
   return (
     <div
@@ -570,6 +432,7 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
       </div>
 
       <div className="space-y-2">
+        {/* Full audio track */}
         <AudioTrackRow label="Full Audio">
           {mergedAudioBlob
             ? <BlobWaveform blob={mergedAudioBlob} />
@@ -579,88 +442,204 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
           }
         </AudioTrackRow>
 
-        <SilenceParams />
-
+        {/* Silence trimming — toggle + settings + result all in one card */}
         <AudioTrackRow label="Silence Removed" savedSec={activeSilenced?.savedSec}>
-          {activeSilenced ? (
-            <div className="space-y-1.5">
-              <BlobWaveform blob={activeSilenced.blob} />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sd.enabled}
+                  onChange={(e) =>
+                    updateAudio({ silenceDetection: { ...sd, enabled: e.target.checked } })
+                  }
+                />
+                <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
+                  Silence trimming
+                </span>
+              </label>
               <button
                 type="button"
-                onClick={resetSilence}
-                className="cursor-pointer text-[11px] underline"
-                style={{ color: 'var(--color-pt-text-3)' }}
+                className="btn btn-ghost p-0.5"
+                aria-label="About silence trimming"
+                title={
+                  'Removes quiet gaps before transcription. The original recording is never changed.\n\n' +
+                  'Sensitivity:\n' +
+                  '  • Aggressive — best for long dead-air gaps.\n' +
+                  '  • Balanced — recommended for most PT sessions.\n' +
+                  '  • Relaxed — only drops very long, obvious silences.\n\n' +
+                  'Pad (ms) keeps audio around speech edges to avoid clipping words. Try 400–600 ms if sentences are cut off.'
+                }
+                style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
               >
-                Reset
+                <Info size={13} />
               </button>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <button
-                type="button"
-                className="btn btn-secondary text-xs"
-                disabled={compilingSilence || !activeId}
-                onClick={() => void compileSilence()}
-              >
-                {compilingSilence ? (
-                  <>
-                    <Loader2 size={12} className="animate-spin" /> Compiling…
-                  </>
-                ) : (
-                  'Compile'
-                )}
-              </button>
-              {activeSilenceError && (
-                <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
-                  {activeSilenceError}
-                </p>
+              {sd.enabled && (
+                <>
+                  <label className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
+                      Sensitivity
+                    </span>
+                    <Select
+                      value={sd.sensitivity}
+                      className="h-7 py-0 text-xs"
+                      onChange={(e) =>
+                        updateAudio({
+                          silenceDetection: {
+                            ...sd,
+                            sensitivity: e.target.value as 'low' | 'medium' | 'high',
+                          },
+                        })
+                      }
+                    >
+                      <option value="low">Aggressive</option>
+                      <option value="medium">Balanced</option>
+                      <option value="high">Relaxed</option>
+                    </Select>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
+                      Pad (ms)
+                    </span>
+                    <TextInput
+                      type="number"
+                      min={0}
+                      max={2000}
+                      step={50}
+                      value={String(sd.padMs)}
+                      className="h-7 w-20 py-0 text-xs"
+                      onChange={(e) => {
+                        const n = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
+                        updateAudio({ silenceDetection: { ...sd, padMs: n } });
+                      }}
+                    />
+                  </label>
+                </>
               )}
             </div>
-          )}
+            {sd.enabled && (
+              activeSilenced ? (
+                <div className="space-y-1.5">
+                  <BlobWaveform blob={activeSilenced.blob} />
+                  <button
+                    type="button"
+                    className="btn btn-ghost py-0.5 text-[11px]"
+                    onClick={resetSilence}
+                  >
+                    Reset
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-xs"
+                    disabled={compilingSilence || !activeId}
+                    onClick={() => void compileSilence()}
+                  >
+                    {compilingSilence ? (
+                      <><Loader2 size={12} className="animate-spin" /> Applying…</>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
+                  {activeSilenceError && (
+                    <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
+                      {activeSilenceError}
+                    </p>
+                  )}
+                </div>
+              )
+            )}
+          </div>
         </AudioTrackRow>
 
-        <SpeedParams />
-
+        {/* Speed up — toggle + settings + result all in one card */}
         <AudioTrackRow
-          label={speedLabel}
+          label={`Speed Up (${su.speed}×)`}
           savedSec={activeSpedup?.savedSec}
           note={!activeSilenced ? 'Uses full audio (no silence-removed clip)' : undefined}
         >
-          {activeSpedup ? (
-            <div className="space-y-1.5">
-              <BlobWaveform blob={activeSpedup.blob} />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={su.enabled}
+                  onChange={(e) => updateAudio({ speedUp: { ...su, enabled: e.target.checked } })}
+                />
+                <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
+                  Speed up
+                </span>
+              </label>
               <button
                 type="button"
-                onClick={resetSpeed}
-                className="cursor-pointer text-[11px] underline"
-                style={{ color: 'var(--color-pt-text-3)' }}
+                className="btn btn-ghost p-0.5"
+                aria-label="About speed up"
+                title={
+                  'Compresses playback time by removing inter-word gaps. The original recording is never changed.\n\n' +
+                  '  • 1.25× — subtle; saves ~20% of playback time.\n' +
+                  '  • 1.5× — recommended for most sessions; saves ~33%.\n' +
+                  '  • 1.75× — aggressive; saves ~43%.'
+                }
+                style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
               >
-                Reset
+                <Info size={13} />
               </button>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <button
-                type="button"
-                className="btn btn-secondary text-xs"
-                disabled={compilingSpeed}
-                onClick={() => void compileSpeed()}
-              >
-                {compilingSpeed ? (
-                  <>
-                    <Loader2 size={12} className="animate-spin" /> Compiling…
-                  </>
-                ) : (
-                  'Compile'
-                )}
-              </button>
-              {activeSpeedError && (
-                <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
-                  {activeSpeedError}
-                </p>
+              {su.enabled && (
+                <label className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Speed</span>
+                  <Select
+                    value={String(su.speed)}
+                    className="h-7 py-0 text-xs"
+                    onChange={(e) =>
+                      updateAudio({
+                        speedUp: { ...su, speed: Number(e.target.value) as 1.25 | 1.5 | 1.75 },
+                      })
+                    }
+                  >
+                    <option value="1.25">1.25× — subtle</option>
+                    <option value="1.5">1.5× — recommended</option>
+                    <option value="1.75">1.75× — aggressive</option>
+                  </Select>
+                </label>
               )}
             </div>
-          )}
+            {su.enabled && (
+              activeSpedup ? (
+                <div className="space-y-1.5">
+                  <BlobWaveform blob={activeSpedup.blob} />
+                  <button
+                    type="button"
+                    className="btn btn-ghost py-0.5 text-[11px]"
+                    onClick={resetSpeed}
+                  >
+                    Reset
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="btn btn-secondary text-xs"
+                    disabled={compilingSpeed}
+                    onClick={() => void compileSpeed()}
+                  >
+                    {compilingSpeed ? (
+                      <><Loader2 size={12} className="animate-spin" /> Applying…</>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
+                  {activeSpeedError && (
+                    <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
+                      {activeSpeedError}
+                    </p>
+                  )}
+                </div>
+              )
+            )}
+          </div>
         </AudioTrackRow>
       </div>
     </div>
