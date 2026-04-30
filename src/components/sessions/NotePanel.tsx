@@ -291,12 +291,15 @@ function NoteActions({
           ) : (
             <>
               <Sparkles size={14} strokeWidth={2} /> Generate from transcript
-              <span className="ml-1 text-[10px] tabular-nums opacity-70">
-                {generateUsed}/{generateCap}
-              </span>
             </>
           )}
         </button>
+        <span
+          className="text-[10px] tabular-nums"
+          style={{ color: 'var(--color-fg-subtle)' }}
+        >
+          {generateUsed}/{generateCap}
+        </span>
         {generationLabel && (
           <span
             className="text-[11px]"
@@ -413,7 +416,7 @@ function NoteExportRow({
     <div className="flex flex-wrap gap-2 pt-2">
       <button
         type="button"
-        className="btn btn-primary text-xs"
+        className="btn btn-secondary text-xs"
         disabled={pdfBusy}
         onClick={handlePdf}
       >
@@ -429,7 +432,7 @@ function NoteExportRow({
       </button>
       <button
         type="button"
-        className="btn btn-secondary text-xs"
+        className="btn btn-ghost text-xs"
         onClick={() => {
           const md = renderNoteMarkdown(note, template, patient);
           navigator.clipboard.writeText(md).then(
@@ -442,7 +445,7 @@ function NoteExportRow({
       </button>
       <button
         type="button"
-        className="btn btn-secondary text-xs"
+        className="btn btn-ghost text-xs"
         onClick={() =>
           downloadFile(
             `${fileBase()}.md`,
@@ -451,11 +454,11 @@ function NoteExportRow({
           )
         }
       >
-        <Download size={12} strokeWidth={2} /> Download .md
+        <Download size={12} strokeWidth={2} /> .md
       </button>
       <button
         type="button"
-        className="btn btn-secondary text-xs"
+        className="btn btn-ghost text-xs"
         onClick={() =>
           downloadFile(
             `${fileBase()}.txt`,
@@ -464,7 +467,7 @@ function NoteExportRow({
           )
         }
       >
-        <FileText size={12} strokeWidth={2} /> Download .txt
+        <FileText size={12} strokeWidth={2} /> .txt
       </button>
     </div>
   );
