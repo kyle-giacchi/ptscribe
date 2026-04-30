@@ -9,7 +9,7 @@ export interface UsePlanReturn {
 
 export function usePlan(): UsePlanReturn {
   const { currentUser } = useAuth();
-  const tier = currentUser.planTier;
+  const tier = currentUser?.planTier ?? 'personal-free';
   const limits = PLAN_LIMITS[tier];
 
   function isWithinLimit(resource: keyof PlanLimits, currentCount: number): boolean {
