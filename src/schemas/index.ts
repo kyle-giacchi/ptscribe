@@ -20,6 +20,7 @@ const ClinicianSchema = z.object({
   phone: z.string().optional(),
   email: z.string().optional(),
   signatureBlock: z.string().optional(),
+  acknowledgedDisclosureAt: z.number().int().optional(),
 });
 
 // ─── Patient ────────────────────────────────────────────────────────────────
@@ -211,6 +212,9 @@ const SettingsSchema = z.object({
       speed: z.union([z.literal(1.25), z.literal(1.5), z.literal(1.75)]),
     }),
   }),
+  security: z.object({
+    idleLockMinutes: z.number().int().min(0).max(120),
+  }),
   ui: z.object({
     sidebarCollapsed: z.boolean(),
     densityMode: z.enum(['cozy', 'compact']),
@@ -270,6 +274,7 @@ export function defaultAppData(): AppData {
         silenceDetection: { enabled: false, sensitivity: 'medium', padMs: 400 },
         speedUp: { enabled: false, speed: 1.5 },
       },
+      security: { idleLockMinutes: 10 },
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },
       retention: {},
     },
