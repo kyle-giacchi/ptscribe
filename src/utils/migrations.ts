@@ -26,6 +26,7 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  * - v7 → v8: Adds `Settings.security.idleLockMinutes` (default 10). Auto-lock the vault
  *   after this many minutes of inactivity. `0` disables the timer.
  * - v8 → v9: Adds optional `Clinician.acknowledgedDisclosureAt` (ms timestamp). Captured
+ * - v9 → v10: Adds optional `SessionClip.localTranscript` (whisper-tiny result kept as revert target).
  *   when the clinician checks the consent box during Setup; absence is fine for
  *   pre-existing data. No structural changes.
  */
@@ -65,6 +66,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 8) {
     working = migrateV8ToV9(working);
+  }
+  if ((working as { version?: number }).version === 9) {
+    working = migrateV9ToV10(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -197,6 +201,10 @@ function migrateV6ToV7(input: Record<string, unknown>): Record<string, unknown> 
 
 function migrateV8ToV9(input: Record<string, unknown>): Record<string, unknown> {
   return { ...input, version: 9 };
+}
+
+function migrateV9ToV10(input: Record<string, unknown>): Record<string, unknown> {
+  return { ...input, version: 10 };
 }
 
 function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {

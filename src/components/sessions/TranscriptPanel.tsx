@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, Layers, Info, AlertTriangle } from 'lucide-react';
+import { Sparkles, Loader2, Layers, Info, AlertTriangle, RotateCcw } from 'lucide-react';
 import type { SessionClip } from '@/types';
 
 function CreateTranscriptButton({
@@ -33,7 +33,7 @@ function CreateTranscriptButton({
           </>
         ) : (
           <>
-            <Sparkles size={14} strokeWidth={2} /> Generate with AI
+            <Sparkles size={14} strokeWidth={2} /> Generate AI Transcription
             <span className="ml-1 text-[10px] tabular-nums opacity-60">
               {used}/{cap}
             </span>
@@ -60,11 +60,12 @@ export function TranscriptPanel({
   transcribeUsed,
   transcribeCap,
   hasUserEdits,
-  transcriptionBlockedReason,
+  hasLocalTranscript,
   onChange,
   onCommit,
   onRemerge,
   onCreateTranscript,
+  onRevertToLocal,
 }: {
   transcript: string;
   clips: SessionClip[];
@@ -74,16 +75,20 @@ export function TranscriptPanel({
   transcribeUsed: number;
   transcribeCap: number;
   hasUserEdits: boolean;
-  transcriptionBlockedReason?: string;
+  hasLocalTranscript: boolean;
   onChange: (next: string) => void;
   onCommit: () => void;
   onRemerge: () => void;
   onCreateTranscript: (clipId?: string) => void;
+  onRevertToLocal: () => void;
 }) {
   const [pendingOverwrite, setPendingOverwrite] = useState(false);
   const [pendingRemerge, setPendingRemerge] = useState(false);
   const transcribableClips = clips.filter(
-    (c) => c.status === 'ready' || c.status === 'failed',
+    (c) =>
+      c.status === 'ready' ||
+      c.status === 'failed' ||
+      (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript),
   );
   const latestId = transcribableClips.at(-1)?.id ?? '';
   const [selectedClipId, setSelectedClipId] = useState(latestId);
@@ -114,7 +119,7 @@ export function TranscriptPanel({
     background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
   };
 
-  const showActionRow = canTranscribe || canRemerge || !!transcriptionBlockedReason;
+  const showActionRow = canTranscribe || canRemerge || hasLocalTranscript;
 
   return (
     <div className="space-y-3">
@@ -217,12 +222,12 @@ export function TranscriptPanel({
                 <Layers size={14} strokeWidth={2} /> Re-merge from clips
               </button>
             )}
+            {hasLocalTranscript && (
+              <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}>
+                <RotateCcw size={14} strokeWidth={2} /> Use Local Transcription
+              </button>
+            )}
           </div>
-          {transcriptionBlockedReason && (
-            <p className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-              {transcriptionBlockedReason}
-            </p>
-          )}
           {canTranscribe && budgetSpent && (
             <p className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
               Session limit reached — reload the page to reset.
