@@ -10,6 +10,7 @@ import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { IdleLockProvider } from '@/contexts/IdleLockProvider';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
@@ -49,6 +50,7 @@ function PageLoader() {
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
@@ -110,6 +112,7 @@ export default function App() {
           }
         />
       </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

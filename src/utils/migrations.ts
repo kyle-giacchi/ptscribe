@@ -29,6 +29,8 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  * - v9 → v10: Adds optional `SessionClip.localTranscript` (whisper-tiny result kept as revert target).
  *   when the clinician checks the consent box during Setup; absence is fine for
  *   pre-existing data. No structural changes.
+ * - v10 → v11: Adds `AppData.tenantId` (string). Defaults to `'local'` for all
+ *   existing single-tenant vaults. Reserved for future multi-tenant routing.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -69,6 +71,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 9) {
     working = migrateV9ToV10(working);
+  }
+  if ((working as { version?: number }).version === 10) {
+    working = migrateV10ToV11(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -205,6 +210,10 @@ function migrateV8ToV9(input: Record<string, unknown>): Record<string, unknown> 
 
 function migrateV9ToV10(input: Record<string, unknown>): Record<string, unknown> {
   return { ...input, version: 10 };
+}
+
+function migrateV10ToV11(input: Record<string, unknown>): Record<string, unknown> {
+  return { ...input, version: 11, tenantId: input.tenantId ?? 'local' };
 }
 
 function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {
