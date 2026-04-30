@@ -165,8 +165,12 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     return apiError('RATE_LIMITED', 'Service daily limit reached', 429);
   }
 
-  if (url.pathname === '/api/transcribe') return handleTranscribe(request, env);
-  if (url.pathname === '/api/generate') return handleGenerate(request, env);
+  if (url.pathname === '/api/transcribe' || url.pathname === '/api/v1/transcribe') {
+    return handleTranscribe(request, env);
+  }
+  if (url.pathname === '/api/generate' || url.pathname === '/api/v1/generate') {
+    return handleGenerate(request, env);
+  }
   return apiError('NOT_FOUND', 'Not found', 404);
 }
 
