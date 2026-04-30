@@ -147,16 +147,22 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     }
   }
 
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  if (!(await checkPreGateLimit(env, ip)).allowed) {
+    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+  }
+
   const gate = request.headers.get('x-ptscribe-key') ?? '';
   const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
   if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
     return apiError('UNAUTHORIZED', 'Unauthorized', 401);
   }
 
-  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  const rateLimitResult = await checkRateLimit(env, ip);
-  if (!rateLimitResult.allowed) {
+  if (!(await checkRateLimit(env, ip)).allowed) {
     return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+  }
+  if (!(await checkGlobalDailyLimit(env)).allowed) {
+    return apiError('RATE_LIMITED', 'Service daily limit reached', 429);
   }
 
   if (url.pathname === '/api/transcribe') return handleTranscribe(request, env);
@@ -402,8 +408,32 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   return json({ text });
 }
 
+const RATE_LIMIT_PRE_GATE_PER_MIN = 20;
 const RATE_LIMIT_PER_MIN = 10;
-const RATE_LIMIT_PER_DAY = 100;
+const RATE_LIMIT_PER_DAY = 300;
+const RATE_LIMIT_GLOBAL_PER_DAY = 500;
+
+async function checkPreGateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
+  if (!env.RATE_LIMIT) return { allowed: true };
+  const now = Date.now();
+  const key = `rl:pg:${ip}:${Math.floor(now / 60_000)}`;
+  const raw = await env.RATE_LIMIT.get(key);
+  const count = raw ? parseInt(raw, 10) : 0;
+  if (count >= RATE_LIMIT_PRE_GATE_PER_MIN) return { allowed: false };
+  await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: 120 });
+  return { allowed: true };
+}
+
+async function checkGlobalDailyLimit(env: Env): Promise<{ allowed: boolean }> {
+  if (!env.RATE_LIMIT) return { allowed: true };
+  const now = Date.now();
+  const key = `rl:global:${Math.floor(now / 86_400_000)}`;
+  const raw = await env.RATE_LIMIT.get(key);
+  const count = raw ? parseInt(raw, 10) : 0;
+  if (count >= RATE_LIMIT_GLOBAL_PER_DAY) return { allowed: false };
+  await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: 172800 });
+  return { allowed: true };
+}
 
 async function checkRateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
   if (!env.RATE_LIMIT) return { allowed: true };
