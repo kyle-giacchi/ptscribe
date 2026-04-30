@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, Loader2, LockOpen, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MicStatusPill, PtButton, type MicState } from '@/components/design';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -889,24 +889,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         </AccordionSection>
 
         <div
-          className="flex items-center justify-between gap-3 rounded-lg px-4 py-3"
+          className="flex items-center gap-3 rounded-lg px-4 py-3"
           style={{
             background: 'var(--color-pt-surface)',
             border: '1px solid var(--color-pt-border)',
           }}
         >
-          <MicStatusPill state={micState} elapsedSec={recorder.durationSec} />
+          {/* Left cluster: status + destructive delete */}
           <div className="flex items-center gap-2">
-            {note && !pendingDeleteSession && (
-              <PtButton
-                variant="ghost"
-                iconLeft={<Copy size={14} strokeWidth={2} />}
-                onClick={handleCopyNote}
-                title="Copy full note as markdown"
-              >
-                Copy note
-              </PtButton>
-            )}
+            <MicStatusPill state={micState} elapsedSec={recorder.durationSec} />
             {pendingDeleteSession ? (
               <>
                 <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
@@ -931,43 +922,50 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             ) : (
               <button
                 type="button"
-                onClick={() => setPendingDeleteSession(true)}
+                className="btn btn-ghost p-2"
                 aria-label={isDemo ? 'Restart demo' : 'Delete session'}
                 title={isDemo ? 'Restart demo' : 'Delete session'}
-                className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
-                style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  border: '1px solid var(--color-pt-border)',
-                  background: 'var(--color-pt-surface)',
-                  color: isDemo ? 'var(--color-pt-text-2)' : 'var(--color-pt-red)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
+                style={{ color: isDemo ? undefined : 'var(--color-pt-red)' }}
+                onClick={() => setPendingDeleteSession(true)}
               >
-                {isDemo ? <RefreshCw size={14} strokeWidth={2} /> : <Trash2 size={14} strokeWidth={2} />}
+                <Trash2 size={14} strokeWidth={2} />
               </button>
             )}
           </div>
-          {note?.finalized ? (
-            <PtButton
-              variant="ghost"
-              iconLeft={<RefreshCw size={14} strokeWidth={2} />}
-              onClick={handleUnfinalize}
-            >
-              Unlock note
-            </PtButton>
-          ) : (
-            <PtButton
-              variant="primary"
-              iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
-              disabled={!note}
-              onClick={handleFinalize}
-            >
-              End &amp; sign
-            </PtButton>
-          )}
+
+          <div className="flex-1" />
+
+          {/* Right cluster: copy + primary action */}
+          <div className="flex items-center gap-2">
+            {note && !pendingDeleteSession && (
+              <PtButton
+                variant="ghost"
+                iconLeft={<Copy size={14} strokeWidth={2} />}
+                onClick={handleCopyNote}
+                title="Copy full note as markdown"
+              >
+                Copy note
+              </PtButton>
+            )}
+            {note?.finalized ? (
+              <PtButton
+                variant="ghost"
+                iconLeft={<LockOpen size={14} strokeWidth={2} />}
+                onClick={handleUnfinalize}
+              >
+                Unlock note
+              </PtButton>
+            ) : (
+              <PtButton
+                variant="primary"
+                iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
+                disabled={!note}
+                onClick={handleFinalize}
+              >
+                End &amp; sign
+              </PtButton>
+            )}
+          </div>
         </div>
       </div>
     </div>

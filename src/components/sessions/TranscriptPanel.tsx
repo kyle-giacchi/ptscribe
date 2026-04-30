@@ -34,19 +34,24 @@ function CreateTranscriptButton({
         ) : (
           <>
             <Sparkles size={14} strokeWidth={2} /> Generate AI Transcription
-            <span className="ml-1 text-[10px] tabular-nums opacity-60">
-              {used}/{cap}
-            </span>
           </>
         )}
       </button>
       <span
+        className="text-[10px] tabular-nums"
+        style={{ color: 'var(--color-fg-subtle)' }}
+      >
+        {used}/{cap}
+      </span>
+      <button
+        type="button"
+        className="btn btn-ghost p-0.5"
+        aria-label="About AI transcription"
         title="Uses cloud AI speech recognition with speaker identification — knows who's speaking (patient vs. clinician) for cleaner, more structured transcripts and better note generation."
-        className="cursor-help"
         style={{ color: 'var(--color-fg-subtle)', lineHeight: 0 }}
       >
         <Info size={13} strokeWidth={2} />
-      </span>
+      </button>
     </div>
   );
 }
