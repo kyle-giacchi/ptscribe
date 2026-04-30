@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useMatch } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { Toaster } from '@/components/ui/Toaster';
 import { duration, ease } from '@/lib/motion';
+import { isDemoMode } from '@/lib/demoMode';
+import { useSessions } from '@/contexts/SessionsProvider';
+import { usePatients } from '@/contexts/PatientsProvider';
+import { labelForType } from '@/utils/labels';
 
 export function AppShell() {
   const location = useLocation();
@@ -14,6 +18,53 @@ export function AppShell() {
     setSidebarOpen(false);
   }, [location.pathname]);
 
+  const shellBox = {
+    background: 'var(--color-pt-surface)',
+    border: '1px solid var(--color-pt-border)',
+    boxShadow: '0 12px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
+  } as const;
+
+  const mainStyle = {
+    background: 'var(--color-pt-surface-alt)',
+    paddingBottom: 'env(safe-area-inset-bottom)',
+    paddingLeft: 'env(safe-area-inset-left)',
+    paddingRight: 'env(safe-area-inset-right)',
+  } as const;
+
+  const pageTransition = (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: duration.quick, ease: ease.enter }}
+      >
+        <Outlet />
+      </motion.div>
+    </AnimatePresence>
+  );
+
+  if (isDemoMode()) {
+    return (
+      <div
+        className="h-[100dvh] w-[100dvw] overflow-hidden md:p-3.5"
+        style={{ background: 'var(--color-pt-bg)' }}
+      >
+        <div
+          className="grid h-full w-full overflow-hidden md:rounded-2xl"
+          style={{ ...shellBox, gridTemplateRows: 'auto 1fr' }}
+        >
+          <DemoTopBar />
+          <main className="overflow-auto" style={mainStyle}>
+            {pageTransition}
+          </main>
+        </div>
+        <Toaster />
+      </div>
+    );
+  }
+
   return (
     <div
       className="h-[100dvh] w-[100dvw] overflow-hidden md:p-3.5"
@@ -21,11 +72,7 @@ export function AppShell() {
     >
       <div
         className="app-shell-grid grid h-full w-full overflow-hidden md:rounded-2xl"
-        style={{
-          background: 'var(--color-pt-surface)',
-          border: '1px solid var(--color-pt-border)',
-          boxShadow: '0 12px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
-        }}
+        style={shellBox}
       >
         <Sidebar className="hidden md:grid" />
         <div
@@ -33,26 +80,8 @@ export function AppShell() {
           style={{ gridTemplateRows: 'auto 1fr' }}
         >
           <TopBar onMenuOpen={() => setSidebarOpen(true)} />
-          <main
-            className="overflow-auto"
-            style={{
-              background: 'var(--color-pt-surface-alt)',
-              paddingBottom: 'env(safe-area-inset-bottom)',
-              paddingLeft: 'env(safe-area-inset-left)',
-              paddingRight: 'env(safe-area-inset-right)',
-            }}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={location.pathname}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: duration.quick, ease: ease.enter }}
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
+          <main className="overflow-auto" style={mainStyle}>
+            {pageTransition}
           </main>
         </div>
       </div>
@@ -86,5 +115,52 @@ export function AppShell() {
 
       <Toaster />
     </div>
+  );
+}
+
+function DemoTopBar() {
+  const sessionMatch = useMatch('/sessions/:id');
+  const { getSession } = useSessions();
+  const { getPatient } = usePatients();
+
+  const session = sessionMatch ? getSession(sessionMatch.params.id ?? '') : undefined;
+  const patient = session ? getPatient(session.patientId) : undefined;
+
+  return (
+    <header
+      className="flex items-center gap-3"
+      style={{
+        background: 'var(--color-pt-surface)',
+        borderBottom: '1px solid var(--color-pt-border)',
+        padding: '12px 22px',
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <div
+          className="truncate"
+          style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.2px', color: 'var(--color-pt-text)' }}
+        >
+          {patient ? `${patient.firstName} ${patient.lastName}` : 'PTScribe'}
+        </div>
+        {session && (
+          <div
+            className="truncate"
+            style={{ fontSize: 12, color: 'var(--color-pt-text-2)', marginTop: 1 }}
+          >
+            {labelForType(session.type)} · {new Date(session.date).toLocaleDateString()}
+          </div>
+        )}
+      </div>
+      <span
+        className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+        style={{
+          background: 'color-mix(in oklab, var(--color-caution) 15%, transparent)',
+          color: 'var(--color-caution)',
+          border: '1px solid color-mix(in oklab, var(--color-caution) 30%, transparent)',
+        }}
+      >
+        Demo
+      </span>
+    </header>
   );
 }
