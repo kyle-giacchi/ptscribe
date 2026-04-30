@@ -93,7 +93,7 @@ describe('parseIsoDate', () => {
 
 describe('monthsBetween', () => {
   it('returns 0 for timestamps in the same month', () => {
-    const a = new Date(2024, 5, 1).getTime();  // June 1 local
+    const a = new Date(2024, 5, 1).getTime(); // June 1 local
     const b = new Date(2024, 5, 30).getTime(); // June 30 local
     expect(monthsBetween(a, b)).toBe(0);
   });
@@ -106,7 +106,7 @@ describe('monthsBetween', () => {
 
   it('handles cross-year boundaries', () => {
     const a = new Date(2023, 10, 1).getTime(); // November
-    const b = new Date(2024, 1, 1).getTime();  // February
+    const b = new Date(2024, 1, 1).getTime(); // February
     expect(monthsBetween(a, b)).toBe(3);
   });
 });

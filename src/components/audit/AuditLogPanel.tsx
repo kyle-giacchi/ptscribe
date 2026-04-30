@@ -103,9 +103,7 @@ export function AuditLogPanel() {
           ) : (
             recent.map((e) => (
               <div key={e.seq} style={{ color: 'var(--color-pt-text-2)' }}>
-                <span style={{ color: 'var(--color-pt-text-3)', marginRight: 8 }}>
-                  #{e.seq}
-                </span>
+                <span style={{ color: 'var(--color-pt-text-3)', marginRight: 8 }}>#{e.seq}</span>
                 {fmt(e.ts)} — {ACTION_LABELS[e.action] ?? e.action}
               </div>
             ))

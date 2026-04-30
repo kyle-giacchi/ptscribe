@@ -172,9 +172,7 @@ export const vault = {
   ): Promise<{ ok: true } | { ok: false; reason: 'bad_passphrase' | 'locked' | 'corrupt' }> {
     if (!dek) return { ok: false, reason: 'locked' };
     if (newPassphrase.length < PASSPHRASE_MIN_CHARS) {
-      throw new Error(
-        `vault: new passphrase must be at least ${PASSPHRASE_MIN_CHARS} characters`,
-      );
+      throw new Error(`vault: new passphrase must be at least ${PASSPHRASE_MIN_CHARS} characters`);
     }
 
     const env = readEnvelope();

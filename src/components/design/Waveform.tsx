@@ -102,11 +102,5 @@ export function Waveform({ micState, height = 48 }: WaveformProps) {
     };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: '100%', height, display: 'block' }}
-      aria-hidden
-    />
-  );
+  return <canvas ref={canvasRef} style={{ width: '100%', height, display: 'block' }} aria-hidden />;
 }

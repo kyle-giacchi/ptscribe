@@ -44,16 +44,19 @@ export function encodePcmWav(samples: Float32Array, sampleRate: number): Blob {
   const w = (off: number, s: string) => {
     for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
   };
-  w(0, 'RIFF'); v.setUint32(4, 36 + dataBytes, true);
-  w(8, 'WAVE'); w(12, 'fmt ');
-  v.setUint32(16, 16, true);            // chunk size
-  v.setUint16(20, 1, true);             // PCM
-  v.setUint16(22, 1, true);             // mono
+  w(0, 'RIFF');
+  v.setUint32(4, 36 + dataBytes, true);
+  w(8, 'WAVE');
+  w(12, 'fmt ');
+  v.setUint32(16, 16, true); // chunk size
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, 1, true); // mono
   v.setUint32(24, sampleRate, true);
   v.setUint32(28, sampleRate * 2, true); // byte rate
-  v.setUint16(32, 2, true);             // block align
-  v.setUint16(34, 16, true);            // bits per sample
-  w(36, 'data'); v.setUint32(40, dataBytes, true);
+  v.setUint16(32, 2, true); // block align
+  v.setUint16(34, 16, true); // bits per sample
+  w(36, 'data');
+  v.setUint32(40, dataBytes, true);
   let off = 44;
   for (let i = 0; i < samples.length; i++) {
     const s = Math.max(-1, Math.min(1, samples[i]));

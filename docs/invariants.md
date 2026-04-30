@@ -147,6 +147,7 @@ Legacy plaintext migration (one-shot):
 Never call `window.confirm()`. All destructive or overwrite actions use an inline caution banner rendered in place of (or adjacent to) the triggering button.
 
 Banner anatomy:
+
 ```tsx
 <div
   className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
@@ -155,11 +156,19 @@ Banner anatomy:
     background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
   }}
 >
-  <AlertTriangle size={13} strokeWidth={2} style={{ color: 'var(--color-caution)', flexShrink: 0 }} />
+  <AlertTriangle
+    size={13}
+    strokeWidth={2}
+    style={{ color: 'var(--color-caution)', flexShrink: 0 }}
+  />
   <span style={{ color: 'var(--color-caution)' }}>Descriptive warning text.</span>
   <div className="ml-auto flex items-center gap-1.5">
-    <button className="btn btn-ghost py-0.5 text-xs" onClick={cancel}>Cancel</button>
-    <button className="btn btn-primary py-0.5 text-xs" onClick={confirm}>Yes, [action]</button>
+    <button className="btn btn-ghost py-0.5 text-xs" onClick={cancel}>
+      Cancel
+    </button>
+    <button className="btn btn-primary py-0.5 text-xs" onClick={confirm}>
+      Yes, [action]
+    </button>
   </div>
 </div>
 ```

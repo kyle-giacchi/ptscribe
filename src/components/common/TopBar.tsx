@@ -53,9 +53,7 @@ function RecordingIndicator({ status }: { status: string }) {
         <span
           className="relative inline-flex h-2 w-2 rounded-full"
           style={{
-            background: isRecording
-              ? 'var(--color-pt-red, #dc2626)'
-              : 'var(--color-pt-text-3)',
+            background: isRecording ? 'var(--color-pt-red, #dc2626)' : 'var(--color-pt-text-3)',
           }}
         />
       </span>
@@ -75,9 +73,7 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
   const session = sessionMatch ? getSession(sessionMatch.params.id ?? '') : undefined;
   const patient = session ? getPatient(session.patientId) : undefined;
   const isSessionRoute = Boolean(sessionMatch && session && patient);
-  const fullName = patient
-    ? `${patient.firstName} ${patient.lastName}`.trim() || 'Patient'
-    : '';
+  const fullName = patient ? `${patient.firstName} ${patient.lastName}`.trim() || 'Patient' : '';
 
   const menuButton = (
     <button

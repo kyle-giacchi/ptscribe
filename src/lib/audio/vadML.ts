@@ -2,9 +2,9 @@ import { NonRealTimeVAD } from '@ricky0123/vad-web';
 import { findSpeechRanges, type SpeechRange, type VadOptions } from './vad';
 
 const SENSITIVITY_THRESHOLDS = {
-  low:    { positiveSpeechThreshold: 0.7,  negativeSpeechThreshold: 0.5  },
-  medium: { positiveSpeechThreshold: 0.5,  negativeSpeechThreshold: 0.35 },
-  high:   { positiveSpeechThreshold: 0.35, negativeSpeechThreshold: 0.2  },
+  low: { positiveSpeechThreshold: 0.7, negativeSpeechThreshold: 0.5 },
+  medium: { positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35 },
+  high: { positiveSpeechThreshold: 0.35, negativeSpeechThreshold: 0.2 },
 } as const;
 
 // Loading the Silero ONNX model + spinning up an ort wasm session is ~tens of

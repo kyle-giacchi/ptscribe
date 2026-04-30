@@ -1,12 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAppData } from './AppDataProvider';
-import type {
-  AISettings,
-  AnalysisMode,
-  AudioSettings,
-  PageKey,
-  Settings,
-} from '@/types';
+import type { AISettings, AnalysisMode, AudioSettings, PageKey, Settings } from '@/types';
 
 export interface SettingsContextValue {
   settings: Settings;
@@ -53,12 +47,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     () => ({
       settings,
       updateSettings: (patch) => updateSettingsSlice({ ...settings, ...patch }),
-      updateAi: (patch) =>
-        updateSettingsSlice({ ...settings, ai: { ...settings.ai, ...patch } }),
+      updateAi: (patch) => updateSettingsSlice({ ...settings, ai: { ...settings.ai, ...patch } }),
       updateAudio: (patch) =>
         updateSettingsSlice({ ...settings, audio: { ...settings.audio, ...patch } }),
-      updateUi: (patch) =>
-        updateSettingsSlice({ ...settings, ui: { ...settings.ui, ...patch } }),
+      updateUi: (patch) => updateSettingsSlice({ ...settings, ui: { ...settings.ui, ...patch } }),
       setIdleLockMinutes: (minutes: number) =>
         updateSettingsSlice({
           ...settings,

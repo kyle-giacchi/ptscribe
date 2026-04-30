@@ -6,25 +6,25 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
   },
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "ptscribe-auth",
-      "database_id": "0bf276aa-5f23-4052-823e-ee79f39e3c69"
-    }
+      "database_id": "0bf276aa-5f23-4052-823e-ee79f39e3c69",
+    },
   ],
   "kv_namespaces": [
     {
       "binding": "RATE_LIMIT",
-      "id": "f877f83936664e6ea409c492aa37c20d"
-    }
+      "id": "f877f83936664e6ea409c492aa37c20d",
+    },
   ],
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }
