@@ -1,6 +1,8 @@
 import { AUDIO_DB } from '@/lib/storageKeys';
 import { vault } from '@/lib/vault/vault';
-import { isPlaintextAudio } from '@/lib/audio/sniff';
+import { isPlaintextAudio, isPtscEncrypted, PTSC_MAGIC } from '@/lib/audio/sniff';
+
+const PTSC_TAG = new Uint8Array(PTSC_MAGIC);
 
 /**
  * IndexedDB-backed store for raw audio Blobs keyed by clip id.
@@ -109,7 +111,12 @@ async function maybeEncrypt(blob: Blob): Promise<ArrayBuffer> {
   const bytes = (await toBytes(blob)) ?? new Uint8Array();
   if (vault.isUnlocked()) {
     const enc = await vault.encryptBlob(new Blob([bytes as BlobPart]));
-    return (await toBytes(enc))!.buffer as ArrayBuffer;
+    const encBytes = (await toBytes(enc))!;
+    // Prefix PTSC tag so the read path can identify encrypted blobs explicitly.
+    const tagged = new Uint8Array(PTSC_TAG.length + encBytes.length);
+    tagged.set(PTSC_TAG, 0);
+    tagged.set(encBytes, PTSC_TAG.length);
+    return tagged.buffer as ArrayBuffer;
   }
   return bytes.buffer.slice(0) as ArrayBuffer;
 }
@@ -121,9 +128,12 @@ async function maybeDecrypt(
   const bytes = await toBytes(raw);
   if (!bytes) return undefined;
   if (!vault.isUnlocked()) return new Blob([bytes as BlobPart], { type: mime });
-  // Plaintext audio left over from before vault setup — pass through.
-  // Encrypted bytes are random (no recognizable header), so we sniff plaintext
-  // formats and decrypt anything else.
+  // Fast path: PTSC tag means explicitly encrypted by this app.
+  if (isPtscEncrypted(bytes)) {
+    const payload = bytes.subarray(PTSC_TAG.length);
+    return vault.decryptBlob(new Blob([payload as BlobPart]), mime);
+  }
+  // Fallback for legacy blobs without the tag.
   if (isPlaintextAudio(bytes)) {
     return new Blob([bytes as BlobPart], { type: mime });
   }
