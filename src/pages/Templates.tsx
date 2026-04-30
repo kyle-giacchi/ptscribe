@@ -38,8 +38,7 @@ export function Templates() {
     }
     for (const fmt of FORMAT_ORDER) {
       buckets[fmt].sort(
-        (a, b) =>
-          Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name),
+        (a, b) => Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name),
       );
     }
     return buckets;
@@ -66,8 +65,20 @@ export function Templates() {
   }
 
   return (
-    <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start', maxWidth: 980, margin: '0 auto', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+    <div
+      style={{
+        padding: 22,
+        display: 'grid',
+        gap: 14,
+        alignContent: 'start',
+        maxWidth: 980,
+        margin: '0 auto',
+        width: '100%',
+      }}
+    >
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+      >
         <div style={{ display: 'grid', gap: 4 }}>
           <Eyebrow>Templates</Eyebrow>
           <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
@@ -144,7 +155,9 @@ export function Templates() {
                           </span>
                         )}
                       </div>
-                      <div style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                      <div
+                        style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}
+                      >
                         {t.sections.length} sections
                       </div>
                     </div>
@@ -175,7 +188,11 @@ export function Templates() {
                           </PtButton>
                           <PtButton
                             variant="ghost"
-                            style={{ padding: '6px 10px', fontSize: 12, color: 'var(--color-pt-red)' }}
+                            style={{
+                              padding: '6px 10px',
+                              fontSize: 12,
+                              color: 'var(--color-pt-red)',
+                            }}
                             onClick={() => {
                               if (confirm(`Delete template "${t.name}"?`)) removeTemplate(t.id);
                             }}
@@ -223,9 +240,8 @@ function CreateTemplateModal({
   return (
     <Modal open onClose={onClose} title="New template" size="sm">
       <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
-        Templates are scoped to a visit type so the New Session picker can show
-        only the relevant ones. You can refine sections and the AI prompt
-        immediately after creating.
+        Templates are scoped to a visit type so the New Session picker can show only the relevant
+        ones. You can refine sections and the AI prompt immediately after creating.
       </p>
       <Field label="Visit type" hint="Where this template will appear.">
         <Select value={format} onChange={(e) => setFormat(e.target.value as NoteFormat)}>
@@ -251,11 +267,7 @@ function CreateTemplateModal({
         <PtButton variant="ghost" onClick={onClose}>
           Cancel
         </PtButton>
-        <PtButton
-          variant="primary"
-          disabled={!name.trim()}
-          onClick={() => onCreate(format, name)}
-        >
+        <PtButton variant="primary" disabled={!name.trim()} onClick={() => onCreate(format, name)}>
           Create &amp; edit
         </PtButton>
       </div>
@@ -278,9 +290,7 @@ function TemplateEditorModal({
   const [sections, setSections] = useState<NoteTemplateSection[]>(template.sections);
 
   const formatOptions: NoteFormat[] =
-    template.format === 'custom'
-      ? ['custom', ...SELECTABLE_FORMATS]
-      : SELECTABLE_FORMATS;
+    template.format === 'custom' ? ['custom', ...SELECTABLE_FORMATS] : SELECTABLE_FORMATS;
 
   function update(idx: number, patch: Partial<NoteTemplateSection>) {
     setSections(sections.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
@@ -309,10 +319,7 @@ function TemplateEditorModal({
           <TextInput value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Visit type" hint="Where this template appears in New Session.">
-          <Select
-            value={format}
-            onChange={(e) => setFormat(e.target.value as NoteFormat)}
-          >
+          <Select value={format} onChange={(e) => setFormat(e.target.value as NoteFormat)}>
             {formatOptions.map((fmt) => (
               <option key={fmt} value={fmt}>
                 {FORMAT_LABEL[fmt]}

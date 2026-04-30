@@ -19,9 +19,7 @@ export function SurfaceCard({
   ...rest
 }: SurfaceCardProps) {
   const merged: CSSProperties = {
-    background: muted
-      ? 'var(--color-pt-surface-mut)'
-      : 'var(--color-pt-surface)',
+    background: muted ? 'var(--color-pt-surface-mut)' : 'var(--color-pt-surface)',
     border: bordered ? '1px solid var(--color-pt-border)' : 'none',
     borderRadius: radius,
     padding,

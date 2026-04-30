@@ -38,13 +38,21 @@ export function useAccordionSections(opts: {
     if (!next) return;
     const section = next;
     const id = window.setTimeout(() => {
-      setOpenSections((s) => { const n = new Set(s); n.add(section); return n; });
+      setOpenSections((s) => {
+        const n = new Set(s);
+        n.add(section);
+        return n;
+      });
     }, 0);
     return () => window.clearTimeout(id);
   }, [sessionStatus]);
 
   function openSection(id: string) {
-    setOpenSections((prev) => { const n = new Set(prev); n.add(id); return n; });
+    setOpenSections((prev) => {
+      const n = new Set(prev);
+      n.add(id);
+      return n;
+    });
   }
 
   return { openSections, toggleSection, resetSections, openSection };

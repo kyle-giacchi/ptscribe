@@ -25,8 +25,7 @@ export function PlansProvider({ children }: { children: ReactNode }) {
       updatePlan: m.update,
       removePlan: m.remove,
       getPlan: m.get,
-      activePlanForPatient: (patientId) =>
-        plans.find((p) => p.patientId === patientId && p.active),
+      activePlanForPatient: (patientId) => plans.find((p) => p.patientId === patientId && p.active),
     };
   }, [plans, updatePlansSlice]);
   return <PlansContext.Provider value={value}>{children}</PlansContext.Provider>;

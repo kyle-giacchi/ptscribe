@@ -52,7 +52,7 @@ export function buildUserPrompt({
   }
 
   lines.push('');
-  lines.push('# Today\'s session transcript');
+  lines.push("# Today's session transcript");
   lines.push(transcript || '(no transcript provided)');
 
   return lines.join('\n');

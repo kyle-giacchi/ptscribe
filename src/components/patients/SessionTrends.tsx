@@ -64,7 +64,10 @@ function Stat({ label, value }: { label: string; value: string }) {
       className="rounded-lg border px-2 py-1.5"
       style={{ borderColor: 'var(--color-border-soft)', background: 'var(--color-surface-2)' }}
     >
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--color-fg-subtle)' }}>
+      <div
+        className="text-[10px] tracking-wide uppercase"
+        style={{ color: 'var(--color-fg-subtle)' }}
+      >
         {label}
       </div>
       <div className="font-mono text-base tabular-nums" style={{ color: 'var(--color-fg)' }}>
@@ -76,7 +79,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function ChartCaption({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--color-fg-subtle)' }}>
+    <div
+      className="text-[11px] tracking-wide uppercase"
+      style={{ color: 'var(--color-fg-subtle)' }}
+    >
       {children}
     </div>
   );

@@ -26,8 +26,8 @@ export function NewTemplateModal({
       size="sm"
     >
       <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
-        Saved as a {visitTypeLabel.toLowerCase()} template. You can edit sections and the
-        AI prompt later from the Templates page.
+        Saved as a {visitTypeLabel.toLowerCase()} template. You can edit sections and the AI prompt
+        later from the Templates page.
       </p>
       <Field label="Template name">
         <TextInput

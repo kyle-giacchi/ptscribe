@@ -31,14 +31,7 @@ import {
   dischargePct,
   adherencePct,
 } from '@/utils/patientMetrics';
-import type {
-  Note,
-  Patient,
-  PlanGoal,
-  PlanOfCare,
-  Prescription,
-  Session,
-} from '@/types';
+import type { Note, Patient, PlanGoal, PlanOfCare, Prescription, Session } from '@/types';
 
 type Tab = 'overview' | 'history' | 'measures' | 'hep' | 'documents' | 'billing';
 const TABS: { value: Tab; label: string }[] = [
@@ -64,14 +57,8 @@ export function PatientDetail() {
   const [tab, setTab] = useState<Tab>('overview');
   const [sameDaySessions, setSameDaySessions] = useState<Session[] | null>(null);
 
-  const sessions = useMemo(
-    () => (patient ? sessionsFor(patient.id) : []),
-    [patient, sessionsFor]
-  );
-  const notes = useMemo(
-    () => (patient ? notesFor(patient.id) : []),
-    [patient, notesFor]
-  );
+  const sessions = useMemo(() => (patient ? sessionsFor(patient.id) : []), [patient, sessionsFor]);
+  const notes = useMemo(() => (patient ? notesFor(patient.id) : []), [patient, notesFor]);
   const plan = patient ? activePlanForPatient(patient.id) : undefined;
 
   if (!patient) {
@@ -131,7 +118,7 @@ export function PatientDetail() {
     if (!patient) return;
     if (
       !confirm(
-        `Remove ${patient.firstName} ${patient.lastName}? All sessions, notes, plans, and audio recordings for this patient will be permanently deleted.`
+        `Remove ${patient.firstName} ${patient.lastName}? All sessions, notes, plans, and audio recordings for this patient will be permanently deleted.`,
       )
     )
       return;
@@ -309,7 +296,11 @@ function PatientHeader({
           <PtButton variant="ghost" iconLeft={<Calendar size={14} strokeWidth={2} />}>
             Schedule
           </PtButton>
-          <PtButton variant="ghost" iconLeft={<Pencil size={14} strokeWidth={2} />} onClick={onEdit}>
+          <PtButton
+            variant="ghost"
+            iconLeft={<Pencil size={14} strokeWidth={2} />}
+            onClick={onEdit}
+          >
             Edit
           </PtButton>
           <PtButton
@@ -378,7 +369,7 @@ function Overview({
 
   const recentVisits = useMemo(
     () => [...sessions].sort((a, b) => b.date - a.date).slice(0, 5),
-    [sessions]
+    [sessions],
   );
 
   // 14-day adherence: 1 if any session that day, scaled by count
@@ -438,9 +429,7 @@ function Overview({
               delta={pendingNotes ? `${pendingNotes} pending` : 'all signed'}
               tone={pendingNotes ? 'warn' : 'good'}
               target={`${finalizedNotes} signed`}
-              pct={
-                sessionsCount > 0 ? Math.round((finalizedNotes / sessionsCount) * 100) : 0
-              }
+              pct={sessionsCount > 0 ? Math.round((finalizedNotes / sessionsCount) * 100) : 0}
             />
             <Metric
               label="Days in care"
@@ -649,16 +638,11 @@ function Overview({
           <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
             {patient.notes && <FlagItem tone="amber" text={patient.notes} />}
             {patient.referringProvider && (
-              <FlagItem
-                tone="mute"
-                text={`Referred by ${patient.referringProvider}`}
-              />
+              <FlagItem tone="mute" text={`Referred by ${patient.referringProvider}`} />
             )}
             {patient.icd10 && <FlagItem tone="mute" text={`ICD-10 ${patient.icd10}`} />}
             {!patient.notes && !patient.referringProvider && !patient.icd10 && (
-              <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
-                No flags on file.
-              </p>
+              <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>No flags on file.</p>
             )}
           </div>
         </SurfaceCard>
@@ -682,8 +666,7 @@ function VisitRow({
     month: 'short',
     day: 'numeric',
   });
-  const summary =
-    session.transcript?.slice(0, 90).trim() || labelForType(session.type);
+  const summary = session.transcript?.slice(0, 90).trim() || labelForType(session.type);
   const pendingSign = note && !note.finalized;
 
   return (
@@ -810,9 +793,7 @@ function Metric({
         >
           {value}
         </span>
-        <span style={{ fontSize: 11.5, color: deltaColor, fontWeight: 600 }}>
-          {delta}
-        </span>
+        <span style={{ fontSize: 11.5, color: deltaColor, fontWeight: 600 }}>{delta}</span>
       </div>
       <div
         style={{
@@ -844,15 +825,7 @@ function Metric({
   );
 }
 
-function ExRow({
-  name,
-  dosage,
-  isNew,
-}: {
-  name: string;
-  dosage: string;
-  isNew?: boolean;
-}) {
+function ExRow({ name, dosage, isNew }: { name: string; dosage: string; isNew?: boolean }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div
@@ -1007,9 +980,7 @@ function PlanEditor({
         </div>
         <ul style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {plan.goals.length === 0 && (
-            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
-              No goals yet.
-            </li>
+            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>No goals yet.</li>
           )}
           {plan.goals.map((g) => (
             <li key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -1101,9 +1072,7 @@ function PlanEditor({
                   <div style={{ fontSize: 13, color: 'var(--color-pt-text)' }}>
                     {ex?.name ?? 'Unknown exercise'}
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
-                    {p.dosage}
-                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{p.dosage}</div>
                 </div>
                 <button
                   type="button"

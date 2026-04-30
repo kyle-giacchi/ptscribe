@@ -1,5 +1,11 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { checkGateCode, checkStoredGateHash, getStoredGateHash, storeGateCode, clearGateCode } from './gate';
+import {
+  checkGateCode,
+  checkStoredGateHash,
+  getStoredGateHash,
+  storeGateCode,
+  clearGateCode,
+} from './gate';
 
 beforeEach(() => localStorage.clear());
 

@@ -5,7 +5,7 @@ export interface LetterChipProps {
 export function LetterChip({ letter }: LetterChipProps) {
   return (
     <span
-      className="font-mono inline-flex items-center justify-center"
+      className="inline-flex items-center justify-center font-mono"
       style={{
         fontSize: 11,
         fontWeight: 600,

@@ -85,7 +85,9 @@ export function migrate(data: unknown): AppData {
 
 function migrateV1ToV2(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input, version: 2 } as Record<string, unknown>;
-  const settings = next.settings as { ai?: { transcription?: Record<string, unknown> } } | undefined;
+  const settings = next.settings as
+    | { ai?: { transcription?: Record<string, unknown> } }
+    | undefined;
   const tx = settings?.ai?.transcription;
   if (tx) {
     if (tx.provider === 'openai') {
@@ -102,7 +104,9 @@ function migrateV1ToV2(input: Record<string, unknown>): Record<string, unknown> 
 
 function migrateV3ToV4(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input, version: 4 } as Record<string, unknown>;
-  const settings = next.settings as { ai?: { transcription?: Record<string, unknown> } } | undefined;
+  const settings = next.settings as
+    | { ai?: { transcription?: Record<string, unknown> } }
+    | undefined;
   const tx = settings?.ai?.transcription;
   if (tx && tx.model === '@cf/openai/whisper-large-v3-turbo') {
     tx.model = '@cf/deepgram/nova-3';
@@ -111,9 +115,7 @@ function migrateV3ToV4(input: Record<string, unknown>): Record<string, unknown> 
   const templates = Array.isArray(next.templates)
     ? (next.templates as Record<string, unknown>[])
     : [];
-  const hasPremium1 = templates.some(
-    (t) => t.builtin === true && t.name === 'Premium Prompt 1',
-  );
+  const hasPremium1 = templates.some((t) => t.builtin === true && t.name === 'Premium Prompt 1');
   if (!hasPremium1) {
     const seed = BUILTIN_TEMPLATES.find((t) => t.name === 'Premium Prompt 1');
     if (seed) {
@@ -137,7 +139,8 @@ function migrateV2ToV3(input: Record<string, unknown>): Record<string, unknown> 
 
   next.sessions = sessions.map((raw) => {
     const s = raw as Record<string, unknown>;
-    const audioRef = typeof s.audioRef === 'string' && s.audioRef.length > 0 ? s.audioRef : undefined;
+    const audioRef =
+      typeof s.audioRef === 'string' && s.audioRef.length > 0 ? s.audioRef : undefined;
     const transcript = typeof s.transcript === 'string' ? s.transcript : undefined;
     const createdAt = typeof s.createdAt === 'number' ? s.createdAt : Date.now();
     const updatedAt = typeof s.updatedAt === 'number' ? s.updatedAt : createdAt;
@@ -172,8 +175,7 @@ function migrateV2ToV3(input: Record<string, unknown>): Record<string, unknown> 
 function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input, version: 5 } as Record<string, unknown>;
   const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
-  const existingAudio =
-    (settings.audio as { silenceDetection?: unknown } | undefined) ?? undefined;
+  const existingAudio = (settings.audio as { silenceDetection?: unknown } | undefined) ?? undefined;
   const existingSd =
     (existingAudio?.silenceDetection as Record<string, unknown> | undefined) ?? undefined;
 
@@ -189,9 +191,7 @@ function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> 
             ? existingSd.sensitivity
             : 'medium',
         padMs:
-          typeof existingSd?.padMs === 'number' &&
-          existingSd.padMs >= 0 &&
-          existingSd.padMs <= 2000
+          typeof existingSd?.padMs === 'number' && existingSd.padMs >= 0 && existingSd.padMs <= 2000
             ? existingSd.padMs
             : 400,
       },
@@ -219,14 +219,12 @@ function migrateV10ToV11(input: Record<string, unknown>): Record<string, unknown
 function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input, version: 8 } as Record<string, unknown>;
   const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
-  const existingSec =
-    (settings.security as Record<string, unknown> | undefined) ?? undefined;
+  const existingSec = (settings.security as Record<string, unknown> | undefined) ?? undefined;
   const lock = existingSec?.idleLockMinutes;
   next.settings = {
     ...settings,
     security: {
-      idleLockMinutes:
-        typeof lock === 'number' && lock >= 0 && lock <= 120 ? Math.floor(lock) : 10,
+      idleLockMinutes: typeof lock === 'number' && lock >= 0 && lock <= 120 ? Math.floor(lock) : 10,
     },
   };
   return next;
@@ -236,8 +234,7 @@ function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> 
   const next = { ...input, version: 6 } as Record<string, unknown>;
   const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
   const existingAudio = (settings.audio as Record<string, unknown> | undefined) ?? {};
-  const existingSu =
-    (existingAudio.speedUp as Record<string, unknown> | undefined) ?? undefined;
+  const existingSu = (existingAudio.speedUp as Record<string, unknown> | undefined) ?? undefined;
 
   next.settings = {
     ...settings,
