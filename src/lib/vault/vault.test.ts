@@ -110,3 +110,46 @@ describe('vault.lock', () => {
     expect(vault.isUnlocked()).toBe(false);
   });
 });
+
+describe('vault.changePassphrase', () => {
+  const OLD = 'a'.repeat(PASSPHRASE_MIN_CHARS);
+  const NEW = 'b'.repeat(PASSPHRASE_MIN_CHARS);
+
+  it('returns locked when vault is not unlocked', async () => {
+    await vault.setup(OLD);
+    vault.lock();
+    const result = await vault.changePassphrase(OLD, NEW);
+    expect(result).toEqual({ ok: false, reason: 'locked' });
+  });
+
+  it('returns bad_passphrase when current passphrase is wrong', async () => {
+    await vault.setup(OLD);
+    const result = await vault.changePassphrase('wrong-passphrase!!', NEW);
+    expect(result).toEqual({ ok: false, reason: 'bad_passphrase' });
+  });
+
+  it('rewraps the DEK and the new passphrase unlocks successfully', async () => {
+    await vault.setup(OLD);
+    const plaintext = JSON.stringify({ x: 1 });
+    const encrypted = await vault.encryptUtf8(plaintext);
+
+    const result = await vault.changePassphrase(OLD, NEW);
+    expect(result).toEqual({ ok: true });
+
+    // Old passphrase should no longer unlock
+    vault.lock();
+    const oldUnlock = await vault.unlock(OLD);
+    expect(oldUnlock.ok).toBe(false);
+
+    // New passphrase should unlock and data should still decrypt
+    const newUnlock = await vault.unlock(NEW);
+    expect(newUnlock.ok).toBe(true);
+    const decrypted = await vault.decryptUtf8(encrypted);
+    expect(decrypted).toBe(plaintext);
+  });
+
+  it('rejects a new passphrase that is too short', async () => {
+    await vault.setup(OLD);
+    await expect(vault.changePassphrase(OLD, 'short')).rejects.toThrow(/passphrase/i);
+  });
+});

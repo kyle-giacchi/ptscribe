@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from '@/lib/storageKeys';
+import { auditLog } from '@/lib/audit/auditLog';
 import {
   ARGON2_ITERATIONS,
   ARGON2_MEMORY_KIB,
@@ -130,6 +131,7 @@ export const vault = {
     });
     dek = newDek;
     bc?.postMessage({ type: 'vault:unlocked' });
+    void auditLog.append('vault:unlocked');
   },
 
   async unlock(passphrase: string): Promise<UnlockResult> {
@@ -149,6 +151,7 @@ export const vault = {
       const kek = await deriveKek(passphrase, salt);
       dek = await unwrapDek({ iv, ciphertext }, kek);
       bc?.postMessage({ type: 'vault:unlocked' });
+      void auditLog.append('vault:unlocked');
       return { ok: true };
     } catch {
       dek = null;
@@ -160,6 +163,64 @@ export const vault = {
     dek = null;
     bc?.postMessage({ type: 'vault:locked' });
     otherTabHasVault = false;
+    void auditLog.append('vault:locked');
+  },
+
+  async changePassphrase(
+    currentPassphrase: string,
+    newPassphrase: string,
+  ): Promise<{ ok: true } | { ok: false; reason: 'bad_passphrase' | 'locked' | 'corrupt' }> {
+    if (!dek) return { ok: false, reason: 'locked' };
+    if (newPassphrase.length < PASSPHRASE_MIN_CHARS) {
+      throw new Error(
+        `vault: new passphrase must be at least ${PASSPHRASE_MIN_CHARS} characters`,
+      );
+    }
+
+    const env = readEnvelope();
+    if (!env) return { ok: false, reason: 'corrupt' };
+
+    let currentSalt: Uint8Array;
+    let wrappedIv: Uint8Array;
+    let wrappedCt: Uint8Array;
+    try {
+      currentSalt = base64ToBytes(env.kdf.salt);
+      wrappedIv = base64ToBytes(env.wrappedDek.iv);
+      wrappedCt = base64ToBytes(env.wrappedDek.ciphertext);
+    } catch {
+      return { ok: false, reason: 'corrupt' };
+    }
+
+    // Verify current passphrase before rewrapping.
+    try {
+      const currentKek = await deriveKek(currentPassphrase, currentSalt);
+      await unwrapDek({ iv: wrappedIv, ciphertext: wrappedCt }, currentKek);
+    } catch {
+      return { ok: false, reason: 'bad_passphrase' };
+    }
+
+    // Rewrap the in-memory DEK under a new salt + KEK — no data re-encryption needed.
+    const newSalt = randomBytes(SALT_BYTES);
+    const newKek = await deriveKek(newPassphrase, newSalt);
+    const wrapped = await wrapDek(dek, newKek);
+
+    writeEnvelope({
+      v: VAULT_VERSION,
+      kdf: {
+        name: 'Argon2id',
+        memoryKib: ARGON2_MEMORY_KIB,
+        iterations: ARGON2_ITERATIONS,
+        parallelism: ARGON2_PARALLELISM,
+        salt: bytesToBase64(newSalt),
+      },
+      wrappedDek: {
+        iv: bytesToBase64(wrapped.iv),
+        ciphertext: bytesToBase64(wrapped.ciphertext),
+      },
+    });
+
+    void auditLog.append('vault:passphrase_changed');
+    return { ok: true };
   },
 
   async encryptUtf8(plaintext: string): Promise<string> {

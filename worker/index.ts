@@ -17,6 +17,9 @@ interface Env {
   ANTHROPIC_API_KEY: string;
   PTSCRIBE_GATE: string;
   RATE_LIMIT?: KVNamespace;
+  /** Comma-separated list of allowed request Origins. Defaults to same-origin
+   *  plus localhost dev ports when unset. */
+  ALLOWED_ORIGINS?: string;
 }
 
 interface GenerateBody {
@@ -131,6 +134,17 @@ function withSecurityHeaders(res: Response, url: URL): Response {
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method !== 'POST') {
     return apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
+  }
+
+  const origin = request.headers.get('Origin');
+  if (origin) {
+    const workerOrigin = new URL(request.url).origin;
+    const allowed = env.ALLOWED_ORIGINS
+      ? new Set(env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean))
+      : new Set([workerOrigin, 'http://localhost:8080', 'http://localhost:8787']);
+    if (!allowed.has(origin)) {
+      return apiError('FORBIDDEN', 'Origin not allowed', 403);
+    }
   }
 
   const gate = request.headers.get('x-ptscribe-key') ?? '';
@@ -430,6 +444,7 @@ function json(payload: unknown, status = 200): Response {
 
 type ErrorCode =
   | 'METHOD_NOT_ALLOWED'
+  | 'FORBIDDEN'
   | 'UNAUTHORIZED'
   | 'RATE_LIMITED'
   | 'NOT_FOUND'
