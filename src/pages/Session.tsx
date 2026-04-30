@@ -13,6 +13,7 @@ import { useRecorder } from '@/hooks/useRecorder';
 import { useLiveTranscript } from '@/hooks/useLiveTranscript';
 import { audioRepository } from '@/services/AudioRepository';
 import { transcribe } from '@/services/ai/transcribe';
+import { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
 import { trimSilence } from '@/lib/audio/silenceTrim';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
@@ -203,6 +204,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             status: 'ready',
             durationSec,
           });
+          runLocalTranscription(clipId, finalBlob);
         } catch (e) {
           setError(`Could not save audio: ${(e as Error).message}`);
           patchClip(clipId, {
@@ -269,40 +271,44 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       await audioRepository.save(clipId, blob);
       patchClip(clipId, { status: 'ready', durationSec });
 
-      const { provider } = settings.ai.transcription;
-      if (provider === 'cloudflare' || provider === 'local') {
-        toast.loading('Transcribing…', { id: tid, duration: Infinity });
-        patchClip(clipId, { status: 'transcribing', updatedAt: Date.now() });
-        const clipObj: SessionClip = {
-          id: clipId, index: session?.clips.length ?? 0, durationSec,
-          status: 'transcribing', createdAt: now, updatedAt: Date.now(),
-        };
-        const result = await transcribeClipBlob(clipObj);
-        if (result.ok) {
-          patchClip(clipId, {
-            status: 'transcribed', transcript: result.text,
-            transcriptedAt: Date.now(), errorMessage: undefined,
-          });
-          const prior = mergeClipTranscripts(session?.clips ?? []);
-          const merged = [prior, result.text.trim()].filter(Boolean).join('\n\n');
-          setTranscript(merged);
-          patchSession({ transcript: merged, transcriptSource: 'whisper' });
-          toast.success('Done.', { id: tid });
-        } else {
-          patchClip(clipId, { status: 'failed', errorMessage: result.error });
-          toast.error(`Transcription failed: ${result.error}`, { id: tid });
-        }
-      } else {
-        toast.success(`Added "${file.name}"`, { id: tid });
-      }
+      toast.success(`Added "${file.name}"`, { id: tid });
+      runLocalTranscription(clipId, blob);
     } catch (e) {
       patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
       toast.error(`Upload failed: ${(e as Error).message}`, { id: tid });
     }
   }
 
+  // ── Local auto-transcription (always runs in background after any clip is saved) ──
+  async function runLocalTranscription(clipId: string, blob: Blob): Promise<void> {
+    patchClip(clipId, { status: 'transcribing', updatedAt: Date.now() });
+    try {
+      const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
+      const text = result.text.trim();
+      if (text) {
+        patchClip(clipId, {
+          status: 'transcribed',
+          transcript: text,
+          localTranscript: text,
+          transcriptedAt: Date.now(),
+          errorMessage: undefined,
+        });
+        const otherMerged = mergeClipTranscripts(
+          (session?.clips ?? []).filter((c) => c.id !== clipId),
+        );
+        const merged = [otherMerged, text].filter(Boolean).join('\n\n');
+        setTranscript(merged);
+        patchSession({ transcript: merged, transcriptSource: 'whisper' });
+      } else {
+        patchClip(clipId, { status: 'ready', updatedAt: Date.now() });
+      }
+    } catch {
+      patchClip(clipId, { status: 'ready', updatedAt: Date.now() });
+    }
+  }
+
   // ── Transcription ────────────────────────────────────────────────────────
-  async function transcribeClipBlob(clip: SessionClip, onProgress?: (msg: string) => void): Promise<
+  async function transcribeClipBlob(clip: SessionClip, onProgress?: (msg: string) => void, useNova?: boolean): Promise<
     | {
         ok: true;
         text: string;
@@ -353,8 +359,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
       const result = await transcribe({
         blob: blobToSend,
-        provider: settings.ai.transcription.provider,
-        model: settings.ai.transcription.model,
+        provider: useNova ? 'cloudflare' : settings.ai.transcription.provider,
+        model: useNova ? '@cf/deepgram/nova-3' : settings.ai.transcription.model,
         onProgress,
       });
       return { ok: true, text: result.text, trimReport, speedReport };
@@ -366,6 +372,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function runTranscribeLoop(
     pending: SessionClip[],
     transcribed: SessionClip[],
+    useNova?: boolean,
   ): Promise<{
     textByClip: Map<string, string>;
     successes: number;
@@ -387,7 +394,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     let totalSpeedOriginalSec = 0;
     await Promise.allSettled(
       pending.map(async (clip) => {
-        const result = await transcribeClipBlob(clip);
+        const result = await transcribeClipBlob(clip, undefined, useNova);
         if (result.ok) {
           successes += 1;
           textByClip.set(clip.id, result.text);
@@ -436,11 +443,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   async function handleCreateTranscript(clipId?: string) {
     if (!session) return;
-    const provider = settings.ai.transcription.provider;
-    if (provider !== 'cloudflare' && provider !== 'local') {
-      toast.error('Switch transcription to Cloudflare or Local Whisper in Settings to transcribe saved clips.');
-      return;
-    }
 
     const guard = checkActionGuard('transcribe');
     if (!guard.allowed) {
@@ -448,10 +450,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       return;
     }
 
+    // Include locally-transcribed clips (localTranscript === transcript means nova hasn't run yet)
     const pending = session.clips.filter(
-      (c) => (c.status === 'ready' || c.status === 'failed') && (clipId == null || c.id === clipId),
+      (c) =>
+        (c.status === 'ready' ||
+          c.status === 'failed' ||
+          (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript)) &&
+        (clipId == null || c.id === clipId),
     );
-    const transcribed = session.clips.filter((c) => c.status === 'transcribed');
+    const transcribed = session.clips.filter(
+      (c) => c.status === 'transcribed' && !pending.some((p) => p.id === c.id),
+    );
 
     if (pending.length === 0 && transcribed.length === 0) {
       toast.error('No clips to transcribe yet.');
@@ -489,7 +498,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       totalOriginalSec,
       totalSpeedSavedSec,
       totalSpeedOriginalSec,
-    } = await runTranscribeLoop(pending, transcribed);
+    } = await runTranscribeLoop(pending, transcribed, true);
 
     const merged = [...session.clips]
       .sort((a, b) => a.createdAt - b.createdAt)
@@ -519,6 +528,22 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         `Audio speed-up saved ${Math.round(totalSpeedSavedSec)}s (~${pct}%) before transcription.`,
       );
     }
+  }
+
+  function handleRevertToLocal() {
+    const clips = session?.clips ?? [];
+    const reverted = clips.map((c) =>
+      c.localTranscript
+        ? { ...c, transcript: c.localTranscript, status: 'transcribed' as ClipStatus }
+        : c,
+    );
+    patchClips(() => reverted);
+    const merged = mergeClipTranscripts(reverted);
+    if (merged.trim()) {
+      setTranscript(merged);
+      patchSession({ transcript: merged, transcriptSource: 'whisper' });
+    }
+    toast.success('Reverted to local transcription.');
   }
 
   // ── Clip management ──────────────────────────────────────────────────────
@@ -688,8 +713,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       : 'var(--color-fg-subtle)';
 
   const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
-  const hasReadyClip = sortedClips.some(
-    (c) => c.status === 'ready' || c.status === 'failed' || c.status === 'transcribed',
+  const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
+  // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
+  const novaEligible = !isRecording && sortedClips.some(
+    (c) =>
+      c.status === 'ready' ||
+      c.status === 'failed' ||
+      (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript),
   );
 
   // Collapsed-header summaries
@@ -706,10 +736,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   const currentClipMerge = mergeClipTranscripts(session.clips).trim();
   const hasUserEdits = transcript.trim().length > 0 && transcript.trim() !== currentClipMerge;
-  const transcriptionBlockedReason =
-    hasReadyClip && !isRecording && settings.ai.transcription.provider === 'webspeech'
-      ? 'Cloudflare or Local Whisper required to transcribe saved clips — switch providers in Settings.'
-      : undefined;
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: '1fr', minHeight: '100%' }}>
@@ -787,12 +813,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             transcript={transcript}
             clips={sortedClips}
             canRemerge={hasTranscribedClip}
-            canTranscribe={hasReadyClip && !isRecording && (settings.ai.transcription.provider === 'cloudflare' || settings.ai.transcription.provider === 'local')}
+            canTranscribe={novaEligible}
             transcribing={busy === 'transcribing'}
             transcribeUsed={transcribeUsed}
             transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
             hasUserEdits={hasUserEdits}
-            transcriptionBlockedReason={transcriptionBlockedReason}
+            hasLocalTranscript={hasLocalTranscript}
             onChange={setTranscript}
             onCommit={() =>
               patchSession({
@@ -802,6 +828,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             }
             onRemerge={handleRemergeFromClips}
             onCreateTranscript={handleCreateTranscript}
+            onRevertToLocal={handleRevertToLocal}
           />
         </AccordionSection>
 
