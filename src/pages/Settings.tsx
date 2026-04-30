@@ -1,44 +1,57 @@
 import { useRef } from 'react';
-import { Download, Upload, ShieldAlert, Eraser, RefreshCw } from 'lucide-react';
+import { Download, Upload, Eraser, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
+import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
+import { exportBackup, importBackup } from '@/services/BackupService';
 import { vault } from '@/lib/vault/vault';
-import { AppDataSchema, defaultAppData } from '@/schemas';
+import { defaultAppData } from '@/schemas';
 import { downloadFile } from '@/utils/download';
 
 export function Settings() {
   const { clinician, setClinician } = useClinician();
-  const { settings, updateAi, updateAudio, updateUi } = useSettings();
+  const { settings, updateAi, updateAudio, updateUi, setIdleLockMinutes } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
   const importRef = useRef<HTMLInputElement>(null);
 
-  function handleExport() {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    downloadFile(
-      `ptnotes-backup-${stamp}.json`,
-      JSON.stringify(appData, null, 2),
-      'application/json',
-    );
-    toast.success('Backup downloaded');
+  async function handleExport() {
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const text = await exportBackup(appData);
+      const suffix = vault.isUnlocked() ? 'encrypted' : 'plaintext';
+      downloadFile(
+        `ptnotes-backup-${stamp}-${suffix}.json`,
+        text,
+        'application/json',
+      );
+      toast.success(
+        vault.isUnlocked()
+          ? 'Encrypted backup downloaded — restoring it requires this vault passphrase.'
+          : 'Backup downloaded (unencrypted — set up a vault passphrase to encrypt future backups).',
+      );
+    } catch (e) {
+      toast.error(`Export failed: ${(e as Error).message}`);
+    }
   }
 
   async function handleImport(file: File) {
     try {
       const text = await file.text();
-      const parsed = JSON.parse(text) as unknown;
-      const result = AppDataSchema.safeParse(parsed);
-      if (!result.success) {
-        toast.error('Backup file is invalid or from a different version.');
+      const result = await importBackup(text);
+      if (!result.ok) {
+        toast.error(result.error.message);
         return;
       }
       bulkUpdate(result.data);
-      toast.success('Backup restored');
+      toast.success(
+        result.encrypted ? 'Encrypted backup restored' : 'Backup restored',
+      );
     } catch (e) {
       toast.error(`Import failed: ${(e as Error).message}`);
     }
@@ -80,8 +93,8 @@ export function Settings() {
       </div>
 
       <SurfaceCard padding={18}>
-        <div style={{ display: 'grid', gap: 10 }}>
-          <Eyebrow>Vault</Eyebrow>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Eyebrow>Vault &amp; security</Eyebrow>
           <p
             style={{
               fontSize: 12,
@@ -93,6 +106,23 @@ export function Settings() {
             Your data on this device is encrypted with your passphrase. The key lives in this tab
             and is cleared when you close it. Use Lock now if you need to hand the device over.
           </p>
+          <div style={{ maxWidth: 280 }}>
+            <Field
+              label="Auto-lock after inactivity"
+              hint="Locks the vault after this much idle time. Pointer, key, or tab activity resets the timer."
+            >
+              <Select
+                value={String(settings.security.idleLockMinutes)}
+                onChange={(e) => setIdleLockMinutes(Number(e.target.value))}
+              >
+                <option value="0">Off</option>
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+              </Select>
+            </Field>
+          </div>
           <div>
             <PtButton
               variant="ghost"
@@ -174,12 +204,7 @@ export function Settings() {
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 12 }}>
           <Eyebrow>AI providers</Eyebrow>
-          <DisclaimerStrip>
-            This testing build uses hosted credentials managed on the server, so audio and
-            transcripts are proxied through our Cloudflare Worker on their way to Cloudflare Workers
-            AI (Deepgram Nova-3 for speech-to-text + speaker diarization) and Anthropic. Treat
-            anything you record as PHI in transit. PTScribe is not HIPAA-certified.
-          </DisclaimerStrip>
+          <HipaaDisclosure variant="compact" />
 
           <div
             style={{
@@ -456,27 +481,3 @@ export function Settings() {
   );
 }
 
-function DisclaimerStrip({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 10,
-        padding: 10,
-        borderRadius: 10,
-        border: '1px solid var(--color-pt-border)',
-        background: 'var(--color-pt-surface-mut)',
-        fontSize: 12,
-        color: 'var(--color-pt-text-2)',
-        lineHeight: 1.5,
-      }}
-    >
-      <ShieldAlert
-        size={14}
-        strokeWidth={1.75}
-        style={{ marginTop: 2, flexShrink: 0, color: 'var(--color-pt-amber)' }}
-      />
-      <p style={{ margin: 0 }}>{children}</p>
-    </div>
-  );
-}

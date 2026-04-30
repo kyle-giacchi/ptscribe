@@ -49,13 +49,84 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname.startsWith('/api/')) {
-      return handleApi(request, env, url);
-    }
+    const res = url.pathname.startsWith('/api/')
+      ? await handleApi(request, env, url)
+      : await env.ASSETS.fetch(request);
 
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(res, url);
   },
 };
+
+/**
+ * Security headers applied to every response. The CSP here is the local-first
+ * boundary: a single compromised dependency can no longer reach an attacker
+ * server, and an iframed clone cannot host this app for clickjacking.
+ *
+ * Notes on the directives:
+ *   - `script-src 'self'`: bundled JS only. No inline scripts; no third-party.
+ *   - `style-src 'self' 'unsafe-inline'`: inline `style={{}}` from React. To be
+ *     tightened with a nonce later.
+ *   - `worker-src 'self' blob:`: `MediaRecorder`, `timeStretch.worker.ts`, and
+ *     transformers.js load from blob URLs.
+ *   - `connect-src 'self' https://*.huggingface.co https://huggingface.co
+ *     https://cdn-lfs.huggingface.co`: same-origin XHR/fetch for `/api/*`,
+ *     plus HuggingFace model downloads when local Whisper is enabled.
+ *   - `media-src 'self' blob:`: <audio> sources blob URLs from IndexedDB.
+ *   - `frame-ancestors 'none'`: blocks framing entirely (better than X-Frame).
+ *   - `object-src 'none'`: no plugins; `base-uri 'self'`: no <base> hijack.
+ */
+function withSecurityHeaders(res: Response, url: URL): Response {
+  // Don't rewrite the body — clone headers and re-emit. Avoid mutating opaque
+  // responses (we never produce any here, so this is straightforward).
+  const headers = new Headers(res.headers);
+
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://huggingface.co https://*.huggingface.co https://cdn-lfs.huggingface.co",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+
+  headers.set('Content-Security-Policy', csp);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('Referrer-Policy', 'no-referrer');
+  headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()',
+  );
+  // HSTS only meaningful for HTTPS clients; safe to send unconditionally because
+  // browsers ignore it on HTTP. Cloudflare is HTTPS-only in production.
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
+  // Cross-origin isolation — keep it modest. COOP same-origin prevents window
+  // handle leaks from popups; CORP same-origin prevents cross-origin embeds of
+  // our assets. Don't enable COEP — it would break the HuggingFace fetch.
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+
+  // Suppress no-cache header from being clobbered if upstream set caching.
+  // /api/* already sets `no-store` in `json()`. For static assets, leave the
+  // ASSETS-binding-supplied caching alone.
+  if (url.pathname.startsWith('/api/')) {
+    headers.set('Cache-Control', 'no-store');
+  }
+
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method !== 'POST') {

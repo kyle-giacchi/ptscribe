@@ -394,13 +394,13 @@ export function Landing({ onSignIn }: LandingProps) {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                 <AlertTriangle size={11} color="#b45309" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span style={{ fontSize: 11, color: '#b45309', lineHeight: 1.45 }}>
-                  <strong>Not compliance-certified</strong> — PTScribe is in active development and has not been independently audited for HIPAA or any other regulatory compliance. Use at your own discretion.
+                  <strong>PTScribe is not HIPAA-certified.</strong> Treat anything you record as PHI and confirm BAA terms with Cloudflare and Anthropic before using real patient data. Full disclosure is shown during setup.
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                 <AlertTriangle size={11} color="#b45309" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span style={{ fontSize: 11, color: '#b45309', lineHeight: 1.45 }}>
-                  <strong>Patient consent required</strong> — always obtain explicit verbal or written consent from patients before recording any session.
+                  <strong>Patient consent required</strong> — obtain explicit verbal or written consent before recording any session.
                 </span>
               </div>
             </div>

@@ -9,6 +9,7 @@ import { TemplatesProvider } from '@/contexts/TemplatesProvider';
 import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
+import { IdleLockProvider } from '@/contexts/IdleLockProvider';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
@@ -64,6 +65,7 @@ export default function App() {
                             <ExercisesProvider>
                               <PlansProvider>
                                 <SettingsProvider>
+                                  <IdleLockProvider>
                                   <DemoBootstrap>
                                     <FirstRunGuard>
                                       <Suspense fallback={<PageLoader />}>
@@ -93,6 +95,7 @@ export default function App() {
                                       </Suspense>
                                     </FirstRunGuard>
                                   </DemoBootstrap>
+                                  </IdleLockProvider>
                                 </SettingsProvider>
                               </PlansProvider>
                             </ExercisesProvider>
