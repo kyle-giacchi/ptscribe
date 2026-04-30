@@ -2,11 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
-import {
-  Stethoscope,
-  ArrowRight,
-  Check,
-} from 'lucide-react';
+import { Stethoscope, ArrowRight, Check } from 'lucide-react';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
@@ -98,10 +94,17 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         >
           Welcome.
         </h1>
-        <p style={{ marginTop: 8, fontSize: 13.5, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
+        <p
+          style={{
+            marginTop: 8,
+            fontSize: 13.5,
+            color: 'var(--color-pt-text-2)',
+            lineHeight: 1.55,
+          }}
+        >
           Record a session, get a structured note. Patients, sessions, notes, templates, and
-          exercises live in this browser. Audio and transcripts are sent to AI providers through
-          a hosted proxy on this testing build.
+          exercises live in this browser. Audio and transcripts are sent to AI providers through a
+          hosted proxy on this testing build.
         </p>
       </div>
 
@@ -249,7 +252,16 @@ function DoneStep() {
 function Stepper({ current }: { current: number }) {
   const steps = ['Profile', 'Done'];
   return (
-    <ol style={{ display: 'flex', alignItems: 'center', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
+    <ol
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        listStyle: 'none',
+        margin: 0,
+        padding: 0,
+      }}
+    >
       {steps.map((label, i) => {
         const done = i < current;
         const active = i === current;

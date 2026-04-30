@@ -37,7 +37,7 @@ export function Dashboard() {
       sessions
         .filter((s) => s.date >= today && s.date < today + DAY_MS)
         .sort((a, b) => a.date - b.date),
-    [sessions, today]
+    [sessions, today],
   );
 
   const avgDuration = useMemo(() => {
@@ -49,7 +49,7 @@ export function Dashboard() {
 
   const draftNotes = useMemo(
     () => notes.filter((n) => !n.finalized).sort((a, b) => b.updatedAt - a.updatedAt),
-    [notes]
+    [notes],
   );
 
   const greetingName = clinician.name?.split(' ')[0] || 'there';
@@ -101,12 +101,10 @@ export function Dashboard() {
                   marginTop: 4,
                 }}
               >
-                <strong style={{ color: 'var(--color-pt-text)' }}>
-                  {todaysSessions.length}
-                </strong>{' '}
+                <strong style={{ color: 'var(--color-pt-text)' }}>{todaysSessions.length}</strong>{' '}
                 session{todaysSessions.length === 1 ? '' : 's'} on your schedule ·{' '}
-                <strong style={{ color: 'var(--color-pt-text)' }}>{draftNotes.length}</strong>{' '}
-                note{draftNotes.length === 1 ? '' : 's'} awaiting sign-off
+                <strong style={{ color: 'var(--color-pt-text)' }}>{draftNotes.length}</strong> note
+                {draftNotes.length === 1 ? '' : 's'} awaiting sign-off
               </div>
             </div>
             <div className="hidden items-center gap-2.5 md:flex">
@@ -144,12 +142,7 @@ export function Dashboard() {
             trend={draftNotes.length === 0 ? 'You’re caught up' : 'Review queue'}
             trendKind={draftNotes.length === 0 ? 'good' : 'warn'}
           />
-          <StatCard
-            eyebrow="Audio drops (7d)"
-            value={0}
-            trend="Mic stable"
-            trendKind="good"
-          />
+          <StatCard eyebrow="Audio drops (7d)" value={0} trend="Mic stable" trendKind="good" />
         </div>
 
         {/* Body */}
@@ -166,13 +159,7 @@ export function Dashboard() {
   );
 }
 
-function ScheduleCard({
-  sessions,
-  patients,
-}: {
-  sessions: Session[];
-  patients: Patient[];
-}) {
+function ScheduleCard({ sessions, patients }: { sessions: Session[]; patients: Patient[] }) {
   return (
     <SurfaceCard>
       <div
@@ -229,8 +216,7 @@ function ScheduleCard({
                     gridTemplateColumns: '70px 32px 1fr auto auto',
                     gap: 14,
                     padding: '12px 18px',
-                    borderTop:
-                      i === 0 ? 'none' : '1px solid var(--color-pt-border)',
+                    borderTop: i === 0 ? 'none' : '1px solid var(--color-pt-border)',
                     textDecoration: 'none',
                     background: isLive ? 'var(--color-pt-accent-soft)' : 'transparent',
                   }}
@@ -250,19 +236,13 @@ function ScheduleCard({
                       })}
                     </div>
                     {s.durationMin ? (
-                      <div
-                        style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}
-                      >
+                      <div style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}>
                         {s.durationMin}m
                       </div>
                     ) : null}
                   </div>
                   <Avatar
-                    name={
-                      patient
-                        ? `${patient.firstName} ${patient.lastName}`
-                        : 'Unknown'
-                    }
+                    name={patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown'}
                     size={32}
                   />
                   <div className="min-w-0">
@@ -274,9 +254,7 @@ function ScheduleCard({
                         color: 'var(--color-pt-text)',
                       }}
                     >
-                      {patient
-                        ? `${patient.firstName} ${patient.lastName}`
-                        : 'Unknown patient'}
+                      {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown patient'}
                     </div>
                     <div
                       className="truncate"
@@ -298,18 +276,12 @@ function ScheduleCard({
   );
 }
 
-function scheduleTone(
-  status: SessionStatus,
-  i: number,
-  total: number
-): StatusTone {
+function scheduleTone(status: SessionStatus, i: number, total: number): StatusTone {
   if (status === 'finalized') return 'done';
-  if (status === 'recording' || status === 'transcribing' || status === 'generating')
-    return 'live';
+  if (status === 'recording' || status === 'transcribing' || status === 'generating') return 'live';
   if (i === 0 || i === Math.min(1, total - 1)) return 'next';
   return 'upcoming';
 }
-
 
 function labelForStatus(s: SessionStatus): string {
   switch (s) {
@@ -371,11 +343,7 @@ function SignOffRail({
                   }}
                 >
                   <Avatar
-                    name={
-                      patient
-                        ? `${patient.firstName} ${patient.lastName}`
-                        : 'Unknown'
-                    }
+                    name={patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown'}
                     size={28}
                   />
                   <div className="min-w-0 flex-1">
@@ -387,15 +355,10 @@ function SignOffRail({
                         color: 'var(--color-pt-text)',
                       }}
                     >
-                      {patient
-                        ? `${patient.firstName} ${patient.lastName}`
-                        : 'Unknown'}
+                      {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown'}
                     </div>
-                    <div
-                      style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
-                    >
-                      {n.format.toUpperCase()} ·{' '}
-                      {new Date(n.updatedAt).toLocaleDateString()}
+                    <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+                      {n.format.toUpperCase()} · {new Date(n.updatedAt).toLocaleDateString()}
                     </div>
                   </div>
                   <StatusBadge tone={tone} label={ageLabel(ageHours)} />
@@ -452,9 +415,7 @@ function AudioCheckRail() {
               >
                 {it.label}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
-                {it.detail}
-              </div>
+              <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>{it.detail}</div>
             </div>
           </li>
         ))}
@@ -483,8 +444,7 @@ function QuickCaptureRail() {
           lineHeight: 1.5,
         }}
       >
-        Drop a quick dictation between visits — it&rsquo;ll route to the patient you
-        pick.
+        Drop a quick dictation between visits — it&rsquo;ll route to the patient you pick.
       </div>
       <Link
         to="/sessions/new"

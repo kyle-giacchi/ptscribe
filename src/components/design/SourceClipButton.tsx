@@ -40,23 +40,17 @@ export function SourceClipButton({
       />
       <span className="min-w-0">
         <span
-          className="font-mono block"
+          className="block font-mono"
           style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-3)' }}
         >
           {timestamp}
         </span>
-        <span
-          className="block truncate"
-          style={{ fontSize: 12.5, color: 'var(--color-pt-text)' }}
-        >
+        <span className="block truncate" style={{ fontSize: 12.5, color: 'var(--color-pt-text)' }}>
           {text}
         </span>
       </span>
       {confidence !== undefined && (
-        <span
-          className="font-mono"
-          style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}
-        >
+        <span className="font-mono" style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}>
           {Math.round(confidence * 100)}%
         </span>
       )}

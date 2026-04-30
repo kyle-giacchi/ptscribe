@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { checkGateCode, checkStoredGateHash, clearGateCode, getStoredGateHash, storeGateCode } from '@/lib/gate';
+import {
+  checkGateCode,
+  checkStoredGateHash,
+  clearGateCode,
+  getStoredGateHash,
+  storeGateCode,
+} from '@/lib/gate';
 import { GateContext } from '@/contexts/GateContext';
 import { Landing } from '@/pages/Landing';
 
 type Status = 'locked' | 'unlocked';
 
 export function AppGate({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<Status>(() =>
-    getStoredGateHash() ? 'unlocked' : 'locked',
-  );
+  const [status, setStatus] = useState<Status>(() => (getStoredGateHash() ? 'unlocked' : 'locked'));
 
   // Validate stored hash on mount in case localStorage was tampered with
   useEffect(() => {

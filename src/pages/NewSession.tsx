@@ -1,11 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Plus,
-  Search,
-  UserPlus,
-} from 'lucide-react';
+import { ArrowLeft, Plus, Search, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
@@ -59,12 +54,8 @@ export function NewSession() {
     const q = query.trim().toLowerCase();
     return patients
       .filter((p) => p.status !== 'discharged')
-      .filter((p) =>
-        q ? `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) : true,
-      )
-      .sort((a, b) =>
-        `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`),
-      );
+      .filter((p) => (q ? `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) : true))
+      .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
   }, [patients, query]);
 
   const visitTemplates = useMemo(() => {
@@ -159,7 +150,9 @@ export function NewSession() {
   }
 
   return (
-    <div style={{ padding: '20px 22px', display: 'grid', gap: 14, maxWidth: 760, margin: '0 auto' }}>
+    <div
+      style={{ padding: '20px 22px', display: 'grid', gap: 14, maxWidth: 760, margin: '0 auto' }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Link
           to="/"
@@ -196,10 +189,19 @@ export function NewSession() {
           {/* Patient */}
           <SurfaceCard>
             <div style={{ padding: '14px 16px 12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                }}
+              >
                 <Eyebrow>Patient</Eyebrow>
                 {selectedPatient && (
-                  <span style={{ fontSize: 11.5, color: 'var(--color-pt-accent-fg)', fontWeight: 500 }}>
+                  <span
+                    style={{ fontSize: 11.5, color: 'var(--color-pt-accent-fg)', fontWeight: 500 }}
+                  >
                     {selectedPatient.firstName} {selectedPatient.lastName}
                   </span>
                 )}
@@ -322,7 +324,8 @@ export function NewSession() {
                           fontWeight: active ? 600 : 400,
                           cursor: 'pointer',
                           fontFamily: 'inherit',
-                          transition: 'background 120ms ease, border-color 120ms ease, color 120ms ease',
+                          transition:
+                            'background 120ms ease, border-color 120ms ease, color 120ms ease',
                           whiteSpace: 'nowrap',
                           minHeight: 36,
                           lineHeight: 1,

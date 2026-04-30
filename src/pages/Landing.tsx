@@ -185,7 +185,15 @@ export function Landing({ onSignIn }: LandingProps) {
           </div>
 
           {/* Headline block */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px 0' }}>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              padding: '40px 0',
+            }}
+          >
             <div
               style={{
                 fontSize: 10.5,
@@ -221,8 +229,8 @@ export function Landing({ onSignIn }: LandingProps) {
                 maxWidth: 340,
               }}
             >
-              PTScribe drafts your notes while you treat — so you finish the day
-              with your patients, not your paperwork.
+              PTScribe drafts your notes while you treat — so you finish the day with your patients,
+              not your paperwork.
             </p>
           </div>
 
@@ -262,10 +270,25 @@ export function Landing({ onSignIn }: LandingProps) {
                   >
                     <Play size={12} fill="#fff" color="#fff" strokeWidth={0} />
                   </span>
-                  <span style={{ fontSize: 14.5, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+                  <span
+                    style={{
+                      fontSize: 14.5,
+                      fontWeight: 700,
+                      color: '#fff',
+                      letterSpacing: '-0.01em',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     Try a demo
                   </span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: 'rgba(255,255,255,0.68)',
+                      marginLeft: 'auto',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     Demo Dr. → Demo Patient → live session
                   </span>
                 </button>
@@ -347,12 +370,14 @@ export function Landing({ onSignIn }: LandingProps) {
                     {busy ? '…' : 'Unlock'}
                   </button>
                 </div>
-                {codeError && (
-                  <div style={{ fontSize: 12, color: '#dc2942' }}>{codeError}</div>
-                )}
+                {codeError && <div style={{ fontSize: 12, color: '#dc2942' }}>{codeError}</div>}
                 <button
                   type="button"
-                  onClick={() => { setMode(null); setCode(''); setCodeError(null); }}
+                  onClick={() => {
+                    setMode(null);
+                    setCode('');
+                    setCodeError(null);
+                  }}
                   style={{
                     all: 'unset',
                     fontSize: 12,
@@ -392,15 +417,28 @@ export function Landing({ onSignIn }: LandingProps) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                <AlertTriangle size={11} color="#b45309" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                <AlertTriangle
+                  size={11}
+                  color="#b45309"
+                  strokeWidth={2}
+                  style={{ flexShrink: 0, marginTop: 1 }}
+                />
                 <span style={{ fontSize: 11, color: '#b45309', lineHeight: 1.45 }}>
-                  <strong>PTScribe is not HIPAA-certified.</strong> Treat anything you record as PHI and confirm BAA terms with Cloudflare and Anthropic before using real patient data. Full disclosure is shown during setup.
+                  <strong>PTScribe is not HIPAA-certified.</strong> Treat anything you record as PHI
+                  and confirm BAA terms with Cloudflare and Anthropic before using real patient
+                  data. Full disclosure is shown during setup.
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                <AlertTriangle size={11} color="#b45309" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                <AlertTriangle
+                  size={11}
+                  color="#b45309"
+                  strokeWidth={2}
+                  style={{ flexShrink: 0, marginTop: 1 }}
+                />
                 <span style={{ fontSize: 11, color: '#b45309', lineHeight: 1.45 }}>
-                  <strong>Patient consent required</strong> — obtain explicit verbal or written consent before recording any session.
+                  <strong>Patient consent required</strong> — obtain explicit verbal or written
+                  consent before recording any session.
                 </span>
               </div>
             </div>

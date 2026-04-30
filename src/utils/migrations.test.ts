@@ -117,9 +117,7 @@ describe('migrate v3 → v4', () => {
 
   it('preserves a non-turbo custom model override', () => {
     const data = v3AppData();
-    (
-      (data.settings as Record<string, unknown>).ai as Record<string, unknown>
-    ).transcription = {
+    ((data.settings as Record<string, unknown>).ai as Record<string, unknown>).transcription = {
       ...(((data.settings as Record<string, unknown>).ai as Record<string, unknown>)
         .transcription as Record<string, unknown>),
       model: '@cf/openai/whisper-sherpa',
@@ -131,7 +129,9 @@ describe('migrate v3 → v4', () => {
   it('backfills the Premium Prompt 1 built-in template when missing', () => {
     const result = migrate(v3AppData());
     const hasPremium1 = result.templates.some(
-      (t) => t.name === 'Premium Prompt 1' && (t as unknown as Record<string, unknown>)['builtin'] === true,
+      (t) =>
+        t.name === 'Premium Prompt 1' &&
+        (t as unknown as Record<string, unknown>)['builtin'] === true,
     );
     expect(hasPremium1).toBe(true);
   });
@@ -363,9 +363,11 @@ describe('migrate v8 → v9', () => {
   });
 
   it('preserves acknowledgedDisclosureAt when already present', () => {
-    const result = migrate(v8AppData({
-      clinician: { ...defaultAppData().clinician, acknowledgedDisclosureAt: 1700000000000 },
-    }));
+    const result = migrate(
+      v8AppData({
+        clinician: { ...defaultAppData().clinician, acknowledgedDisclosureAt: 1700000000000 },
+      }),
+    );
     expect(result.clinician.acknowledgedDisclosureAt).toBe(1700000000000);
   });
 

@@ -22,8 +22,8 @@ export function SameDayModal({
   return (
     <Modal open onClose={onClose} title="Session already started today" size="sm">
       <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: 0 }}>
-        You have {sessions.length === 1 ? 'an open session' : `${sessions.length} open sessions`} for{' '}
-        <strong>{name}</strong> today. Continue where you left off, or start fresh.
+        You have {sessions.length === 1 ? 'an open session' : `${sessions.length} open sessions`}{' '}
+        for <strong>{name}</strong> today. Continue where you left off, or start fresh.
       </p>
 
       <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>

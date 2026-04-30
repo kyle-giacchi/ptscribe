@@ -109,10 +109,7 @@ export function StatusDot({
 }) {
   return (
     <span className="relative inline-block" style={{ width: size, height: size }}>
-      <span
-        className="absolute inset-0"
-        style={{ borderRadius: '50%', background: color }}
-      />
+      <span className="absolute inset-0" style={{ borderRadius: '50%', background: color }} />
       {pulse && (
         <span
           className="absolute"

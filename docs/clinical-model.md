@@ -8,32 +8,32 @@ The domain a PT cares about: who is being treated, what was said in the room, wh
 
 A person under care. Demographics + a free-text `notes` field for chart context.
 
-| Field               | Type             | Notes                                                       |
-| ------------------- | ---------------- | ----------------------------------------------------------- |
-| `firstName`/`lastName` | string        | Required.                                                   |
-| `dob`               | ms timestamp     | Optional.                                                   |
-| `sex`               | `'F' \| 'M' \| 'X'` | Optional.                                                |
-| `mrn`               | string           | Local chart number — optional, never sent to AI.            |
-| `primaryDiagnosis`  | string           | Free text. Plays a role in note generation prompts.         |
-| `icd10`             | string           | Optional code.                                              |
-| `referringProvider` | string           | Optional.                                                   |
-| `status`            | `'active' \| 'on_hold' \| 'discharged'` | Drives filtering in patient picker.    |
+| Field                  | Type                                    | Notes                                               |
+| ---------------------- | --------------------------------------- | --------------------------------------------------- |
+| `firstName`/`lastName` | string                                  | Required.                                           |
+| `dob`                  | ms timestamp                            | Optional.                                           |
+| `sex`                  | `'F' \| 'M' \| 'X'`                     | Optional.                                           |
+| `mrn`                  | string                                  | Local chart number — optional, never sent to AI.    |
+| `primaryDiagnosis`     | string                                  | Free text. Plays a role in note generation prompts. |
+| `icd10`                | string                                  | Optional code.                                      |
+| `referringProvider`    | string                                  | Optional.                                           |
+| `status`               | `'active' \| 'on_hold' \| 'discharged'` | Drives filtering in patient picker.                 |
 
 ### Session
 
 One treatment encounter. Owns the audio + transcript and (eventually) the generated `Note`.
 
-| Field             | Type                                         | Notes                                                          |
-| ----------------- | -------------------------------------------- | -------------------------------------------------------------- |
-| `patientId`       | id                                           | FK into `patients`.                                            |
-| `type`            | `'evaluation' \| 'follow_up' \| 'progress' \| 'discharge'` | Drives the default template selection. |
-| `date`            | ms timestamp                                 | Set when the session is created.                               |
-| `status`          | see below                                    | State machine.                                                 |
-| `audioRef`        | sessionId (string)                           | Key into `AudioRepository` (IndexedDB). Absent if no recording.|
-| `transcript`      | string                                       | Final transcript text.                                         |
-| `transcriptSource`| `'whisper' \| 'webspeech' \| 'manual'`       | Where the transcript came from.                                |
-| `noteId`          | id                                           | FK into `notes`. Set on first generate or first manual edit.   |
-| `templateId`      | id                                           | FK into `templates`. Stamped at session start.                 |
+| Field              | Type                                                       | Notes                                                           |
+| ------------------ | ---------------------------------------------------------- | --------------------------------------------------------------- |
+| `patientId`        | id                                                         | FK into `patients`.                                             |
+| `type`             | `'evaluation' \| 'follow_up' \| 'progress' \| 'discharge'` | Drives the default template selection.                          |
+| `date`             | ms timestamp                                               | Set when the session is created.                                |
+| `status`           | see below                                                  | State machine.                                                  |
+| `audioRef`         | sessionId (string)                                         | Key into `AudioRepository` (IndexedDB). Absent if no recording. |
+| `transcript`       | string                                                     | Final transcript text.                                          |
+| `transcriptSource` | `'whisper' \| 'webspeech' \| 'manual'`                     | Where the transcript came from.                                 |
+| `noteId`           | id                                                         | FK into `notes`. Set on first generate or first manual edit.    |
+| `templateId`       | id                                                         | FK into `templates`. Stamped at session start.                  |
 
 #### Session status state machine
 
@@ -51,13 +51,13 @@ Transitions are owned by the `Session` page. A session can skip transcription en
 
 The structured chart note generated from (or written against) a session's transcript.
 
-| Field         | Type                                                       | Notes                                                |
-| ------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
-| `format`      | `'soap' \| 'evaluation' \| 'progress' \| 'discharge' \| 'custom'` | Mirrors `NoteTemplate.format`.                |
-| `sections`    | `{ key, label, body }[]`                                   | One entry per template section. Bodies are plain text/Markdown. |
-| `templateId`  | id                                                         | FK to the template the note was generated against.   |
-| `finalized`   | boolean                                                    | Locks the editor when true. Toggled by Finalize/Re-open. |
-| `finalizedAt` | ms timestamp                                               | Stamped when `finalized` flips true.                 |
+| Field         | Type                                                              | Notes                                                           |
+| ------------- | ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| `format`      | `'soap' \| 'evaluation' \| 'progress' \| 'discharge' \| 'custom'` | Mirrors `NoteTemplate.format`.                                  |
+| `sections`    | `{ key, label, body }[]`                                          | One entry per template section. Bodies are plain text/Markdown. |
+| `templateId`  | id                                                                | FK to the template the note was generated against.              |
+| `finalized`   | boolean                                                           | Locks the editor when true. Toggled by Finalize/Re-open.        |
+| `finalizedAt` | ms timestamp                                                      | Stamped when `finalized` flips true.                            |
 
 A note is created lazily — only when the clinician asks the AI to generate, or starts editing manually. Until then the session has `noteId: undefined`.
 
@@ -73,28 +73,28 @@ Built-in templates are read-only at the provider level — the UI exposes Clone 
 
 Reusable item in the home-exercise library. Built-ins seed common PT exercises across body regions; clinicians can add their own.
 
-| Field         | Type                                                                 |
-| ------------- | -------------------------------------------------------------------- |
-| `name`        | string                                                               |
-| `region`      | `BodyRegion` (cervical, lumbar, shoulder, knee, …)                   |
-| `category`    | `'strength' \| 'mobility' \| 'stability' \| 'cardio' \| 'neuro' \| 'manual_therapy'` |
-| `instructions`| string — what the patient does                                       |
-| `cues`        | string — coaching pointers                                           |
-| `defaultDosage` | string — e.g. "3 sets of 10, 2x/day"                              |
-| `videoUrl`    | string — optional reference                                          |
+| Field           | Type                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `name`          | string                                                                               |
+| `region`        | `BodyRegion` (cervical, lumbar, shoulder, knee, …)                                   |
+| `category`      | `'strength' \| 'mobility' \| 'stability' \| 'cardio' \| 'neuro' \| 'manual_therapy'` |
+| `instructions`  | string — what the patient does                                                       |
+| `cues`          | string — coaching pointers                                                           |
+| `defaultDosage` | string — e.g. "3 sets of 10, 2x/day"                                                 |
+| `videoUrl`      | string — optional reference                                                          |
 
 ### PlanOfCare
 
 Per-patient, owns the goals and prescribed exercises that survive across sessions.
 
-| Field            | Type                                            |
-| ---------------- | ----------------------------------------------- |
-| `patientId`      | id                                              |
-| `startDate`      | ms timestamp                                    |
-| `expectedDischargeDate` | ms timestamp (optional)                  |
-| `goals`          | `{ id, text, targetDate?, met }[]`              |
-| `prescriptions`  | `{ id, exerciseId, dosage, notes? }[]`          |
-| `active`         | boolean — only one active plan per patient by convention |
+| Field                   | Type                                                     |
+| ----------------------- | -------------------------------------------------------- |
+| `patientId`             | id                                                       |
+| `startDate`             | ms timestamp                                             |
+| `expectedDischargeDate` | ms timestamp (optional)                                  |
+| `goals`                 | `{ id, text, targetDate?, met }[]`                       |
+| `prescriptions`         | `{ id, exerciseId, dosage, notes? }[]`                   |
+| `active`                | boolean — only one active plan per patient by convention |
 
 ## AI prompt shape
 

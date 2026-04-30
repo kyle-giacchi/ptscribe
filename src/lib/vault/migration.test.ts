@@ -29,10 +29,7 @@ describe('isLikelyEncryptedAudio', () => {
 
 describe('migrateLegacyPlaintext', () => {
   it('encrypts existing plaintext AppData', async () => {
-    localStorage.setItem(
-      STORAGE_KEYS.appData,
-      JSON.stringify({ version: 3, marker: 'plaintext' }),
-    );
+    localStorage.setItem(STORAGE_KEYS.appData, JSON.stringify({ version: 3, marker: 'plaintext' }));
     await vault.setup('a'.repeat(PASSPHRASE_MIN_CHARS));
     const result = await migrateLegacyPlaintext();
     expect(result.migratedAppData).toBe(true);

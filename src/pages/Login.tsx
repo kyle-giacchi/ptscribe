@@ -159,7 +159,10 @@ export function Login() {
             </button>
 
             <button
-              onClick={() => { setError(null); setView('magic-form'); }}
+              onClick={() => {
+                setError(null);
+                setView('magic-form');
+              }}
               disabled={loading}
               style={{
                 width: '100%',
@@ -225,7 +228,10 @@ export function Login() {
             </form>
 
             <button
-              onClick={() => { setError(null); setView('default'); }}
+              onClick={() => {
+                setError(null);
+                setView('default');
+              }}
               disabled={loading}
               style={{
                 background: 'none',
@@ -265,7 +271,10 @@ export function Login() {
               We sent a sign-in link to <strong>{email}</strong>. Click the link to continue.
             </p>
             <button
-              onClick={() => { setView('default'); setEmail(''); }}
+              onClick={() => {
+                setView('default');
+                setEmail('');
+              }}
               style={{
                 background: 'none',
                 border: 'none',

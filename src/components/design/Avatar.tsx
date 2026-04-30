@@ -30,7 +30,7 @@ export function Avatar({ name, size = 32, className }: AvatarProps) {
         .slice(0, 2)
         .join('')
         .toUpperCase() || '?',
-    [name]
+    [name],
   );
   const variant = VARIANTS[hashIndex(name || 'x')];
   return (

@@ -75,10 +75,7 @@ export function AppShell() {
         style={shellBox}
       >
         <Sidebar className="hidden md:grid" />
-        <div
-          className="grid min-w-0 overflow-hidden"
-          style={{ gridTemplateRows: 'auto 1fr' }}
-        >
+        <div className="grid min-w-0 overflow-hidden" style={{ gridTemplateRows: 'auto 1fr' }}>
           <TopBar onMenuOpen={() => setSidebarOpen(true)} />
           <main className="overflow-auto" style={mainStyle}>
             {pageTransition}
@@ -138,7 +135,12 @@ function DemoTopBar() {
       <div className="min-w-0 flex-1">
         <div
           className="truncate"
-          style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.2px', color: 'var(--color-pt-text)' }}
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: '-0.2px',
+            color: 'var(--color-pt-text)',
+          }}
         >
           {patient ? `${patient.firstName} ${patient.lastName}` : 'PTScribe'}
         </div>

@@ -30,7 +30,9 @@ export function IdleLockProvider({ children }: { children: ReactNode }) {
     function fire() {
       if (!vault.isUnlocked()) return;
       vault.lock();
-      toast.message(`Vault locked after ${minutes} minute${minutes === 1 ? '' : 's'} of inactivity.`);
+      toast.message(
+        `Vault locked after ${minutes} minute${minutes === 1 ? '' : 's'} of inactivity.`,
+      );
     }
 
     function reset() {

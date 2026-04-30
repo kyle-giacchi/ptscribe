@@ -20,7 +20,10 @@ for (const size of [192, 512]) {
     <text x="16" y="22" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="18" font-weight="700">PT</text>
   </svg>
 </body></html>`);
-  const screenshot = await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: size, height: size } });
+  const screenshot = await page.screenshot({
+    type: 'png',
+    clip: { x: 0, y: 0, width: size, height: size },
+  });
   fs.writeFileSync(path.join(publicDir, `pwa-${size}x${size}.png`), screenshot);
   console.log(`Generated public/pwa-${size}x${size}.png`);
 }

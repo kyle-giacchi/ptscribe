@@ -13,8 +13,7 @@ export function Toaster() {
             'card !bg-[var(--color-surface)] !border-[var(--color-border)] !text-[var(--color-fg)] !shadow-md !rounded-xl',
           title: 'font-medium',
           description: 'text-[var(--color-fg-muted)]',
-          actionButton:
-            '!bg-[var(--color-accent)] !text-white !rounded-md !px-3 !py-1 !text-xs',
+          actionButton: '!bg-[var(--color-accent)] !text-white !rounded-md !px-3 !py-1 !text-xs',
           cancelButton:
             '!bg-[var(--color-surface-2)] !text-[var(--color-fg)] !rounded-md !px-3 !py-1 !text-xs',
           success: '!text-[var(--color-positive)]',

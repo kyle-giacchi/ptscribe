@@ -90,9 +90,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         console.error('AppData save failed', err);
         const msg = err instanceof Error ? err.message : '';
         if (msg.includes('QuotaExceeded') || msg.includes('quota') || msg.includes('storage')) {
-          toast.error('Storage quota exceeded — your data could not be saved. Free up space or export a backup.');
+          toast.error(
+            'Storage quota exceeded — your data could not be saved. Free up space or export a backup.',
+          );
         } else if (msg.includes('vault') && msg.includes('another tab')) {
-          toast.error('Vault is open in another tab — save blocked. Close the other tab or lock the vault there.');
+          toast.error(
+            'Vault is open in another tab — save blocked. Close the other tab or lock the vault there.',
+          );
         } else {
           toast.error('Failed to save data. Check the console for details.');
         }

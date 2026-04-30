@@ -23,16 +23,10 @@ export function CPTBillRow({ code, label, units }: CPTBillRowProps) {
       >
         {code}
       </span>
-      <span
-        className="truncate"
-        style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}
-      >
+      <span className="truncate" style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
         {label}
       </span>
-      <span
-        className="font-mono"
-        style={{ fontSize: 11.5, color: 'var(--color-pt-text-2)' }}
-      >
+      <span className="font-mono" style={{ fontSize: 11.5, color: 'var(--color-pt-text-2)' }}>
         ×{units}
       </span>
     </div>
