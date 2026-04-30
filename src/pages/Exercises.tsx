@@ -36,7 +36,9 @@ export function Exercises() {
 
   return (
     <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+      >
         <div style={{ display: 'grid', gap: 4 }}>
           <Eyebrow>Exercise library</Eyebrow>
           <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
@@ -111,7 +113,14 @@ export function Exercises() {
         {filtered.map((e) => (
           <SurfaceCard key={e.id} padding={14}>
             <div style={{ display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                }}
+              >
                 <div style={{ minWidth: 0 }}>
                   <h3
                     style={{
@@ -174,7 +183,14 @@ export function Exercises() {
                   </div>
                 )}
               </div>
-              <p style={{ fontSize: 12, color: 'var(--color-pt-text-2)', margin: 0, lineHeight: 1.5 }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: 'var(--color-pt-text-2)',
+                  margin: 0,
+                  lineHeight: 1.5,
+                }}
+              >
                 {e.instructions}
               </p>
               {e.cues && (
@@ -202,7 +218,14 @@ export function Exercises() {
         ))}
         {filtered.length === 0 && (
           <SurfaceCard padding={20}>
-            <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0, textAlign: 'center' }}>
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--color-pt-text-3)',
+                margin: 0,
+                textAlign: 'center',
+              }}
+            >
               No exercises match.
             </p>
           </SurfaceCard>
@@ -222,7 +245,13 @@ export function Exercises() {
               toast.success('Exercise saved');
             } else {
               const now = Date.now();
-              addExercise({ ...payload, id: newId(), builtin: false, createdAt: now, updatedAt: now });
+              addExercise({
+                ...payload,
+                id: newId(),
+                builtin: false,
+                createdAt: now,
+                updatedAt: now,
+              });
               toast.success('Exercise added');
             }
             setEditing(null);

@@ -46,7 +46,9 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
     currentUser: session ? mapSession(session) : null,
     isLoading: isPending,
     isAuthenticated: !!session,
-    signOut: async () => { await authClient.signOut(); },
+    signOut: async () => {
+      await authClient.signOut();
+    },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

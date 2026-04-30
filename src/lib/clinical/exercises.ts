@@ -45,21 +45,24 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Upper Trapezius Stretch',
     region: 'cervical',
     category: 'mobility',
-    instructions: 'Sit on hand of side being stretched; tilt opposite ear toward shoulder, light overpressure with free hand.',
+    instructions:
+      'Sit on hand of side being stretched; tilt opposite ear toward shoulder, light overpressure with free hand.',
     defaultDosage: '3x30s/side',
   },
   {
     name: 'Levator Scapulae Stretch',
     region: 'cervical',
     category: 'mobility',
-    instructions: 'Look down toward armpit on opposite side; gentle overpressure with hand on back of head.',
+    instructions:
+      'Look down toward armpit on opposite side; gentle overpressure with hand on back of head.',
     defaultDosage: '3x30s/side',
   },
   {
     name: 'Deep Neck Flexor Activation',
     region: 'cervical',
     category: 'stability',
-    instructions: 'Supine with small towel roll under neck. Subtle nod (chin tuck) without lifting head; hold 10s.',
+    instructions:
+      'Supine with small towel roll under neck. Subtle nod (chin tuck) without lifting head; hold 10s.',
     defaultDosage: '10 reps x 10s, daily',
     cues: 'Motion is small — nod only, no head lift.',
   },
@@ -67,7 +70,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Cervical Isometrics (Multi-Direction)',
     region: 'cervical',
     category: 'strength',
-    instructions: 'Press head gently into hand in flexion, extension, sidebending, and rotation; no movement occurs.',
+    instructions:
+      'Press head gently into hand in flexion, extension, sidebending, and rotation; no movement occurs.',
     defaultDosage: '5s hold x 5 reps each direction',
   },
   // ── Thoracic ───────────────────────────────────────────────────────────────
@@ -75,7 +79,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Thoracic Foam Roller Extension',
     region: 'thoracic',
     category: 'mobility',
-    instructions: 'Foam roller perpendicular under mid-back, hands behind head, extend over roller.',
+    instructions:
+      'Foam roller perpendicular under mid-back, hands behind head, extend over roller.',
     defaultDosage: '3 sets x 30s, daily',
     cues: 'Avoid extending through the lumbar spine.',
   },
@@ -90,7 +95,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Open Books',
     region: 'thoracic',
     category: 'mobility',
-    instructions: 'Sidelying with knees bent and stacked, arms extended together. Rotate top arm open, following hand with eyes.',
+    instructions:
+      'Sidelying with knees bent and stacked, arms extended together. Rotate top arm open, following hand with eyes.',
     defaultDosage: '2x10/side',
     cues: 'Keep knees stacked; let breath drive end-range rotation.',
   },
@@ -98,21 +104,24 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Thread the Needle',
     region: 'thoracic',
     category: 'mobility',
-    instructions: 'Quadruped, slide one arm under and across the body, lowering shoulder toward floor.',
+    instructions:
+      'Quadruped, slide one arm under and across the body, lowering shoulder toward floor.',
     defaultDosage: '2x10/side',
   },
   {
     name: 'Cat-Camel',
     region: 'thoracic',
     category: 'mobility',
-    instructions: 'Quadruped, alternate rounding and arching the spine through full pain-free range.',
+    instructions:
+      'Quadruped, alternate rounding and arching the spine through full pain-free range.',
     defaultDosage: '2x10, daily',
   },
   {
     name: 'Prone Y / T / W / I',
     region: 'thoracic',
     category: 'strength',
-    instructions: 'Prone on bench or floor, perform scapular retraction in Y, T, W, and I positions.',
+    instructions:
+      'Prone on bench or floor, perform scapular retraction in Y, T, W, and I positions.',
     defaultDosage: '2x10 each position',
     cues: 'Initiate from scapula, not arms; thumbs up in Y and T.',
   },
@@ -151,21 +160,24 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Pallof Press',
     region: 'core',
     category: 'stability',
-    instructions: 'Anchor band at chest height, stand perpendicular, press band straight out and resist rotation.',
+    instructions:
+      'Anchor band at chest height, stand perpendicular, press band straight out and resist rotation.',
     defaultDosage: '3x10/side',
   },
   {
     name: 'Hollow Hold',
     region: 'core',
     category: 'stability',
-    instructions: 'Supine, low back pressed into floor, arms overhead and legs lifted in shallow dish position.',
+    instructions:
+      'Supine, low back pressed into floor, arms overhead and legs lifted in shallow dish position.',
     defaultDosage: '3x20-30s',
   },
   {
     name: 'Supine Marching',
     region: 'core',
     category: 'stability',
-    instructions: 'Supine, knees bent, alternate lifting one foot off floor while maintaining neutral spine.',
+    instructions:
+      'Supine, knees bent, alternate lifting one foot off floor while maintaining neutral spine.',
     defaultDosage: '3x10/side, daily',
   },
   {
@@ -215,14 +227,16 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Lower Trunk Rotation',
     region: 'lumbar',
     category: 'mobility',
-    instructions: 'Supine, knees bent and together, lower knees side to side within pain-free range.',
+    instructions:
+      'Supine, knees bent and together, lower knees side to side within pain-free range.',
     defaultDosage: '2x10/side',
   },
   {
     name: 'Side Plank',
     region: 'lumbar',
     category: 'stability',
-    instructions: 'Forearm and knees (or feet) supporting, lift hips so body forms a straight line.',
+    instructions:
+      'Forearm and knees (or feet) supporting, lift hips so body forms a straight line.',
     defaultDosage: '3x20-30s/side',
     cues: 'No hip sag; ribs stacked over pelvis.',
   },
@@ -266,14 +280,16 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Internal Rotation at 0° with Band',
     region: 'shoulder',
     category: 'strength',
-    instructions: 'Band anchored at elbow height, elbow at side bent 90°, rotate forearm across body.',
+    instructions:
+      'Band anchored at elbow height, elbow at side bent 90°, rotate forearm across body.',
     defaultDosage: '3x15',
   },
   {
     name: 'External Rotation at 90° Abduction',
     region: 'shoulder',
     category: 'strength',
-    instructions: 'Shoulder abducted 90°, elbow bent 90° supported on table or in 90/90 position. Rotate forearm up against resistance.',
+    instructions:
+      'Shoulder abducted 90°, elbow bent 90° supported on table or in 90/90 position. Rotate forearm up against resistance.',
     defaultDosage: '3x12',
   },
   {
@@ -295,14 +311,16 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Full Can',
     region: 'shoulder',
     category: 'strength',
-    instructions: 'Standing, thumbs up, raise arms in scapular plane (~30° forward of frontal) to shoulder height.',
+    instructions:
+      'Standing, thumbs up, raise arms in scapular plane (~30° forward of frontal) to shoulder height.',
     defaultDosage: '3x12',
   },
   {
     name: 'Cross-Body Posterior Capsule Stretch',
     region: 'shoulder',
     category: 'mobility',
-    instructions: 'Bring affected arm across chest, opposite hand applies gentle overpressure above elbow.',
+    instructions:
+      'Bring affected arm across chest, opposite hand applies gentle overpressure above elbow.',
     defaultDosage: '3x30s',
   },
   {
@@ -316,14 +334,16 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Shoulder Flexion AAROM with Cane',
     region: 'shoulder',
     category: 'mobility',
-    instructions: 'Supine, hold cane in both hands, use unaffected arm to assist affected arm overhead.',
+    instructions:
+      'Supine, hold cane in both hands, use unaffected arm to assist affected arm overhead.',
     defaultDosage: '2x10',
   },
   {
     name: 'Wall Slides',
     region: 'shoulder',
     category: 'mobility',
-    instructions: 'Forearms on wall in W position, slide arms up and overhead while maintaining wall contact.',
+    instructions:
+      'Forearms on wall in W position, slide arms up and overhead while maintaining wall contact.',
     defaultDosage: '3x10',
     cues: 'Avoid arching low back or shrugging.',
   },
@@ -331,7 +351,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Scapular Wall Push-Up',
     region: 'shoulder',
     category: 'strength',
-    instructions: 'Hands on wall in push-up start. Without bending elbows, protract and retract scapulae.',
+    instructions:
+      'Hands on wall in push-up start. Without bending elbows, protract and retract scapulae.',
     defaultDosage: '3x12',
   },
   // ── Elbow ──────────────────────────────────────────────────────────────────
@@ -368,7 +389,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Eccentric Wrist Extension',
     region: 'elbow',
     category: 'strength',
-    instructions: 'Forearm supported, palm down with light weight or resistance device. Use other hand to assist into extension, then slowly lower (3-4s) into flexion.',
+    instructions:
+      'Forearm supported, palm down with light weight or resistance device. Use other hand to assist into extension, then slowly lower (3-4s) into flexion.',
     defaultDosage: '3x15, daily',
     cues: 'Slow eccentric phase is the loading dose.',
   },
@@ -383,7 +405,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Triceps Extension',
     region: 'elbow',
     category: 'strength',
-    instructions: 'Light weight or band overhead, bend and straighten elbow keeping upper arm vertical.',
+    instructions:
+      'Light weight or band overhead, bend and straighten elbow keeping upper arm vertical.',
     defaultDosage: '3x12',
   },
 
@@ -392,14 +415,16 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Wrist AROM (All Planes)',
     region: 'wrist_hand',
     category: 'mobility',
-    instructions: 'Forearm supported. Move wrist through flexion/extension, radial/ulnar deviation, and circumduction.',
+    instructions:
+      'Forearm supported. Move wrist through flexion/extension, radial/ulnar deviation, and circumduction.',
     defaultDosage: '2x10 each direction, 3x/day',
   },
   {
     name: 'Tendon Glides',
     region: 'wrist_hand',
     category: 'mobility',
-    instructions: 'Cycle through five hand positions: straight, hook fist, full fist, table-top, straight fist.',
+    instructions:
+      'Cycle through five hand positions: straight, hook fist, full fist, table-top, straight fist.',
     defaultDosage: '2x10 cycles, 3x/day',
   },
   {
@@ -420,7 +445,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Finger Abduction / Adduction',
     region: 'wrist_hand',
     category: 'strength',
-    instructions: 'Spread fingers apart and bring together; can use rubber band around fingers for resistance.',
+    instructions:
+      'Spread fingers apart and bring together; can use rubber band around fingers for resistance.',
     defaultDosage: '3x15',
   },
   {
@@ -434,7 +460,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Wrist Extension Strengthening',
     region: 'wrist_hand',
     category: 'strength',
-    instructions: 'Forearm supported palm down with light weight; lift back of hand against gravity.',
+    instructions:
+      'Forearm supported palm down with light weight; lift back of hand against gravity.',
     defaultDosage: '3x15',
   },
 
@@ -464,21 +491,24 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Single-Leg Bridge',
     region: 'hip',
     category: 'strength',
-    instructions: 'Supine, one knee bent, opposite leg extended. Drive through heel and lift hips, keeping pelvis level.',
+    instructions:
+      'Supine, one knee bent, opposite leg extended. Drive through heel and lift hips, keeping pelvis level.',
     defaultDosage: '3x10/side',
   },
   {
     name: 'Monster Walks',
     region: 'hip',
     category: 'strength',
-    instructions: 'Mini band around knees or ankles, athletic stance, step laterally and forward/back maintaining tension.',
+    instructions:
+      'Mini band around knees or ankles, athletic stance, step laterally and forward/back maintaining tension.',
     defaultDosage: '3x10 steps each direction',
   },
   {
     name: 'Pelvic Drop (Hip Hike)',
     region: 'hip',
     category: 'strength',
-    instructions: 'Stand on a step with one foot off the edge. Drop opposite pelvis down, then lift up using stance-leg glute med.',
+    instructions:
+      'Stand on a step with one foot off the edge. Drop opposite pelvis down, then lift up using stance-leg glute med.',
     defaultDosage: '3x10/side',
     cues: 'Motion comes from pelvis, not knee bend.',
   },
@@ -494,14 +524,16 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Figure-4 Piriformis Stretch',
     region: 'hip',
     category: 'mobility',
-    instructions: 'Supine, ankle of affected leg crossed over opposite knee, pull opposite thigh toward chest.',
+    instructions:
+      'Supine, ankle of affected leg crossed over opposite knee, pull opposite thigh toward chest.',
     defaultDosage: '3x30s/side',
   },
   {
     name: 'Standing Hip Abduction',
     region: 'hip',
     category: 'strength',
-    instructions: 'Stand near support, lift one leg out to the side keeping knee straight and pelvis level.',
+    instructions:
+      'Stand near support, lift one leg out to the side keeping knee straight and pelvis level.',
     defaultDosage: '3x12/side',
   },
   {
@@ -538,7 +570,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Terminal Knee Extension (TKE)',
     region: 'knee',
     category: 'strength',
-    instructions: 'Band anchored behind knee, slight knee bend in stance. Press knee back into full extension against band.',
+    instructions:
+      'Band anchored behind knee, slight knee bend in stance. Press knee back into full extension against band.',
     defaultDosage: '3x15',
   },
   {
@@ -552,7 +585,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Lateral Step-Down',
     region: 'knee',
     category: 'strength',
-    instructions: 'Stand on edge of step on one leg. Slowly lower opposite heel to floor with control, then return.',
+    instructions:
+      'Stand on edge of step on one leg. Slowly lower opposite heel to floor with control, then return.',
     defaultDosage: '3x10/side',
     cues: 'Pelvis level; knee tracks over toes.',
   },
@@ -567,21 +601,24 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Hamstring Curl (Prone or Standing)',
     region: 'knee',
     category: 'strength',
-    instructions: 'Prone with ankle weight or standing with band, bend knee to bring heel toward glute.',
+    instructions:
+      'Prone with ankle weight or standing with band, bend knee to bring heel toward glute.',
     defaultDosage: '3x12/side',
   },
   {
     name: 'Forward Lunge',
     region: 'knee',
     category: 'strength',
-    instructions: 'Step forward into lunge, lower back knee toward floor, push off front leg to return.',
+    instructions:
+      'Step forward into lunge, lower back knee toward floor, push off front leg to return.',
     defaultDosage: '3x10/side',
   },
   {
     name: 'Reverse Lunge',
     region: 'knee',
     category: 'strength',
-    instructions: 'Step backward into lunge, lower back knee toward floor, push off front leg to return.',
+    instructions:
+      'Step backward into lunge, lower back knee toward floor, push off front leg to return.',
     defaultDosage: '3x10/side',
   },
   // ── Ankle / Foot ───────────────────────────────────────────────────────────
@@ -603,28 +640,32 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Ankle Eversion with Band',
     region: 'ankle_foot',
     category: 'strength',
-    instructions: 'Long sitting, band around forefoot anchored medially. Turn sole outward against resistance.',
+    instructions:
+      'Long sitting, band around forefoot anchored medially. Turn sole outward against resistance.',
     defaultDosage: '3x15',
   },
   {
     name: 'Ankle Inversion with Band',
     region: 'ankle_foot',
     category: 'strength',
-    instructions: 'Long sitting, band around forefoot anchored laterally. Turn sole inward against resistance.',
+    instructions:
+      'Long sitting, band around forefoot anchored laterally. Turn sole inward against resistance.',
     defaultDosage: '3x15',
   },
   {
     name: 'Ankle Dorsiflexion with Band',
     region: 'ankle_foot',
     category: 'strength',
-    instructions: 'Long sitting, band around forefoot anchored away from body. Pull foot toward shin against resistance.',
+    instructions:
+      'Long sitting, band around forefoot anchored away from body. Pull foot toward shin against resistance.',
     defaultDosage: '3x15',
   },
   {
     name: 'Gastrocnemius Stretch',
     region: 'ankle_foot',
     category: 'mobility',
-    instructions: 'Stand facing wall, affected leg back with knee straight, heel down. Lean forward.',
+    instructions:
+      'Stand facing wall, affected leg back with knee straight, heel down. Lean forward.',
     defaultDosage: '3x30s/side',
   },
   {
@@ -682,28 +723,32 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Standing Weight Shifts',
     region: 'gait_balance',
     category: 'stability',
-    instructions: 'Stand with feet shoulder-width, shift weight side to side, then forward and back.',
+    instructions:
+      'Stand with feet shoulder-width, shift weight side to side, then forward and back.',
     defaultDosage: '3x10 each direction',
   },
   {
     name: 'Y-Balance Reach',
     region: 'gait_balance',
     category: 'stability',
-    instructions: 'Stand on one leg, reach opposite foot anterior, posteromedial, and posterolateral, returning to center between reaches.',
+    instructions:
+      'Stand on one leg, reach opposite foot anterior, posteromedial, and posterolateral, returning to center between reaches.',
     defaultDosage: '3x5/direction/side',
   },
   {
     name: 'Marching in Place',
     region: 'gait_balance',
     category: 'neuro',
-    instructions: 'Stand near support, lift knees alternately to hip height with controlled cadence.',
+    instructions:
+      'Stand near support, lift knees alternately to hip height with controlled cadence.',
     defaultDosage: '3x30s, daily',
   },
   {
     name: 'Lateral Walking',
     region: 'gait_balance',
     category: 'neuro',
-    instructions: 'Step sideways with control, leading with same foot for set distance, then reverse.',
+    instructions:
+      'Step sideways with control, leading with same foot for set distance, then reverse.',
     defaultDosage: '3x20 steps each direction',
   },
   {
@@ -724,7 +769,8 @@ export const BUILTIN_EXERCISES: Seed[] = [
     name: 'Stance Progression (Eyes Open → Eyes Closed)',
     region: 'gait_balance',
     category: 'stability',
-    instructions: 'Progress through narrow → semi-tandem → tandem → single-leg, first eyes open then eyes closed near a stable surface.',
+    instructions:
+      'Progress through narrow → semi-tandem → tandem → single-leg, first eyes open then eyes closed near a stable surface.',
     defaultDosage: '3x30s per stance',
   },
   {

@@ -15,13 +15,8 @@ export interface PatientsContextValue {
 const PatientsContext = createContext<PatientsContextValue | null>(null);
 
 export function PatientsProvider({ children }: { children: ReactNode }) {
-  const {
-    appData,
-    updatePatientsSlice,
-    updateSessionsSlice,
-    updateNotesSlice,
-    updatePlansSlice,
-  } = useAppData();
+  const { appData, updatePatientsSlice, updateSessionsSlice, updateNotesSlice, updatePlansSlice } =
+    useAppData();
   const patients = appData.patients;
 
   const removePatient = useCallback(

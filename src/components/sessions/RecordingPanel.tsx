@@ -60,7 +60,10 @@ function RecordingBlankOptions({
           style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) { onUpload(file); e.target.value = ''; }
+            if (file) {
+              onUpload(file);
+              e.target.value = '';
+            }
           }}
         />
       </label>
@@ -156,9 +159,13 @@ export function RecordingPanel({
             onClick={onRecordingComplete}
           >
             {isMerging ? (
-              <><Loader2 size={14} className="animate-spin" /> Combining clips…</>
+              <>
+                <Loader2 size={14} className="animate-spin" /> Combining clips…
+              </>
             ) : (
-              <><CheckCircle2 size={14} strokeWidth={2} /> Recording Complete</>
+              <>
+                <CheckCircle2 size={14} strokeWidth={2} /> Recording Complete
+              </>
             )}
           </button>
         </div>
@@ -170,7 +177,6 @@ export function RecordingPanel({
     </div>
   );
 }
-
 
 function RecordingControlRow({
   idle,
@@ -203,7 +209,10 @@ function RecordingControlRow({
               style={{ display: 'none' }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) { onUpload(file); e.target.value = ''; }
+                if (file) {
+                  onUpload(file);
+                  e.target.value = '';
+                }
               }}
             />
           </label>
@@ -328,7 +337,7 @@ function AudioTrackRow({
     >
       <div className="mb-2 flex items-center gap-2">
         <span
-          className="text-[11px] font-semibold uppercase tracking-wide"
+          className="text-[11px] font-semibold tracking-wide uppercase"
           style={{ color: 'var(--color-pt-text-2)' }}
         >
           {label}
@@ -356,7 +365,13 @@ function AudioTrackRow({
   );
 }
 
-function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[]; mergedAudioBlob: Blob | null }) {
+function AudioPreviewSection({
+  clips,
+  mergedAudioBlob,
+}: {
+  clips: SessionClip[];
+  mergedAudioBlob: Blob | null;
+}) {
   const { settings, updateAudio } = useSettings();
   const playableClips = clips.filter(
     (c) => c.status === 'ready' || c.status === 'transcribing' || c.status === 'transcribed',
@@ -434,12 +449,11 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
       <div className="space-y-2">
         {/* Full audio track */}
         <AudioTrackRow label="Full Audio">
-          {mergedAudioBlob
-            ? <BlobWaveform blob={mergedAudioBlob} />
-            : activeId
-              ? <PlaybackWaveform audioKey={activeId} />
-              : null
-          }
+          {mergedAudioBlob ? (
+            <BlobWaveform blob={mergedAudioBlob} />
+          ) : activeId ? (
+            <PlaybackWaveform audioKey={activeId} />
+          ) : null}
         </AudioTrackRow>
 
         {/* Silence trimming — toggle + settings + result all in one card */}
@@ -517,8 +531,8 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
                 </>
               )}
             </div>
-            {sd.enabled && (
-              activeSilenced ? (
+            {sd.enabled &&
+              (activeSilenced ? (
                 <div className="space-y-1.5">
                   <BlobWaveform blob={activeSilenced.blob} />
                   <button
@@ -538,7 +552,9 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
                     onClick={() => void compileSilence()}
                   >
                     {compilingSilence ? (
-                      <><Loader2 size={12} className="animate-spin" /> Applying…</>
+                      <>
+                        <Loader2 size={12} className="animate-spin" /> Applying…
+                      </>
                     ) : (
                       'Apply'
                     )}
@@ -549,8 +565,7 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
                     </p>
                   )}
                 </div>
-              )
-            )}
+              ))}
           </div>
         </AudioTrackRow>
 
@@ -588,7 +603,9 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
               </button>
               {su.enabled && (
                 <label className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>Speed</span>
+                  <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
+                    Speed
+                  </span>
                   <Select
                     value={String(su.speed)}
                     className="h-7 py-0 text-xs"
@@ -605,8 +622,8 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
                 </label>
               )}
             </div>
-            {su.enabled && (
-              activeSpedup ? (
+            {su.enabled &&
+              (activeSpedup ? (
                 <div className="space-y-1.5">
                   <BlobWaveform blob={activeSpedup.blob} />
                   <button
@@ -626,7 +643,9 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
                     onClick={() => void compileSpeed()}
                   >
                     {compilingSpeed ? (
-                      <><Loader2 size={12} className="animate-spin" /> Applying…</>
+                      <>
+                        <Loader2 size={12} className="animate-spin" /> Applying…
+                      </>
                     ) : (
                       'Apply'
                     )}
@@ -637,8 +656,7 @@ function AudioPreviewSection({ clips, mergedAudioBlob }: { clips: SessionClip[];
                     </p>
                   )}
                 </div>
-              )
-            )}
+              ))}
           </div>
         </AudioTrackRow>
       </div>

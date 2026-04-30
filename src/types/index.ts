@@ -60,11 +60,11 @@ export type TranscriptSource = 'whisper' | 'webspeech' | 'manual';
  * `recordings` and for the per-chunk WAL rows in `recording_chunks`).
  */
 export type ClipStatus =
-  | 'pending'      // recording in flight; no consolidated Blob yet
-  | 'ready'        // audio saved, awaiting transcription
+  | 'pending' // recording in flight; no consolidated Blob yet
+  | 'ready' // audio saved, awaiting transcription
   | 'transcribing' // Whisper request in flight
-  | 'transcribed'  // transcript text populated
-  | 'failed';      // last transcription attempt failed
+  | 'transcribed' // transcript text populated
+  | 'failed'; // last transcription attempt failed
 
 export interface SessionClip {
   id: ID;

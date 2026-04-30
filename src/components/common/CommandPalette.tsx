@@ -148,10 +148,7 @@ export function CommandPalette() {
                         <Icon size={16} strokeWidth={1.75} />
                         <span className="flex-1">{label}</span>
                         {hint && (
-                          <span
-                            className="text-xs"
-                            style={{ color: 'var(--color-fg-subtle)' }}
-                          >
+                          <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
                             {hint}
                           </span>
                         )}

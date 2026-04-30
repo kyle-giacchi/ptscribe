@@ -67,7 +67,9 @@ describe('TemplatesProvider', () => {
     );
     await act(async () => ref.current.updateTemplate(template.id, { name: 'Renamed Template' }));
     await waitFor(() =>
-      expect(ref.current.templates.find((t) => t.id === template.id)?.name).toBe('Renamed Template'),
+      expect(ref.current.templates.find((t) => t.id === template.id)?.name).toBe(
+        'Renamed Template',
+      ),
     );
   });
 

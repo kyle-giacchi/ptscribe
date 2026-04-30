@@ -40,7 +40,10 @@ interface PatientRowData {
   badgeLabel: string;
 }
 
-function deriveStatus(p: Patient, sessionCount: number): {
+function deriveStatus(
+  p: Patient,
+  sessionCount: number,
+): {
   filter: StatusFilter;
   tone: StatusTone;
   label: string;
@@ -56,7 +59,6 @@ function deriveStatus(p: Patient, sessionCount: number): {
   }
   return { filter: 'on_track', tone: 'on-track', label: 'On-track' };
 }
-
 
 function shortMrn(p: Patient): string {
   return p.mrn?.trim() || `PT-${p.id.slice(0, 5).toUpperCase()}`;
@@ -215,21 +217,12 @@ function Toolbar({
           }}
         />
       </div>
-      <SegmentedControl
-        items={STATUS_FILTERS}
-        value={filter}
-        onChange={onFilter}
-        size="sm"
-      />
+      <SegmentedControl items={STATUS_FILTERS} value={filter} onChange={onFilter} size="sm" />
       <div style={{ flex: 1 }} />
       <PtButton variant="ghost" iconLeft={<Upload size={14} strokeWidth={2} />}>
         Import patient
       </PtButton>
-      <PtButton
-        variant="primary"
-        iconLeft={<Plus size={14} strokeWidth={2.4} />}
-        onClick={onAdd}
-      >
+      <PtButton variant="primary" iconLeft={<Plus size={14} strokeWidth={2.4} />} onClick={onAdd}>
         New patient
       </PtButton>
     </div>
@@ -428,11 +421,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         <p style={{ fontSize: 13.5, color: 'var(--color-pt-text-2)' }}>
           No patients yet — add your first to start charting.
         </p>
-        <PtButton
-          variant="primary"
-          onClick={onAdd}
-          iconLeft={<Plus size={14} strokeWidth={2.4} />}
-        >
+        <PtButton variant="primary" onClick={onAdd} iconLeft={<Plus size={14} strokeWidth={2.4} />}>
           Add your first patient
         </PtButton>
       </div>
@@ -520,10 +509,7 @@ function AddPatientModal({
 
       <FormSection title="Demographics" hint="Optional — used in note headers and PDFs.">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="Date of birth"
-            hint={fmtIsoDateOptional(parseIsoDate(dob)) || undefined}
-          >
+          <Field label="Date of birth" hint={fmtIsoDateOptional(parseIsoDate(dob)) || undefined}>
             <TextInput type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
           </Field>
           <Field label="Sex">
@@ -543,10 +529,7 @@ function AddPatientModal({
             <TextInput value={mrn} onChange={(e) => setMrn(e.target.value)} />
           </Field>
           <Field label="Referring provider">
-            <TextInput
-              value={referring}
-              onChange={(e) => setReferring(e.target.value)}
-            />
+            <TextInput value={referring} onChange={(e) => setReferring(e.target.value)} />
           </Field>
           <Field label="Primary diagnosis" className="sm:col-span-2">
             <TextInput
@@ -600,14 +583,9 @@ function FormSection({
         >
           {title}
         </h3>
-        {hint && (
-          <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
-            {hint}
-          </span>
-        )}
+        {hint && <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{hint}</span>}
       </div>
       {children}
     </section>
   );
 }
-

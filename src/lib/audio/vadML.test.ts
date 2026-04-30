@@ -53,7 +53,7 @@ describe('findSpeechRangesML', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].startSec).toBeCloseTo(2 - 0.4, 5); // 2s - 400ms pad
-    expect(result[0].endSec).toBeCloseTo(5 + 0.4, 5);   // 5s + 400ms pad
+    expect(result[0].endSec).toBeCloseTo(5 + 0.4, 5); // 5s + 400ms pad
   });
 
   it('passes low sensitivity thresholds to NonRealTimeVAD.new', async () => {

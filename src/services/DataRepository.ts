@@ -61,13 +61,17 @@ export const dataRepository = {
 
   async save(data: AppData): Promise<void> {
     if (vault.isTwoTabConflict()) {
-      throw new Error('vault: open in another tab — save blocked to prevent plaintext overwriting encrypted data');
+      throw new Error(
+        'vault: open in another tab — save blocked to prevent plaintext overwriting encrypted data',
+      );
     }
     const json = JSON.stringify(data);
     // AES-GCM + base64 adds ~37% overhead; cap plaintext to keep the
     // encrypted envelope safely under the 5 MB safeStorage guard.
     if (vault.isUnlocked() && new Blob([json]).size > 3.5 * 1024 * 1024) {
-      throw new Error('AppData exceeds 3.5 MB plaintext limit; encryption overhead would exceed localStorage quota');
+      throw new Error(
+        'AppData exceeds 3.5 MB plaintext limit; encryption overhead would exceed localStorage quota',
+      );
     }
     const out = vault.isUnlocked() ? await vault.encryptUtf8(json) : json;
     safeLocalStorage.setItem(STORAGE_KEYS.appData, out);

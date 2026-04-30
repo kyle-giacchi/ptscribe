@@ -37,7 +37,7 @@ export function AccordionSection({
         aria-expanded={effectiveOpen}
         aria-controls={`accordion-body-${id}`}
         onClick={locked ? undefined : onToggle}
-        className={`flex w-full items-center gap-3 text-left transition-colors${locked ? '' : ' hover:bg-[var(--color-pt-surface-alt)]'}`}
+        className={`flex w-full items-center gap-3 text-left transition-colors${locked ? '' : 'hover:bg-[var(--color-pt-surface-alt)]'}`}
         style={{ padding: '12px 16px', cursor: locked ? 'not-allowed' : 'pointer' }}
       >
         <span
@@ -50,10 +50,7 @@ export function AccordionSection({
         >
           {stepNum}
         </span>
-        <span
-          className="font-display text-base font-semibold"
-          style={{ color: 'var(--color-fg)' }}
-        >
+        <span className="font-display text-base font-semibold" style={{ color: 'var(--color-fg)' }}>
           {title}
         </span>
         <div className="ml-auto flex items-center gap-3">

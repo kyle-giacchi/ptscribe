@@ -20,7 +20,9 @@ export function createAuth(env: Env, ctx: ExecutionContext) {
     basePath: '/api/auth',
     database: kyselyAdapter(db, { type: 'sqlite' }),
     trustedOrigins: env.ALLOWED_ORIGINS
-      ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+      ? env.ALLOWED_ORIGINS.split(',')
+          .map((o) => o.trim())
+          .filter(Boolean)
       : [baseURL, 'http://localhost:8080', 'http://localhost:8787'],
     advanced: {
       useSecureCookies: isSecure,

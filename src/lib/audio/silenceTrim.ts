@@ -23,10 +23,7 @@ export interface TrimOptions extends Partial<VadOptions> {
 /** Trim sustained silent regions from a recorded audio Blob. The original Blob is
  *  never mutated; the caller decides whether to use the trimmed copy. If decoding
  *  fails for any reason, the original Blob is returned untouched. */
-export async function trimSilence(
-  input: Blob,
-  options: TrimOptions = {},
-): Promise<TrimResult> {
+export async function trimSilence(input: Blob, options: TrimOptions = {}): Promise<TrimResult> {
   const Ctx =
     options.audioContextFactory ??
     (() =>
@@ -128,4 +125,3 @@ export function summarizeTrim(totalSec: number, kept: SpeechRange[]): TrimReport
     droppedRanges: dropped,
   };
 }
-

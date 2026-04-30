@@ -22,39 +22,39 @@ The palette is a **cool/warm split**: cool gray-blues hold the room; a single wa
 
 ```css
 /* Ground — soft gray-blue */
---color-bg:           oklch(0.985 0.008 240);  /* page background, near-white with blue cast */
---color-surface:      oklch(0.97  0.012 240);  /* cards, panels */
---color-surface-2:    oklch(0.945 0.016 240);  /* nested surfaces, hovered rows */
---color-border:       oklch(0.90  0.020 240);  /* hairlines, dividers */
---color-border-soft:  oklch(0.93  0.015 240);  /* internal table rules */
+--color-bg: oklch(0.985 0.008 240); /* page background, near-white with blue cast */
+--color-surface: oklch(0.97 0.012 240); /* cards, panels */
+--color-surface-2: oklch(0.945 0.016 240); /* nested surfaces, hovered rows */
+--color-border: oklch(0.9 0.02 240); /* hairlines, dividers */
+--color-border-soft: oklch(0.93 0.015 240); /* internal table rules */
 
 /* Text */
---color-fg:           oklch(0.28  0.030 250);  /* primary copy — blue-tinted near-black */
---color-fg-muted:     oklch(0.50  0.025 245);  /* secondary copy, captions */
---color-fg-subtle:    oklch(0.65  0.020 245);  /* placeholders, disabled */
+--color-fg: oklch(0.28 0.03 250); /* primary copy — blue-tinted near-black */
+--color-fg-muted: oklch(0.5 0.025 245); /* secondary copy, captions */
+--color-fg-subtle: oklch(0.65 0.02 245); /* placeholders, disabled */
 
 /* Accent — soft orange (the money color) */
---color-accent:       oklch(0.78  0.13  60);   /* primary accent — warm, not neon */
---color-accent-soft:  oklch(0.92  0.06  65);   /* tinted backgrounds, chips */
---color-accent-fg:    oklch(0.30  0.08  50);   /* text on accent-soft */
---color-accent-deep:  oklch(0.62  0.16  55);   /* hover/active state for accent surfaces */
+--color-accent: oklch(0.78 0.13 60); /* primary accent — warm, not neon */
+--color-accent-soft: oklch(0.92 0.06 65); /* tinted backgrounds, chips */
+--color-accent-fg: oklch(0.3 0.08 50); /* text on accent-soft */
+--color-accent-deep: oklch(0.62 0.16 55); /* hover/active state for accent surfaces */
 
 /* Semantic — all desaturated to fit the calm palette */
---color-positive:     oklch(0.72  0.10 165);   /* gains, on-track — sage, not green */
---color-caution:      oklch(0.80  0.10  85);   /* warnings — pale amber, distinct from accent */
---color-negative:     oklch(0.62  0.12  25);   /* over-budget — terracotta, never red */
---color-info:         oklch(0.70  0.07 235);   /* informational — slate blue */
+--color-positive: oklch(0.72 0.1 165); /* gains, on-track — sage, not green */
+--color-caution: oklch(0.8 0.1 85); /* warnings — pale amber, distinct from accent */
+--color-negative: oklch(0.62 0.12 25); /* over-budget — terracotta, never red */
+--color-info: oklch(0.7 0.07 235); /* informational — slate blue */
 
 /* Effects */
---shadow-sm:  0 1px 2px oklch(0.30 0.03 250 / 0.04);
---shadow-md:  0 4px 16px -4px oklch(0.30 0.03 250 / 0.08);
---shadow-lg:  0 12px 32px -8px oklch(0.30 0.03 250 / 0.10);
+--shadow-sm: 0 1px 2px oklch(0.3 0.03 250 / 0.04);
+--shadow-md: 0 4px 16px -4px oklch(0.3 0.03 250 / 0.08);
+--shadow-lg: 0 12px 32px -8px oklch(0.3 0.03 250 / 0.1);
 
 /* Radii — soft */
 --radius-sm: 0.5rem;
---radius:    0.75rem;
+--radius: 0.75rem;
 --radius-lg: 1rem;
---radius-xl: 1.5rem;  /* hero cards */
+--radius-xl: 1.5rem; /* hero cards */
 ```
 
 ### 2.2 Usage rules
@@ -78,14 +78,14 @@ A distinctive serif for hero figures (warm, editorial, slightly human) paired wi
 
 ### 3.2 Scale
 
-| Role             | Size / Line height | Weight | Notes                                |
-| ---------------- | ------------------ | ------ | ------------------------------------ |
-| Hero figure      | 64–80px / 1.0      | Fraunces 400 | Tabular nums; orange; never abbreviated |
-| Page title       | 28px / 1.2        | Fraunces 500 | One per page                         |
-| Section title    | 18px / 1.3        | Manrope 600  | Sentence case, never ALL CAPS        |
-| Body             | 15px / 1.55       | Manrope 400  | Default reading size                 |
-| Label / caption  | 13px / 1.4        | Manrope 500  | `--color-fg-muted`                   |
-| Tabular figure   | 15px / 1.4        | Manrope 500  | `tnum` always on for any $ amount    |
+| Role            | Size / Line height | Weight       | Notes                                   |
+| --------------- | ------------------ | ------------ | --------------------------------------- |
+| Hero figure     | 64–80px / 1.0      | Fraunces 400 | Tabular nums; orange; never abbreviated |
+| Page title      | 28px / 1.2         | Fraunces 500 | One per page                            |
+| Section title   | 18px / 1.3         | Manrope 600  | Sentence case, never ALL CAPS           |
+| Body            | 15px / 1.55        | Manrope 400  | Default reading size                    |
+| Label / caption | 13px / 1.4         | Manrope 500  | `--color-fg-muted`                      |
+| Tabular figure  | 15px / 1.4         | Manrope 500  | `tnum` always on for any $ amount       |
 
 ### 3.3 Rules
 
@@ -103,31 +103,31 @@ React-driven motion is the second-biggest lever after color. Use the [`motion`](
 
 ```ts
 export const ease = {
-  standard: [0.32, 0.08, 0.24, 1],   // Material-ish, calm
-  enter:    [0.16, 0.84, 0.44, 1],   // decelerate — for entering elements
-  exit:     [0.4,  0.0,  1,    1],   // accelerate — for exiting elements
+  standard: [0.32, 0.08, 0.24, 1], // Material-ish, calm
+  enter: [0.16, 0.84, 0.44, 1], // decelerate — for entering elements
+  exit: [0.4, 0.0, 1, 1], // accelerate — for exiting elements
 } as const;
 
 export const duration = {
-  instant: 0.12,  // hover color shifts, focus rings
-  quick:   0.2,   // small UI: chips, buttons, dropdown items
-  base:    0.32,  // default — cards, dialogs, route content
-  slow:    0.5,   // hero figures, dashboard reveal
-  hero:    0.8,   // page-load orchestration only
+  instant: 0.12, // hover color shifts, focus rings
+  quick: 0.2, // small UI: chips, buttons, dropdown items
+  base: 0.32, // default — cards, dialogs, route content
+  slow: 0.5, // hero figures, dashboard reveal
+  hero: 0.8, // page-load orchestration only
 } as const;
 ```
 
 ### 4.2 Patterns
 
-| Pattern                        | Recipe                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------- |
-| **Page enter**                 | Fade + 8px translate-y, `duration.base`, `ease.enter`. Stagger children 40ms. |
-| **Hero figure mount**          | Fade + scale `0.96 → 1`, `duration.slow`, `ease.enter`. Number itself counts up (see 4.3). |
-| **List add/remove**            | `<AnimatePresence>` + layout animation. Enter: opacity 0→1 + translate-y 6px. Exit: opacity + height collapse. |
-| **Dialog**                     | Backdrop fades `duration.quick`. Panel scales `0.97 → 1` + fades, `duration.base`. |
-| **Tab / route change**         | Crossfade only (no slide). `duration.quick`. |
-| **Hover on interactive surface** | Background shift only, `duration.instant`. No translate, no scale. |
-| **Focus ring**                 | 2px outline, `--color-accent` at 50% opacity, `duration.instant`. |
+| Pattern                          | Recipe                                                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Page enter**                   | Fade + 8px translate-y, `duration.base`, `ease.enter`. Stagger children 40ms.                                  |
+| **Hero figure mount**            | Fade + scale `0.96 → 1`, `duration.slow`, `ease.enter`. Number itself counts up (see 4.3).                     |
+| **List add/remove**              | `<AnimatePresence>` + layout animation. Enter: opacity 0→1 + translate-y 6px. Exit: opacity + height collapse. |
+| **Dialog**                       | Backdrop fades `duration.quick`. Panel scales `0.97 → 1` + fades, `duration.base`.                             |
+| **Tab / route change**           | Crossfade only (no slide). `duration.quick`.                                                                   |
+| **Hover on interactive surface** | Background shift only, `duration.instant`. No translate, no scale.                                             |
+| **Focus ring**                   | 2px outline, `--color-accent` at 50% opacity, `duration.instant`.                                              |
 
 ### 4.3 Counting up financial figures
 
@@ -158,23 +158,28 @@ Hero numbers (Guilt-Free, Net Worth) animate from previous → new value over `d
 These extend, not replace, the shadcn primitives already in the project.
 
 ### Cards
+
 - Always `--color-surface` background, `--color-border` 1px, `--shadow-sm`, `--radius-lg`.
 - Hero cards: `--radius-xl`, `--shadow-md`, optional 1px inner highlight (`box-shadow: inset 0 1px 0 white/40%`).
 
 ### Buttons
+
 - **Primary:** `--color-accent` background, `--color-accent-fg` text, `--radius`. Hover → `--color-accent-deep`.
 - **Secondary:** `--color-surface-2` background, `--color-fg` text, hairline border.
 - **Ghost:** transparent, `--color-fg-muted` text, surface tint on hover.
 - All buttons: `duration.quick` background + color transition.
 
 ### Inputs
+
 - `--color-surface` background, `--color-border-soft` 1px border. On focus: border becomes `--color-accent` at 60% opacity, no harsh ring.
 - Labels above, never floating labels (financial data is too important to obscure).
 
 ### Numbers in tables
+
 - Tabular nums, right-aligned, `--color-fg`. Negative values use `--color-negative` (terracotta, regular weight). No parentheses or minus prefixes — color carries the sign.
 
 ### Empty states
+
 - One short sentence (`--color-fg-muted`) + one ghost CTA. No illustrations in v1; they'd compete with the calm.
 
 ---

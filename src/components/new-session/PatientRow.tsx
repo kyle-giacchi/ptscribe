@@ -67,7 +67,11 @@ export function PatientRow({
           )}
         </div>
         {selected && (
-          <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0, color: 'var(--color-pt-accent)' }} />
+          <Check
+            size={15}
+            strokeWidth={2.5}
+            style={{ flexShrink: 0, color: 'var(--color-pt-accent)' }}
+          />
         )}
       </button>
     </li>

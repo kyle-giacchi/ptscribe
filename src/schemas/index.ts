@@ -1,10 +1,5 @@
 import { z } from 'zod';
-import {
-  APP_DATA_VERSION,
-  type AppData,
-  type NoteTemplate,
-  type Exercise,
-} from '@/types';
+import { APP_DATA_VERSION, type AppData, type NoteTemplate, type Exercise } from '@/types';
 import { newId } from '@/utils/ids';
 import { BUILTIN_TEMPLATES } from '@/lib/clinical/templates';
 import { BUILTIN_EXERCISES } from '@/lib/clinical/exercises';
@@ -63,14 +58,7 @@ const SessionSchema = z.object({
   type: z.enum(['evaluation', 'follow_up', 'progress', 'discharge']),
   date: z.number().int(),
   durationMin: z.number().min(0).optional(),
-  status: z.enum([
-    'draft',
-    'recording',
-    'transcribing',
-    'generating',
-    'ready',
-    'finalized',
-  ]),
+  status: z.enum(['draft', 'recording', 'transcribing', 'generating', 'ready', 'finalized']),
   clips: z.array(SessionClipSchema),
   transcript: z.string().optional(),
   liveTranscript: z.string().optional(),

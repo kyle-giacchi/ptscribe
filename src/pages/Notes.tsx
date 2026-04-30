@@ -44,7 +44,8 @@ export function Notes() {
         if (statusFilter === 'draft' && note.finalized) return false;
         if (statusFilter === 'finalized' && !note.finalized) return false;
         if (!q) return true;
-        const hay = `${patient?.firstName ?? ''} ${patient?.lastName ?? ''} ${note.format}`.toLowerCase();
+        const hay =
+          `${patient?.firstName ?? ''} ${patient?.lastName ?? ''} ${note.format}`.toLowerCase();
         if (hay.includes(q)) return true;
         return note.sections.some((s) => s.body.toLowerCase().includes(q));
       })
@@ -202,18 +203,13 @@ function TableHeader() {
   );
 }
 
-function noteTone(
-  note: { finalized: boolean; updatedAt: number },
-  visitDate?: number
-): StatusTone {
+function noteTone(note: { finalized: boolean; updatedAt: number }, visitDate?: number): StatusTone {
   if (note.finalized) return 'done';
-  const ageDays =
-    (Date.now() - (visitDate ?? note.updatedAt)) / (24 * 60 * 60 * 1000);
+  const ageDays = (Date.now() - (visitDate ?? note.updatedAt)) / (24 * 60 * 60 * 1000);
   if (ageDays > 2) return 'flagged';
   if (ageDays > 1) return 'plateau';
   return 'next';
 }
-
 
 function snippet(text?: string): string {
   if (!text) return '';

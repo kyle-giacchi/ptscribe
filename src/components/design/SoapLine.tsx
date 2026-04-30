@@ -18,9 +18,7 @@ export function SoapLine({ text, anchor, edited, billing }: SoapLineProps) {
         padding: '8px 10px',
         borderRadius: 8,
         background: edited ? 'var(--color-pt-amber-soft)' : 'transparent',
-        border: edited
-          ? '1px solid var(--color-pt-amber-border)'
-          : '1px solid transparent',
+        border: edited ? '1px solid var(--color-pt-amber-border)' : '1px solid transparent',
         transition: 'background-color 120ms ease-out, border-color 120ms ease-out',
         fontSize: 13.5,
         lineHeight: 1.55,

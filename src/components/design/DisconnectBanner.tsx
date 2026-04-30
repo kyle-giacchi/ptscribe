@@ -49,9 +49,7 @@ export function DisconnectBanner({
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-pt-text)' }}>
           Microphone disconnected
         </div>
-        <div
-          style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', marginTop: 2 }}
-        >
+        <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', marginTop: 2 }}>
           {message}
         </div>
       </div>

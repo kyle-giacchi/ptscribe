@@ -22,7 +22,10 @@ export function useActionGuard() {
     const count = kind === 'transcribe' ? transcribeCountRef.current : generateCountRef.current;
     const max = kind === 'transcribe' ? MAX_TRANSCRIBES_PER_SESSION : MAX_GENERATES_PER_SESSION;
     if (count >= max) {
-      return { allowed: false, reason: `Limit reached: ${max} ${kind}s per session. Reload to reset.` };
+      return {
+        allowed: false,
+        reason: `Limit reached: ${max} ${kind}s per session. Reload to reset.`,
+      };
     }
     const elapsed = now - lastAt;
     if (lastAt > 0 && elapsed < ACTION_COOLDOWN_MS) {

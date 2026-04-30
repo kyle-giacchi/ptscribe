@@ -153,5 +153,4 @@ describe('buildUserPrompt', () => {
     expect(result).not.toContain('MRN-12345-SECRET');
     expect(result).not.toContain('MRN');
   });
-
 });
