@@ -1,4 +1,9 @@
-export type PlanTier = 'demo' | 'starter' | 'pro' | 'enterprise';
+export type PlanTier =
+  | 'demo'
+  | 'personal-free'
+  | 'personal-premium'
+  | 'enterprise-free'
+  | 'enterprise-premium';
 
 export interface PlanLimits {
   maxPatients: number;
@@ -19,7 +24,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     aiGenerationsPerMonth: 30,
     teamMembers: 1,
   },
-  starter: {
+  'personal-free': {
     maxPatients: 50,
     maxSessionsPerMonth: 100,
     maxStorageGb: 5,
@@ -27,15 +32,23 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     aiGenerationsPerMonth: 200,
     teamMembers: 1,
   },
-  pro: {
+  'personal-premium': {
     maxPatients: -1,
     maxSessionsPerMonth: -1,
     maxStorageGb: 25,
     transcriptionMinutesPerMonth: -1,
     aiGenerationsPerMonth: -1,
-    teamMembers: 5,
+    teamMembers: 1,
   },
-  enterprise: {
+  'enterprise-free': {
+    maxPatients: 200,
+    maxSessionsPerMonth: 500,
+    maxStorageGb: 20,
+    transcriptionMinutesPerMonth: 1000,
+    aiGenerationsPerMonth: 500,
+    teamMembers: 10,
+  },
+  'enterprise-premium': {
     maxPatients: -1,
     maxSessionsPerMonth: -1,
     maxStorageGb: -1,

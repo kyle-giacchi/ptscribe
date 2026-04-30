@@ -5,17 +5,24 @@
  * also serves the SPA via the Assets binding configured in wrangler.jsonc.
  *
  * Routes:
+ *   POST /api/auth/**      → Better Auth handler (no gate required)
  *   POST /api/transcribe   body = audio/* (the actual MIME, e.g. audio/webm) → { text }
  *   POST /api/generate     body = JSON {model, system, user, ...}            → { text }
  *
- * All /api/* requests must include `x-ptscribe-key: <env.PTSCRIBE_GATE>`.
+ * /api/transcribe and /api/generate require `x-ptscribe-key: <env.PTSCRIBE_GATE>`.
  */
 
-interface Env {
+import { createAuth } from './auth';
+
+export interface Env {
   AI: Ai;
   ASSETS: Fetcher;
   ANTHROPIC_API_KEY: string;
   PTSCRIBE_GATE: string;
+  AUTH_SECRET: string;
+  /** Full origin of the app, e.g. https://ptscribe.app. Used for passkey rpID and cookie security. */
+  AUTH_BASE_URL?: string;
+  DB: D1Database;
   RATE_LIMIT?: KVNamespace;
   /** Comma-separated list of allowed request Origins. Defaults to same-origin
    *  plus localhost dev ports when unset. */
@@ -49,12 +56,22 @@ const ALLOWED_GENERATE_MODELS = new Set([
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    const res = url.pathname.startsWith('/api/')
-      ? await handleApi(request, env, url)
-      : await env.ASSETS.fetch(request);
+    let res: Response;
+    if (url.pathname.startsWith('/api/auth/')) {
+      const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+      if (!(await checkPreGateLimit(env, ip)).allowed) {
+        res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+      } else {
+        res = await createAuth(env, ctx).handler(request);
+      }
+    } else if (url.pathname.startsWith('/api/')) {
+      res = await handleApi(request, env, url);
+    } else {
+      res = await env.ASSETS.fetch(request);
+    }
 
     return withSecurityHeaders(res, url);
   },
