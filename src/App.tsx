@@ -14,11 +14,11 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
-import { RequireAuth } from '@/components/common/RequireAuth';
 import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
 import { isDemoMode } from '@/lib/demoMode';
 import { Setup } from '@/pages/Setup';
+import { HomePage } from '@/pages/HomePage';
 import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
 
@@ -30,16 +30,10 @@ const PatientDetail = lazy(() =>
 const NewSession = lazy(() =>
   import('@/pages/NewSession').then((m) => ({ default: m.NewSession })),
 );
-const SessionPage = lazy(() =>
-  import('@/pages/Session').then((m) => ({ default: m.SessionPage })),
-);
+const SessionPage = lazy(() => import('@/pages/Session').then((m) => ({ default: m.SessionPage })));
 const Notes = lazy(() => import('@/pages/Notes').then((m) => ({ default: m.Notes })));
-const Templates = lazy(() =>
-  import('@/pages/Templates').then((m) => ({ default: m.Templates })),
-);
-const Exercises = lazy(() =>
-  import('@/pages/Exercises').then((m) => ({ default: m.Exercises })),
-);
+const Templates = lazy(() => import('@/pages/Templates').then((m) => ({ default: m.Templates })));
+const Exercises = lazy(() => import('@/pages/Exercises').then((m) => ({ default: m.Exercises })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
 
 function PageLoader() {
@@ -69,20 +63,11 @@ function AppProviders() {
                                 <Routes>
                                   <Route path="/setup" element={<Setup />} />
                                   <Route element={<AppShell />}>
-                                    <Route index element={<Dashboard />} />
+                                    <Route path="/today" element={<Dashboard />} />
                                     <Route path="/patients" element={<Patients />} />
-                                    <Route
-                                      path="/patients/:id"
-                                      element={<PatientDetail />}
-                                    />
-                                    <Route
-                                      path="/sessions/new"
-                                      element={<NewSession />}
-                                    />
-                                    <Route
-                                      path="/sessions/:id"
-                                      element={<SessionPage />}
-                                    />
+                                    <Route path="/patients/:id" element={<PatientDetail />} />
+                                    <Route path="/sessions/new" element={<NewSession />} />
+                                    <Route path="/sessions/:id" element={<SessionPage />} />
                                     <Route path="/notes" element={<Notes />} />
                                     <Route path="/templates" element={<Templates />} />
                                     <Route path="/exercises" element={<Exercises />} />
@@ -111,6 +96,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route
@@ -121,9 +107,7 @@ export default function App() {
                   <AppProviders />
                 </AppGate>
               ) : (
-                <RequireAuth>
-                  <AppProviders />
-                </RequireAuth>
+                <AppProviders />
               )
             }
           />
