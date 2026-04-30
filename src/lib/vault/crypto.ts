@@ -42,22 +42,30 @@ export function base64ToBytes(b64: string): Uint8Array {
 }
 
 export async function deriveKek(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
-  const raw = await argon2id({
-    password: passphrase,
-    salt,
-    parallelism: ARGON2_PARALLELISM,
-    iterations: ARGON2_ITERATIONS,
-    memorySize: ARGON2_MEMORY_KIB,
-    hashLength: ARGON2_HASH_LENGTH,
-    outputType: 'binary',
-  });
-  return subtle().importKey(
-    'raw',
-    raw as BufferSource,
-    { name: 'AES-GCM', length: AES_KEY_BITS },
-    false,
-    ['wrapKey', 'unwrapKey'],
-  );
+  // Convert to Uint8Array so we can zero the bytes after KDF.
+  // The original string is immutable in JS and cannot be zeroed, but minimizing
+  // how long a secondary copy lives in a typed buffer is still worthwhile.
+  const passphraseBytes = new TextEncoder().encode(passphrase);
+  try {
+    const raw = await argon2id({
+      password: passphraseBytes,
+      salt,
+      parallelism: ARGON2_PARALLELISM,
+      iterations: ARGON2_ITERATIONS,
+      memorySize: ARGON2_MEMORY_KIB,
+      hashLength: ARGON2_HASH_LENGTH,
+      outputType: 'binary',
+    });
+    return subtle().importKey(
+      'raw',
+      raw as BufferSource,
+      { name: 'AES-GCM', length: AES_KEY_BITS },
+      false,
+      ['wrapKey', 'unwrapKey'],
+    );
+  } finally {
+    passphraseBytes.fill(0);
+  }
 }
 
 export async function generateDek(): Promise<CryptoKey> {

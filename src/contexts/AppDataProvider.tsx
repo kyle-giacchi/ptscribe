@@ -22,6 +22,7 @@ import type {
 import { toast } from 'sonner';
 import { defaultAppData } from '@/schemas';
 import { dataRepository } from '@/services/DataRepository';
+import { audioRepository } from '@/services/AudioRepository';
 import { vault } from '@/lib/vault/vault';
 
 const SAVE_DEBOUNCE_MS = 300;
@@ -55,9 +56,21 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const loaded = await dataRepository.load();
       if (cancelled) return;
-      setAppData(loaded ?? defaultAppData());
+      const data = loaded ?? defaultAppData();
+      setAppData(data);
       if (dataRepository.hasCorruptData()) setCorruptWarning(true);
       if (vault.isTwoTabConflict()) setTwoTabWarning(true);
+
+      // Purge audio blobs beyond the retention window (fire-and-forget).
+      const days = data.settings.retention.autoDeleteAudioAfterDays;
+      if (days) {
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        for (const session of data.sessions) {
+          for (const clip of session.clips) {
+            if (clip.createdAt < cutoff) void audioRepository.remove(clip.id);
+          }
+        }
+      }
     })();
     return () => {
       cancelled = true;
