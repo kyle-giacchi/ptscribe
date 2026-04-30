@@ -22,7 +22,8 @@ export function buildUserPrompt({
   const lines: string[] = [];
 
   lines.push('# Patient context');
-  lines.push(`Name: ${patient.firstName} ${patient.lastName}`);
+  // Send a pseudonym ID rather than the real name to limit PHI transmitted to Anthropic (A9).
+  lines.push(`Patient ID: PT-${patient.id.slice(0, 8)}`);
   if (patient.dob) {
     const ageYears = Math.floor((Date.now() - patient.dob) / (365.25 * 24 * 3_600_000));
     lines.push(`Age: ${ageYears}`);

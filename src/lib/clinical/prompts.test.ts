@@ -30,13 +30,15 @@ const baseTemplate: NoteTemplate = {
 const baseTranscript = 'Patient reports left knee pain rated 6 out of 10.';
 
 describe('buildUserPrompt', () => {
-  it('includes the patient full name', () => {
+  it('includes a pseudonym patient ID and omits the real name', () => {
     const result = buildUserPrompt({
       template: baseTemplate,
       transcript: baseTranscript,
       patient: basePatient,
     });
-    expect(result).toContain('Alex Rivera');
+    expect(result).toContain('Patient ID: PT-p1');
+    expect(result).not.toContain('Alex');
+    expect(result).not.toContain('Rivera');
   });
 
   it('includes the transcript text', () => {
