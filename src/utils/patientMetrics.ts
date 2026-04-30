@@ -11,7 +11,7 @@ export function labelForSex(s?: Sex): string {
 
 export function derivePatientBadge(
   p: Patient,
-  sessionCount: number
+  sessionCount: number,
 ): { tone: StatusTone; label: string } {
   if (p.status === 'discharged') return { tone: 'done', label: 'Discharged' };
   if (p.status === 'on_hold') return { tone: 'plateau', label: 'On hold' };
@@ -19,16 +19,9 @@ export function derivePatientBadge(
   return { tone: 'on-track', label: 'On-track' };
 }
 
-export function daysInCare(
-  p: Patient,
-  sessions: Session[],
-  plan: PlanOfCare | undefined
-): number {
+export function daysInCare(p: Patient, sessions: Session[], plan: PlanOfCare | undefined): number {
   const start =
-    plan?.startDate ??
-    (sessions.length
-      ? Math.min(...sessions.map((s) => s.date))
-      : p.createdAt);
+    plan?.startDate ?? (sessions.length ? Math.min(...sessions.map((s) => s.date)) : p.createdAt);
   return Math.max(0, Math.floor((Date.now() - start) / DAY_MS));
 }
 

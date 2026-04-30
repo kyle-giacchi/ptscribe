@@ -19,7 +19,14 @@ import { downloadFile } from '@/utils/download';
 
 export function Settings() {
   const { clinician, setClinician } = useClinician();
-  const { settings, updateAi, updateAudio, updateUi, setIdleLockMinutes, setAutoDeleteAudioAfterDays } = useSettings();
+  const {
+    settings,
+    updateAi,
+    updateAudio,
+    updateUi,
+    setIdleLockMinutes,
+    setAutoDeleteAudioAfterDays,
+  } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -28,11 +35,7 @@ export function Settings() {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const text = await exportBackup(appData);
       const suffix = vault.isUnlocked() ? 'encrypted' : 'plaintext';
-      downloadFile(
-        `ptnotes-backup-${stamp}-${suffix}.json`,
-        text,
-        'application/json',
-      );
+      downloadFile(`ptnotes-backup-${stamp}-${suffix}.json`, text, 'application/json');
       void auditLog.append('backup:exported');
       toast.success(
         vault.isUnlocked()
@@ -54,9 +57,7 @@ export function Settings() {
       }
       bulkUpdate(result.data);
       void auditLog.append('backup:imported');
-      toast.success(
-        result.encrypted ? 'Encrypted backup restored' : 'Backup restored',
-      );
+      toast.success(result.encrypted ? 'Encrypted backup restored' : 'Backup restored');
     } catch (e) {
       toast.error(`Import failed: ${(e as Error).message}`);
     }
@@ -170,9 +171,7 @@ export function Settings() {
               <Select
                 value={String(settings.retention.autoDeleteAudioAfterDays ?? '')}
                 onChange={(e) =>
-                  setAutoDeleteAudioAfterDays(
-                    e.target.value ? Number(e.target.value) : undefined,
-                  )
+                  setAutoDeleteAudioAfterDays(e.target.value ? Number(e.target.value) : undefined)
                 }
               >
                 <option value="">Off</option>
@@ -276,7 +275,9 @@ export function Settings() {
                 }
               >
                 <option value="cloudflare">Cloudflare Workers AI (Nova-3 with diarization)</option>
-                <option value="local">Local Whisper (no API credits, first use downloads ~150 MB)</option>
+                <option value="local">
+                  Local Whisper (no API credits, first use downloads ~150 MB)
+                </option>
                 <option value="webspeech">Browser live (Web Speech, no speaker labels)</option>
                 <option value="none">Off</option>
               </Select>
@@ -295,7 +296,10 @@ export function Settings() {
               </Field>
             )}
             {settings.ai.transcription.provider === 'local' && (
-              <Field label="Local model" hint="HuggingFace model ID — tiny.en is fastest, base.en is more accurate">
+              <Field
+                label="Local model"
+                hint="HuggingFace model ID — tiny.en is fastest, base.en is more accurate"
+              >
                 <TextInput
                   placeholder="onnx-community/whisper-tiny.en"
                   value={settings.ai.transcription.model}
@@ -530,4 +534,3 @@ export function Settings() {
     </div>
   );
 }
-

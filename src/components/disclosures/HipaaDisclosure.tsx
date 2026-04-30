@@ -37,7 +37,9 @@ export function HipaaDisclosure({
           style={{ marginTop: 2, flexShrink: 0, color: 'var(--color-pt-amber)' }}
         />
         <p style={{ margin: 0 }}>
-          <strong style={{ color: 'var(--color-pt-text)' }}>PTScribe is not HIPAA-certified.</strong>{' '}
+          <strong style={{ color: 'var(--color-pt-text)' }}>
+            PTScribe is not HIPAA-certified.
+          </strong>{' '}
           Patient data is encrypted on this device, but audio and transcripts are sent over TLS to
           Cloudflare Workers AI and Anthropic for transcription and note generation. Treat
           everything you record as PHI in transit and confirm BAAs with both providers before using
@@ -83,9 +85,9 @@ export function HipaaDisclosure({
 
       <p style={{ margin: 0 }}>
         <strong style={{ color: 'var(--color-pt-text)' }}>What leaves the device.</strong>{' '}
-        Transcription and note generation are proxied through a Cloudflare Worker we operate.
-        Audio is forwarded to Cloudflare Workers AI (Deepgram Nova-3) and transcripts are forwarded
-        to Anthropic (Claude). Both legs travel over TLS and reach providers using server-side
+        Transcription and note generation are proxied through a Cloudflare Worker we operate. Audio
+        is forwarded to Cloudflare Workers AI (Deepgram Nova-3) and transcripts are forwarded to
+        Anthropic (Claude). Both legs travel over TLS and reach providers using server-side
         credentials the browser never sees.
       </p>
 

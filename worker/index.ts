@@ -157,7 +157,11 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   if (origin) {
     const workerOrigin = new URL(request.url).origin;
     const allowed = env.ALLOWED_ORIGINS
-      ? new Set(env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean))
+      ? new Set(
+          env.ALLOWED_ORIGINS.split(',')
+            .map((o) => o.trim())
+            .filter(Boolean),
+        )
       : new Set([workerOrigin, 'http://localhost:8080', 'http://localhost:8787']);
     if (!allowed.has(origin)) {
       return apiError('FORBIDDEN', 'Origin not allowed', 403);
@@ -193,8 +197,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 
 async function handleTranscribe(request: Request, env: Env): Promise<Response> {
   const language = request.headers.get('x-ptscribe-language') || undefined;
-  const model =
-    request.headers.get('x-ptscribe-model')?.trim() || DEFAULT_TRANSCRIBE_MODEL;
+  const model = request.headers.get('x-ptscribe-model')?.trim() || DEFAULT_TRANSCRIBE_MODEL;
   const contentType = request.headers.get('Content-Type') || 'audio/webm';
 
   if (!ALLOWED_TRANSCRIBE_MODELS.has(model)) {
@@ -239,14 +242,17 @@ async function runDeepgram(
     // gives us a `paragraphs.transcript` already shaped as
     // "Speaker 0: ...\n\nSpeaker 1: ..." which is perfect for the prompt.
     const stream = new Response(audio).body;
-    const result = (await env.AI.run(model as keyof AiModels, {
-      audio: { body: stream, contentType },
-      diarize: true,
-      smart_format: true,
-      punctuate: true,
-      paragraphs: true,
-      ...(language ? { language } : { detect_language: true }),
-    } as never)) as DeepgramResponse;
+    const result = (await env.AI.run(
+      model as keyof AiModels,
+      {
+        audio: { body: stream, contentType },
+        diarize: true,
+        smart_format: true,
+        punctuate: true,
+        paragraphs: true,
+        ...(language ? { language } : { detect_language: true }),
+      } as never,
+    )) as DeepgramResponse;
 
     const text = extractDeepgramText(result);
     if (!text) return apiError('EMPTY_TEXT', 'Nova-3 returned no text', 502);
@@ -272,10 +278,13 @@ async function runWhisper(
   const audioInput = isTurbo ? bytesToBase64(audio) : Array.from(audio);
 
   try {
-    const result = (await env.AI.run(model as keyof AiModels, {
-      audio: audioInput,
-      ...(language ? { language } : {}),
-    } as never)) as { text?: string };
+    const result = (await env.AI.run(
+      model as keyof AiModels,
+      {
+        audio: audioInput,
+        ...(language ? { language } : {}),
+      } as never,
+    )) as { text?: string };
 
     const text = typeof result?.text === 'string' ? result.text : '';
     if (!text) return apiError('EMPTY_TEXT', 'Whisper returned no text', 502);
@@ -337,7 +346,10 @@ function fromParagraphList(alt: DeepgramAlt): string {
   return paragraphs
     .map((p) => {
       const speaker = typeof p.speaker === 'number' ? p.speaker : 0;
-      const body = (p.sentences ?? []).map((s) => s.text ?? '').join(' ').trim();
+      const body = (p.sentences ?? [])
+        .map((s) => s.text ?? '')
+        .join(' ')
+        .trim();
       return body ? `Speaker ${speaker}: ${body}` : '';
     })
     .filter(Boolean)

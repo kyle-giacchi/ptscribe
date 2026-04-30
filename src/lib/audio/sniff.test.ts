@@ -20,16 +20,12 @@ describe('isPlaintextAudio', () => {
   });
 
   it('recognizes WAV (RIFF + WAVE)', () => {
-    const bytes = new Uint8Array([
-      0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45,
-    ]);
+    const bytes = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]);
     expect(isPlaintextAudio(bytes)).toBe(true);
   });
 
   it('rejects RIFF without WAVE marker (e.g. AVI)', () => {
-    const bytes = new Uint8Array([
-      0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x41, 0x56, 0x49, 0x20,
-    ]);
+    const bytes = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x41, 0x56, 0x49, 0x20]);
     expect(isPlaintextAudio(bytes)).toBe(false);
   });
 
