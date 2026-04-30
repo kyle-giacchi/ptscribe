@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPlaintextAudio } from './sniff';
+import { isPlaintextAudio, isPtscEncrypted, PTSC_MAGIC } from './sniff';
 
 describe('isPlaintextAudio', () => {
   it('recognizes WebM/Matroska EBML header', () => {
@@ -41,5 +41,24 @@ describe('isPlaintextAudio', () => {
   it('rejects buffers shorter than every supported magic', () => {
     expect(isPlaintextAudio(new Uint8Array([0x1a, 0x45]))).toBe(false);
     expect(isPlaintextAudio(new Uint8Array([]))).toBe(false);
+  });
+
+  it('rejects PTSC-tagged encrypted blobs', () => {
+    const tagged = new Uint8Array([...PTSC_MAGIC, 0xab, 0xcd, 0xef]);
+    expect(isPlaintextAudio(tagged)).toBe(false);
+  });
+});
+
+describe('isPtscEncrypted', () => {
+  it('returns true for PTSC-tagged blobs', () => {
+    expect(isPtscEncrypted(new Uint8Array([0x50, 0x54, 0x53, 0x43, 0x00]))).toBe(true);
+  });
+
+  it('returns false for plaintext audio', () => {
+    expect(isPtscEncrypted(new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x00]))).toBe(false);
+  });
+
+  it('returns false for short buffers', () => {
+    expect(isPtscEncrypted(new Uint8Array([0x50, 0x54]))).toBe(false);
   });
 });
