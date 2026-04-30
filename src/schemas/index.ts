@@ -50,6 +50,7 @@ const SessionClipSchema = z.object({
   status: z.enum(['pending', 'ready', 'transcribing', 'transcribed', 'failed']),
   transcript: z.string().optional(),
   liveTranscript: z.string().optional(),
+  localTranscript: z.string().optional(),
   transcriptedAt: z.number().int().optional(),
   errorMessage: z.string().optional(),
   createdAt: z.number().int(),

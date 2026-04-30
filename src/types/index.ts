@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 9;
+export const APP_DATA_VERSION = 10;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -73,6 +73,7 @@ export interface SessionClip {
   status: ClipStatus;
   transcript?: string;
   liveTranscript?: string;
+  localTranscript?: string;
   transcriptedAt?: number;
   errorMessage?: string;
   createdAt: number;
