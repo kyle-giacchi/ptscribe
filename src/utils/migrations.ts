@@ -23,6 +23,11 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   time-stretch before transcription.
  * - v6 → v7: Adds optional `liveTranscript` field to Session and SessionClip for per-clip
  *   Web Speech capture. No structural changes — new fields default to absent.
+ * - v7 → v8: Adds `Settings.security.idleLockMinutes` (default 10). Auto-lock the vault
+ *   after this many minutes of inactivity. `0` disables the timer.
+ * - v8 → v9: Adds optional `Clinician.acknowledgedDisclosureAt` (ms timestamp). Captured
+ *   when the clinician checks the consent box during Setup; absence is fine for
+ *   pre-existing data. No structural changes.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -54,6 +59,12 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 6) {
     working = migrateV6ToV7(working);
+  }
+  if ((working as { version?: number }).version === 7) {
+    working = migrateV7ToV8(working);
+  }
+  if ((working as { version?: number }).version === 8) {
+    working = migrateV8ToV9(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -182,6 +193,26 @@ function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> 
 
 function migrateV6ToV7(input: Record<string, unknown>): Record<string, unknown> {
   return { ...input, version: 7 };
+}
+
+function migrateV8ToV9(input: Record<string, unknown>): Record<string, unknown> {
+  return { ...input, version: 9 };
+}
+
+function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 8 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingSec =
+    (settings.security as Record<string, unknown> | undefined) ?? undefined;
+  const lock = existingSec?.idleLockMinutes;
+  next.settings = {
+    ...settings,
+    security: {
+      idleLockMinutes:
+        typeof lock === 'number' && lock >= 0 && lock <= 120 ? Math.floor(lock) : 10,
+    },
+  };
+  return next;
 }
 
 function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> {

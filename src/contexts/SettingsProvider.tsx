@@ -14,6 +14,7 @@ export interface SettingsContextValue {
   updateAi: (patch: Partial<AISettings>) => void;
   updateAudio: (patch: Partial<AudioSettings>) => void;
   updateUi: (patch: Partial<Settings['ui']>) => void;
+  setIdleLockMinutes: (minutes: number) => void;
   // Per-page detail-level toggle (kept from prior app for the dashboard etc.).
   // We persist this in localStorage directly because it isn't part of the
   // schema-validated AppData; keep it transient + ephemeral.
@@ -57,6 +58,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updateSettingsSlice({ ...settings, audio: { ...settings.audio, ...patch } }),
       updateUi: (patch) =>
         updateSettingsSlice({ ...settings, ui: { ...settings.ui, ...patch } }),
+      setIdleLockMinutes: (minutes: number) =>
+        updateSettingsSlice({
+          ...settings,
+          security: { ...settings.security, idleLockMinutes: minutes },
+        }),
       getPageMode: (key) => readPageModes()[key] ?? 'simple',
       setPageMode: (key, mode) => {
         const modes = readPageModes();

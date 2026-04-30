@@ -162,7 +162,7 @@ describe('migrate v2 → v3', () => {
 
     const result = migrate(data);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(CURRENT_VERSION);
     expect(result.sessions).toHaveLength(1);
     const session = result.sessions[0];
     expect((session as { audioRef?: unknown }).audioRef).toBeUndefined();
@@ -254,7 +254,7 @@ describe('migrate v4 → v5', () => {
     const data = v4AppData();
     const result = migrate(data);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(CURRENT_VERSION);
     expect(result.settings.audio.silenceDetection).toEqual({
       enabled: false,
       sensitivity: 'medium',
@@ -289,12 +289,98 @@ describe('migrate v4 → v5', () => {
   });
 });
 
+function v7AppData(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const seed = defaultAppData();
+  return {
+    ...seed,
+    version: 7,
+    settings: {
+      ...seed.settings,
+      // Strip the v8 security block to simulate persisted v7 data.
+      security: undefined,
+    } as unknown,
+    ...overrides,
+  };
+}
+
+function v8AppData(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const seed = defaultAppData();
+  // Strip the v9-introduced field to simulate persisted v8 clinician.
+  const clinicianSansAck = { ...seed.clinician };
+  delete (clinicianSansAck as { acknowledgedDisclosureAt?: number }).acknowledgedDisclosureAt;
+  return {
+    ...seed,
+    version: 8,
+    clinician: clinicianSansAck,
+    ...overrides,
+  };
+}
+
+describe('migrate v7 → v8', () => {
+  it('injects default security.idleLockMinutes (10) when missing', () => {
+    const result = migrate(v7AppData());
+    expect(result.settings.security).toEqual({ idleLockMinutes: 10 });
+  });
+
+  it('preserves an existing idleLockMinutes value when provided', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 7,
+      settings: {
+        ...seed.settings,
+        security: { idleLockMinutes: 30 },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.security.idleLockMinutes).toBe(30);
+  });
+
+  it('clamps an out-of-range idleLockMinutes back to default', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 7,
+      settings: {
+        ...seed.settings,
+        security: { idleLockMinutes: 9999 },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.security.idleLockMinutes).toBe(10);
+  });
+
+  it('produces output that satisfies AppDataSchema', () => {
+    const result = migrate(v7AppData());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+describe('migrate v8 → v9', () => {
+  it('leaves clinician.acknowledgedDisclosureAt absent for legacy data', () => {
+    const result = migrate(v8AppData());
+    expect(result.clinician.acknowledgedDisclosureAt).toBeUndefined();
+  });
+
+  it('preserves acknowledgedDisclosureAt when already present', () => {
+    const result = migrate(v8AppData({
+      clinician: { ...defaultAppData().clinician, acknowledgedDisclosureAt: 1700000000000 },
+    }));
+    expect(result.clinician.acknowledgedDisclosureAt).toBe(1700000000000);
+  });
+
+  it('produces output that satisfies AppDataSchema', () => {
+    const result = migrate(v8AppData());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
 describe('migrate v5 → v6', () => {
   it('injects default audio.speedUp (disabled, 1.5×) when missing', () => {
     const data = v5AppData();
     const result = migrate(data);
 
-    expect(result.version).toBe(7);
+    expect(result.version).toBe(CURRENT_VERSION);
     expect(result.settings.audio.speedUp).toEqual({ enabled: false, speed: 1.5 });
   });
 

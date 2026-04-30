@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 7;
+export const APP_DATA_VERSION = 9;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -14,6 +14,11 @@ export interface Clinician {
   phone?: string;
   email?: string;
   signatureBlock?: string;
+  /**
+   * Timestamp (ms) when the clinician acknowledged the HIPAA / data-handling
+   * disclosure. Set during Setup; absence means the wizard hasn't completed.
+   */
+  acknowledgedDisclosureAt?: number;
 }
 
 // ─── Patient ────────────────────────────────────────────────────────────────
@@ -285,9 +290,18 @@ export interface AudioSettings {
   speedUp: SpeedUpSettings;
 }
 
+export interface SecuritySettings {
+  /**
+   * Minutes of user inactivity before the vault auto-locks. `0` disables
+   * auto-lock; default `10`. Bounded `[0, 120]` in the schema.
+   */
+  idleLockMinutes: number;
+}
+
 export interface Settings {
   ai: AISettings;
   audio: AudioSettings;
+  security: SecuritySettings;
   ui: {
     sidebarCollapsed: boolean;
     densityMode: DensityMode;

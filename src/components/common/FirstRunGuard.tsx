@@ -7,7 +7,9 @@ export function FirstRunGuard({ children }: { children: ReactNode }) {
   const { clinician } = useClinician();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const needsSetup = !isDemoMode() && !clinician.name.trim();
+  const needsSetup =
+    !isDemoMode() &&
+    (!clinician.name.trim() || typeof clinician.acknowledgedDisclosureAt !== 'number');
 
   useEffect(() => {
     if (needsSetup && pathname !== '/setup') {
