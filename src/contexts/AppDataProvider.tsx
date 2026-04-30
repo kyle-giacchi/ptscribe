@@ -19,8 +19,10 @@ import type {
   PlanOfCare,
   Settings,
 } from '@/types';
+import { toast } from 'sonner';
 import { defaultAppData } from '@/schemas';
 import { dataRepository } from '@/services/DataRepository';
+import { vault } from '@/lib/vault/vault';
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -44,6 +46,8 @@ const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [appData, setAppData] = useState<AppData | null>(null);
+  const [corruptWarning, setCorruptWarning] = useState(false);
+  const [twoTabWarning, setTwoTabWarning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -52,17 +56,33 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const loaded = await dataRepository.load();
       if (cancelled) return;
       setAppData(loaded ?? defaultAppData());
+      if (dataRepository.hasCorruptData()) setCorruptWarning(true);
+      if (vault.isTwoTabConflict()) setTwoTabWarning(true);
     })();
     return () => {
       cancelled = true;
     };
   }, []);
 
+  useEffect(() => {
+    return vault.onConflictChange((conflicted) => {
+      setTwoTabWarning(conflicted);
+    });
+  }, []);
+
   const scheduleSave = useCallback((next: AppData) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      dataRepository.save(next).catch((err) => {
+      dataRepository.save(next).catch((err: unknown) => {
         console.error('AppData save failed', err);
+        const msg = err instanceof Error ? err.message : '';
+        if (msg.includes('QuotaExceeded') || msg.includes('quota') || msg.includes('storage')) {
+          toast.error('Storage quota exceeded — your data could not be saved. Free up space or export a backup.');
+        } else if (msg.includes('vault') && msg.includes('another tab')) {
+          toast.error('Vault is open in another tab — save blocked. Close the other tab or lock the vault there.');
+        } else {
+          toast.error('Failed to save data. Check the console for details.');
+        }
       });
     }, SAVE_DEBOUNCE_MS);
   }, []);
@@ -148,7 +168,76 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
+  return (
+    <AppDataContext.Provider value={value}>
+      {twoTabWarning && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            top: corruptWarning ? 44 : 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: '#78350f',
+            color: '#fffbeb',
+            padding: '10px 16px',
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            Encryption vault is open in another tab. Saving is blocked here to prevent data
+            corruption. Close the other tab or lock the vault there first.
+          </span>
+        </div>
+      )}
+      {corruptWarning && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: '#7f1d1d',
+            color: '#fef2f2',
+            padding: '10px 16px',
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            Your saved data could not be loaded and has been reset. A backup of the corrupt data has
+            been preserved under <code>ptnotes.appData.corrupt</code> in localStorage.
+          </span>
+          <button
+            onClick={() => {
+              dataRepository.clearCorruptData();
+              setCorruptWarning(false);
+            }}
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              border: 'none',
+              color: 'inherit',
+              borderRadius: 4,
+              padding: '4px 10px',
+              cursor: 'pointer',
+              fontSize: 12,
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {children}
+    </AppDataContext.Provider>
+  );
 }
 
 export function useAppData(): AppDataContextValue {

@@ -1,5 +1,6 @@
 export const STORAGE_KEYS = {
   appData: 'ptnotes.appData',
+  appDataCorrupt: 'ptnotes.appData.corrupt',
   vault: 'ptnotes.vault',
 } as const;
 

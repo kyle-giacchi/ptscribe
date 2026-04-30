@@ -1,4 +1,7 @@
-export const MAX_OBJECT_BYTES = 5 * 1024 * 1024; // 5 MB
+// 5 MB cap on the stored (post-encryption) value. For vault-encrypted AppData,
+// DataRepository.save() pre-checks the plaintext at 3.5 MB so the encrypted
+// envelope (~4.8 MB) stays safely under this limit.
+export const MAX_OBJECT_BYTES = 5 * 1024 * 1024;
 
 function isAvailable(): boolean {
   try {
@@ -35,7 +38,15 @@ export const safeLocalStorage = {
   setItem(key: string, value: string): void {
     if (!isAvailable()) return;
     validateObjectSize(value);
-    window.localStorage.setItem(key, value);
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (e) {
+      const name = (e as DOMException)?.name;
+      if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+        throw new Error('QuotaExceeded: localStorage is full');
+      }
+      throw e;
+    }
   },
   removeItem(key: string): void {
     if (!isAvailable()) return;

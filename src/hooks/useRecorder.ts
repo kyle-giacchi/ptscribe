@@ -196,6 +196,9 @@ export function useRecorder(): UseRecorder {
         setDurationSec(0);
         setBlob(null);
         recorder.start(CHUNK_TIMESLICE_MS);
+        audioRepository.saveChunkMime(clipId, recorder.mimeType || mimeType || 'audio/webm').catch(() => {
+          /* best-effort */
+        });
         // Best-effort: keep screen awake while recording. Browsers auto-release
         // on visibilitychange; the handler below re-acquires on return.
         void acquireWakeLock().then((sentinel) => {

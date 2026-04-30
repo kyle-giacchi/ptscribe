@@ -16,6 +16,7 @@ interface Env {
   ASSETS: Fetcher;
   ANTHROPIC_API_KEY: string;
   PTSCRIBE_GATE: string;
+  RATE_LIMIT?: KVNamespace;
 }
 
 interface GenerateBody {
@@ -29,31 +30,124 @@ interface GenerateBody {
 
 const DEFAULT_TRANSCRIBE_MODEL = '@cf/deepgram/nova-3';
 
+const ALLOWED_TRANSCRIBE_MODELS = new Set([
+  '@cf/deepgram/nova-3',
+  '@cf/openai/whisper',
+  '@cf/openai/whisper-large-v3-turbo',
+  '@cf/openai/whisper-sherpa',
+]);
+
+const ALLOWED_GENERATE_MODELS = new Set([
+  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-6',
+  'claude-opus-4-7',
+]);
+
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname.startsWith('/api/')) {
-      return handleApi(request, env, url);
-    }
+    const res = url.pathname.startsWith('/api/')
+      ? await handleApi(request, env, url)
+      : await env.ASSETS.fetch(request);
 
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(res, url);
   },
 };
 
+/**
+ * Security headers applied to every response. The CSP here is the local-first
+ * boundary: a single compromised dependency can no longer reach an attacker
+ * server, and an iframed clone cannot host this app for clickjacking.
+ *
+ * Notes on the directives:
+ *   - `script-src 'self'`: bundled JS only. No inline scripts; no third-party.
+ *   - `style-src 'self' 'unsafe-inline'`: inline `style={{}}` from React. To be
+ *     tightened with a nonce later.
+ *   - `worker-src 'self' blob:`: `MediaRecorder`, `timeStretch.worker.ts`, and
+ *     transformers.js load from blob URLs.
+ *   - `connect-src 'self' https://*.huggingface.co https://huggingface.co
+ *     https://cdn-lfs.huggingface.co`: same-origin XHR/fetch for `/api/*`,
+ *     plus HuggingFace model downloads when local Whisper is enabled.
+ *   - `media-src 'self' blob:`: <audio> sources blob URLs from IndexedDB.
+ *   - `frame-ancestors 'none'`: blocks framing entirely (better than X-Frame).
+ *   - `object-src 'none'`: no plugins; `base-uri 'self'`: no <base> hijack.
+ */
+function withSecurityHeaders(res: Response, url: URL): Response {
+  // Don't rewrite the body — clone headers and re-emit. Avoid mutating opaque
+  // responses (we never produce any here, so this is straightforward).
+  const headers = new Headers(res.headers);
+
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://huggingface.co https://*.huggingface.co https://cdn-lfs.huggingface.co",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+
+  headers.set('Content-Security-Policy', csp);
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('Referrer-Policy', 'no-referrer');
+  headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()',
+  );
+  // HSTS only meaningful for HTTPS clients; safe to send unconditionally because
+  // browsers ignore it on HTTP. Cloudflare is HTTPS-only in production.
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
+  // Cross-origin isolation — keep it modest. COOP same-origin prevents window
+  // handle leaks from popups; CORP same-origin prevents cross-origin embeds of
+  // our assets. Don't enable COEP — it would break the HuggingFace fetch.
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+
+  // Suppress no-cache header from being clobbered if upstream set caching.
+  // /api/* already sets `no-store` in `json()`. For static assets, leave the
+  // ASSETS-binding-supplied caching alone.
+  if (url.pathname.startsWith('/api/')) {
+    headers.set('Cache-Control', 'no-store');
+  }
+
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
+    return apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
   }
 
   const gate = request.headers.get('x-ptscribe-key') ?? '';
-  if (!env.PTSCRIBE_GATE || !timingSafeEqual(gate, env.PTSCRIBE_GATE)) {
-    return json({ error: 'Unauthorized' }, 401);
+  const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
+  if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
+    return apiError('UNAUTHORIZED', 'Unauthorized', 401);
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const rateLimitResult = await checkRateLimit(env, ip);
+  if (!rateLimitResult.allowed) {
+    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
   }
 
   if (url.pathname === '/api/transcribe') return handleTranscribe(request, env);
   if (url.pathname === '/api/generate') return handleGenerate(request, env);
-  return json({ error: 'Not found' }, 404);
+  return apiError('NOT_FOUND', 'Not found', 404);
 }
 
 async function handleTranscribe(request: Request, env: Env): Promise<Response> {
@@ -62,15 +156,27 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     request.headers.get('x-ptscribe-model')?.trim() || DEFAULT_TRANSCRIBE_MODEL;
   const contentType = request.headers.get('Content-Type') || 'audio/webm';
 
+  if (!ALLOWED_TRANSCRIBE_MODELS.has(model)) {
+    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${model}`, 400);
+  }
+
+  const contentLength = Number(request.headers.get('Content-Length') ?? NaN);
+  if (!isNaN(contentLength) && contentLength > MAX_AUDIO_BYTES) {
+    return apiError('PAYLOAD_TOO_LARGE', 'Payload too large', 413);
+  }
+
   let audio: Uint8Array;
   try {
     const buf = await request.arrayBuffer();
+    if (buf.byteLength > MAX_AUDIO_BYTES) {
+      return apiError('PAYLOAD_TOO_LARGE', 'Payload too large', 413);
+    }
     audio = new Uint8Array(buf);
   } catch {
-    return json({ error: 'Failed to read audio body' }, 400);
+    return apiError('INVALID_AUDIO', 'Failed to read audio body', 400);
   }
   if (audio.byteLength === 0) {
-    return json({ error: 'Empty audio body' }, 400);
+    return apiError('EMPTY_AUDIO', 'Empty audio body', 400);
   }
 
   if (model.startsWith('@cf/deepgram/')) {
@@ -102,11 +208,12 @@ async function runDeepgram(
     } as never)) as DeepgramResponse;
 
     const text = extractDeepgramText(result);
-    if (!text) return json({ error: 'Nova-3 returned no text' }, 502);
+    if (!text) return apiError('EMPTY_TEXT', 'Nova-3 returned no text', 502);
     return json({ text });
   } catch (err) {
-    return json(
-      { error: `Workers AI Nova-3 failed: ${(err as Error).message || 'unknown'}` },
+    return apiError(
+      'UPSTREAM_FAILED',
+      `Workers AI Nova-3 failed: ${(err as Error).message || 'unknown'}`,
       502,
     );
   }
@@ -130,11 +237,12 @@ async function runWhisper(
     } as never)) as { text?: string };
 
     const text = typeof result?.text === 'string' ? result.text : '';
-    if (!text) return json({ error: 'Whisper returned no text' }, 502);
+    if (!text) return apiError('EMPTY_TEXT', 'Whisper returned no text', 502);
     return json({ text });
   } catch (err) {
-    return json(
-      { error: `Workers AI Whisper failed: ${(err as Error).message || 'unknown'}` },
+    return apiError(
+      'UPSTREAM_FAILED',
+      `Workers AI Whisper failed: ${(err as Error).message || 'unknown'}`,
       502,
     );
   }
@@ -221,17 +329,20 @@ function fromWordTags(alt: DeepgramAlt): string {
 
 async function handleGenerate(request: Request, env: Env): Promise<Response> {
   if (!env.ANTHROPIC_API_KEY) {
-    return json({ error: 'Server is missing ANTHROPIC_API_KEY secret' }, 500);
+    return apiError('MISSING_API_KEY', 'Server is missing ANTHROPIC_API_KEY secret', 500);
   }
 
   let body: GenerateBody;
   try {
     body = (await request.json()) as GenerateBody;
   } catch {
-    return json({ error: 'Invalid JSON body' }, 400);
+    return apiError('INVALID_JSON', 'Invalid JSON body', 400);
   }
   if (!body.model || !body.system || !body.user) {
-    return json({ error: 'Missing model/system/user' }, 400);
+    return apiError('MISSING_FIELDS', 'Missing model/system/user', 400);
+  }
+  if (!ALLOWED_GENERATE_MODELS.has(body.model)) {
+    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
   }
 
   const cacheSystem = body.cacheSystem !== false;
@@ -259,8 +370,9 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
 
   if (!upstream.ok) {
     const errBody = await safeText(upstream);
-    return json(
-      { error: `Anthropic request failed (${upstream.status}): ${errBody || upstream.statusText}` },
+    return apiError(
+      'UPSTREAM_FAILED',
+      `Anthropic request failed (${upstream.status}): ${errBody || upstream.statusText}`,
       upstream.status >= 500 ? 502 : upstream.status,
     );
   }
@@ -272,15 +384,67 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     .filter((b) => b.type === 'text' && typeof b.text === 'string')
     .map((b) => b.text as string)
     .join('');
-  if (!text) return json({ error: 'Anthropic response had no text content' }, 502);
+  if (!text) return apiError('EMPTY_TEXT', 'Anthropic response had no text content', 502);
   return json({ text });
+}
+
+const RATE_LIMIT_PER_MIN = 10;
+const RATE_LIMIT_PER_DAY = 100;
+
+async function checkRateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
+  if (!env.RATE_LIMIT) return { allowed: true };
+
+  const now = Date.now();
+  const minuteKey = `rl:min:${ip}:${Math.floor(now / 60_000)}`;
+  const dayKey = `rl:day:${ip}:${Math.floor(now / 86_400_000)}`;
+
+  const [minRaw, dayRaw] = await Promise.all([
+    env.RATE_LIMIT.get(minuteKey),
+    env.RATE_LIMIT.get(dayKey),
+  ]);
+
+  const minCount = minRaw ? parseInt(minRaw, 10) : 0;
+  const dayCount = dayRaw ? parseInt(dayRaw, 10) : 0;
+
+  if (minCount >= RATE_LIMIT_PER_MIN || dayCount >= RATE_LIMIT_PER_DAY) {
+    return { allowed: false };
+  }
+
+  await Promise.all([
+    env.RATE_LIMIT.put(minuteKey, String(minCount + 1), { expirationTtl: 120 }),
+    env.RATE_LIMIT.put(dayKey, String(dayCount + 1), { expirationTtl: 172800 }),
+  ]);
+
+  return { allowed: true };
 }
 
 function json(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    },
   });
+}
+
+type ErrorCode =
+  | 'METHOD_NOT_ALLOWED'
+  | 'UNAUTHORIZED'
+  | 'RATE_LIMITED'
+  | 'NOT_FOUND'
+  | 'MODEL_NOT_ALLOWED'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'INVALID_AUDIO'
+  | 'EMPTY_AUDIO'
+  | 'INVALID_JSON'
+  | 'MISSING_FIELDS'
+  | 'MISSING_API_KEY'
+  | 'EMPTY_TEXT'
+  | 'UPSTREAM_FAILED';
+
+function apiError(code: ErrorCode, error: string, status: number): Response {
+  return json({ code, error }, status);
 }
 
 async function safeText(res: Response): Promise<string> {
@@ -304,11 +468,23 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const buf = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // Both inputs are SHA-256 hex (64 chars). Iterate a fixed length so an
+  // attacker probing length differences sees the same wall-clock cost.
+  const FIXED_LEN = 64;
+  let mismatch = a.length ^ b.length;
+  for (let i = 0; i < FIXED_LEN; i += 1) {
+    const ca = i < a.length ? a.charCodeAt(i) : 0;
+    const cb = i < b.length ? b.charCodeAt(i) : 0;
+    mismatch |= ca ^ cb;
   }
   return mismatch === 0;
 }

@@ -141,4 +141,15 @@ describe('buildUserPrompt', () => {
     expect(result).toContain('(no transcript provided)');
   });
 
+  it('does not leak MRN into the prompt', () => {
+    const patient: Patient = { ...basePatient, mrn: 'MRN-12345-SECRET' };
+    const result = buildUserPrompt({
+      template: baseTemplate,
+      transcript: baseTranscript,
+      patient,
+    });
+    expect(result).not.toContain('MRN-12345-SECRET');
+    expect(result).not.toContain('MRN');
+  });
+
 });

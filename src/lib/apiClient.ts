@@ -4,7 +4,7 @@
  * Worker returns when the gate code is missing or wrong.
  */
 
-import { getStoredGateCode, clearGateCode } from '@/lib/gate';
+import { getStoredGateHash, clearGateCode } from '@/lib/gate';
 
 const GATE_HEADER = 'x-ptscribe-key';
 
@@ -16,9 +16,9 @@ export class GateRejectedError extends Error {
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const code = getStoredGateCode();
+  const hash = getStoredGateHash();
   const headers = new Headers(init.headers);
-  if (code) headers.set(GATE_HEADER, code);
+  if (hash) headers.set(GATE_HEADER, hash);
 
   const res = await fetch(path, { ...init, headers });
 

@@ -6,11 +6,11 @@ import {
   Stethoscope,
   ArrowRight,
   Check,
-  ShieldAlert,
 } from 'lucide-react';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
+import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { duration, ease } from '@/lib/motion';
 
 type Step = 'welcome' | 'profile' | 'done';
@@ -105,7 +105,7 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         </p>
       </div>
 
-      <DisclaimerCard />
+      <HipaaDisclosure variant="full" />
 
       <div>
         <PtButton
@@ -126,6 +126,9 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
   const [credentials, setCredentials] = useState(clinician.credentials);
   const [practiceName, setPracticeName] = useState(clinician.practiceName ?? '');
   const [npi, setNpi] = useState(clinician.npi ?? '');
+  const [acknowledged, setAcknowledged] = useState(
+    typeof clinician.acknowledgedDisclosureAt === 'number',
+  );
 
   function handleNext() {
     setClinician({
@@ -133,6 +136,7 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
       credentials: credentials.trim(),
       practiceName: practiceName.trim() || undefined,
       npi: npi.trim() || undefined,
+      acknowledgedDisclosureAt: Date.now(),
     });
     onNext();
   }
@@ -176,10 +180,36 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
         </div>
       </SurfaceCard>
 
+      <HipaaDisclosure variant="full" />
+
+      <label
+        style={{
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+          fontSize: 13,
+          color: 'var(--color-pt-text-2)',
+          cursor: 'pointer',
+          lineHeight: 1.5,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          onChange={(e) => setAcknowledged(e.target.checked)}
+          style={{ marginTop: 3, flexShrink: 0 }}
+        />
+        <span>
+          I have read the disclosure above and understand that PTScribe is not HIPAA-certified, that
+          audio and transcripts are sent to third-party AI providers, and that I am responsible for
+          obtaining patient consent and for confirming any BAA arrangements.
+        </span>
+      </label>
+
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <PtButton
           variant="primary"
-          disabled={!name.trim()}
+          disabled={!name.trim() || !acknowledged}
           onClick={handleNext}
           iconRight={<ArrowRight size={14} strokeWidth={2} />}
         >
@@ -211,45 +241,6 @@ function DoneStep() {
         <PtButton variant="ghost" onClick={() => navigate('/', { replace: true })}>
           Go to dashboard
         </PtButton>
-      </div>
-    </div>
-  );
-}
-
-function DisclaimerCard() {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 12,
-        padding: 14,
-        borderRadius: 12,
-        border: '1px solid var(--color-pt-border)',
-        background: 'var(--color-pt-surface-mut)',
-        fontSize: 12,
-        lineHeight: 1.55,
-        color: 'var(--color-pt-text-2)',
-      }}
-    >
-      <ShieldAlert
-        size={16}
-        strokeWidth={1.75}
-        style={{ marginTop: 2, flexShrink: 0, color: 'var(--color-pt-amber)' }}
-      />
-      <div style={{ display: 'grid', gap: 6 }}>
-        <p style={{ margin: 0 }}>
-          <strong style={{ color: 'var(--color-pt-text)' }}>Privacy &amp; HIPAA.</strong> Patient
-          metadata, session details, and notes live in this browser’s local storage. When you
-          transcribe or generate a note, audio and transcripts pass through a hosted Cloudflare
-          Worker on their way to Cloudflare Workers AI (Whisper) and Anthropic.
-        </p>
-        <p style={{ margin: 0 }}>
-          <strong style={{ color: 'var(--color-pt-text)' }}>
-            PTScribe is not HIPAA-certified software
-          </strong>
-          {' '}— treat anything you record as PHI in transit and confirm BAA terms with both
-          providers before using it with real patient data.
-        </p>
       </div>
     </div>
   );

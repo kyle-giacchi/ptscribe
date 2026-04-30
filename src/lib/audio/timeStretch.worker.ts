@@ -1,28 +1,32 @@
 import { SoundTouch } from 'soundtouchjs';
 
 interface WorkerInput {
+  id: number;
   samples: Float32Array;
   tempo: number;
 }
 
 interface WorkerSuccess {
+  id: number;
   result: Float32Array;
   error?: never;
 }
 
 interface WorkerFailure {
+  id: number;
   result?: never;
   error: string;
 }
 
+const post = self as unknown as {
+  postMessage: (d: WorkerSuccess | WorkerFailure, t?: Transferable[]) => void;
+};
+
 self.onmessage = (event: MessageEvent<WorkerInput>) => {
-  const { samples, tempo } = event.data;
+  const { id, samples, tempo } = event.data;
   try {
     if (samples.length === 0) {
-      (self as unknown as { postMessage: (d: WorkerSuccess, t: Transferable[]) => void }).postMessage(
-        { result: new Float32Array(0) },
-        [],
-      );
+      post.postMessage({ id, result: new Float32Array(0) }, []);
       return;
     }
 
@@ -46,10 +50,7 @@ self.onmessage = (event: MessageEvent<WorkerInput>) => {
     const outputFrames = Math.min(availableFrames, expectedFrames);
 
     if (outputFrames === 0) {
-      (self as unknown as { postMessage: (d: WorkerSuccess, t: Transferable[]) => void }).postMessage(
-        { result: new Float32Array(0) },
-        [],
-      );
+      post.postMessage({ id, result: new Float32Array(0) }, []);
       return;
     }
 
@@ -59,13 +60,8 @@ self.onmessage = (event: MessageEvent<WorkerInput>) => {
     const out = new Float32Array(outputFrames);
     for (let i = 0; i < outputFrames; i += 1) out[i] = stereoOut[i * 2];
 
-    (self as unknown as { postMessage: (d: WorkerSuccess, t: Transferable[]) => void }).postMessage(
-      { result: out },
-      [out.buffer],
-    );
+    post.postMessage({ id, result: out }, [out.buffer]);
   } catch (e) {
-    (self as unknown as { postMessage: (d: WorkerFailure) => void }).postMessage({
-      error: (e as Error).message ?? 'Unknown worker error',
-    });
+    post.postMessage({ id, error: (e as Error).message ?? 'Unknown worker error' });
   }
 };

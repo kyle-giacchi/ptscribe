@@ -1,5 +1,6 @@
 import { AUDIO_DB } from '@/lib/storageKeys';
 import { vault } from '@/lib/vault/vault';
+import { isPlaintextAudio } from '@/lib/audio/sniff';
 
 /**
  * IndexedDB-backed store for raw audio Blobs keyed by clip id.
@@ -76,6 +77,10 @@ function chunkRangeFor(sessionId: string): IDBKeyRange {
 
 const RECORDING_MIME = 'audio/webm';
 
+function mimeKey(sessionId: string): string {
+  return `mime:${sessionId}`;
+}
+
 /**
  * IndexedDB has gnarly cross-realm behavior with Blob (especially under
  * jsdom + fake-indexeddb in tests, where Blob loses its prototype after
@@ -116,8 +121,10 @@ async function maybeDecrypt(
   const bytes = await toBytes(raw);
   if (!bytes) return undefined;
   if (!vault.isUnlocked()) return new Blob([bytes as BlobPart], { type: mime });
-  // Plaintext WebM left over from before vault setup — pass through.
-  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+  // Plaintext audio left over from before vault setup — pass through.
+  // Encrypted bytes are random (no recognizable header), so we sniff plaintext
+  // formats and decrypt anything else.
+  if (isPlaintextAudio(bytes)) {
     return new Blob([bytes as BlobPart], { type: mime });
   }
   return vault.decryptBlob(new Blob([bytes as BlobPart]), mime);
@@ -219,11 +226,33 @@ export const audioRepository = {
     return count > 0;
   },
 
-  async clearChunks(sessionId: string): Promise<void> {
-    await withStore<undefined>(
-      AUDIO_DB.chunkStore,
-      'readwrite',
-      (store) => store.delete(chunkRangeFor(sessionId)) as IDBRequest<undefined>,
+  async saveChunkMime(sessionId: string, mimeType: string): Promise<void> {
+    await withStore<IDBValidKey>(AUDIO_DB.chunkStore, 'readwrite', (store) =>
+      store.put(mimeType, mimeKey(sessionId)),
     );
+  },
+
+  async loadChunkMime(sessionId: string): Promise<string> {
+    const stored = await withStore<string | undefined>(
+      AUDIO_DB.chunkStore,
+      'readonly',
+      (store) => store.get(mimeKey(sessionId)) as IDBRequest<string | undefined>,
+    );
+    return typeof stored === 'string' ? stored : RECORDING_MIME;
+  },
+
+  async clearChunks(sessionId: string): Promise<void> {
+    await Promise.all([
+      withStore<undefined>(
+        AUDIO_DB.chunkStore,
+        'readwrite',
+        (store) => store.delete(chunkRangeFor(sessionId)) as IDBRequest<undefined>,
+      ),
+      withStore<undefined>(
+        AUDIO_DB.chunkStore,
+        'readwrite',
+        (store) => store.delete(mimeKey(sessionId)) as IDBRequest<undefined>,
+      ),
+    ]);
   },
 };

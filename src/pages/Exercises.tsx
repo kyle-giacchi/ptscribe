@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useToggle } from '@/hooks/useToggle';
 import { Lock, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
@@ -21,7 +22,7 @@ export function Exercises() {
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState<'all' | BodyRegion>('all');
   const [editing, setEditing] = useState<Exercise | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, startCreating, stopCreating] = useToggle();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -45,7 +46,7 @@ export function Exercises() {
         <PtButton
           variant="primary"
           iconLeft={<Plus size={14} strokeWidth={2} />}
-          onClick={() => setCreating(true)}
+          onClick={startCreating}
         >
           New exercise
         </PtButton>
@@ -213,7 +214,7 @@ export function Exercises() {
           exercise={editing}
           onClose={() => {
             setEditing(null);
-            setCreating(false);
+            stopCreating();
           }}
           onSave={(payload) => {
             if (editing) {
@@ -225,7 +226,7 @@ export function Exercises() {
               toast.success('Exercise added');
             }
             setEditing(null);
-            setCreating(false);
+            stopCreating();
           }}
         />
       )}
