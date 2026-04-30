@@ -230,6 +230,7 @@ const SettingsSchema = z.object({
 export const AppDataSchema = z.object({
   version: z.literal(APP_DATA_VERSION),
   lastModified: z.number().int(),
+  tenantId: z.string(),
   clinician: ClinicianSchema,
   patients: z.array(PatientSchema),
   sessions: z.array(SessionSchema),
@@ -259,6 +260,7 @@ export function defaultAppData(): AppData {
   return {
     version: APP_DATA_VERSION,
     lastModified: now,
+    tenantId: 'local',
     clinician: { name: '', credentials: '' },
     patients: [],
     sessions: [],

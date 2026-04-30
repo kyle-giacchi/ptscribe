@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 10;
+export const APP_DATA_VERSION = 11;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
@@ -329,6 +329,7 @@ export type PageKey =
 export interface AppData {
   version: AppDataVersion;
   lastModified: number;
+  tenantId: string;
   clinician: Clinician;
   patients: Patient[];
   sessions: Session[];

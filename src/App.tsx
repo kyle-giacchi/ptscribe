@@ -10,13 +10,17 @@ import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { IdleLockProvider } from '@/contexts/IdleLockProvider';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
+import { RequireAuth } from '@/components/common/RequireAuth';
 import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
+import { isDemoMode } from '@/lib/demoMode';
 import { Setup } from '@/pages/Setup';
 import { Login } from '@/pages/Login';
+import { AuthCallback } from '@/pages/AuthCallback';
 
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Patients = lazy(() => import('@/pages/Patients').then((m) => ({ default: m.Patients })));
@@ -46,70 +50,85 @@ function PageLoader() {
   );
 }
 
+function AppProviders() {
+  return (
+    <VaultGate>
+      <AppDataProvider>
+        <ClinicianProvider>
+          <PatientsProvider>
+            <SessionsProvider>
+              <NotesProvider>
+                <TemplatesProvider>
+                  <ExercisesProvider>
+                    <PlansProvider>
+                      <SettingsProvider>
+                        <IdleLockProvider>
+                          <DemoBootstrap>
+                            <FirstRunGuard>
+                              <Suspense fallback={<PageLoader />}>
+                                <Routes>
+                                  <Route path="/setup" element={<Setup />} />
+                                  <Route element={<AppShell />}>
+                                    <Route index element={<Dashboard />} />
+                                    <Route path="/patients" element={<Patients />} />
+                                    <Route
+                                      path="/patients/:id"
+                                      element={<PatientDetail />}
+                                    />
+                                    <Route
+                                      path="/sessions/new"
+                                      element={<NewSession />}
+                                    />
+                                    <Route
+                                      path="/sessions/:id"
+                                      element={<SessionPage />}
+                                    />
+                                    <Route path="/notes" element={<Notes />} />
+                                    <Route path="/templates" element={<Templates />} />
+                                    <Route path="/exercises" element={<Exercises />} />
+                                    <Route path="/settings" element={<Settings />} />
+                                  </Route>
+                                </Routes>
+                              </Suspense>
+                            </FirstRunGuard>
+                          </DemoBootstrap>
+                        </IdleLockProvider>
+                      </SettingsProvider>
+                    </PlansProvider>
+                  </ExercisesProvider>
+                </TemplatesProvider>
+              </NotesProvider>
+            </SessionsProvider>
+          </PatientsProvider>
+        </ClinicianProvider>
+      </AppDataProvider>
+    </VaultGate>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="*"
-          element={
-            <AppGate>
-              <VaultGate>
-                <AppDataProvider>
-                  <ClinicianProvider>
-                    <PatientsProvider>
-                      <SessionsProvider>
-                        <NotesProvider>
-                          <TemplatesProvider>
-                            <ExercisesProvider>
-                              <PlansProvider>
-                                <SettingsProvider>
-                                  <IdleLockProvider>
-                                  <DemoBootstrap>
-                                    <FirstRunGuard>
-                                      <Suspense fallback={<PageLoader />}>
-                                        <Routes>
-                                          <Route path="/setup" element={<Setup />} />
-                                          <Route element={<AppShell />}>
-                                            <Route index element={<Dashboard />} />
-                                            <Route path="/patients" element={<Patients />} />
-                                            <Route
-                                              path="/patients/:id"
-                                              element={<PatientDetail />}
-                                            />
-                                            <Route
-                                              path="/sessions/new"
-                                              element={<NewSession />}
-                                            />
-                                            <Route
-                                              path="/sessions/:id"
-                                              element={<SessionPage />}
-                                            />
-                                            <Route path="/notes" element={<Notes />} />
-                                            <Route path="/templates" element={<Templates />} />
-                                            <Route path="/exercises" element={<Exercises />} />
-                                            <Route path="/settings" element={<Settings />} />
-                                          </Route>
-                                        </Routes>
-                                      </Suspense>
-                                    </FirstRunGuard>
-                                  </DemoBootstrap>
-                                  </IdleLockProvider>
-                                </SettingsProvider>
-                              </PlansProvider>
-                            </ExercisesProvider>
-                          </TemplatesProvider>
-                        </NotesProvider>
-                      </SessionsProvider>
-                    </PatientsProvider>
-                  </ClinicianProvider>
-                </AppDataProvider>
-              </VaultGate>
-            </AppGate>
-          }
-        />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route
+            path="*"
+            element={
+              isDemoMode() ? (
+                <AppGate>
+                  <AppProviders />
+                </AppGate>
+              ) : (
+                <RequireAuth>
+                  <AppProviders />
+                </RequireAuth>
+              )
+            }
+          />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

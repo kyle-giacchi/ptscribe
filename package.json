@@ -21,6 +21,7 @@
     "cf:tail": "wrangler tail"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.6.9",
     "@huggingface/transformers": "^4.2.0",
     "@react-pdf/renderer": "^4.5.1",
     "@ricky0123/vad-web": "^0.0.30",
@@ -32,10 +33,13 @@
     "@visx/responsive": "^3.12.0",
     "@visx/scale": "^3.12.0",
     "@visx/shape": "^3.12.0",
+    "better-auth": "^1.6.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "hash-wasm": "^4.12.0",
+    "kysely": "^0.28.16",
+    "kysely-d1": "^0.4.0",
     "lucide-react": "^1.8.0",
     "motion": "^12.38.0",
     "onnxruntime-web": "^1.24.3",

@@ -7,6 +7,8 @@ import { useTemplates } from '@/contexts/TemplatesProvider';
 import { isDemoMode, DEMO_PATIENT_ID, DEMO_SESSION_ID } from '@/lib/demoMode';
 import type { Patient, Session } from '@/types';
 
+const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;
+
 export function DemoBootstrap({ children }: { children: ReactNode }) {
   const demoMode = isDemoMode();
   const { clinician, setClinician } = useClinician();
@@ -17,56 +19,54 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
 
   const seededRef = useRef(false);
-  const redirectedRef = useRef(false);
 
   useEffect(() => {
     if (!demoMode) return;
-    if (seededRef.current) return;
 
-    if (!clinician.name.trim()) {
-      setClinician({ name: 'Demo Clinician', credentials: 'DPT' });
+    if (!seededRef.current) {
+      if (!clinician.name.trim()) {
+        setClinician({ name: 'Demo Clinician', credentials: 'DPT' });
+      }
+
+      let demoPatient = patients.find((p) => p.id === DEMO_PATIENT_ID);
+      if (!demoPatient) {
+        const now = Date.now();
+        const next: Patient = {
+          id: DEMO_PATIENT_ID,
+          firstName: 'Demo',
+          lastName: 'Patient',
+          primaryDiagnosis: 'Right shoulder pain — rotator cuff strain',
+          status: 'active',
+          createdAt: now,
+          updatedAt: now,
+        };
+        addPatient(next);
+        demoPatient = next;
+      }
+
+      if (!sessions.find((s) => s.id === DEMO_SESSION_ID)) {
+        const now = Date.now();
+        const soapTemplate = templates.find((t) => t.format === 'soap' && t.builtin);
+        const next: Session = {
+          id: DEMO_SESSION_ID,
+          patientId: DEMO_PATIENT_ID,
+          type: 'follow_up',
+          date: now,
+          status: 'draft',
+          clips: [],
+          templateId: soapTemplate?.id,
+          createdAt: now,
+          updatedAt: now,
+        };
+        addSession(next);
+      }
+
+      seededRef.current = true;
     }
 
-    let demoPatient = patients.find((p) => p.id === DEMO_PATIENT_ID);
-    if (!demoPatient) {
-      const now = Date.now();
-      const next: Patient = {
-        id: DEMO_PATIENT_ID,
-        firstName: 'Demo',
-        lastName: 'Patient',
-        primaryDiagnosis: 'Right shoulder pain — rotator cuff strain',
-        status: 'active',
-        createdAt: now,
-        updatedAt: now,
-      };
-      addPatient(next);
-      demoPatient = next;
-    }
-
-    let demoSession = sessions.find((s) => s.id === DEMO_SESSION_ID);
-    if (!demoSession) {
-      const now = Date.now();
-      const soapTemplate = templates.find((t) => t.format === 'soap' && t.builtin);
-      const next: Session = {
-        id: DEMO_SESSION_ID,
-        patientId: demoPatient.id,
-        type: 'follow_up',
-        date: now,
-        status: 'draft',
-        clips: [],
-        templateId: soapTemplate?.id,
-        createdAt: now,
-        updatedAt: now,
-      };
-      addSession(next);
-      demoSession = next;
-    }
-
-    seededRef.current = true;
-
-    if (!redirectedRef.current && (pathname === '/' || pathname === '/setup')) {
-      redirectedRef.current = true;
-      navigate(`/sessions/${demoSession.id}`, { replace: true });
+    // Keep the demo user locked to the session — any navigation attempt bounces back.
+    if (pathname !== DEMO_SESSION_PATH) {
+      navigate(DEMO_SESSION_PATH, { replace: true });
     }
   }, [
     demoMode,
