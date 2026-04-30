@@ -139,8 +139,32 @@ Legacy plaintext migration (one-shot):
 `useRecorder` owns three resources for the duration of a clip: the `MediaRecorder`, a `'screen'` `WakeLockSentinel`, and a `visibilitychange` listener. All three must be released on every exit path — `stop`, `reset`, error, and unmount — via `teardown()`.
 
 - Wake lock is acquired after `recorder.start()` and tracked in `wakeLockRef`. Browsers auto-release it on `visibilitychange → hidden`; the visibility handler re-acquires it on return-to-foreground only if `recorderRef.current?.state === 'recording'`. Any rewrite that adds a new recorder state must update this gate.
-- Wake lock is best-effort. `acquireWakeLock` returns `null` when the API is unavailable or denied. Recording must continue regardless. Do not throw on wake-lock failure or block the start path on it.
+- Wake lock is best-effort. `acquireWakeLock` returns `null` when the API is unavailable or denied. Recording must continue regardless. Do not throw on wake-lock failure or block the start path on it. **Browser support:** the Screen Wake Lock API is unavailable on iOS Safari ≤ 16.3 and on any non-secure context — those clients record without a lock and may screen-lock on long sessions; this is expected and is not a bug to chase.
 - The visibility handler also flips a sticky `wasBackgrounded` flag the first time the tab is hidden during a clip. The flag is consumed by `Session.tsx` to surface a "verify duration" warning. It is reset only by the next `start()` or `reset()` — do not clear it on `visibilitychange → visible`.
+
+## Destructive actions use inline confirmation
+
+Never call `window.confirm()`. All destructive or overwrite actions use an inline caution banner rendered in place of (or adjacent to) the triggering button.
+
+Banner anatomy:
+```tsx
+<div
+  className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-xs"
+  style={{
+    borderColor: 'var(--color-caution)',
+    background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
+  }}
+>
+  <AlertTriangle size={13} strokeWidth={2} style={{ color: 'var(--color-caution)', flexShrink: 0 }} />
+  <span style={{ color: 'var(--color-caution)' }}>Descriptive warning text.</span>
+  <div className="ml-auto flex items-center gap-1.5">
+    <button className="btn btn-ghost py-0.5 text-xs" onClick={cancel}>Cancel</button>
+    <button className="btn btn-primary py-0.5 text-xs" onClick={confirm}>Yes, [action]</button>
+  </div>
+</div>
+```
+
+The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is local `useState` in the component that owns the action. Confirm handlers clear the guard then call the actual action. Cancel handlers clear the guard only. This pattern is used in `ClipsList` (delete clip), `TranscriptPanel` (overwrite transcript, re-merge), `NotePanel` (replace draft), and `Session` (delete session).
 
 ## Type changes ripple
 

@@ -25,7 +25,7 @@ export function useAudioRecovery(
             outcomes.push({ clipId: clip.id, ok: false });
             continue;
           }
-          const mimeType = chunks[0]?.type || 'audio/webm';
+          const mimeType = await audioRepository.loadChunkMime(clip.id);
           const blob = new Blob(chunks, { type: mimeType });
           await audioRepository.save(clip.id, blob);
           await audioRepository.clearChunks(clip.id);

@@ -16,6 +16,8 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { newId } from '@/utils/ids';
 import { parseIsoDate, fmtIsoDateOptional, relativeFromNow } from '@/utils/dates';
+import { ageFromDob } from '@/utils/patients';
+import { useToggle } from '@/hooks/useToggle';
 import type { Patient, Sex } from '@/types';
 
 type StatusFilter = 'all' | 'on_track' | 'plateau' | 'flagged' | 'new';
@@ -55,11 +57,6 @@ function deriveStatus(p: Patient, sessionCount: number): {
   return { filter: 'on_track', tone: 'on-track', label: 'On-track' };
 }
 
-function ageFromDob(dob?: number): number | null {
-  if (!dob) return null;
-  const diffMs = Date.now() - dob;
-  return Math.floor(diffMs / (365.25 * 24 * 60 * 60 * 1000));
-}
 
 function shortMrn(p: Patient): string {
   return p.mrn?.trim() || `PT-${p.id.slice(0, 5).toUpperCase()}`;
@@ -71,7 +68,7 @@ export function Patients() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
-  const [open, setOpen] = useState(false);
+  const [open, openModal, closeModal] = useToggle();
   const [now] = useState(() => Date.now());
 
   const sessionStats = useMemo(() => {
@@ -131,11 +128,11 @@ export function Patients() {
         onQuery={setQuery}
         filter={filter}
         onFilter={setFilter}
-        onAdd={() => setOpen(true)}
+        onAdd={() => openModal()}
       />
 
       {patients.length === 0 ? (
-        <EmptyState onAdd={() => setOpen(true)} />
+        <EmptyState onAdd={() => openModal()} />
       ) : (
         <SurfaceCard padding={0}>
           <TableHeader />
@@ -165,10 +162,10 @@ export function Patients() {
 
       <AddPatientModal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => closeModal()}
         onSave={(patient) => {
           addPatient(patient);
-          setOpen(false);
+          closeModal();
         }}
       />
     </div>

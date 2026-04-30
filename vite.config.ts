@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 import fs from 'node:fs';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
@@ -49,6 +50,73 @@ export default defineConfig({
   plugins: [
     react(),
     serveMLAssetsDev(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
+      manifest: {
+        name: 'PTScribe',
+        short_name: 'PTScribe',
+        description: 'PT session notes, transcription, and AI-generated SOAP notes',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
+        display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
+        scope: '/',
+        icons: [
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        // ML assets are too large to precache (~20MB); handle via runtime caching
+        // Limit raised to cover the current monolithic bundle (H10 code splitting will lower it)
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globIgnores: ['**/*.onnx', '**/*.wasm', '**/ort-wasm-simd-threaded*.mjs'],
+        navigateFallback: 'index.html',
+        runtimeCaching: [
+          {
+            // Never cache AI/transcription API calls
+            urlPattern: /\/api\/.*/,
+            handler: 'NetworkOnly',
+          },
+          {
+            // ML assets: cache after first load, reuse across sessions
+            urlPattern: /\.(onnx|wasm)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ml-assets',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /ort-wasm-simd-threaded.*\.mjs$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ml-assets',
+              expiration: { maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/,
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'google-fonts-stylesheets' },
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-webfonts',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+      },
+    }),
     viteStaticCopy({
       targets: [
         {
@@ -100,5 +168,25 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // ML/audio stack — only loaded when Session page is visited
+          if (
+            id.includes('@huggingface/transformers') ||
+            id.includes('onnxruntime-web') ||
+            id.includes('@ricky0123/vad-web') ||
+            id.includes('soundtouchjs')
+          )
+            return 'vendor-ml';
+          // PDF rendering — also session-page only
+          if (id.includes('@react-pdf')) return 'vendor-pdf';
+          // Rich-text editor
+          if (id.includes('@tiptap') || id.includes('tiptap-markdown')) return 'vendor-editor';
+          // Data visualisation
+          if (id.includes('@visx')) return 'vendor-charts';
+        },
+      },
+    },
   },
 });

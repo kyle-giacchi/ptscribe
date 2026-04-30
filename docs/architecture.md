@@ -9,7 +9,9 @@ src/
   contexts/       AppDataProvider (root) + slice providers (one per domain)
   hooks/          useRecorder, useLiveTranscript
   pages/          Route-level components — consume hooks/contexts only
-  components/     UI primitives (Field, PageHeader, AppShell, Sidebar) and shared widgets
+  components/     UI primitives (Field, PageHeader, AppShell, Sidebar) and shared widgets;
+                  sessions/ sub-directory holds the Session page panel components
+                  (AccordionSection, ClipsList, RecordingPanel, TranscriptPanel, NotePanel)
   types/          Domain types (index.ts)
   schemas/        Zod schemas mirroring types + defaultAppData factory
   utils/          ids.ts, migrations.ts, downloadFile.ts, markdown.ts
@@ -97,7 +99,7 @@ AI calls flow `browser → our Cloudflare Worker → provider`. Provider credent
 
 | Browser endpoint    | Worker action                                       | Provider                | Default model                       |
 | ------------------- | --------------------------------------------------- | ----------------------- | ----------------------------------- |
-| `POST /api/transcribe` | Forwards raw audio bytes to the Workers AI binding | Cloudflare Workers AI   | `@cf/openai/whisper-large-v3-turbo` |
+| `POST /api/transcribe` | Forwards raw audio bytes to the Workers AI binding | Cloudflare Workers AI   | `@cf/deepgram/nova-3` (speaker diarization) |
 | `POST /api/generate`   | Forwards JSON to the Anthropic Messages API        | Anthropic Messages      | `claude-sonnet-4-6`                 |
 
 Wire details:
