@@ -15,6 +15,7 @@ export interface SettingsContextValue {
   updateAudio: (patch: Partial<AudioSettings>) => void;
   updateUi: (patch: Partial<Settings['ui']>) => void;
   setIdleLockMinutes: (minutes: number) => void;
+  setAutoDeleteAudioAfterDays: (days: number | undefined) => void;
   // Per-page detail-level toggle (kept from prior app for the dashboard etc.).
   // We persist this in localStorage directly because it isn't part of the
   // schema-validated AppData; keep it transient + ephemeral.
@@ -62,6 +63,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updateSettingsSlice({
           ...settings,
           security: { ...settings.security, idleLockMinutes: minutes },
+        }),
+      setAutoDeleteAudioAfterDays: (days: number | undefined) =>
+        updateSettingsSlice({
+          ...settings,
+          retention: { ...settings.retention, autoDeleteAudioAfterDays: days },
         }),
       getPageMode: (key) => readPageModes()[key] ?? 'simple',
       setPageMode: (key, mode) => {

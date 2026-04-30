@@ -131,7 +131,7 @@ export function PatientDetail() {
     if (!patient) return;
     if (
       !confirm(
-        `Remove ${patient.firstName} ${patient.lastName}? Sessions and notes are kept.`
+        `Remove ${patient.firstName} ${patient.lastName}? All sessions, notes, plans, and audio recordings for this patient will be permanently deleted.`
       )
     )
       return;
