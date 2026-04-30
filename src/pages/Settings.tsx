@@ -11,6 +11,9 @@ import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
 import { exportBackup, importBackup } from '@/services/BackupService';
 import { vault } from '@/lib/vault/vault';
+import { ChangePassphraseForm } from '@/components/vault/ChangePassphraseForm';
+import { auditLog } from '@/lib/audit/auditLog';
+import { AuditLogPanel } from '@/components/audit/AuditLogPanel';
 import { defaultAppData } from '@/schemas';
 import { downloadFile } from '@/utils/download';
 
@@ -30,6 +33,7 @@ export function Settings() {
         text,
         'application/json',
       );
+      void auditLog.append('backup:exported');
       toast.success(
         vault.isUnlocked()
           ? 'Encrypted backup downloaded — restoring it requires this vault passphrase.'
@@ -49,6 +53,7 @@ export function Settings() {
         return;
       }
       bulkUpdate(result.data);
+      void auditLog.append('backup:imported');
       toast.success(
         result.encrypted ? 'Encrypted backup restored' : 'Backup restored',
       );
@@ -70,6 +75,7 @@ export function Settings() {
     }
     resetAll();
     await dataRepository.save(defaultAppData());
+    void auditLog.append('data:reset');
     toast.success('All local data erased');
   }
 
@@ -123,6 +129,7 @@ export function Settings() {
               </Select>
             </Field>
           </div>
+          <ChangePassphraseForm />
           <div>
             <PtButton
               variant="ghost"
@@ -134,6 +141,17 @@ export function Settings() {
               Lock now
             </PtButton>
           </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Eyebrow>Audit log</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0, lineHeight: 1.5 }}>
+            Hash-chained record of vault access, note generation, and backup events. Use "Verify
+            chain" to confirm no entries were deleted or modified.
+          </p>
+          <AuditLogPanel />
         </div>
       </SurfaceCard>
 
