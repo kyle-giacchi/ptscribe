@@ -18,7 +18,7 @@ import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
 import { isDemoMode } from '@/lib/demoMode';
 import { Setup } from '@/pages/Setup';
-import { HomePage } from '@/pages/HomePage';
+import { Landing } from '@/pages/Landing';
 import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
 
@@ -96,7 +96,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route
