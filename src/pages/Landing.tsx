@@ -11,7 +11,7 @@ const SOAP = [
 ];
 
 interface LandingProps {
-  onSignIn: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export function Landing({ onSignIn }: LandingProps) {
@@ -80,6 +80,10 @@ export function Landing({ onSignIn }: LandingProps) {
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
   function openMode(m: 'demo' | 'signup') {
+    if (m === 'demo' && !onSignIn) {
+      navigate('/patients');
+      return;
+    }
     setMode(m);
     setCode('');
     setCodeError(null);
@@ -88,9 +92,11 @@ export function Landing({ onSignIn }: LandingProps) {
 
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
+    if (!onSignIn) return;
+    const signIn = onSignIn;
     setBusy(true);
     setCodeError(null);
-    const result = await onSignIn(code);
+    const result = await signIn(code);
     setBusy(false);
     if (!result.ok) {
       setCodeError(result.error ?? 'Invalid code.');
