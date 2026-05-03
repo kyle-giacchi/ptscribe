@@ -210,7 +210,7 @@ export function Login() {
               <button
                 onClick={() => {
                   activateTestUserSession();
-                  navigate(from, { replace: true });
+                  navigate('/today', { replace: true });
                 }}
                 disabled={loading}
                 style={{

@@ -106,7 +106,7 @@ export function Landing({ onSignIn }: LandingProps) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: `radial-gradient(ellipse 80% 50% at 50% 0%, oklch(64% 0.12 185 / 0.13) 0%, transparent 65%), ${C.bg}`, display: 'flex', flexDirection: 'column' }}>
 
       {/* ── NAV ──────────────────────────────────────────────── */}
       <nav
@@ -146,19 +146,8 @@ export function Landing({ onSignIn }: LandingProps) {
           width: '100%',
           margin: '0 auto',
           boxSizing: 'border-box',
-          overflow: 'hidden',
         }}
       >
-        {/* Ambient teal bloom — adds warmth, not glassmorphism */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'radial-gradient(ellipse 75% 55% at 50% -5%, oklch(64% 0.12 185 / 0.13) 0%, transparent 68%)',
-            pointerEvents: 'none',
-          }}
-        />
 
         <div
           className="ldg-u ldg-u1"
