@@ -800,7 +800,7 @@ function Metric({
           marginTop: 6,
           height: 4,
           borderRadius: 999,
-          background: '#eef0f4',
+          background: 'var(--color-pt-slate-soft)',
           overflow: 'hidden',
         }}
       >
@@ -887,13 +887,13 @@ function FlagItem({ tone, text }: { tone: 'amber' | 'mute'; text: string }) {
           bg: 'var(--color-pt-amber-soft)',
           bd: 'var(--color-pt-amber-border)',
           fg: 'var(--color-pt-amber-fg)',
-          dot: '#c47a09',
+          dot: 'var(--color-pt-amber)',
         }
       : {
           bg: 'var(--color-pt-surface-mut)',
           bd: 'var(--color-pt-border)',
           fg: 'var(--color-pt-text-2)',
-          dot: '#a4adbd',
+          dot: 'var(--color-pt-slate)',
         };
   return (
     <div

@@ -155,7 +155,7 @@ export function NewSession() {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Link
-          to="/"
+          to="/today"
           style={{
             display: 'inline-flex',
             alignItems: 'center',

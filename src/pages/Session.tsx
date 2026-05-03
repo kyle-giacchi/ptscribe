@@ -690,7 +690,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})),
     );
     removeSession(session!.id);
-    navigate('/', { replace: true });
+    navigate('/today', { replace: true });
   }
 
   // ── Recording complete — merge clips + compile live transcripts ──────────
@@ -1130,7 +1130,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     type="checkbox"
                     checked={silenceDebugOn}
                     onChange={(e) => setSilenceDebugOn(e.target.checked)}
-                    style={{ accentColor: '#0ea5a8' }}
+                    style={{ accentColor: 'var(--color-pt-accent)' }}
                   />
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
                     Silence visibility
@@ -1191,7 +1191,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     type="checkbox"
                     checked={speedDebugOn}
                     onChange={(e) => setSpeedDebugOn(e.target.checked)}
-                    style={{ accentColor: '#0ea5a8' }}
+                    style={{ accentColor: 'var(--color-pt-accent)' }}
                   />
                   <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
                     Speed-up visibility
@@ -1265,7 +1265,7 @@ function deriveMicState(status: string): MicState {
 function NotFound() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Link to="/" className="btn btn-ghost w-fit">
+      <Link to="/today" className="btn btn-ghost w-fit">
         <ArrowLeft size={14} strokeWidth={2} /> Dashboard
       </Link>
       <div className="card">Session not found.</div>
