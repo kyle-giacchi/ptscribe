@@ -40,13 +40,21 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+const TEST_USER_KEY = 'ptscribe-test-user-session';
+
+export function activateTestUserSession() {
+  sessionStorage.setItem(TEST_USER_KEY, '1');
+}
+
 function RealAuthProvider({ children }: { children: ReactNode }) {
+  const isTestUser = sessionStorage.getItem(TEST_USER_KEY) === '1';
   const { data: session, isPending } = authClient.useSession();
   const value: AuthContextValue = {
-    currentUser: session ? mapSession(session) : null,
-    isLoading: isPending,
-    isAuthenticated: !!session,
+    currentUser: isTestUser ? DEMO_USER : session ? mapSession(session) : null,
+    isLoading: isTestUser ? false : isPending,
+    isAuthenticated: isTestUser || !!session,
     signOut: async () => {
+      sessionStorage.removeItem(TEST_USER_KEY);
       await authClient.signOut();
     },
   };

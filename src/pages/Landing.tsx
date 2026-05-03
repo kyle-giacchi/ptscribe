@@ -21,18 +21,18 @@ const STEPS = [
 ];
 
 const C = {
-  bg: 'oklch(97.5% 0.008 185)',
-  text: '#1a2030',
-  text2: '#5a6577',
-  text3: '#8893a5',
-  accent: '#0ea5a8',
-  accentHover: '#0c9497',
-  accentFg: '#0a6d70',
-  accentSoft: '#e6f7f6',
-  border: '#e4e8ee',
-  borderStrong: '#d6dce5',
-  surface: '#ffffff',
-  danger: '#dc2942',
+  bg: 'var(--color-pt-landing-bg)',
+  text: 'var(--color-pt-text)',
+  text2: 'var(--color-pt-text-2)',
+  text3: 'var(--color-pt-text-3)',
+  accent: 'var(--color-pt-accent)',
+  accentHover: 'var(--color-pt-accent-fg)',
+  accentFg: 'var(--color-pt-accent-fg)',
+  accentSoft: 'var(--color-pt-accent-soft)',
+  border: 'var(--color-pt-border)',
+  borderStrong: 'var(--color-pt-border-strong)',
+  surface: 'var(--color-pt-surface)',
+  danger: 'var(--color-pt-red)',
 } as const;
 
 interface LandingProps {
@@ -123,7 +123,7 @@ export function Landing({ onSignIn }: LandingProps) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', flexShrink: 0 }}>P</div>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', flexShrink: 0 }}>P</div>
           <span style={{ fontSize: 15.5, fontWeight: 700, color: C.text, letterSpacing: '-0.02em' }}>PTScribe</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -210,7 +210,7 @@ export function Landing({ onSignIn }: LandingProps) {
               <button
                 id="ldg-demo"
                 onClick={handleDemo}
-                style={{ all: 'unset', padding: '15px 40px', background: C.accent, borderRadius: 12, cursor: 'pointer', fontSize: 15.5, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em', transition: 'background 0.15s', boxSizing: 'border-box' }}
+                style={{ all: 'unset', padding: '15px 40px', background: C.accent, borderRadius: 12, cursor: 'pointer', fontSize: 15.5, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', transition: 'background 0.15s', boxSizing: 'border-box' }}
               >
                 Try a demo
               </button>
@@ -247,7 +247,7 @@ export function Landing({ onSignIn }: LandingProps) {
               <button
                 type="submit"
                 disabled={code.length !== 6 || busy}
-                style={{ padding: '12px 18px', background: code.length === 6 && !busy ? C.accent : '#f1f3f7', border: 'none', borderRadius: 10, cursor: code.length === 6 && !busy ? 'pointer' : 'default', color: code.length === 6 && !busy ? '#fff' : C.text3, fontWeight: 700, fontSize: 14, transition: 'background 0.15s' }}
+                style={{ padding: '12px 18px', background: code.length === 6 && !busy ? C.accent : 'var(--color-pt-slate-soft)', border: 'none', borderRadius: 10, cursor: code.length === 6 && !busy ? 'pointer' : 'default', color: code.length === 6 && !busy ? '#ffffff' : C.text3, fontWeight: 700, fontSize: 14, transition: 'background 0.15s' }}
               >
                 {busy ? '…' : 'Unlock'}
               </button>

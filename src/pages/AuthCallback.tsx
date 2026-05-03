@@ -32,13 +32,13 @@ export function AuthCallback() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#1a2030',
+        background: 'var(--color-pt-landing-bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-teal-400" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-pt-slate)] border-t-[var(--color-pt-accent)]" />
     </div>
   );
 }
