@@ -5,12 +5,13 @@ import {
   ArrowLeft,
   CheckCircle2,
   Copy,
-  Loader2,
   LockOpen,
+  Settings,
   Trash2,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { MicStatusPill, PtButton, type MicState } from '@/components/design';
+import { MicStatusPill, PtButton, SegmentedControl, type MicState } from '@/components/design';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -27,8 +28,6 @@ import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
-import { wordCount, formatDuration } from '@/utils/format';
-import { WARN_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 import { newId } from '@/utils/ids';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import type { ClipStatus, Note, NoteFormat, NoteSection, Session, SessionClip } from '@/types';
@@ -37,11 +36,9 @@ import {
   MAX_TRANSCRIBES_PER_SESSION,
   MAX_GENERATES_PER_SESSION,
 } from '@/hooks/useActionGuard';
-import { useAccordionSections } from '@/hooks/useAccordionSections';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
-import { AccordionSection } from '@/components/sessions/AccordionSection';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
@@ -92,12 +89,18 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   const { checkActionGuard, recordAction, transcribeUsed, generateUsed } = useActionGuard();
 
-  const sessionStatus = session?.status ?? 'draft';
-  const { openSections, toggleSection, resetSections, openSection } = useAccordionSections({
-    hasTranscript: !!session?.transcript,
-    hasNote: !!session?.noteId,
-    sessionStatus,
-  });
+  const [activeTab, setActiveTab] = useState<'record' | 'review'>('record');
+  // Once dismissed per session, the re-record warning does not resurface.
+  const [recordWarnDismissed, setRecordWarnDismissed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [silenceDebugOn, setSilenceDebugOn] = useState(false);
+  const [speedDebugOn, setSpeedDebugOn] = useState(false);
+  const [debugStats, setDebugStats] = useState<{
+    droppedSec: number;
+    originalSec: number;
+    speedSavedSec: number;
+    speedOriginalSec: number;
+  } | null>(null);
 
   // ── Atomic session/clip patches via functional slice update ──────────────
   function patchSession(patch: Partial<Session>) {
@@ -543,6 +546,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
     recordAction('transcribe');
     setBusy(null);
+    setDebugStats({
+      droppedSec: totalDroppedSec,
+      originalSec: totalOriginalSec,
+      speedSavedSec: totalSpeedSavedSec,
+      speedOriginalSec: totalSpeedOriginalSec,
+    });
     reportTranscribeOutcome(successes, failures);
     if (totalDroppedSec > 1) {
       const pct = Math.round((totalDroppedSec / Math.max(totalOriginalSec, 1)) * 100);
@@ -672,7 +681,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       if (note) removeNote(note.id);
       patchSession({ clips: [], status: 'draft', transcript: undefined, noteId: undefined });
       setTranscript('');
-      resetSections();
+      setActiveTab('record');
       setPendingDeleteSession(false);
       return;
     }
@@ -692,9 +701,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (readyClips.length > 0) {
       setIsMerging(true);
       try {
-        const blobs = (await Promise.all(readyClips.map((c) => audioRepository.load(c.id)))).filter(
-          (b): b is Blob => b !== null,
-        );
+        const blobs = (
+          await Promise.all(readyClips.map((c) => audioRepository.load(c.id)))
+        ).filter((b): b is Blob => b !== null);
         if (blobs.length > 0) setMergedAudioBlob(await mergeAudioBlobs(blobs));
       } catch (e) {
         toast.error(`Could not combine clips: ${(e as Error).message}`);
@@ -712,13 +721,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
     }
 
-    openSection('transcription');
+    setActiveTab('review');
   }
 
   // ── Skip recording step ───────────────────────────────────────────────────
   function handleSkipRecording() {
     setRecordingSkipped(true);
-    openSection('transcription');
+    setActiveTab('review');
   }
 
   // ── Copy full note ────────────────────────────────────────────────────────
@@ -736,266 +745,504 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const micState = deriveMicState(recorder.status);
   const isDemo = isDemoMode() && session.patientId === DEMO_PATIENT_ID;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
-  const nearingLimit = isRecording && recorder.durationSec >= WARN_CLIP_DURATION_SEC;
-  const timerColor = nearingLimit
-    ? 'var(--color-caution)'
-    : isRecording
-      ? 'var(--color-negative)'
-      : 'var(--color-fg-subtle)';
 
   const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
   const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
   // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
   const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
 
-  // Collapsed-header summaries
-  const clipSummary =
-    sortedClips.length > 0
-      ? `${sortedClips.length} clip${sortedClips.length === 1 ? '' : 's'}`
-      : undefined;
-  const transcriptWordCount = wordCount(transcript);
-  const noteSummary = note?.finalized
-    ? 'Finalized'
-    : note?.sections.some((s) => s.body.trim())
-      ? 'Draft'
-      : undefined;
-
   const currentClipMerge = mergeClipTranscripts(session.clips).trim();
   const hasUserEdits = transcript.trim().length > 0 && transcript.trim() !== currentClipMerge;
 
+  // Show a strong warning when the user navigates back to Record after a note has been generated.
+  // A generated note represents expensive AI work that becomes stale if more clips are added.
+  // The warning is per-session dismissible — once acknowledged it does not re-surface.
+  const showRecordWarning =
+    activeTab === 'record' && !recordWarnDismissed && !!note;
+
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '1fr', minHeight: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+
+      {/* ── Error banner ──────────────────────────────────── */}
+      {error && (
+        <div style={{ padding: '12px 22px 0' }}>
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        </div>
+      )}
+
+      {/* ── Tab bar ───────────────────────────────────────── */}
       <div
         style={{
-          padding: 22,
-          background: 'var(--color-pt-surface-alt)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '12px 22px 0',
+        }}
+      >
+        <SegmentedControl
+          value={activeTab}
+          onChange={setActiveTab}
+          items={[
+            { value: 'record', label: 'Record' },
+            { value: 'review', label: 'Review' },
+          ]}
+        />
+        <div style={{ flex: 1 }} />
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          title="Debug tools"
+          style={{
+            all: 'unset',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            cursor: 'pointer',
+            color: 'var(--color-pt-text-2)',
+            background: 'var(--color-pt-surface)',
+            border: '1px solid var(--color-pt-border)',
+          }}
+        >
+          <Settings size={14} strokeWidth={2} />
+        </button>
+      </div>
+
+      {/* ── Scrollable content ────────────────────────────── */}
+      <div
+        style={{
+          flex: 1,
+          padding: '10px 22px',
           overflow: 'auto',
           display: 'grid',
           gap: 10,
           alignContent: 'start',
         }}
       >
-        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-        {/* ① Recording */}
-        <AccordionSection
-          id="recording"
-          stepNum={1}
-          title="Recording"
-          open={openSections.has('recording')}
-          onToggle={() => toggleSection('recording')}
-          meta={
-            <div className="flex items-center gap-3">
-              {nearingLimit && (
-                <span className="text-[11px]" style={{ color: 'var(--color-caution)' }}>
-                  Approaching limit
-                </span>
-              )}
-              {clipSummary && (
-                <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                  {clipSummary}
-                </span>
-              )}
-              <span className="font-mono text-sm tabular-nums" style={{ color: timerColor }}>
-                {formatDuration(recorder.durationSec)}
-              </span>
-              {isRecording && <PulseDot />}
-            </div>
-          }
-        >
-          <RecordingPanel
-            recorder={recorder}
-            live={live}
-            clips={sortedClips}
-            onStart={handleStartRecording}
-            onStop={handleStopRecording}
-            onPauseResume={handlePauseResume}
-            onDeleteClip={handleDeleteClip}
-            onUpload={handleUploadAudio}
-            onSkip={handleSkipRecording}
-            onRecordingComplete={handleRecordingComplete}
-            isMerging={isMerging}
-            mergedAudioBlob={mergedAudioBlob}
-            wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
-            onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
-          />
-        </AccordionSection>
-
-        {/* ② Transcription */}
-        <AccordionSection
-          id="transcription"
-          stepNum={2}
-          title="Transcription"
-          open={openSections.has('transcription')}
-          onToggle={() => toggleSection('transcription')}
-          locked={isTranscriptLocked}
-          meta={
-            <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-              {transcriptWordCount > 0 ? `${transcriptWordCount} words` : 'Empty'}
-            </span>
-          }
-        >
-          <TranscriptPanel
-            transcript={transcript}
-            clips={sortedClips}
-            canRemerge={hasTranscribedClip}
-            canTranscribe={novaEligible}
-            transcribing={busy === 'transcribing'}
-            transcribeUsed={transcribeUsed}
-            transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
-            hasUserEdits={hasUserEdits}
-            hasLocalTranscript={hasLocalTranscript}
-            onChange={setTranscript}
-            onCommit={() =>
-              patchSession({
-                transcript,
-                transcriptSource: session.transcriptSource ?? 'manual',
-              })
-            }
-            onRemerge={handleRemergeFromClips}
-            onCreateTranscript={handleCreateTranscript}
-            onRevertToLocal={handleRevertToLocal}
-          />
-        </AccordionSection>
-
-        {/* ③ Notes */}
-        <AccordionSection
-          id="notes"
-          stepNum={3}
-          title="Notes"
-          open={openSections.has('notes')}
-          onToggle={() => toggleSection('notes')}
-          locked={isTranscriptLocked}
-          meta={
-            <div className="flex items-center gap-2">
-              {busy === 'generating' && (
-                <Loader2
-                  size={12}
-                  className="animate-spin"
-                  style={{ color: 'var(--color-fg-subtle)' }}
+        {/* ① Record tab */}
+        {activeTab === 'record' && (
+          <>
+            {showRecordWarning && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--color-caution)',
+                  background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
+                }}
+              >
+                <AlertTriangle
+                  size={15}
+                  strokeWidth={2}
+                  style={{ color: 'var(--color-caution)', flexShrink: 0, marginTop: 1 }}
                 />
-              )}
-              {template && (
-                <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-                  {template.name}
-                </span>
-              )}
-              {noteSummary && (
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--color-fg)',
+                      marginBottom: 4,
+                    }}
+                  >
+                    Recording more will invalidate your generated note
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
+                    Any new clips will be added to your transcript, but your note was generated from
+                    the previous transcript. You&apos;ll need to re-run transcription and regenerate
+                    before the note reflects this recording.
+                  </div>
+                </div>
+                <div
                   style={{
-                    background: note?.finalized
-                      ? 'color-mix(in oklab, var(--color-positive) 15%, transparent)'
-                      : 'var(--color-pt-surface-alt)',
-                    color: note?.finalized ? 'var(--color-positive)' : 'var(--color-fg-muted)',
-                    border: `1px solid ${note?.finalized ? 'var(--color-positive)' : 'var(--color-pt-border)'}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    flexShrink: 0,
                   }}
                 >
-                  {noteSummary}
-                </span>
-              )}
-            </div>
-          }
-        >
-          <NotePanel
-            patient={patient}
-            note={note}
-            template={template}
-            templates={templates}
-            transcript={transcript}
-            busy={busy}
-            generateUsed={generateUsed}
-            generateCap={MAX_GENERATES_PER_SESSION}
-            generationProvider={settings.ai.generation.provider}
-            generationModel={settings.ai.generation.model}
-            generationReady={settings.ai.generation.provider === 'anthropic'}
-            onTemplateChange={(id) => patchSession({ templateId: id })}
-            onGenerate={handleGenerate}
-            onUnfinalize={handleUnfinalize}
-            onSectionChange={handleSectionChange}
-          />
-        </AccordionSection>
+                  <button
+                    type="button"
+                    className="btn btn-ghost py-1 text-xs"
+                    onClick={() => setActiveTab('review')}
+                  >
+                    Back to Review
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost py-1 text-xs"
+                    onClick={() => setRecordWarnDismissed(true)}
+                  >
+                    Keep recording
+                  </button>
+                </div>
+              </div>
+            )}
+            <RecordingPanel
+              recorder={recorder}
+              live={live}
+              clips={sortedClips}
+              onStart={handleStartRecording}
+              onStop={handleStopRecording}
+              onPauseResume={handlePauseResume}
+              onDeleteClip={handleDeleteClip}
+              onUpload={handleUploadAudio}
+              onSkip={handleSkipRecording}
+              onRecordingComplete={handleRecordingComplete}
+              isMerging={isMerging}
+              mergedAudioBlob={mergedAudioBlob}
+              wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
+              onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
+            />
+          </>
+        )}
 
-        <div
-          className="flex items-center gap-3 rounded-lg px-4 py-3"
-          style={{
-            background: 'var(--color-pt-surface)',
-            border: '1px solid var(--color-pt-border)',
-          }}
-        >
-          {/* Left cluster: status + destructive delete */}
-          <div className="flex items-center gap-2">
-            <MicStatusPill state={micState} elapsedSec={recorder.durationSec} />
-            {pendingDeleteSession ? (
-              <>
-                <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
-                  {isDemo ? 'Restart demo?' : 'Delete session?'}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost py-0.5 text-xs"
-                  onClick={() => setPendingDeleteSession(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost py-0.5 text-xs"
-                  style={{ color: isDemo ? undefined : 'var(--color-negative)' }}
-                  onClick={handleDeleteSession}
-                >
-                  {isDemo ? 'Restart' : 'Delete'}
-                </button>
-              </>
-            ) : (
+        {/* ② Review tab */}
+        {activeTab === 'review' &&
+          (isTranscriptLocked ? (
+            <div
+              style={{
+                padding: '44px 24px',
+                textAlign: 'center',
+                borderRadius: 12,
+                border: '1px dashed var(--color-pt-border)',
+                background: 'var(--color-pt-surface)',
+              }}
+            >
+              <div
+                style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-fg)', marginBottom: 6 }}
+              >
+                Nothing to review yet
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--color-fg-subtle)', lineHeight: 1.6 }}>
+                Record a clip or upload audio, then come back here.
+              </div>
+            </div>
+          ) : (
+            <>
+              <TranscriptPanel
+                transcript={transcript}
+                clips={sortedClips}
+                canRemerge={hasTranscribedClip}
+                canTranscribe={novaEligible}
+                transcribing={busy === 'transcribing'}
+                transcribeUsed={transcribeUsed}
+                transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
+                hasUserEdits={hasUserEdits}
+                hasLocalTranscript={hasLocalTranscript}
+                onChange={setTranscript}
+                onCommit={() =>
+                  patchSession({
+                    transcript,
+                    transcriptSource: session.transcriptSource ?? 'manual',
+                  })
+                }
+                onRemerge={handleRemergeFromClips}
+                onCreateTranscript={handleCreateTranscript}
+                onRevertToLocal={handleRevertToLocal}
+              />
+              <NotePanel
+                patient={patient}
+                note={note}
+                template={template}
+                templates={templates}
+                transcript={transcript}
+                busy={busy}
+                generateUsed={generateUsed}
+                generateCap={MAX_GENERATES_PER_SESSION}
+                generationProvider={settings.ai.generation.provider}
+                generationModel={settings.ai.generation.model}
+                generationReady={settings.ai.generation.provider === 'anthropic'}
+                onTemplateChange={(id) => patchSession({ templateId: id })}
+                onGenerate={handleGenerate}
+                onUnfinalize={handleUnfinalize}
+                onSectionChange={handleSectionChange}
+              />
+            </>
+          ))}
+      </div>
+
+      {/* ── Bottom action bar ─────────────────────────────── */}
+      <div
+        className="flex items-center gap-3 rounded-lg px-4 py-3"
+        style={{
+          margin: '0 22px 22px',
+          background: 'var(--color-pt-surface)',
+          border: '1px solid var(--color-pt-border)',
+        }}
+      >
+        {/* Left cluster: status + destructive delete */}
+        <div className="flex items-center gap-2">
+          <MicStatusPill state={micState} elapsedSec={recorder.durationSec} />
+          {pendingDeleteSession ? (
+            <>
+              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
+                {isDemo ? 'Restart demo?' : 'Delete session?'}
+              </span>
               <button
                 type="button"
-                className="btn btn-ghost p-2"
-                aria-label={isDemo ? 'Restart demo' : 'Delete session'}
-                title={isDemo ? 'Restart demo' : 'Delete session'}
-                style={{ color: isDemo ? undefined : 'var(--color-pt-red)' }}
-                onClick={() => setPendingDeleteSession(true)}
+                className="btn btn-ghost py-0.5 text-xs"
+                onClick={() => setPendingDeleteSession(false)}
               >
-                <Trash2 size={14} strokeWidth={2} />
+                Cancel
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                className="btn btn-ghost py-0.5 text-xs"
+                style={{ color: isDemo ? undefined : 'var(--color-negative)' }}
+                onClick={handleDeleteSession}
+              >
+                {isDemo ? 'Restart' : 'Delete'}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-ghost p-2"
+              aria-label={isDemo ? 'Restart demo' : 'Delete session'}
+              title={isDemo ? 'Restart demo' : 'Delete session'}
+              style={{ color: isDemo ? undefined : 'var(--color-pt-red)' }}
+              onClick={() => setPendingDeleteSession(true)}
+            >
+              <Trash2 size={14} strokeWidth={2} />
+            </button>
+          )}
+        </div>
 
-          <div className="flex-1" />
+        <div className="flex-1" />
 
-          {/* Right cluster: copy + primary action */}
-          <div className="flex items-center gap-2">
-            {note && !pendingDeleteSession && (
-              <PtButton
-                variant="ghost"
-                iconLeft={<Copy size={14} strokeWidth={2} />}
-                onClick={handleCopyNote}
-                title="Copy full note as markdown"
-              >
-                Copy note
-              </PtButton>
-            )}
-            {note?.finalized ? (
-              <PtButton
-                variant="ghost"
-                iconLeft={<LockOpen size={14} strokeWidth={2} />}
-                onClick={handleUnfinalize}
-              >
-                Unlock note
-              </PtButton>
-            ) : (
-              <PtButton
-                variant="primary"
-                iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
-                disabled={!note}
-                onClick={handleFinalize}
-              >
-                End &amp; sign
-              </PtButton>
-            )}
-          </div>
+        {/* Right cluster: copy + primary action */}
+        <div className="flex items-center gap-2">
+          {note && !pendingDeleteSession && (
+            <PtButton
+              variant="ghost"
+              iconLeft={<Copy size={14} strokeWidth={2} />}
+              onClick={handleCopyNote}
+              title="Copy full note as markdown"
+            >
+              Copy note
+            </PtButton>
+          )}
+          {note?.finalized ? (
+            <PtButton
+              variant="ghost"
+              iconLeft={<LockOpen size={14} strokeWidth={2} />}
+              onClick={handleUnfinalize}
+            >
+              Unlock note
+            </PtButton>
+          ) : (
+            <PtButton
+              variant="primary"
+              iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
+              disabled={!note}
+              onClick={handleFinalize}
+            >
+              End &amp; sign
+            </PtButton>
+          )}
         </div>
       </div>
+
+      {/* ── Debug drawer ──────────────────────────────────── */}
+      {drawerOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+          onClick={() => setDrawerOpen(false)}
+        >
+          <div
+            style={{
+              width: 320,
+              height: '100%',
+              background: 'var(--color-pt-surface)',
+              borderLeft: '1px solid var(--color-pt-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '-4px 0 24px rgba(26,32,48,0.08)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '14px 16px',
+                borderBottom: '1px solid var(--color-pt-border)',
+              }}
+            >
+              <span
+                style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--color-fg)', flex: 1 }}
+              >
+                Debug tools
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost p-1.5"
+                onClick={() => setDrawerOpen(false)}
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+            </div>
+
+            {/* Drawer body */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: 16,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+              }}
+            >
+              {/* ── Silence visibility ──────────────────────── */}
+              <div
+                style={{
+                  borderRadius: 10,
+                  border: '1px solid var(--color-pt-border)',
+                  overflow: 'hidden',
+                }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    background: 'var(--color-pt-surface-alt)',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={silenceDebugOn}
+                    onChange={(e) => setSilenceDebugOn(e.target.checked)}
+                    style={{ accentColor: '#0ea5a8' }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
+                    Silence visibility
+                  </span>
+                </label>
+                {silenceDebugOn && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 5,
+                    }}
+                  >
+                    {debugStats && debugStats.originalSec > 0 ? (
+                      <>
+                        <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--color-fg)' }}>
+                            {Math.round(debugStats.droppedSec)}s
+                          </span>{' '}
+                          trimmed (
+                          {Math.round((debugStats.droppedSec / debugStats.originalSec) * 100)}% of
+                          recording)
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                          {Math.round(debugStats.originalSec)}s original →{' '}
+                          {Math.round(debugStats.originalSec - debugStats.droppedSec)}s after trim
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                        Run transcription to see silence data.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Speed-up visibility ─────────────────────── */}
+              <div
+                style={{
+                  borderRadius: 10,
+                  border: '1px solid var(--color-pt-border)',
+                  overflow: 'hidden',
+                }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    background: 'var(--color-pt-surface-alt)',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={speedDebugOn}
+                    onChange={(e) => setSpeedDebugOn(e.target.checked)}
+                    style={{ accentColor: '#0ea5a8' }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
+                    Speed-up visibility
+                  </span>
+                </label>
+                {speedDebugOn && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 5,
+                    }}
+                  >
+                    {debugStats && debugStats.speedOriginalSec > 0 ? (
+                      <>
+                        <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--color-fg)' }}>
+                            {Math.round(debugStats.speedSavedSec)}s
+                          </span>{' '}
+                          saved (
+                          {Math.round(
+                            (debugStats.speedSavedSec / debugStats.speedOriginalSec) * 100,
+                          )}
+                          % speedup)
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)' }}>
+                          Speed factor:{' '}
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: 'var(--color-fg)',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {settings.audio.speedUp.speed}×
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                        Run transcription to see speed-up data.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1046,14 +1293,3 @@ function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss
   );
 }
 
-// ─── Misc helpers ────────────────────────────────────────────────────────────
-
-function PulseDot() {
-  return (
-    <span
-      className="inline-block h-2.5 w-2.5 animate-pulse rounded-full"
-      style={{ background: 'var(--color-negative)' }}
-      aria-hidden
-    />
-  );
-}
