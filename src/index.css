@@ -46,6 +46,10 @@
   --color-pt-slate-border: #dde2ea;
   --color-pt-slate-fg: #374055;
 
+  /* Shared page-level surfaces */
+  --color-pt-landing-bg: oklch(97.5% 0.008 185); /* entry pages: Landing, Login, Setup, AuthCallback */
+  --color-pt-overlay: oklch(0.28 0.03 250 / 0.32); /* mobile sidebar / modal scrim */
+
   /* === Legacy aliases (kept until full migration sweep) =================== */
   /* These map old --color-* names to the new palette so un-redesigned pages
      pick up the new look automatically. Remove during phase 4 sweep. */
@@ -100,7 +104,7 @@ body,
 }
 
 body {
-  background: var(--color-pt-bg);
+  background: var(--color-pt-surface-alt);
   color: var(--color-pt-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

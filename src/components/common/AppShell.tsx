@@ -20,8 +20,6 @@ export function AppShell() {
 
   const shellBox = {
     background: 'var(--color-pt-surface)',
-    border: '1px solid var(--color-pt-border)',
-    boxShadow: '0 12px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6)',
   } as const;
 
   const mainStyle = {
@@ -47,12 +45,9 @@ export function AppShell() {
 
   if (isDemoMode()) {
     return (
-      <div
-        className="h-[100dvh] w-[100dvw] overflow-hidden md:p-3.5"
-        style={{ background: 'var(--color-pt-bg)' }}
-      >
+      <div className="h-[100dvh] w-[100dvw] overflow-hidden">
         <div
-          className="grid h-full w-full overflow-hidden md:rounded-2xl"
+          className="grid h-full w-full overflow-hidden"
           style={{ ...shellBox, gridTemplateRows: 'auto 1fr' }}
         >
           <DemoTopBar />
@@ -66,12 +61,9 @@ export function AppShell() {
   }
 
   return (
-    <div
-      className="h-[100dvh] w-[100dvw] overflow-hidden md:p-3.5"
-      style={{ background: 'var(--color-pt-bg)' }}
-    >
+    <div className="h-[100dvh] w-[100dvw] overflow-hidden">
       <div
-        className="app-shell-grid grid h-full w-full overflow-hidden md:rounded-2xl"
+        className="app-shell-grid grid h-full w-full overflow-hidden"
         style={shellBox}
       >
         <Sidebar className="hidden md:grid" />
@@ -88,7 +80,7 @@ export function AppShell() {
           <div className="fixed inset-0 z-50 md:hidden">
             <motion.div
               className="absolute inset-0"
-              style={{ background: 'oklch(0.28 0.03 250 / 0.32)' }}
+              style={{ background: 'var(--color-pt-overlay)' }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
