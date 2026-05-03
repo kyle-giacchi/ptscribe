@@ -373,7 +373,7 @@ function ProgressCell({ count }: { count: number }) {
           flex: 1,
           height: 4,
           borderRadius: 999,
-          background: '#eef0f4',
+          background: 'var(--color-pt-slate-soft)',
           overflow: 'hidden',
           maxWidth: 80,
         }}

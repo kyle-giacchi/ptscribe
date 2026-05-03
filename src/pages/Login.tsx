@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { MailCheck } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
+import { activateTestUserSession } from '@/contexts/AuthContext';
 
 type View = 'default' | 'magic-form' | 'magic-sent';
 
@@ -64,39 +66,56 @@ export function Login() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#1a2030',
+        background: 'var(--color-pt-landing-bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px 16px',
         boxSizing: 'border-box',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
+      {/* Ambient teal bloom — matches Landing hero */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(ellipse 75% 55% at 50% -5%, oklch(64% 0.12 185 / 0.13) 0%, transparent 68%)',
+          pointerEvents: 'none',
+        }}
+      />
+
       <div
         style={{
-          background: '#ffffff',
+          position: 'relative',
+          background: 'var(--color-pt-surface)',
           borderRadius: 20,
+          border: '1px solid var(--color-pt-border)',
           padding: '48px 56px',
           textAlign: 'center',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.35)',
+          boxShadow: 'var(--shadow-banner)',
           maxWidth: 400,
           width: '100%',
           boxSizing: 'border-box',
         }}
       >
-        {/* Logo */}
+        {/* Logo mark */}
         <div
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 11,
-            background: '#0ea5a8',
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            background: 'var(--color-pt-accent)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#fff',
-            fontSize: 18,
+            color: '#ffffff',
+            fontSize: 14,
             fontWeight: 800,
+            letterSpacing: '-0.02em',
             margin: '0 auto 20px',
           }}
         >
@@ -106,7 +125,7 @@ export function Login() {
         <h1
           style={{
             margin: '0 0 8px',
-            color: '#1a2030',
+            color: 'var(--color-pt-text)',
             fontSize: 26,
             fontWeight: 800,
             letterSpacing: '-0.03em',
@@ -120,11 +139,11 @@ export function Login() {
             style={{
               margin: '16px 0',
               padding: '12px 16px',
-              background: '#fff7ed',
-              border: '1px solid #f59e0b',
+              background: 'var(--color-pt-amber-soft)',
+              border: '1px solid var(--color-pt-amber-border)',
               borderRadius: 10,
               fontSize: 13,
-              color: '#92400e',
+              color: 'var(--color-pt-amber-fg)',
               textAlign: 'left',
             }}
           >
@@ -134,7 +153,9 @@ export function Login() {
 
         {view === 'default' && (
           <>
-            <p style={{ margin: '0 0 28px', color: '#8893a5', fontSize: 14, lineHeight: 1.6 }}>
+            <p
+              style={{ margin: '0 0 28px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
+            >
               Sign in with your device passkey, or use a magic link sent to your email.
             </p>
 
@@ -144,8 +165,8 @@ export function Login() {
               style={{
                 width: '100%',
                 padding: '14px',
-                background: loading ? '#94a3b8' : '#0ea5a8',
-                color: '#fff',
+                background: loading ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
+                color: '#ffffff',
                 border: 'none',
                 borderRadius: 12,
                 fontSize: 15,
@@ -168,8 +189,8 @@ export function Login() {
                 width: '100%',
                 padding: '14px',
                 background: 'transparent',
-                color: '#0ea5a8',
-                border: '1.5px solid #0ea5a8',
+                color: 'var(--color-pt-accent-fg)',
+                border: '1.5px solid var(--color-pt-accent-border)',
                 borderRadius: 12,
                 fontSize: 15,
                 fontWeight: 600,
@@ -178,12 +199,44 @@ export function Login() {
             >
               Use magic link instead
             </button>
+
+            <div
+              style={{
+                margin: '20px 0 4px',
+                borderTop: '1px solid var(--color-pt-border)',
+                paddingTop: 16,
+              }}
+            >
+              <button
+                onClick={() => {
+                  activateTestUserSession();
+                  navigate(from, { replace: true });
+                }}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  background: 'transparent',
+                  color: 'var(--color-pt-text-3)',
+                  border: '1px dashed var(--color-pt-border)',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Login as Test User
+              </button>
+            </div>
           </>
         )}
 
         {view === 'magic-form' && (
           <>
-            <p style={{ margin: '0 0 24px', color: '#8893a5', fontSize: 14, lineHeight: 1.6 }}>
+            <p
+              style={{ margin: '0 0 24px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
+            >
               Enter your email and we&apos;ll send you a sign-in link.
             </p>
 
@@ -197,10 +250,11 @@ export function Login() {
                 style={{
                   width: '100%',
                   padding: '13px 14px',
-                  border: '1.5px solid #e2e8f0',
+                  border: '1.5px solid var(--color-pt-border)',
                   borderRadius: 10,
                   fontSize: 14,
-                  color: '#1a2030',
+                  color: 'var(--color-pt-text)',
+                  background: 'var(--color-pt-surface)',
                   marginBottom: 12,
                   boxSizing: 'border-box',
                   outline: 'none',
@@ -213,8 +267,8 @@ export function Login() {
                 style={{
                   width: '100%',
                   padding: '14px',
-                  background: loading || !email ? '#94a3b8' : '#0ea5a8',
-                  color: '#fff',
+                  background: loading || !email ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
+                  color: '#ffffff',
                   border: 'none',
                   borderRadius: 12,
                   fontSize: 15,
@@ -236,7 +290,7 @@ export function Login() {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#8893a5',
+                color: 'var(--color-pt-text-3)',
                 fontSize: 13,
                 cursor: 'pointer',
                 padding: '4px 0',
@@ -253,21 +307,24 @@ export function Login() {
               style={{
                 width: 48,
                 height: 48,
-                background: '#f0fdf4',
+                background: 'var(--color-pt-accent-soft)',
+                border: '1px solid var(--color-pt-accent-border)',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                fontSize: 22,
+                color: 'var(--color-pt-accent-fg)',
               }}
             >
-              ✉️
+              <MailCheck size={22} strokeWidth={1.75} />
             </div>
-            <p style={{ margin: '0 0 8px', color: '#1a2030', fontSize: 15, fontWeight: 600 }}>
+            <p style={{ margin: '0 0 8px', color: 'var(--color-pt-text)', fontSize: 15, fontWeight: 600 }}>
               Check your email
             </p>
-            <p style={{ margin: '0 0 24px', color: '#8893a5', fontSize: 14, lineHeight: 1.6 }}>
+            <p
+              style={{ margin: '0 0 24px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
+            >
               We sent a sign-in link to <strong>{email}</strong>. Click the link to continue.
             </p>
             <button
@@ -278,7 +335,7 @@ export function Login() {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#0ea5a8',
+                color: 'var(--color-pt-accent-fg)',
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',

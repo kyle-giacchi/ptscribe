@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
-import { Stethoscope, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
@@ -20,7 +20,7 @@ export function Setup() {
     <div
       style={{
         minHeight: '100vh',
-        background: 'var(--color-pt-bg)',
+        background: 'var(--color-pt-landing-bg)',
         padding: '48px 24px',
       }}
     >
@@ -31,30 +31,34 @@ export function Setup() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: 'var(--color-pt-accent-soft)',
-              color: 'var(--color-pt-accent-fg)',
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: 'var(--color-pt-accent)',
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              flexShrink: 0,
             }}
           >
-            <Stethoscope size={20} strokeWidth={1.75} />
+            P
           </div>
           <div>
             <div
               style={{
-                fontSize: 20,
+                fontSize: 15.5,
                 fontWeight: 700,
                 color: 'var(--color-pt-text)',
-                letterSpacing: '-0.01em',
+                letterSpacing: '-0.02em',
               }}
             >
-              PT <span style={{ color: 'var(--color-pt-accent-fg)' }}>Scribe</span>
+              PTScribe
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
               {step === 'welcome'
                 ? 'A clinical scribe that lives in your browser.'
-                : 'A few quick questions and you’re ready to record.'}
+                : "A few quick questions and you're ready to record."}
             </div>
           </div>
         </header>
@@ -228,7 +232,7 @@ function DoneStep() {
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       <StepHeading
-        title="You’re all set"
+        title="You're all set"
         subtitle="Add your first patient from the Patients page, or jump straight into a session."
       />
       <div style={{ display: 'flex', gap: 10 }}>
@@ -241,7 +245,7 @@ function DoneStep() {
         >
           Add a patient
         </PtButton>
-        <PtButton variant="ghost" onClick={() => navigate('/', { replace: true })}>
+        <PtButton variant="ghost" onClick={() => navigate('/today', { replace: true })}>
           Go to dashboard
         </PtButton>
       </div>
