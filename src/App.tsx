@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppDataProvider } from '@/contexts/AppDataProvider';
 import { ClinicianProvider } from '@/contexts/ClinicianProvider';
 import { PatientsProvider } from '@/contexts/PatientsProvider';
@@ -18,7 +18,7 @@ import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
 import { isDemoMode } from '@/lib/demoMode';
 import { Setup } from '@/pages/Setup';
-import { HomePage } from '@/pages/HomePage';
+import { Landing } from '@/pages/Landing';
 import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
 
@@ -96,7 +96,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route
