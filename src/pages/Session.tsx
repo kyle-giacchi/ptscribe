@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Copy,
   LockOpen,
+  Receipt,
   Settings,
   Trash2,
   X,
@@ -28,6 +29,7 @@ import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { generateNote } from '@/services/ai/generate';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
+import { formatCostRange } from '@/lib/clinical/cost';
 import { newId } from '@/utils/ids';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import type { ClipStatus, Note, NoteFormat, NoteSection, Session, SessionClip } from '@/types';
@@ -1000,6 +1002,26 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     Keep recording
                   </button>
                 </div>
+              </div>
+            )}
+            {sortedClips.length === 0 && recorder.status !== 'recording' && (
+              <div
+                title={`Approximate upper bound — assumes the full ${settings.recordingLimits.maxMinutes}-minute cap is used.`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: '1px solid var(--color-pt-border)',
+                  background: 'var(--color-pt-surface-mut)',
+                  fontSize: 11.5,
+                  color: 'var(--color-pt-text-3)',
+                  width: 'fit-content',
+                }}
+              >
+                <Receipt size={12} strokeWidth={2} />
+                {formatCostRange(settings.recordingLimits.maxMinutes)}
               </div>
             )}
             <RecordingPanel

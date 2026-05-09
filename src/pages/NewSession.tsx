@@ -6,6 +6,7 @@ import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
 import { newId } from '@/utils/ids';
 import { isSameDay } from '@/utils/dates';
 import { isSameDayWarningSuppressed } from '@/utils/sameDaySuppression';
@@ -38,10 +39,17 @@ export function NewSession() {
   const { patients, addPatient } = usePatients();
   const { forPatient: sessionsForPatient, addSession } = useSessions();
   const { templates, addTemplate } = useTemplates();
+  const { settings } = useSettings();
+  const orgDefaultTemplateId = settings.orgPolicy.activeTemplateId;
 
   const [patientId, setPatientId] = useState(params.get('patientId') ?? '');
   const [sessionType, setSessionType] = useState<SessionType>('follow_up');
-  const [templateId, setTemplateId] = useState<string>('');
+  const [templateId, setTemplateId] = useState<string>(() => {
+    if (!orgDefaultTemplateId) return '';
+    const tpl = templates.find((t) => t.id === orgDefaultTemplateId);
+    if (!tpl) return '';
+    return tpl.format === TYPE_TO_FORMAT['follow_up'] ? tpl.id : '';
+  });
   const [showAllTemplates, showAllTemplatesOn, showAllTemplatesOff] = useToggle();
   const [creatingTemplate, openCreatingTemplate, closeCreatingTemplate] = useToggle();
   const [query, setQuery] = useState('');
@@ -67,8 +75,11 @@ export function NewSession() {
       .sort((a, b) => Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name));
   }, [templates, sessionType]);
 
+  const orgDefaultMatch =
+    (orgDefaultTemplateId && visitTemplates.find((t) => t.id === orgDefaultTemplateId)?.id) || '';
   const effectiveTemplateId =
     (templateId && visitTemplates.find((t) => t.id === templateId)?.id) ||
+    orgDefaultMatch ||
     visitTemplates[0]?.id ||
     '';
 
@@ -361,6 +372,7 @@ export function NewSession() {
                 sessionType={sessionType}
                 visitTemplates={visitTemplates}
                 effectiveTemplateId={effectiveTemplateId}
+                orgDefaultTemplateId={orgDefaultTemplateId}
                 showAllTemplates={showAllTemplates}
                 onPickTemplate={setTemplateId}
                 onShowAll={showAllTemplatesOn}

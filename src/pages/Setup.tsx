@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { ArrowRight, Check } from 'lucide-react';
@@ -9,14 +9,65 @@ import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { duration, ease } from '@/lib/motion';
-import { DISCLOSURE_VERSION } from '@/types';
+import { DISCLOSURE_VERSION, type FirstRunRole } from '@/types';
 
-type Step = 'welcome' | 'profile' | 'done';
-const FLOW: Step[] = ['profile', 'done'];
+type Step = 'welcome' | 'role' | 'profile' | 'owner-tips' | 'done';
+const FLOW: Step[] = ['role', 'profile', 'owner-tips', 'done'];
 
 export function Setup() {
   const [step, setStep] = useState<Step>('welcome');
+  const { settings, updateFirstRun } = useSettings();
+  const { clinician, setClinician } = useClinician();
+  const [searchParams] = useSearchParams();
+  const role = settings.firstRun.role;
+
+  // D14: URL pre-fill — runs once on mount, gated by onboardingUrlConsumed.
+  useEffect(() => {
+    if (settings.firstRun.onboardingUrlConsumed) return;
+    const urlRole = searchParams.get('role');
+    const urlClinic = searchParams.get('clinic');
+    let consumed = false;
+    const patch: Partial<typeof settings.firstRun> = {};
+
+    if (urlRole === 'owner' || urlRole === 'clinician') {
+      patch.role = urlRole as FirstRunRole;
+      consumed = true;
+    }
+
+    if (urlClinic && !clinician.practiceName?.trim()) {
+      try {
+        const decoded = decodeURIComponent(urlClinic);
+        if (decoded.trim()) {
+          setClinician({ practiceName: decoded });
+          consumed = true;
+        }
+      } catch {
+        // Malformed URI — silently ignore.
+      }
+    }
+
+    if (consumed) {
+      patch.onboardingUrlConsumed = true;
+      updateFirstRun(patch);
+      // If a role came from the URL, jump straight into profile.
+      if (patch.role) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setStep('profile');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const flowIndex = FLOW.indexOf(step);
+  // Hide owner-tips from the stepper for clinicians.
+  const visibleSteps: Step[] =
+    role === 'owner' ? FLOW : (FLOW.filter((s) => s !== 'owner-tips') as Step[]);
+  const visibleIndex = visibleSteps.indexOf(step);
+  const stepperLabels = visibleSteps
+    .filter((s) => s !== 'done')
+    .map((s) => stepLabel(s))
+    .concat('Done');
+  const stepperCurrent = visibleIndex;
 
   return (
     <div
@@ -60,12 +111,14 @@ export function Setup() {
             <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
               {step === 'welcome'
                 ? 'A clinical scribe that lives in your browser.'
-                : "A few quick questions and you're ready to record."}
+                : "Tell us your role and we'll tailor the rest."}
             </div>
           </div>
         </header>
 
-        {flowIndex >= 0 && step !== 'done' && <Stepper current={flowIndex} />}
+        {flowIndex >= 0 && step !== 'done' && (
+          <Stepper labels={stepperLabels} current={stepperCurrent} />
+        )}
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -75,14 +128,49 @@ export function Setup() {
             exit={{ opacity: 0, x: -12 }}
             transition={{ duration: duration.base, ease: ease.enter }}
           >
-            {step === 'welcome' && <WelcomeStep onStart={() => setStep('profile')} />}
-            {step === 'profile' && <ProfileStep onNext={() => setStep('done')} />}
+            {step === 'welcome' && <WelcomeStep onStart={() => setStep('role')} />}
+            {step === 'role' && (
+              <RoleStep
+                onPick={(picked) => {
+                  updateFirstRun({ role: picked });
+                  setStep('profile');
+                }}
+              />
+            )}
+            {step === 'profile' && (
+              <ProfileStep
+                onNext={() => {
+                  // After profile, owners see tips; clinicians go straight to done.
+                  if (settings.firstRun.role === 'owner') {
+                    setStep('owner-tips');
+                  } else {
+                    setStep('done');
+                  }
+                }}
+              />
+            )}
+            {step === 'owner-tips' && <OwnerTipsStep onContinue={() => setStep('done')} />}
             {step === 'done' && <DoneStep />}
           </motion.div>
         </AnimatePresence>
       </div>
     </div>
   );
+}
+
+function stepLabel(step: Step): string {
+  switch (step) {
+    case 'role':
+      return 'Role';
+    case 'profile':
+      return 'Profile';
+    case 'owner-tips':
+      return 'Next steps';
+    case 'done':
+      return 'Done';
+    default:
+      return '';
+  }
 }
 
 function WelcomeStep({ onStart }: { onStart: () => void }) {
@@ -126,6 +214,87 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         </PtButton>
       </div>
     </div>
+  );
+}
+
+function RoleStep({ onPick }: { onPick: (role: FirstRunRole) => void }) {
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <StepHeading
+        title="Which best describes you?"
+        subtitle="We'll surface the right next steps after setup. You can change this later in Settings."
+      />
+      <div
+        style={{
+          display: 'grid',
+          gap: 12,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        }}
+      >
+        <RoleCard
+          title="I run this practice"
+          description="Owner or admin. After setup we'll point you at templates and the security/encryption settings so the rest of your team can come online."
+          cta="I'm the owner"
+          onClick={() => onPick('owner')}
+        />
+        <RoleCard
+          title="I record sessions"
+          description="Clinician using PTScribe day-to-day. After setup we'll drop you into the patient list so you can start a session."
+          cta="I'm a clinician"
+          onClick={() => onPick('clinician')}
+        />
+      </div>
+    </div>
+  );
+}
+
+function RoleCard({
+  title,
+  description,
+  cta,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  cta: string;
+  onClick: () => void;
+}) {
+  return (
+    <SurfaceCard padding={18}>
+      <div style={{ display: 'grid', gap: 12, height: '100%' }}>
+        <div>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: 'var(--color-pt-text)',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {title}
+          </div>
+          <p
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              color: 'var(--color-pt-text-2)',
+              lineHeight: 1.5,
+            }}
+          >
+            {description}
+          </p>
+        </div>
+        <div style={{ marginTop: 'auto' }}>
+          <PtButton
+            variant="primary"
+            onClick={onClick}
+            iconRight={<ArrowRight size={14} strokeWidth={2} />}
+          >
+            {cta}
+          </PtButton>
+        </div>
+      </div>
+    </SurfaceCard>
   );
 }
 
@@ -231,6 +400,83 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
   );
 }
 
+function OwnerTipsStep({ onContinue }: { onContinue: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <StepHeading
+        title="Two quick next steps"
+        subtitle="As the owner, these are the two areas worth visiting before clinicians log in."
+      />
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: 'var(--color-pt-text)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Templates
+            </div>
+            <p
+              style={{
+                marginTop: 4,
+                fontSize: 13,
+                color: 'var(--color-pt-text-2)',
+                lineHeight: 1.5,
+              }}
+            >
+              Clone a built-in note template and tune it to match your documentation style. Every
+              clinician in your practice will use the templates you set up here.
+            </p>
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: 'var(--color-pt-text)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Settings &rarr; Security
+            </div>
+            <p
+              style={{
+                marginTop: 4,
+                fontSize: 13,
+                color: 'var(--color-pt-text-2)',
+                lineHeight: 1.5,
+              }}
+            >
+              Enable at-rest encryption with a passphrase before any real patient data lands in this
+              browser. Tab close evicts the key &mdash; there is no recovery.
+            </p>
+          </div>
+        </div>
+      </SurfaceCard>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <PtButton variant="primary" onClick={() => navigate('/templates')}>
+          Open Templates
+        </PtButton>
+        <PtButton variant="ghost" onClick={() => navigate('/settings')}>
+          Open Settings
+        </PtButton>
+        <PtButton
+          variant="ghost"
+          onClick={onContinue}
+          iconRight={<ArrowRight size={14} strokeWidth={2} />}
+        >
+          Continue
+        </PtButton>
+      </div>
+    </div>
+  );
+}
+
 function DoneStep() {
   const navigate = useNavigate();
   return (
@@ -257,8 +503,7 @@ function DoneStep() {
   );
 }
 
-function Stepper({ current }: { current: number }) {
-  const steps = ['Profile', 'Done'];
+function Stepper({ labels, current }: { labels: string[]; current: number }) {
   return (
     <ol
       style={{
@@ -270,7 +515,7 @@ function Stepper({ current }: { current: number }) {
         padding: 0,
       }}
     >
-      {steps.map((label, i) => {
+      {labels.map((label, i) => {
         const done = i < current;
         const active = i === current;
         return (
@@ -303,7 +548,7 @@ function Stepper({ current }: { current: number }) {
             >
               {label}
             </span>
-            {i < steps.length - 1 && (
+            {i < labels.length - 1 && (
               <span
                 aria-hidden
                 style={{
