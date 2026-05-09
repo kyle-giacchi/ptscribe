@@ -20,8 +20,7 @@ export type AuditAction =
   | 'vault:passphrase_changed'
   | 'backup:exported'
   | 'backup:imported'
-  | 'data:reset'
-  | 'note:generated';
+  | 'data:reset';
 
 export interface AuditEntry {
   seq: number;

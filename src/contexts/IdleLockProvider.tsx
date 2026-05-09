@@ -15,7 +15,6 @@ const ACTIVITY_EVENTS = [
   'keydown',
   'touchstart',
   'pointerdown',
-  'visibilitychange',
 ] as const;
 
 export function IdleLockProvider({ children }: { children: ReactNode }) {

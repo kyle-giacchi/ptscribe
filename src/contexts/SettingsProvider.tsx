@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAppData } from './AppDataProvider';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
 import type {
   AISettings,
   AnalysisMode,
@@ -31,11 +32,9 @@ export interface SettingsContextValue {
   setPageMode: (key: PageKey, mode: AnalysisMode) => void;
 }
 
-const PAGE_MODE_KEY = 'ptnotes.pageModes';
-
 function readPageModes(): Partial<Record<PageKey, AnalysisMode>> {
   try {
-    const raw = localStorage.getItem(PAGE_MODE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.pageModes);
     if (!raw) return {};
     return JSON.parse(raw);
   } catch {
@@ -45,7 +44,7 @@ function readPageModes(): Partial<Record<PageKey, AnalysisMode>> {
 
 function writePageModes(modes: Partial<Record<PageKey, AnalysisMode>>): void {
   try {
-    localStorage.setItem(PAGE_MODE_KEY, JSON.stringify(modes));
+    localStorage.setItem(STORAGE_KEYS.pageModes, JSON.stringify(modes));
   } catch {
     /* swallow — page mode is a UI nicety */
   }

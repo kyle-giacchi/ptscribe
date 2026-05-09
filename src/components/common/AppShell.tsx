@@ -48,9 +48,23 @@ export function AppShell() {
       <div className="h-[100dvh] w-[100dvw] overflow-hidden">
         <div
           className="grid h-full w-full overflow-hidden"
-          style={{ ...shellBox, gridTemplateRows: 'auto 1fr' }}
+          style={{ ...shellBox, gridTemplateRows: 'auto auto 1fr' }}
         >
           <DemoTopBar />
+          <div
+            style={{
+              background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
+              borderBottom: '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
+              padding: '5px 22px',
+              fontSize: 11.5,
+              color: 'var(--color-caution)',
+              textAlign: 'center',
+              lineHeight: 1.4,
+            }}
+          >
+            Demo mode — data uses a shared passphrase embedded in the source code. Do not enter real
+            patient information.
+          </div>
           <main className="overflow-auto" style={mainStyle}>
             {pageTransition}
           </main>
