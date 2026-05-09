@@ -119,6 +119,14 @@ export function RecordingPanel({
     }
   }, [recorder.hardCapStopped, settings.recordingLimits.maxMinutes]);
 
+  useEffect(() => {
+    if (recorder.idleAutoStopped) {
+      toast.warning(
+        `Auto-stopped after ${settings.recordingLimits.idleAutoStopMinutes} min of silence. Start a new clip when you're ready.`,
+      );
+    }
+  }, [recorder.idleAutoStopped, settings.recordingLimits.idleAutoStopMinutes]);
+
   if (idle && clips.length === 0) {
     return <RecordingBlankOptions onStart={onStart} onUpload={onUpload} onSkip={onSkip} />;
   }

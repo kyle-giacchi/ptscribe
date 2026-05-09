@@ -31,6 +31,8 @@ export interface UseRecorder {
   softWarnReached: boolean;
   /** Set when the recorder auto-stopped because duration crossed maxMinutes. */
   hardCapStopped: boolean;
+  /** Set when the recorder auto-stopped after sustained silence past idleAutoStopMinutes. */
+  idleAutoStopped: boolean;
 }
 
 const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -39,6 +41,11 @@ const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4
 // chunk row to IDB so a tab crash loses at most this many seconds of audio.
 // 5s balances IDB write rate (~12/min) against worst-case loss window.
 const CHUNK_TIMESLICE_MS = 5000;
+
+// ~-50 dBFS in linear amplitude. Anything quieter is treated as silence for
+// the idle-auto-stop check; quiet keystrokes and HVAC hum stay below this.
+const VOICE_RMS_THRESHOLD = 0.00316;
+const ANALYSER_FFT_SIZE = 2048;
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;
@@ -62,6 +69,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const [blob, setBlob] = useState<Blob | null>(null);
   const [softWarnReached, setSoftWarnReached] = useState(false);
   const [hardCapStopped, setHardCapStopped] = useState(false);
+  const [idleAutoStopped, setIdleAutoStopped] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -71,6 +79,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const startedAtRef = useRef<number>(0);
   const accumulatedRef = useRef<number>(0);
   const stopResolveRef = useRef<((b: Blob | null) => void) | null>(null);
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const analyserBufferRef = useRef<Float32Array<ArrayBuffer> | null>(null);
+  const lastVoiceAtMsRef = useRef<number>(0);
 
   const limitsRef = useRef<RecordingLimitsSettings | undefined>(options.limits);
   useEffect(() => {
@@ -120,6 +133,22 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       clearInterval(tickRef.current);
       tickRef.current = null;
     }
+    if (analyserRef.current) {
+      try {
+        analyserRef.current.disconnect();
+      } catch {
+        /* best-effort */
+      }
+      analyserRef.current = null;
+    }
+    analyserBufferRef.current = null;
+    if (audioCtxRef.current) {
+      const ctx = audioCtxRef.current;
+      audioCtxRef.current = null;
+      void ctx.close().catch(() => {
+        /* best-effort */
+      });
+    }
     if (streamRef.current) {
       for (const track of streamRef.current.getTracks()) track.stop();
       streamRef.current = null;
@@ -142,12 +171,34 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
 
   const tickStart = useCallback(() => {
     startedAtRef.current = Date.now();
+    // Restart the silence-grace window on every (re)start so a paused-then-
+    // resumed clip can't auto-stop the instant resume runs.
+    lastVoiceAtMsRef.current = Date.now();
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = setInterval(() => {
-      const live = (Date.now() - startedAtRef.current) / 1000;
+      const now = Date.now();
+      const live = (now - startedAtRef.current) / 1000;
       const total = accumulatedRef.current + live;
       setDurationSec(total);
       const limits = limitsRef.current;
+
+      // Sample the analyser before any limit checks so lastVoiceAtMs is fresh
+      // even when no limits are configured (defensive — the analyser is cheap).
+      const analyser = analyserRef.current;
+      const buffer = analyserBufferRef.current;
+      if (analyser && buffer) {
+        analyser.getFloatTimeDomainData(buffer);
+        let sumSquares = 0;
+        for (let i = 0; i < buffer.length; i++) {
+          const sample = buffer[i];
+          sumSquares += sample * sample;
+        }
+        const rms = Math.sqrt(sumSquares / buffer.length);
+        if (rms >= VOICE_RMS_THRESHOLD) {
+          lastVoiceAtMsRef.current = now;
+        }
+      }
+
       if (!limits) return;
       const totalMin = total / 60;
       if (totalMin >= limits.softWarnAtMinutes) {
@@ -158,6 +209,17 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         if (r && r.state !== 'inactive') {
           setHardCapStopped(true);
           r.stop();
+        }
+        return;
+      }
+      if (limits.idleAutoStopMinutes > 0) {
+        const idleMin = (now - lastVoiceAtMsRef.current) / 60000;
+        if (idleMin >= limits.idleAutoStopMinutes) {
+          const r = recorderRef.current;
+          if (r && r.state !== 'inactive') {
+            setIdleAutoStopped(true);
+            r.stop();
+          }
         }
       }
     }, 250);
@@ -189,6 +251,30 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
+
+        // Web Audio analyser drives the silence-based idle auto-stop. The graph
+        // is source → analyser with no connection to destination, so it never
+        // plays the mic back. Failures here must not break recording — the
+        // MediaRecorder path is independent.
+        try {
+          const AudioCtxCtor =
+            window.AudioContext ??
+            (window as unknown as { webkitAudioContext?: typeof AudioContext })
+              .webkitAudioContext;
+          if (AudioCtxCtor) {
+            const ctx = new AudioCtxCtor();
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = ANALYSER_FFT_SIZE;
+            source.connect(analyser);
+            audioCtxRef.current = ctx;
+            analyserRef.current = analyser;
+            analyserBufferRef.current = new Float32Array(new ArrayBuffer(analyser.fftSize * 4));
+          }
+        } catch {
+          /* Analyser is best-effort; idle auto-stop simply won't fire. */
+        }
+
         const mimeType = pickMimeType();
         const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         chunksRef.current = [];
@@ -227,6 +313,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         setBlob(null);
         setSoftWarnReached(false);
         setHardCapStopped(false);
+        setIdleAutoStopped(false);
         recorder.start(CHUNK_TIMESLICE_MS);
         audioRepository
           .saveChunkMime(clipId, recorder.mimeType || mimeType || 'audio/webm')
@@ -296,6 +383,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     setWasBackgrounded(false);
     setSoftWarnReached(false);
     setHardCapStopped(false);
+    setIdleAutoStopped(false);
   }, [teardown]);
 
   return {
@@ -311,5 +399,6 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     wasBackgrounded,
     softWarnReached,
     hardCapStopped,
+    idleAutoStopped,
   };
 }
