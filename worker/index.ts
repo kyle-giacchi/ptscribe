@@ -422,7 +422,7 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   });
 
   if (!upstream.ok) {
-    const errBody = await safeText(upstream);
+    const errBody = (await safeText(upstream)).slice(0, 200);
     return apiError(
       'UPSTREAM_FAILED',
       `Anthropic request failed (${upstream.status}): ${errBody || upstream.statusText}`,

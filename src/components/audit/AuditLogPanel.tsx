@@ -10,7 +10,6 @@ const ACTION_LABELS: Record<string, string> = {
   'backup:exported': 'Backup exported',
   'backup:imported': 'Backup imported',
   'data:reset': 'Data reset',
-  'note:generated': 'Note generated',
 };
 
 function fmt(ts: number): string {

@@ -1,4 +1,4 @@
-import { APP_DATA_VERSION, type AppData } from '@/types';
+import { APP_DATA_VERSION, UNASSIGNED_PATIENT_ID, type AppData } from '@/types';
 import { BUILTIN_TEMPLATES } from '@/lib/clinical/templates';
 import { newId } from '@/utils/ids';
 
@@ -31,6 +31,12 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   pre-existing data. No structural changes.
  * - v10 → v11: Adds `AppData.tenantId` (string). Defaults to `'local'` for all
  *   existing single-tenant vaults. Reserved for future multi-tenant routing.
+ * - v11 → v12: Adds `Settings.session.autoFinish` (default true) and seeds a
+ *   built-in "Unassigned" patient row used by quick-record paths.
+ * - v12 → v13: Adds `Settings.recordingLimits` (cost guardrails — 75 min soft warn,
+ *   90 min hard cap, 10 min idle auto-stop), `Settings.orgPolicy` (active template
+ *   id + tone style), and `Settings.firstRun` (role + onboarding state) to support
+ *   business-owner persona work. No structural changes to other slices.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -74,6 +80,12 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 10) {
     working = migrateV10ToV11(working);
+  }
+  if ((working as { version?: number }).version === 11) {
+    working = migrateV11ToV12(working);
+  }
+  if ((working as { version?: number }).version === 12) {
+    working = migrateV12ToV13(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -214,6 +226,98 @@ function migrateV9ToV10(input: Record<string, unknown>): Record<string, unknown>
 
 function migrateV10ToV11(input: Record<string, unknown>): Record<string, unknown> {
   return { ...input, version: 11, tenantId: input.tenantId ?? 'local' };
+}
+
+function migrateV12ToV13(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 13 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+
+  const existingLimits = (settings.recordingLimits as Record<string, unknown> | undefined) ?? {};
+  const softWarn = existingLimits.softWarnAtMinutes;
+  const max = existingLimits.maxMinutes;
+  const idle = existingLimits.idleAutoStopMinutes;
+
+  const existingOrg = (settings.orgPolicy as Record<string, unknown> | undefined) ?? {};
+  const existingTone = existingOrg.toneStyle;
+  const existingActive = existingOrg.activeTemplateId;
+
+  const existingFirstRun = (settings.firstRun as Record<string, unknown> | undefined) ?? {};
+
+  next.settings = {
+    ...settings,
+    recordingLimits: {
+      softWarnAtMinutes:
+        typeof softWarn === 'number' && softWarn >= 15 && softWarn <= 240
+          ? Math.floor(softWarn)
+          : 75,
+      maxMinutes:
+        typeof max === 'number' && max >= 30 && max <= 240 ? Math.floor(max) : 90,
+      idleAutoStopMinutes:
+        typeof idle === 'number' && idle >= 0 && idle <= 60 ? Math.floor(idle) : 10,
+    },
+    orgPolicy: {
+      ...(typeof existingActive === 'string' && existingActive.length > 0
+        ? { activeTemplateId: existingActive }
+        : {}),
+      toneStyle:
+        existingTone === 'narrative' || existingTone === 'terse' || existingTone === 'clinical'
+          ? existingTone
+          : 'narrative',
+    },
+    firstRun: {
+      ...(typeof existingFirstRun.role === 'string' &&
+      (existingFirstRun.role === 'owner' || existingFirstRun.role === 'clinician')
+        ? { role: existingFirstRun.role }
+        : {}),
+      ...(typeof existingFirstRun.onboardingDoneAt === 'number'
+        ? { onboardingDoneAt: existingFirstRun.onboardingDoneAt }
+        : {}),
+      ...(typeof existingFirstRun.disclosureVersion === 'number'
+        ? { disclosureVersion: existingFirstRun.disclosureVersion }
+        : {}),
+      ...(typeof existingFirstRun.onboardingUrlConsumed === 'boolean'
+        ? { onboardingUrlConsumed: existingFirstRun.onboardingUrlConsumed }
+        : {}),
+    },
+  };
+
+  return next;
+}
+
+function migrateV11ToV12(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 12 } as Record<string, unknown>;
+
+  // 1. session.autoFinish setting (default true).
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingSession = (settings.session as Record<string, unknown> | undefined) ?? undefined;
+  next.settings = {
+    ...settings,
+    session: {
+      autoFinish:
+        typeof existingSession?.autoFinish === 'boolean' ? existingSession.autoFinish : true,
+    },
+  };
+
+  // 2. Seed the built-in "Unassigned" patient if absent. Quick-record paths
+  // attach sessions to this row so a session can start before a real patient
+  // is selected.
+  const patients = Array.isArray(next.patients)
+    ? (next.patients as Record<string, unknown>[])
+    : [];
+  if (!patients.some((p) => p.id === UNASSIGNED_PATIENT_ID)) {
+    const now = Date.now();
+    patients.unshift({
+      id: UNASSIGNED_PATIENT_ID,
+      firstName: 'Unassigned',
+      lastName: '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    next.patients = patients;
+  }
+
+  return next;
 }
 
 function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {

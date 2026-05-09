@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Download, Upload, Eraser, RefreshCw } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Copy, Download, Upload, Eraser, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
@@ -7,8 +7,11 @@ import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
+import { useSessions } from '@/contexts/SessionsProvider';
+import { useNotes } from '@/contexts/NotesProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { exportBackup, importBackup } from '@/services/BackupService';
 import { vault } from '@/lib/vault/vault';
 import { ChangePassphraseForm } from '@/components/vault/ChangePassphraseForm';
@@ -16,6 +19,60 @@ import { auditLog } from '@/lib/audit/auditLog';
 import { AuditLogPanel } from '@/components/audit/AuditLogPanel';
 import { defaultAppData } from '@/schemas';
 import { downloadFile } from '@/utils/download';
+import type { Note, Session } from '@/types';
+
+function describeVaultStatus(
+  unlocked: boolean,
+  initialized: boolean,
+): { label: string; color: string } {
+  if (!initialized) return { label: 'Vault: not initialized', color: 'var(--color-pt-text-3)' };
+  if (unlocked) return { label: 'Vault: unlocked', color: '#16a34a' };
+  return { label: 'Vault: locked', color: '#dc2626' };
+}
+
+function describeDisclosure(at: number | undefined, version: number | undefined): string {
+  if (!at || !version) return '—';
+  return `Disclosure v${version} acknowledged ${new Date(at).toLocaleDateString()}`;
+}
+
+function buildOnboardingLink(origin: string, practiceName: string | undefined): string {
+  const base = `${origin}/setup?role=clinician`;
+  return practiceName ? `${base}&clinic=${encodeURIComponent(practiceName)}` : base;
+}
+
+interface UsageBucket {
+  key: string;
+  label: string;
+  sessions: number;
+  notes: number;
+}
+
+function bucketUsageByMonth(sessions: Session[], notes: Note[]): UsageBucket[] {
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const now = new Date();
+  const months: { key: string; label: string }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ key: fmt(d), label: d.toLocaleString(undefined, { month: 'short' }) });
+  }
+  const sessionByMonth = new Map<string, number>();
+  for (const s of sessions) {
+    const k = fmt(new Date(s.date));
+    sessionByMonth.set(k, (sessionByMonth.get(k) ?? 0) + 1);
+  }
+  const noteByMonth = new Map<string, number>();
+  for (const n of notes) {
+    const k = fmt(new Date(n.createdAt));
+    noteByMonth.set(k, (noteByMonth.get(k) ?? 0) + 1);
+  }
+  return months.map((m) => ({
+    key: m.key,
+    label: m.label,
+    sessions: sessionByMonth.get(m.key) ?? 0,
+    notes: noteByMonth.get(m.key) ?? 0,
+  }));
+}
 
 export function Settings() {
   const { clinician, setClinician } = useClinician();
@@ -24,11 +81,47 @@ export function Settings() {
     updateAi,
     updateAudio,
     updateUi,
+    updateSession,
     setIdleLockMinutes,
     setAutoDeleteAudioAfterDays,
   } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
+  const { sessions } = useSessions();
+  const { notes } = useNotes();
   const importRef = useRef<HTMLInputElement>(null);
+  const [showFullDisclosure, setShowFullDisclosure] = useState(false);
+
+  // ── A1 "Security & compliance" summary card ────────────────────────────────
+  // Decision: keep the existing Vault & security and Data retention cards as-is
+  // (they own the actual mutators) and render a compact summary here that
+  // surfaces vault state, disclosure acknowledgement, and a re-show toggle. The
+  // summary footer cross-links to the detail cards rather than duplicating
+  // their selects.
+  const vaultUnlocked = vault.isUnlocked();
+  const vaultStatus = describeVaultStatus(vaultUnlocked, vault.isInitialized());
+  const disclosureLine = describeDisclosure(
+    clinician.acknowledgedDisclosureAt,
+    settings.firstRun.disclosureVersion,
+  );
+
+  // ── B8 "Local usage" stats ────────────────────────────────────────────────
+  const totalMinutes = sessions.reduce((acc, s) => acc + (s.durationMin ?? 0), 0);
+  const totalNotesFinalized = notes.filter((n) => n.finalized).length;
+  const monthlyBuckets = useMemo(
+    () => bucketUsageByMonth(sessions, notes),
+    [sessions, notes],
+  );
+  const usageMax = Math.max(1, ...monthlyBuckets.flatMap((b) => [b.sessions, b.notes]));
+
+  // D14 — Copy onboarding link. Practice name is optional; we omit the param
+  // when missing rather than disabling the button.
+  function handleCopyOnboardingLink() {
+    const url = buildOnboardingLink(window.location.origin, clinician.practiceName);
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success('Onboarding link copied'))
+      .catch(() => toast.error('Could not copy link'));
+  }
 
   async function handleExport() {
     try {
@@ -74,8 +167,12 @@ export function Settings() {
     } catch {
       /* ignore */
     }
-    resetAll();
+    dataRepository.clearCorruptData();
+    localStorage.removeItem(STORAGE_KEYS.pageModes);
+    // Save fresh data first so there is never a window with no persisted state,
+    // then reset in-memory (resetAll no longer calls clear).
     await dataRepository.save(defaultAppData());
+    resetAll();
     void auditLog.append('data:reset');
     toast.success('All local data erased');
   }
@@ -144,6 +241,14 @@ export function Settings() {
           </div>
         </div>
       </SurfaceCard>
+
+      <SecurityComplianceCard
+        vaultStatus={vaultStatus}
+        vaultUnlocked={vaultUnlocked}
+        disclosureLine={disclosureLine}
+        showFullDisclosure={showFullDisclosure}
+        onToggleDisclosure={() => setShowFullDisclosure((v) => !v)}
+      />
 
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 12 }}>
@@ -247,6 +352,15 @@ export function Settings() {
               onChange={(e) => setClinician({ signatureBlock: e.target.value })}
             />
           </Field>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <PtButton
+              variant="ghost"
+              iconLeft={<Copy size={14} strokeWidth={2} />}
+              onClick={handleCopyOnboardingLink}
+            >
+              Copy clinician onboarding link
+            </PtButton>
+          </div>
         </div>
       </SurfaceCard>
 
@@ -370,6 +484,28 @@ export function Settings() {
 
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 12 }}>
+          <Eyebrow>Recording workflow</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            When auto-finish is on, the recording panel shows a one-tap{' '}
+            <strong>Stop &amp; finish</strong> button that chains stop → transcribe → generate. Turn
+            off if you prefer to advance each step yourself.
+          </p>
+          <div style={{ maxWidth: 280 }}>
+            <Field label="Auto-finish chain">
+              <Select
+                value={settings.session.autoFinish ? 'on' : 'off'}
+                onChange={(e) => updateSession({ autoFinish: e.target.value === 'on' })}
+              >
+                <option value="on">On — show Stop &amp; finish</option>
+                <option value="off">Off — manual steps only</option>
+              </Select>
+            </Field>
+          </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 12 }}>
           <Eyebrow>Audio processing (experimental)</Eyebrow>
           <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
             Trim sustained silent regions and/or speed up playback before sending audio to
@@ -469,6 +605,14 @@ export function Settings() {
         </div>
       </SurfaceCard>
 
+      <LocalUsageCard
+        totalSessions={sessions.length}
+        totalMinutes={totalMinutes}
+        totalNotesFinalized={totalNotesFinalized}
+        monthlyBuckets={monthlyBuckets}
+        usageMax={usageMax}
+      />
+
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 10 }}>
           <Eyebrow>Backup &amp; restore</Eyebrow>
@@ -532,5 +676,241 @@ export function Settings() {
         </div>
       </SurfaceCard>
     </div>
+  );
+}
+
+interface SecurityComplianceCardProps {
+  vaultStatus: { label: string; color: string };
+  vaultUnlocked: boolean;
+  disclosureLine: string;
+  showFullDisclosure: boolean;
+  onToggleDisclosure: () => void;
+}
+
+function SecurityComplianceCard({
+  vaultStatus,
+  vaultUnlocked,
+  disclosureLine,
+  showFullDisclosure,
+  onToggleDisclosure,
+}: SecurityComplianceCardProps) {
+  return (
+    <SurfaceCard padding={18}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <Eyebrow>Security &amp; compliance</Eyebrow>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            aria-hidden
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: vaultStatus.color,
+              flex: '0 0 auto',
+            }}
+          />
+          <span style={{ fontSize: 13, color: 'var(--color-pt-text-1)' }}>{vaultStatus.label}</span>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>{disclosureLine}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {vaultUnlocked && (
+            <PtButton
+              variant="ghost"
+              onClick={() => {
+                vault.lock();
+                window.location.reload();
+              }}
+            >
+              Lock now
+            </PtButton>
+          )}
+          <PtButton variant="ghost" onClick={onToggleDisclosure}>
+            {showFullDisclosure ? 'Hide full disclosure' : 'Re-show full disclosure'}
+          </PtButton>
+        </div>
+        {showFullDisclosure && <HipaaDisclosure variant="full" />}
+        <p
+          style={{
+            fontSize: 11,
+            color: 'var(--color-pt-text-3)',
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          Idle-lock timing lives in the Vault &amp; security card above; audio retention lives in
+          the Data retention card below.
+        </p>
+      </div>
+    </SurfaceCard>
+  );
+}
+
+interface LocalUsageCardProps {
+  totalSessions: number;
+  totalMinutes: number;
+  totalNotesFinalized: number;
+  monthlyBuckets: UsageBucket[];
+  usageMax: number;
+}
+
+function LocalUsageCard({
+  totalSessions,
+  totalMinutes,
+  totalNotesFinalized,
+  monthlyBuckets,
+  usageMax,
+}: LocalUsageCardProps) {
+  return (
+    <SurfaceCard padding={18}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <Eyebrow>Local usage</Eyebrow>
+        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+          Counts derived from local data; nothing leaves this device.
+        </p>
+        <div
+          style={{
+            display: 'grid',
+            gap: 10,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+          }}
+        >
+          <UsageStat label="Sessions" value={String(totalSessions)} />
+          <UsageStat label="Minutes recorded" value={String(Math.round(totalMinutes))} />
+          <UsageStat label="Notes finalized" value={String(totalNotesFinalized)} />
+        </div>
+        <div style={{ display: 'grid', gap: 6 }}>
+          <div
+            style={{
+              fontSize: 11,
+              color: 'var(--color-pt-text-3)',
+              textTransform: 'uppercase',
+              letterSpacing: 0.4,
+            }}
+          >
+            Last 6 months
+          </div>
+          <UsageBarChart data={monthlyBuckets} max={usageMax} />
+          <div
+            style={{
+              display: 'flex',
+              gap: 14,
+              fontSize: 11,
+              color: 'var(--color-pt-text-3)',
+            }}
+          >
+            <LegendSwatch color="var(--color-pt-accent, #6366f1)" label="Sessions" />
+            <LegendSwatch color="var(--color-pt-text-2, #94a3b8)" label="Notes" />
+          </div>
+        </div>
+      </div>
+    </SurfaceCard>
+  );
+}
+
+function UsageStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: '10px 12px',
+        borderRadius: 10,
+        border: '1px solid var(--color-pt-border, rgba(0,0,0,0.08))',
+        background: 'var(--color-pt-surface-2, rgba(0,0,0,0.02))',
+        display: 'grid',
+        gap: 2,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 0.4,
+          textTransform: 'uppercase',
+          color: 'var(--color-pt-text-3)',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 22,
+          fontVariantNumeric: 'tabular-nums',
+          color: 'var(--color-pt-text-1)',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function LegendSwatch({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span
+        aria-hidden
+        style={{ width: 10, height: 10, borderRadius: 2, background: color, display: 'inline-block' }}
+      />
+      {label}
+    </span>
+  );
+}
+
+// Inline SVG grouped-bar chart. recharts isn't in package.json (verified) and
+// pulling visx in for a 6-bucket compact chart is overkill, so this is the
+// documented fallback path the task allows. Brand accent colors fall back to
+// hex when the CSS variable hasn't been resolved.
+function UsageBarChart({ data, max }: { data: UsageBucket[]; max: number }) {
+  const height = 180;
+  const padTop = 8;
+  const padBottom = 22;
+  const innerH = height - padTop - padBottom;
+  const groupCount = data.length;
+  const sessionFill = 'var(--color-pt-accent, #6366f1)';
+  const noteFill = 'var(--color-pt-text-2, #94a3b8)';
+
+  return (
+    <svg
+      width="100%"
+      height={height}
+      viewBox={`0 0 ${groupCount * 60} ${height}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Sessions and notes per month over the last 6 months"
+    >
+      {data.map((b, i) => {
+        const groupX = i * 60;
+        const barW = 22;
+        const sessionsH = (b.sessions / max) * innerH;
+        const notesH = (b.notes / max) * innerH;
+        return (
+          <g key={b.key}>
+            <rect
+              x={groupX + 6}
+              y={padTop + (innerH - sessionsH)}
+              width={barW}
+              height={sessionsH}
+              fill={sessionFill}
+              rx={2}
+            />
+            <rect
+              x={groupX + 32}
+              y={padTop + (innerH - notesH)}
+              width={barW}
+              height={notesH}
+              fill={noteFill}
+              rx={2}
+            />
+            <text
+              x={groupX + 30}
+              y={height - 6}
+              textAnchor="middle"
+              fontSize={11}
+              fill="var(--color-pt-text-3)"
+            >
+              {b.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }

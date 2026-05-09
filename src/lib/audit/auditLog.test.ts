@@ -24,8 +24,8 @@ describe('auditLog.append / read', () => {
   });
 
   it('records the correct action', async () => {
-    await auditLog.append('note:generated');
-    expect(auditLog.read()[0].action).toBe('note:generated');
+    await auditLog.append('backup:exported');
+    expect(auditLog.read()[0].action).toBe('backup:exported');
   });
 
   it('first entry prevHash is the genesis hash', async () => {
@@ -42,7 +42,7 @@ describe('auditLog.verify', () => {
 
   it('returns valid=true for an intact chain', async () => {
     await auditLog.append('vault:unlocked');
-    await auditLog.append('note:generated');
+    await auditLog.append('backup:exported');
     await auditLog.append('vault:locked');
     const result = await auditLog.verify();
     expect(result.valid).toBe(true);
@@ -51,7 +51,7 @@ describe('auditLog.verify', () => {
 
   it('detects tampering when an entry action is modified', async () => {
     await auditLog.append('vault:unlocked');
-    await auditLog.append('note:generated');
+    await auditLog.append('backup:exported');
 
     // Tamper: mutate the first entry's action directly in localStorage.
     const raw = JSON.parse(localStorage.getItem('ptnotes.auditLog')!);
@@ -66,7 +66,7 @@ describe('auditLog.verify', () => {
 
   it('detects tampering when an entry is deleted from the middle', async () => {
     await auditLog.append('vault:unlocked');
-    await auditLog.append('note:generated');
+    await auditLog.append('backup:exported');
     await auditLog.append('vault:locked');
 
     // Delete the second entry.

@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { isDemoMode } from '@/lib/demoMode';
 import { DEMO_USER } from '@/lib/auth/demo';
 import { authClient, type AuthSession } from '@/lib/auth/client';
+import { vault } from '@/lib/vault/vault';
 import type { AppUser } from '@/lib/auth/types';
 import type { PlanTier } from '@/types/plans';
 
@@ -54,8 +55,10 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
     isLoading: isTestUser ? false : isPending,
     isAuthenticated: isTestUser || !!session,
     signOut: async () => {
+      vault.lock();
       sessionStorage.removeItem(TEST_USER_KEY);
       await authClient.signOut();
+      window.location.reload();
     },
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
