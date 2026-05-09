@@ -348,6 +348,8 @@ function NoteEditor({
   );
 }
 
+type CopyFormat = 'plain' | 'markdown';
+
 function NoteExportRow({
   note,
   template,
@@ -359,6 +361,7 @@ function NoteExportRow({
 }) {
   const { clinician } = useClinician();
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [copyFormat, setCopyFormat] = useState<CopyFormat>('plain');
 
   function fileBase(): string {
     const date = new Date(note.createdAt).toISOString().slice(0, 10);
@@ -376,8 +379,62 @@ function NoteExportRow({
     }
   }
 
+  function handleCopy() {
+    const text =
+      copyFormat === 'markdown'
+        ? renderNoteMarkdown(note, template, patient)
+        : renderNotePlainText(note, template, patient);
+    navigator.clipboard.writeText(text).then(
+      () => toast.success(copyFormat === 'markdown' ? 'Copied as Markdown' : 'Copied as plain text'),
+      () => toast.error('Copy failed'),
+    );
+  }
+
   return (
-    <div className="flex flex-wrap gap-2 pt-2">
+    <div
+      className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t px-1 py-2"
+      style={{
+        borderColor: 'var(--color-pt-border)',
+        background: 'var(--color-pt-surface)',
+      }}
+    >
+      <button
+        type="button"
+        className="btn btn-primary text-xs"
+        onClick={handleCopy}
+        title={`Copy entire note as ${copyFormat === 'markdown' ? 'Markdown' : 'plain text'}`}
+      >
+        <Copy size={12} strokeWidth={2} /> Copy note
+      </button>
+      <div
+        role="radiogroup"
+        aria-label="Copy format"
+        className="inline-flex overflow-hidden rounded-md border text-[11px]"
+        style={{ borderColor: 'var(--color-pt-border)' }}
+      >
+        {(['plain', 'markdown'] as const).map((fmt) => {
+          const active = copyFormat === fmt;
+          return (
+            <button
+              key={fmt}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => setCopyFormat(fmt)}
+              className="px-2 py-1"
+              style={{
+                background: active ? 'var(--color-pt-accent-soft)' : 'transparent',
+                color: active ? 'var(--color-pt-accent-fg)' : 'var(--color-fg-subtle)',
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                border: 'none',
+              }}
+            >
+              {fmt === 'plain' ? 'Plain' : 'Markdown'}
+            </button>
+          );
+        })}
+      </div>
       <button
         type="button"
         className="btn btn-secondary text-xs"
@@ -393,19 +450,6 @@ function NoteExportRow({
             <Download size={12} strokeWidth={2} /> Export PDF
           </>
         )}
-      </button>
-      <button
-        type="button"
-        className="btn btn-ghost text-xs"
-        onClick={() => {
-          const md = renderNoteMarkdown(note, template, patient);
-          navigator.clipboard.writeText(md).then(
-            () => toast.success('Copied to clipboard'),
-            () => toast.error('Copy failed'),
-          );
-        }}
-      >
-        <Copy size={12} strokeWidth={2} /> Copy markdown
       </button>
       <button
         type="button"

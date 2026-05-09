@@ -430,3 +430,158 @@ describe('migrate v5 → v6', () => {
     expect(parsed.success).toBe(true);
   });
 });
+
+function v12AppData(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const seed = defaultAppData();
+  // Strip the v13-only slices so we test that the migration adds them.
+  const settings = { ...seed.settings } as Record<string, unknown>;
+  delete settings.recordingLimits;
+  delete settings.orgPolicy;
+  delete settings.firstRun;
+  return {
+    ...seed,
+    version: 12,
+    settings,
+    ...overrides,
+  };
+}
+
+describe('migrate v12 → v13', () => {
+  it('seeds default recordingLimits when missing', () => {
+    const result = migrate(v12AppData());
+    expect(result.settings.recordingLimits).toEqual({
+      softWarnAtMinutes: 75,
+      maxMinutes: 90,
+      idleAutoStopMinutes: 10,
+    });
+  });
+
+  it('seeds default orgPolicy.toneStyle to narrative', () => {
+    const result = migrate(v12AppData());
+    expect(result.settings.orgPolicy.toneStyle).toBe('narrative');
+    expect(result.settings.orgPolicy.activeTemplateId).toBeUndefined();
+  });
+
+  it('seeds an empty firstRun block', () => {
+    const result = migrate(v12AppData());
+    expect(result.settings.firstRun).toEqual({});
+  });
+
+  it('preserves an existing recordingLimits block within bounds', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        recordingLimits: {
+          softWarnAtMinutes: 30,
+          maxMinutes: 60,
+          idleAutoStopMinutes: 0,
+        },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.recordingLimits).toEqual({
+      softWarnAtMinutes: 30,
+      maxMinutes: 60,
+      idleAutoStopMinutes: 0,
+    });
+  });
+
+  it('clamps out-of-range recordingLimits to defaults', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        recordingLimits: {
+          softWarnAtMinutes: 5, // below min
+          maxMinutes: 999, // above max
+          idleAutoStopMinutes: -3, // below min
+        },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.recordingLimits).toEqual({
+      softWarnAtMinutes: 75,
+      maxMinutes: 90,
+      idleAutoStopMinutes: 10,
+    });
+  });
+
+  it('preserves an existing orgPolicy with valid tone and template id', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        orgPolicy: { activeTemplateId: 'tpl-123', toneStyle: 'terse' },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.orgPolicy).toEqual({
+      activeTemplateId: 'tpl-123',
+      toneStyle: 'terse',
+    });
+  });
+
+  it('falls back to narrative tone when an unknown style is encountered', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        orgPolicy: { toneStyle: 'colloquial' },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.orgPolicy.toneStyle).toBe('narrative');
+  });
+
+  it('preserves an existing firstRun block', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        firstRun: {
+          role: 'owner',
+          onboardingDoneAt: 1700000000000,
+          disclosureVersion: 1,
+          onboardingUrlConsumed: true,
+        },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.firstRun).toEqual({
+      role: 'owner',
+      onboardingDoneAt: 1700000000000,
+      disclosureVersion: 1,
+      onboardingUrlConsumed: true,
+    });
+  });
+
+  it('drops an invalid firstRun.role value', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        firstRun: { role: 'admin' },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.firstRun.role).toBeUndefined();
+  });
+
+  it('produces output that passes AppDataSchema.safeParse', () => {
+    const result = migrate(v12AppData());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});

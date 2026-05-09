@@ -101,15 +101,25 @@ export function StatusBadge({ tone, label }: StatusBadgeProps) {
 export function StatusDot({
   color,
   pulse,
+  heartbeat,
   size = 8,
 }: {
   color: string;
   pulse?: boolean;
+  heartbeat?: boolean;
   size?: number;
 }) {
   return (
     <span className="relative inline-block" style={{ width: size, height: size }}>
-      <span className="absolute inset-0" style={{ borderRadius: '50%', background: color }} />
+      <span
+        className="absolute inset-0"
+        style={{
+          borderRadius: '50%',
+          background: color,
+          animation: heartbeat ? 'pts-heartbeat 1.4s ease-in-out infinite' : undefined,
+          transformOrigin: 'center',
+        }}
+      />
       {pulse && (
         <span
           className="absolute"

@@ -4,10 +4,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import { ArrowRight, Check } from 'lucide-react';
 import { useClinician } from '@/contexts/ClinicianProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
 import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { duration, ease } from '@/lib/motion';
+import { DISCLOSURE_VERSION } from '@/types';
 
 type Step = 'welcome' | 'profile' | 'done';
 const FLOW: Step[] = ['profile', 'done'];
@@ -129,6 +131,7 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
 
 function ProfileStep({ onNext }: { onNext: () => void }) {
   const { clinician, setClinician } = useClinician();
+  const { updateFirstRun } = useSettings();
   const [name, setName] = useState(clinician.name);
   const [credentials, setCredentials] = useState(clinician.credentials);
   const [practiceName, setPracticeName] = useState(clinician.practiceName ?? '');
@@ -145,6 +148,7 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
       npi: npi.trim() || undefined,
       acknowledgedDisclosureAt: Date.now(),
     });
+    updateFirstRun({ disclosureVersion: DISCLOSURE_VERSION, onboardingDoneAt: Date.now() });
     onNext();
   }
 

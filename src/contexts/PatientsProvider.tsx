@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { useAppData } from './AppDataProvider';
 import { makeListMutators } from './listSlice';
 import { audioRepository } from '@/services/AudioRepository';
-import type { Patient } from '@/types';
+import { UNASSIGNED_PATIENT_ID, type Patient } from '@/types';
 
 export interface PatientsContextValue {
   patients: Patient[];
@@ -21,6 +21,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
 
   const removePatient = useCallback(
     (id: string) => {
+      if (id === UNASSIGNED_PATIENT_ID) return;
       const patientSessions = appData.sessions.filter((s) => s.patientId === id);
       const sessionIds = new Set(patientSessions.map((s) => s.id));
 
@@ -50,7 +51,11 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
     return {
       patients,
       addPatient: m.add,
-      updatePatient: m.update,
+      // The "Unassigned" sentinel patient is read-only — UI should never edit it.
+      updatePatient: (id, patch) => {
+        if (id === UNASSIGNED_PATIENT_ID) return;
+        m.update(id, patch);
+      },
       removePatient,
       getPatient: m.get,
     };
