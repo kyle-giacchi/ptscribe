@@ -1,6 +1,6 @@
 import { pipeline, env } from '@huggingface/transformers';
 
-env.useBrowserCache = true;
+env.useBrowserCache = false;
 env.allowLocalModels = false;
 
 type InMsg = {

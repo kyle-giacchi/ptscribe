@@ -71,6 +71,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           }
         }
       }
+
+      // Purge orphaned recording chunks — chunks whose clipId no longer
+      // exists in any session (tab crash mid-recording or reset-without-stop).
+      const activeClipIds = new Set(data.sessions.flatMap((s) => s.clips.map((c) => c.id)));
+      void audioRepository.listChunkSessionIds().then((chunkIds) => {
+        for (const id of chunkIds) {
+          if (!activeClipIds.has(id)) void audioRepository.clearChunks(id);
+        }
+      });
     })();
     return () => {
       cancelled = true;
@@ -161,9 +170,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateSettingsSlice: (next) => merge('settings', next),
       bulkUpdate,
       resetAll: () => {
-        const fresh = defaultAppData();
-        setAppData(fresh);
-        dataRepository.clear();
+        setAppData(defaultAppData());
       },
     };
   }, [appData, merge, bulkUpdate]);

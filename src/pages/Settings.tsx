@@ -11,6 +11,7 @@ import { useSessions } from '@/contexts/SessionsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { exportBackup, importBackup } from '@/services/BackupService';
 import { vault } from '@/lib/vault/vault';
 import { ChangePassphraseForm } from '@/components/vault/ChangePassphraseForm';
@@ -166,8 +167,12 @@ export function Settings() {
     } catch {
       /* ignore */
     }
-    resetAll();
+    dataRepository.clearCorruptData();
+    localStorage.removeItem(STORAGE_KEYS.pageModes);
+    // Save fresh data first so there is never a window with no persisted state,
+    // then reset in-memory (resetAll no longer calls clear).
     await dataRepository.save(defaultAppData());
+    resetAll();
     void auditLog.append('data:reset');
     toast.success('All local data erased');
   }

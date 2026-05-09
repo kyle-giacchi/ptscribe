@@ -9,7 +9,6 @@ import type {
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
 import { buildSystemPrompt, buildUserPrompt } from '@/lib/clinical/prompts';
-import { auditLog } from '@/lib/audit/auditLog';
 
 export interface GenerateNoteArgs {
   provider: GenerationProvider;
@@ -52,7 +51,6 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       label: s.label,
       body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
     }));
-    void auditLog.append('note:generated');
     return { sections };
   },
   none: () => {

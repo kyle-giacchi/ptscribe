@@ -3,6 +3,7 @@ export const STORAGE_KEYS = {
   appDataCorrupt: 'ptnotes.appData.corrupt',
   vault: 'ptnotes.vault',
   auditLog: 'ptnotes.auditLog',
+  pageModes: 'ptnotes.pageModes',
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
