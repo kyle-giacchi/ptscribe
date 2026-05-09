@@ -84,7 +84,12 @@ export function MicStatusPill({ state, elapsedSec, onClick }: MicStatusPillProps
         cursor: onClick ? 'pointer' : 'default',
       }}
     >
-      <StatusDot color={cfg.dot} pulse={cfg.pulse} size={10} />
+      <StatusDot
+        color={cfg.dot}
+        pulse={cfg.pulse}
+        heartbeat={state === 'connected'}
+        size={10}
+      />
       <span>{cfg.label}</span>
       {elapsedSec !== undefined && (
         <span

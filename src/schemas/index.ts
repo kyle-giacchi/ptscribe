@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { APP_DATA_VERSION, type AppData, type NoteTemplate, type Exercise } from '@/types';
+import {
+  APP_DATA_VERSION,
+  UNASSIGNED_PATIENT_ID,
+  type AppData,
+  type NoteTemplate,
+  type Exercise,
+  type Patient,
+} from '@/types';
 import { newId } from '@/utils/ids';
 import { BUILTIN_TEMPLATES } from '@/lib/clinical/templates';
 import { BUILTIN_EXERCISES } from '@/lib/clinical/exercises';
@@ -101,6 +108,7 @@ const NoteTemplateSchema = z.object({
       key: z.string(),
       label: z.string(),
       promptHint: z.string().optional(),
+      required: z.boolean().optional(),
     }),
   ),
   systemPrompt: z.string(),
@@ -204,6 +212,24 @@ const SettingsSchema = z.object({
   security: z.object({
     idleLockMinutes: z.number().int().min(0).max(120),
   }),
+  session: z.object({
+    autoFinish: z.boolean(),
+  }),
+  recordingLimits: z.object({
+    softWarnAtMinutes: z.number().int().min(15).max(240),
+    maxMinutes: z.number().int().min(30).max(240),
+    idleAutoStopMinutes: z.number().int().min(0).max(60),
+  }),
+  orgPolicy: z.object({
+    activeTemplateId: z.string().optional(),
+    toneStyle: z.enum(['narrative', 'terse', 'clinical']),
+  }),
+  firstRun: z.object({
+    role: z.enum(['owner', 'clinician']).optional(),
+    onboardingDoneAt: z.number().int().optional(),
+    disclosureVersion: z.number().int().optional(),
+    onboardingUrlConsumed: z.boolean().optional(),
+  }),
   ui: z.object({
     sidebarCollapsed: z.boolean(),
     densityMode: z.enum(['cozy', 'compact']),
@@ -245,12 +271,20 @@ export function defaultAppData(): AppData {
     createdAt: now,
     updatedAt: now,
   }));
+  const unassignedPatient: Patient = {
+    id: UNASSIGNED_PATIENT_ID,
+    firstName: 'Unassigned',
+    lastName: '',
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  };
   return {
     version: APP_DATA_VERSION,
     lastModified: now,
     tenantId: 'local',
     clinician: { name: '', credentials: '' },
-    patients: [],
+    patients: [unassignedPatient],
     sessions: [],
     notes: [],
     templates,
@@ -266,6 +300,14 @@ export function defaultAppData(): AppData {
         speedUp: { enabled: false, speed: 1.5 },
       },
       security: { idleLockMinutes: 10 },
+      session: { autoFinish: true },
+      recordingLimits: {
+        softWarnAtMinutes: 75,
+        maxMinutes: 90,
+        idleAutoStopMinutes: 10,
+      },
+      orgPolicy: { toneStyle: 'narrative' },
+      firstRun: {},
       ui: { sidebarCollapsed: false, densityMode: 'cozy' },
       retention: {},
     },
