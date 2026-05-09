@@ -1,16 +1,42 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, Star } from 'lucide-react';
 import { Eyebrow, PtButton } from '@/components/design';
 import { duration, ease } from '@/lib/motion';
 import type { NoteTemplate, SessionType } from '@/types';
 
+function OrgDefaultPill() {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 3,
+        flexShrink: 0,
+        padding: '2px 7px',
+        borderRadius: 999,
+        fontSize: 10,
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        background: 'var(--color-pt-accent-soft)',
+        color: 'var(--color-pt-accent-fg)',
+        border: '1px solid var(--color-pt-accent)',
+      }}
+    >
+      <Star size={9} fill="currentColor" strokeWidth={2} /> Org default
+    </span>
+  );
+}
+
 function TemplateOption({
   template,
   selected,
+  isOrgDefault,
   onSelect,
 }: {
   template: NoteTemplate;
   selected: boolean;
+  isOrgDefault: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -64,6 +90,7 @@ function TemplateOption({
           >
             {template.name}
           </span>
+          {isOrgDefault && <OrgDefaultPill />}
         </span>
         <span
           style={{
@@ -82,10 +109,12 @@ function TemplateOption({
 function CompactTemplate({
   template,
   hasMore,
+  isOrgDefault,
   onChange,
 }: {
   template: NoteTemplate | undefined;
   hasMore: boolean;
+  isOrgDefault: boolean;
   onChange: () => void;
 }) {
   if (!template) return null;
@@ -131,6 +160,7 @@ function CompactTemplate({
           >
             {template.builtin ? 'Built-in' : 'Custom'}
           </span>
+          {isOrgDefault && <OrgDefaultPill />}
         </div>
         <div style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
           {template.sections.length} sections
@@ -149,6 +179,7 @@ export function TemplateSection({
   sessionType,
   visitTemplates,
   effectiveTemplateId,
+  orgDefaultTemplateId,
   showAllTemplates,
   onPickTemplate,
   onShowAll,
@@ -157,6 +188,7 @@ export function TemplateSection({
   sessionType: SessionType;
   visitTemplates: NoteTemplate[];
   effectiveTemplateId: string;
+  orgDefaultTemplateId?: string;
   showAllTemplates: boolean;
   onPickTemplate: (id: string) => void;
   onShowAll: () => void;
@@ -166,6 +198,8 @@ export function TemplateSection({
   const showCompact = !isEmpty && (visitTemplates.length === 1 || !showAllTemplates);
   const compactTemplate =
     visitTemplates.find((t) => t.id === effectiveTemplateId) ?? visitTemplates[0];
+  const isOrgDefault = (id: string | undefined) =>
+    !!orgDefaultTemplateId && !!id && orgDefaultTemplateId === id;
   return (
     <div style={{ borderTop: '1px solid var(--color-pt-border)', paddingTop: 16 }}>
       <AnimatePresence mode="wait">
@@ -218,6 +252,7 @@ export function TemplateSection({
             <CompactTemplate
               template={compactTemplate}
               hasMore={visitTemplates.length > 1}
+              isOrgDefault={isOrgDefault(compactTemplate?.id)}
               onChange={onShowAll}
             />
           )}
@@ -229,6 +264,7 @@ export function TemplateSection({
                   key={t.id}
                   template={t}
                   selected={t.id === effectiveTemplateId}
+                  isOrgDefault={isOrgDefault(t.id)}
                   onSelect={() => onPickTemplate(t.id)}
                 />
               ))}
