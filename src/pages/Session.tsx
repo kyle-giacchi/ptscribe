@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -64,7 +64,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const note = session ? forSession(session.id) : undefined;
   const template = getTemplate(session?.templateId ?? '') ?? templates[0];
 
-  const recorder = useRecorder();
+  const recorder = useRecorder({ limits: settings.recordingLimits });
   const live = useLiveTranscript();
 
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
@@ -132,7 +132,107 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleStartRecording,
   );
 
+  // ── "Stop & finish" chain state ─────────────────────────────────────────
+  // Sequences stop → wait-for-clip → cloud transcribe → generate → switch to Review.
+  // Each phase is driven by an effect so we can react to recorder/clip state changes
+  // rather than racing against React's batched state updates.
+  type ChainPhase = 'stopping' | 'waiting' | 'transcribing' | 'post-transcribe' | 'generating' | null;
+  const [chainPhase, setChainPhase] = useState<ChainPhase>(null);
+  // Read inside handleStopRecording to skip the local-whisper background pass
+  // while the chain is active (we go straight to cloud Nova for speed).
+  const chainActiveRef = useRef(false);
+
+  // ── ?autoRecord=1 deep link auto-start ──────────────────────────────────
+  // Lets Dashboard / NewSession links jump straight into recording with one tap.
+  // Guards: only fires once per mount, only when recorder is idle and no clips
+  // exist yet (so refreshing a populated session never re-records).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoRecordRequested = searchParams.get('autoRecord') === '1';
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!autoRecordRequested) return;
+    if (autoStartedRef.current) return;
+    if (!session || !patient) return;
+    if (recorder.status !== 'idle') return;
+    if (session.clips.length > 0) return;
+    autoStartedRef.current = true;
+    // Strip the param so a refresh doesn't re-trigger.
+    const next = new URLSearchParams(searchParams);
+    next.delete('autoRecord');
+    setSearchParams(next, { replace: true });
+    void handleStartRecording();
+    // handleStartRecording intentionally omitted — it's a function declaration
+    // that closes over fresh state each render and we only want this effect to
+    // fire on the gating conditions, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
+
+  // ── Chain state machine ────────────────────────────────────────────────
+  // Each phase advances when its preconditions (recorder state, clip state,
+  // transcript text) are satisfied. The setChainPhase calls below are the
+  // explicit transition step of a state machine, not cascading renders — the
+  // react-hooks/set-state-in-effect lint is suppressed accordingly.
+
+  // Phase: stopping → waiting (recorder fully released)
+  useEffect(() => {
+    if (chainPhase !== 'stopping') return;
+    if (recorder.status === 'recording' || recorder.status === 'paused') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChainPhase('waiting');
+  }, [chainPhase, recorder.status]);
+
+  // Phase: waiting → transcribing (clips have settled out of 'pending')
+  useEffect(() => {
+    if (chainPhase !== 'waiting') return;
+    if (!session) return;
+    const settled = session.clips.every((c) => c.status !== 'pending');
+    if (!settled) return;
+    const eligible = session.clips.filter((c) => c.status === 'ready' || c.status === 'failed');
+    if (eligible.length === 0) {
+      // Nothing to transcribe — bail to Review and let the user act.
+      chainActiveRef.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setChainPhase(null);
+      setActiveTab('review');
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChainPhase('transcribing');
+    void (async () => {
+      await handleCreateTranscript();
+      setChainPhase('post-transcribe');
+    })();
+  }, [chainPhase, session]);
+
+  // Phase: post-transcribe → generating (or end if generation isn't viable)
+  useEffect(() => {
+    if (chainPhase !== 'post-transcribe') return;
+    const generationReady = settings.ai.generation.provider === 'anthropic' && !!template;
+    if (!transcript.trim() || !generationReady) {
+      chainActiveRef.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setChainPhase(null);
+      setActiveTab('review');
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChainPhase('generating');
+    void (async () => {
+      await handleGenerate();
+      chainActiveRef.current = false;
+      setChainPhase(null);
+      setActiveTab('review');
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chainPhase, transcript, settings.ai.generation.provider, template]);
+
   if (!session || !patient) return <NotFound />;
+
+  function handleStopAndFinish() {
+    chainActiveRef.current = true;
+    setChainPhase('stopping');
+    void handleStopRecording();
+  }
 
   function ensureNote(initialSections?: NoteSection[]): Note {
     if (note) return note;
@@ -221,7 +321,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             status: 'ready',
             durationSec,
           });
-          runLocalTranscription(clipId, finalBlob);
+          // Skip the local-whisper background pass while the Stop & finish chain
+          // is running — the chain heads straight to cloud Nova for speed and
+          // letting local race in just shifts the clip into 'transcribing' state.
+          if (!chainActiveRef.current) {
+            runLocalTranscription(clipId, finalBlob);
+          }
         } catch (e) {
           setError(`Could not save audio: ${(e as Error).message}`);
           patchClip(clipId, {
@@ -634,6 +739,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         transcript,
         patient: patient!,
         sessionType: session!.type,
+        toneStyle: settings.orgPolicy.toneStyle,
       });
       if (note) {
         updateNote(note.id, {
@@ -661,7 +767,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     updateNote(target.id, { sections: next });
   }
 
+  const missingRequiredLabels: string[] = (() => {
+    if (!template || !note) return [];
+    const bodyByKey = new Map(note.sections.map((s) => [s.key, s.body]));
+    return template.sections
+      .filter((s) => s.required && !(bodyByKey.get(s.key) ?? '').trim())
+      .map((s) => s.label);
+  })();
+
   function handleFinalize() {
+    if (missingRequiredLabels.length > 0) {
+      toast.error(`Required sections empty: ${missingRequiredLabels.join(', ')}`);
+      return;
+    }
     const target = ensureNote();
     finalizeNote(target.id);
     patchSession({ status: 'finalized' });
@@ -890,6 +1008,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               clips={sortedClips}
               onStart={handleStartRecording}
               onStop={handleStopRecording}
+              onStopAndFinish={handleStopAndFinish}
+              autoFinish={settings.session.autoFinish}
+              chainPhase={chainPhase}
               onPauseResume={handlePauseResume}
               onDeleteClip={handleDeleteClip}
               onUpload={handleUploadAudio}
@@ -1041,8 +1162,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             <PtButton
               variant="primary"
               iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
-              disabled={!note}
+              disabled={!note || missingRequiredLabels.length > 0}
               onClick={handleFinalize}
+              title={
+                missingRequiredLabels.length > 0
+                  ? `Required sections empty: ${missingRequiredLabels.join(', ')}`
+                  : undefined
+              }
             >
               End &amp; sign
             </PtButton>

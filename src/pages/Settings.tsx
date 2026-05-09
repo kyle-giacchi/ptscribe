@@ -24,6 +24,7 @@ export function Settings() {
     updateAi,
     updateAudio,
     updateUi,
+    updateSession,
     setIdleLockMinutes,
     setAutoDeleteAudioAfterDays,
   } = useSettings();
@@ -362,6 +363,28 @@ export function Settings() {
               >
                 <option value="cozy">Cozy</option>
                 <option value="compact">Compact</option>
+              </Select>
+            </Field>
+          </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Eyebrow>Recording workflow</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            When auto-finish is on, the recording panel shows a one-tap{' '}
+            <strong>Stop &amp; finish</strong> button that chains stop → transcribe → generate. Turn
+            off if you prefer to advance each step yourself.
+          </p>
+          <div style={{ maxWidth: 280 }}>
+            <Field label="Auto-finish chain">
+              <Select
+                value={settings.session.autoFinish ? 'on' : 'off'}
+                onChange={(e) => updateSession({ autoFinish: e.target.value === 'on' })}
+              >
+                <option value="on">On — show Stop &amp; finish</option>
+                <option value="off">Off — manual steps only</option>
               </Select>
             </Field>
           </div>

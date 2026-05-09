@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { PtButton } from '@/components/design';
 import { labelForType } from '@/utils/labels';
+import { suppressSameDayWarningForToday } from '@/utils/sameDaySuppression';
 import type { Patient, Session } from '@/types';
 
 export function SameDayModal({
@@ -17,6 +19,12 @@ export function SameDayModal({
   onContinue: (sessionId: string) => void;
   onCreateNew: () => void;
 }) {
+  const [suppress, setSuppress] = useState(false);
+
+  function applySuppressionIfRequested() {
+    if (suppress) suppressSameDayWarningForToday();
+  }
+
   if (!sessions) return null;
   const name = patient ? `${patient.firstName} ${patient.lastName}` : 'this patient';
   return (
@@ -65,12 +73,43 @@ export function SameDayModal({
         })}
       </div>
 
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 8,
+          fontSize: 12,
+          color: 'var(--color-pt-text-3)',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={suppress}
+          onChange={(e) => setSuppress(e.target.checked)}
+        />
+        Don&rsquo;t ask again today
+      </label>
+
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
-        <PtButton variant="ghost" onClick={onCreateNew}>
+        <PtButton
+          variant="ghost"
+          onClick={() => {
+            applySuppressionIfRequested();
+            onCreateNew();
+          }}
+        >
           Start new session anyway
         </PtButton>
         {sessions.length === 1 && (
-          <PtButton variant="primary" onClick={() => onContinue(sessions[0].id)}>
+          <PtButton
+            variant="primary"
+            onClick={() => {
+              applySuppressionIfRequested();
+              onContinue(sessions[0].id);
+            }}
+          >
             Continue session
           </PtButton>
         )}

@@ -5,9 +5,10 @@ import type {
   Note,
   Patient,
   SessionType,
+  ToneStyle,
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
-import { buildUserPrompt } from '@/lib/clinical/prompts';
+import { buildSystemPrompt, buildUserPrompt } from '@/lib/clinical/prompts';
 import { auditLog } from '@/lib/audit/auditLog';
 
 export interface GenerateNoteArgs {
@@ -18,6 +19,7 @@ export interface GenerateNoteArgs {
   patient: Patient;
   priorNote?: Note;
   sessionType?: SessionType;
+  toneStyle?: ToneStyle;
   signal?: AbortSignal;
 }
 
@@ -39,7 +41,7 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
 
     const result = await callAnthropic({
       model: args.model || 'claude-sonnet-4-6',
-      system: args.template.systemPrompt,
+      system: buildSystemPrompt(args.template, args.toneStyle),
       user: userPrompt,
       signal: args.signal,
     });

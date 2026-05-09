@@ -1,10 +1,65 @@
+import { useEffect, useState } from 'react';
 import { useLocation, useMatch, Link } from 'react-router-dom';
-import { Bell, Menu, ArrowLeft } from 'lucide-react';
+import { Bell, Menu, ArrowLeft, Lock, Unlock } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
+import { vault } from '@/lib/vault/vault';
 import { labelForType } from '@/utils/labels';
+
+function useVaultState(): { initialized: boolean; unlocked: boolean } {
+  const [state, setState] = useState(() => ({
+    initialized: vault.isInitialized(),
+    unlocked: vault.isUnlocked(),
+  }));
+
+  useEffect(() => {
+    const refresh = () =>
+      setState({ initialized: vault.isInitialized(), unlocked: vault.isUnlocked() });
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ptnotes-vault') : null;
+    if (bc) bc.onmessage = refresh;
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const interval = window.setInterval(refresh, 5000);
+    return () => {
+      bc?.close();
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  return state;
+}
+
+function VaultPill() {
+  const { initialized, unlocked } = useVaultState();
+  if (!initialized) return null;
+  const Icon = unlocked ? Unlock : Lock;
+  const label = unlocked ? 'Unlocked' : 'Locked';
+  const tone = unlocked
+    ? { fg: '#0a6d70', bg: '#e6f7f6', border: '#9fdcdc' }
+    : { fg: 'var(--color-pt-text-2)', bg: 'var(--color-pt-surface-mut)', border: 'var(--color-pt-border)' };
+  return (
+    <span
+      title={`Vault is ${label.toLowerCase()}`}
+      className="inline-flex items-center gap-1"
+      style={{
+        fontSize: 11,
+        fontWeight: 500,
+        padding: '3px 8px',
+        borderRadius: 999,
+        border: `1px solid ${tone.border}`,
+        background: tone.bg,
+        color: tone.fg,
+      }}
+    >
+      <Icon size={11} strokeWidth={2} />
+      <span>Vault: {label}</span>
+    </span>
+  );
+}
 
 interface TopBarProps {
   onMenuOpen?: () => void;
@@ -97,6 +152,7 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
 
   const rightActions = (
     <div className="flex items-center gap-2.5">
+      <VaultPill />
       <button
         type="button"
         aria-label="Notifications"

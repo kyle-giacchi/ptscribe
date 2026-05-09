@@ -1,4 +1,4 @@
-import type { NoteTemplate, Patient, Note, SessionType } from '@/types';
+import type { NoteTemplate, Patient, Note, SessionType, ToneStyle } from '@/types';
 
 export interface BuildPromptArgs {
   template: NoteTemplate;
@@ -6,6 +6,22 @@ export interface BuildPromptArgs {
   patient: Patient;
   priorNote?: Note;
   sessionType?: SessionType;
+}
+
+const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {
+  narrative: 'Write in flowing professional prose. Full sentences. Clinical but readable.',
+  terse:
+    'Write in bullet-point shorthand. Phrases over sentences. Skip articles where ambiguity is low. Prefer abbreviations a PT will recognize (PROM, AROM, MMT, WBAT, NWB, etc.).',
+  clinical:
+    'Write in formal clinical documentation style. Third-person passive where natural. Use precise anatomical and biomechanical terminology. Cite specific measurements when transcript supplies them.',
+};
+
+export function buildSystemPrompt(
+  template: NoteTemplate,
+  toneStyle: ToneStyle = 'narrative',
+): string {
+  const base = template.systemPrompt.trimEnd();
+  return `${base}\n\n# Tone & style\n${TONE_INSTRUCTIONS[toneStyle]}`;
 }
 
 /**

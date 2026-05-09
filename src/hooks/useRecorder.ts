@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { audioRepository } from '@/services/AudioRepository';
 import { acquireWakeLock, releaseWakeLock } from '@/lib/wakeLock';
+import type { RecordingLimitsSettings } from '@/types';
 
 export type RecorderStatus = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
+
+export interface UseRecorderOptions {
+  limits?: RecordingLimitsSettings;
+}
 
 export interface UseRecorder {
   status: RecorderStatus;
@@ -22,6 +27,10 @@ export interface UseRecorder {
    * may have throttled/killed the recorder; clinicians should verify duration.
    */
   wasBackgrounded: boolean;
+  /** Sticky once duration crosses softWarnAtMinutes; reset on `reset`. */
+  softWarnReached: boolean;
+  /** Set when the recorder auto-stopped because duration crossed maxMinutes. */
+  hardCapStopped: boolean;
 }
 
 const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -46,11 +55,13 @@ function pickMimeType(): string | undefined {
  * via `teardown()`. Wake lock is best-effort and never blocks recording.
  * See docs/invariants.md#recorder-lifecycle-wake-lock--visibility.
  */
-export function useRecorder(): UseRecorder {
+export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const [status, setStatus] = useState<RecorderStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [durationSec, setDurationSec] = useState(0);
   const [blob, setBlob] = useState<Blob | null>(null);
+  const [softWarnReached, setSoftWarnReached] = useState(false);
+  const [hardCapStopped, setHardCapStopped] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -60,6 +71,11 @@ export function useRecorder(): UseRecorder {
   const startedAtRef = useRef<number>(0);
   const accumulatedRef = useRef<number>(0);
   const stopResolveRef = useRef<((b: Blob | null) => void) | null>(null);
+
+  const limitsRef = useRef<RecordingLimitsSettings | undefined>(options.limits);
+  useEffect(() => {
+    limitsRef.current = options.limits;
+  }, [options.limits]);
 
   const [wasBackgrounded, setWasBackgrounded] = useState(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -129,7 +145,21 @@ export function useRecorder(): UseRecorder {
     if (tickRef.current) clearInterval(tickRef.current);
     tickRef.current = setInterval(() => {
       const live = (Date.now() - startedAtRef.current) / 1000;
-      setDurationSec(accumulatedRef.current + live);
+      const total = accumulatedRef.current + live;
+      setDurationSec(total);
+      const limits = limitsRef.current;
+      if (!limits) return;
+      const totalMin = total / 60;
+      if (totalMin >= limits.softWarnAtMinutes) {
+        setSoftWarnReached(true);
+      }
+      if (totalMin >= limits.maxMinutes) {
+        const r = recorderRef.current;
+        if (r && r.state !== 'inactive') {
+          setHardCapStopped(true);
+          r.stop();
+        }
+      }
     }, 250);
   }, []);
 
@@ -195,6 +225,8 @@ export function useRecorder(): UseRecorder {
         accumulatedRef.current = 0;
         setDurationSec(0);
         setBlob(null);
+        setSoftWarnReached(false);
+        setHardCapStopped(false);
         recorder.start(CHUNK_TIMESLICE_MS);
         audioRepository
           .saveChunkMime(clipId, recorder.mimeType || mimeType || 'audio/webm')
@@ -262,6 +294,8 @@ export function useRecorder(): UseRecorder {
     setError(null);
     setStatus('idle');
     setWasBackgrounded(false);
+    setSoftWarnReached(false);
+    setHardCapStopped(false);
   }, [teardown]);
 
   return {
@@ -275,5 +309,7 @@ export function useRecorder(): UseRecorder {
     stop,
     reset,
     wasBackgrounded,
+    softWarnReached,
+    hardCapStopped,
   };
 }
