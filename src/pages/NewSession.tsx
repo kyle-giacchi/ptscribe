@@ -6,14 +6,17 @@ import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
 import { newId } from '@/utils/ids';
 import { isSameDay } from '@/utils/dates';
+import { isSameDayWarningSuppressed } from '@/utils/sameDaySuppression';
 import { useToggle } from '@/hooks/useToggle';
 import { PatientRow } from '@/components/new-session/PatientRow';
 import { TemplateSection } from '@/components/new-session/TemplateSection';
 import { StartBar } from '@/components/new-session/StartBar';
 import { NewTemplateModal } from '@/components/new-session/NewTemplateModal';
 import { SameDayModal } from '@/components/new-session/SameDayModal';
+import { UNASSIGNED_PATIENT_ID } from '@/types';
 import type { NoteFormat, NoteTemplate, Patient, Session, SessionType } from '@/types';
 
 const TYPE_TO_FORMAT: Record<SessionType, NoteFormat> = {
@@ -36,10 +39,17 @@ export function NewSession() {
   const { patients, addPatient } = usePatients();
   const { forPatient: sessionsForPatient, addSession } = useSessions();
   const { templates, addTemplate } = useTemplates();
+  const { settings } = useSettings();
+  const orgDefaultTemplateId = settings.orgPolicy.activeTemplateId;
 
   const [patientId, setPatientId] = useState(params.get('patientId') ?? '');
   const [sessionType, setSessionType] = useState<SessionType>('follow_up');
-  const [templateId, setTemplateId] = useState<string>('');
+  const [templateId, setTemplateId] = useState<string>(() => {
+    if (!orgDefaultTemplateId) return '';
+    const tpl = templates.find((t) => t.id === orgDefaultTemplateId);
+    if (!tpl) return '';
+    return tpl.format === TYPE_TO_FORMAT['follow_up'] ? tpl.id : '';
+  });
   const [showAllTemplates, showAllTemplatesOn, showAllTemplatesOff] = useToggle();
   const [creatingTemplate, openCreatingTemplate, closeCreatingTemplate] = useToggle();
   const [query, setQuery] = useState('');
@@ -65,8 +75,11 @@ export function NewSession() {
       .sort((a, b) => Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name));
   }, [templates, sessionType]);
 
+  const orgDefaultMatch =
+    (orgDefaultTemplateId && visitTemplates.find((t) => t.id === orgDefaultTemplateId)?.id) || '';
   const effectiveTemplateId =
     (templateId && visitTemplates.find((t) => t.id === templateId)?.id) ||
+    orgDefaultMatch ||
     visitTemplates[0]?.id ||
     '';
 
@@ -99,11 +112,28 @@ export function NewSession() {
     const todaySessions = sessionsForPatient(patientId).filter(
       (s) => s.status !== 'finalized' && isSameDay(s.date, Date.now()),
     );
-    if (todaySessions.length > 0) {
+    if (todaySessions.length > 0 && !isSameDayWarningSuppressed()) {
       setSameDayModal(todaySessions);
     } else {
       doCreateSession();
     }
+  }
+
+  function handleRecordWithoutPatient() {
+    const now = Date.now();
+    const session: Session = {
+      id: newId(),
+      patientId: UNASSIGNED_PATIENT_ID,
+      type: sessionType,
+      date: now,
+      status: 'draft',
+      clips: [],
+      templateId: effectiveTemplateId || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addSession(session);
+    navigate(`/sessions/${session.id}?autoRecord=1`);
   }
 
   function handleQuickAddPatient() {
@@ -342,6 +372,7 @@ export function NewSession() {
                 sessionType={sessionType}
                 visitTemplates={visitTemplates}
                 effectiveTemplateId={effectiveTemplateId}
+                orgDefaultTemplateId={orgDefaultTemplateId}
                 showAllTemplates={showAllTemplates}
                 onPickTemplate={setTemplateId}
                 onShowAll={showAllTemplatesOn}
@@ -356,6 +387,26 @@ export function NewSession() {
             disabled={!patientId}
             onStart={handleStart}
           />
+
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={handleRecordWithoutPatient}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 8px',
+                fontSize: 12,
+                color: 'var(--color-pt-text-3)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
+              }}
+            >
+              Record without picking a patient — assign later
+            </button>
+          </div>
         </>
       )}
 

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Copy, Pencil, Trash2, Lock, Plus } from 'lucide-react';
+import { Copy, Pencil, Trash2, Lock, Plus, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
 import { newId } from '@/utils/ids';
 import { useToggle } from '@/hooks/useToggle';
 import type { NoteFormat, NoteTemplate, NoteTemplateSection } from '@/types';
@@ -22,6 +23,8 @@ const SELECTABLE_FORMATS: NoteFormat[] = ['evaluation', 'soap', 'progress', 'dis
 
 export function Templates() {
   const { templates, addTemplate, updateTemplate, cloneTemplate, removeTemplate } = useTemplates();
+  const { settings, updateOrgPolicy } = useSettings();
+  const orgDefaultId = settings.orgPolicy.activeTemplateId;
   const [editing, setEditing] = useState<NoteTemplate | null>(null);
   const [creating, startCreating, stopCreating] = useToggle();
 
@@ -154,6 +157,25 @@ export function Templates() {
                             <Lock size={10} /> Built-in
                           </span>
                         )}
+                        {!t.builtin && orgDefaultId === t.id && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 7px',
+                              borderRadius: 999,
+                              fontSize: 10,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              background: 'var(--color-pt-accent-soft)',
+                              color: 'var(--color-pt-accent-fg)',
+                              border: '1px solid var(--color-pt-accent)',
+                            }}
+                          >
+                            <Star size={10} fill="currentColor" strokeWidth={2} /> Org default
+                          </span>
+                        )}
                       </div>
                       <div
                         style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}
@@ -162,6 +184,45 @@ export function Templates() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {!t.builtin && (
+                        <PtButton
+                          variant="ghost"
+                          style={{
+                            padding: '6px 10px',
+                            fontSize: 12,
+                            color:
+                              orgDefaultId === t.id
+                                ? 'var(--color-pt-accent-fg)'
+                                : 'var(--color-pt-text-3)',
+                          }}
+                          aria-label={
+                            orgDefaultId === t.id
+                              ? 'Clear org default template'
+                              : 'Set as org default template'
+                          }
+                          aria-pressed={orgDefaultId === t.id}
+                          title={
+                            orgDefaultId === t.id
+                              ? 'Org default — click to clear'
+                              : 'Set as org default'
+                          }
+                          onClick={() => {
+                            if (orgDefaultId === t.id) {
+                              updateOrgPolicy({ activeTemplateId: undefined });
+                              toast.success('Org default cleared');
+                            } else {
+                              updateOrgPolicy({ activeTemplateId: t.id });
+                              toast.success(`"${t.name}" set as org default`);
+                            }
+                          }}
+                        >
+                          <Star
+                            size={12}
+                            strokeWidth={2}
+                            fill={orgDefaultId === t.id ? 'currentColor' : 'none'}
+                          />
+                        </PtButton>
+                      )}
                       <PtButton
                         variant="ghost"
                         iconLeft={<Copy size={12} strokeWidth={2} />}

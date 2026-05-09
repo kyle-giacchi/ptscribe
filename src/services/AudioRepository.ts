@@ -195,6 +195,22 @@ export const audioRepository = {
     );
   },
 
+  async listChunkSessionIds(): Promise<string[]> {
+    const allKeys = await withStore<IDBValidKey[]>(
+      AUDIO_DB.chunkStore,
+      'readonly',
+      (store) => store.getAllKeys() as IDBRequest<IDBValidKey[]>,
+    );
+    const ids = new Set<string>();
+    for (const key of allKeys) {
+      if (typeof key !== 'string') continue;
+      if (key.startsWith('mime:')) continue;
+      const colonIdx = key.lastIndexOf(':');
+      if (colonIdx > 0) ids.add(key.substring(0, colonIdx));
+    }
+    return [...ids];
+  },
+
   async clear(): Promise<void> {
     await Promise.all([
       withStore<undefined>(

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Sun, Mic, ChevronRight, Inbox, Headphones } from 'lucide-react';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -16,15 +16,36 @@ import {
   type StatusTone,
 } from '@/components/design';
 import { shortLabelForType } from '@/utils/labels';
-import type { Session, SessionStatus, Patient } from '@/types';
+import { newId } from '@/utils/ids';
+import { UNASSIGNED_PATIENT_ID, type Session, type SessionStatus, type Patient } from '@/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function Dashboard() {
   const { patients } = usePatients();
-  const { sessions } = useSessions();
+  const { sessions, addSession } = useSessions();
   const { notes } = useNotes();
   const { clinician } = useClinician();
+  const navigate = useNavigate();
+
+  // Quick Record: create a draft session attached to the built-in Unassigned
+  // patient and jump straight into recording. The user can reassign on the
+  // session screen once the visit ends.
+  function handleQuickRecord() {
+    const now = Date.now();
+    const session: Session = {
+      id: newId(),
+      patientId: UNASSIGNED_PATIENT_ID,
+      type: 'follow_up',
+      date: now,
+      status: 'draft',
+      clips: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    addSession(session);
+    navigate(`/sessions/${session.id}?autoRecord=1`);
+  }
 
   const today = useMemo(() => {
     const d = new Date();
@@ -151,7 +172,7 @@ export function Dashboard() {
           <div className="flex flex-col gap-3.5">
             <SignOffRail notes={draftNotes} patients={patients} />
             <AudioCheckRail />
-            <QuickCaptureRail />
+            <QuickCaptureRail onQuickRecord={handleQuickRecord} />
           </div>
         </div>
       </div>
@@ -424,7 +445,7 @@ function AudioCheckRail() {
   );
 }
 
-function QuickCaptureRail() {
+function QuickCaptureRail({ onQuickRecord }: { onQuickRecord: () => void }) {
   return (
     <SurfaceCard
       padding="16px 18px"
@@ -444,10 +465,11 @@ function QuickCaptureRail() {
           lineHeight: 1.5,
         }}
       >
-        Drop a quick dictation between visits — it&rsquo;ll route to the patient you pick.
+        Tap record now — you can pick (or add) the patient after the visit.
       </div>
-      <Link
-        to="/sessions/new"
+      <button
+        type="button"
+        onClick={onQuickRecord}
         className="mt-3 inline-flex items-center gap-2"
         style={{
           background: 'var(--color-pt-surface)',
@@ -456,13 +478,13 @@ function QuickCaptureRail() {
           color: 'var(--color-pt-accent-fg)',
           fontSize: 12.5,
           fontWeight: 600,
-          textDecoration: 'none',
           border: '1px solid var(--color-pt-accent-border)',
+          cursor: 'pointer',
         }}
       >
         <StatusDot color="var(--color-pt-accent)" pulse size={8} />
-        Start dictation
-      </Link>
+        Record now
+      </button>
       <div
         className="mt-4 flex items-center gap-2"
         style={{ fontSize: 11, color: 'var(--color-pt-accent-fg)' }}

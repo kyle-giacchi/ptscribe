@@ -213,6 +213,26 @@ body {
   }
 }
 
+/* Heartbeat: a 2-beat (lub-dub) scale pattern for the recording status dot. */
+@keyframes pts-heartbeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.35);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.2);
+  }
+  56% {
+    transform: scale(1);
+  }
+}
+
 /* TipTap ProseMirror styles for note section editors */
 .tiptap-content {
   min-height: 5.5rem;

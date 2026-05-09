@@ -1,6 +1,17 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAppData } from './AppDataProvider';
-import type { AISettings, AnalysisMode, AudioSettings, PageKey, Settings } from '@/types';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
+import type {
+  AISettings,
+  AnalysisMode,
+  AudioSettings,
+  FirstRunState,
+  OrgPolicySettings,
+  PageKey,
+  RecordingLimitsSettings,
+  SessionWorkflowSettings,
+  Settings,
+} from '@/types';
 
 export interface SettingsContextValue {
   settings: Settings;
@@ -8,6 +19,10 @@ export interface SettingsContextValue {
   updateAi: (patch: Partial<AISettings>) => void;
   updateAudio: (patch: Partial<AudioSettings>) => void;
   updateUi: (patch: Partial<Settings['ui']>) => void;
+  updateSession: (patch: Partial<SessionWorkflowSettings>) => void;
+  updateRecordingLimits: (patch: Partial<RecordingLimitsSettings>) => void;
+  updateOrgPolicy: (patch: Partial<OrgPolicySettings>) => void;
+  updateFirstRun: (patch: Partial<FirstRunState>) => void;
   setIdleLockMinutes: (minutes: number) => void;
   setAutoDeleteAudioAfterDays: (days: number | undefined) => void;
   // Per-page detail-level toggle (kept from prior app for the dashboard etc.).
@@ -17,11 +32,9 @@ export interface SettingsContextValue {
   setPageMode: (key: PageKey, mode: AnalysisMode) => void;
 }
 
-const PAGE_MODE_KEY = 'ptnotes.pageModes';
-
 function readPageModes(): Partial<Record<PageKey, AnalysisMode>> {
   try {
-    const raw = localStorage.getItem(PAGE_MODE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.pageModes);
     if (!raw) return {};
     return JSON.parse(raw);
   } catch {
@@ -31,7 +44,7 @@ function readPageModes(): Partial<Record<PageKey, AnalysisMode>> {
 
 function writePageModes(modes: Partial<Record<PageKey, AnalysisMode>>): void {
   try {
-    localStorage.setItem(PAGE_MODE_KEY, JSON.stringify(modes));
+    localStorage.setItem(STORAGE_KEYS.pageModes, JSON.stringify(modes));
   } catch {
     /* swallow — page mode is a UI nicety */
   }
@@ -51,6 +64,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateAudio: (patch) =>
         updateSettingsSlice({ ...settings, audio: { ...settings.audio, ...patch } }),
       updateUi: (patch) => updateSettingsSlice({ ...settings, ui: { ...settings.ui, ...patch } }),
+      updateSession: (patch) =>
+        updateSettingsSlice({ ...settings, session: { ...settings.session, ...patch } }),
+      updateRecordingLimits: (patch) =>
+        updateSettingsSlice({
+          ...settings,
+          recordingLimits: { ...settings.recordingLimits, ...patch },
+        }),
+      updateOrgPolicy: (patch) =>
+        updateSettingsSlice({ ...settings, orgPolicy: { ...settings.orgPolicy, ...patch } }),
+      updateFirstRun: (patch) =>
+        updateSettingsSlice({ ...settings, firstRun: { ...settings.firstRun, ...patch } }),
       setIdleLockMinutes: (minutes: number) =>
         updateSettingsSlice({
           ...settings,

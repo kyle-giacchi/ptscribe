@@ -72,6 +72,10 @@ Non-obvious rules that fail silently if violated. **Read first before any cross-
 
 UI/UX style guide: soft gray-blue ground + soft orange accent, motion timing scale, typography pairing (Fraunces + Manrope), component conventions. Read before any visual change.
 
+### [docs/personas.md](personas.md)
+
+Two product personas — busy clinician (Dana) and PT business owner (Marcus) — with what they want, what kills their trust, and design implications. Read before proposing UX changes, defaults, or new settings.
+
 ### [docs/clinical-model.md](clinical-model.md)
 
 Domain entities (Patient, Session, Note, Template, Exercise, PlanOfCare), session state machine, AI prompt shape, manual-only fallback. Read when adding a new domain field, changing the note generation prompt, or wiring a new template format.

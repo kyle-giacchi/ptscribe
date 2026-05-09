@@ -1,7 +1,13 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 11;
+export const APP_DATA_VERSION = 13;
 export type AppDataVersion = typeof APP_DATA_VERSION;
+
+/**
+ * Disclosure copy version. Bump when the HIPAA / data-handling text changes
+ * meaningfully so the user is re-prompted to acknowledge the new wording.
+ */
+export const DISCLOSURE_VERSION = 1;
 
 // ─── Clinician ──────────────────────────────────────────────────────────────
 
@@ -126,6 +132,8 @@ export interface NoteTemplateSection {
   key: string;
   label: string;
   promptHint?: string;
+  /** When true, NotePanel blocks finalize until this section has a non-empty body. */
+  required?: boolean;
 }
 
 export interface NoteTemplate {
@@ -299,10 +307,67 @@ export interface SecuritySettings {
   idleLockMinutes: number;
 }
 
+export interface SessionWorkflowSettings {
+  /**
+   * When true, "Stop & finish" chains stop → transcribe → generate → copy in one
+   * tap. When false, the user advances each step manually. Default true.
+   */
+  autoFinish: boolean;
+}
+
+/**
+ * Soft + hard caps on how long a single recording can run before the recorder
+ * nudges the clinician to split, then auto-stops. Defends Marcus's
+ * cost-predictability and "lunch-left-recording" failure modes.
+ */
+export interface RecordingLimitsSettings {
+  /** Show a non-blocking "split this?" banner once duration passes this many minutes. Default 75. Bounded [15, 240]. */
+  softWarnAtMinutes: number;
+  /** Auto-stop the recorder when duration crosses this many minutes. Default 90. Bounded [30, 240]. */
+  maxMinutes: number;
+  /** When the mic input has been silent for this many continuous minutes, surface an idle-stop prompt. `0` disables. Default 10. Bounded [0, 60]. */
+  idleAutoStopMinutes: number;
+}
+
+export type ToneStyle = 'narrative' | 'terse' | 'clinical';
+
+/**
+ * Org-wide documentation policy. The `activeTemplateId` makes one template the
+ * organization default — NewSession and the generator use it unless the
+ * clinician explicitly picks another. `toneStyle` flows into the generator
+ * prompt so two clinicians dictating the same visit produce notes that read
+ * alike.
+ */
+export interface OrgPolicySettings {
+  activeTemplateId?: ID;
+  toneStyle: ToneStyle;
+}
+
+export type FirstRunRole = 'owner' | 'clinician';
+
+/**
+ * State captured during the first launch fork. `role` distinguishes the
+ * owner-set-up-the-team flow from the clinician-just-record flow.
+ * `disclosureVersion` matches `DISCLOSURE_VERSION` at the time the user
+ * acknowledged the disclosure — bump the constant to re-prompt.
+ * `onboardingUrlConsumed` is set true after `?role=…&clinic=…` URL params have
+ * been read once so refreshes don't re-pre-fill.
+ */
+export interface FirstRunState {
+  role?: FirstRunRole;
+  onboardingDoneAt?: number;
+  disclosureVersion?: number;
+  onboardingUrlConsumed?: boolean;
+}
+
 export interface Settings {
   ai: AISettings;
   audio: AudioSettings;
   security: SecuritySettings;
+  session: SessionWorkflowSettings;
+  recordingLimits: RecordingLimitsSettings;
+  orgPolicy: OrgPolicySettings;
+  firstRun: FirstRunState;
   ui: {
     sidebarCollapsed: boolean;
     densityMode: DensityMode;
@@ -311,6 +376,14 @@ export interface Settings {
     autoDeleteAudioAfterDays?: number;
   };
 }
+
+/**
+ * Fixed ID for the built-in "Unassigned" patient. Quick-record paths target this
+ * ID so a session can start before a real patient is selected; the user can
+ * reassign later from the session screen. Treated as read-only by
+ * PatientsProvider (update/remove are no-ops).
+ */
+export const UNASSIGNED_PATIENT_ID = 'patient:unassigned';
 
 // ─── Page mode (carry-over for compact/detailed view per page) ──────────────
 

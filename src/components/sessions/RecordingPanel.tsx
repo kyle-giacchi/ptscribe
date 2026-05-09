@@ -1,4 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import {
   Mic,
   Square,
@@ -21,12 +22,23 @@ import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import type { SessionClip } from '@/types';
 
+export type ChainPhase =
+  | 'stopping'
+  | 'waiting'
+  | 'transcribing'
+  | 'post-transcribe'
+  | 'generating'
+  | null;
+
 export interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
   clips: SessionClip[];
   onStart: () => void;
   onStop: () => void;
+  onStopAndFinish: () => void;
+  autoFinish: boolean;
+  chainPhase: ChainPhase;
   onPauseResume: () => void;
   onDeleteClip: (clipId: string) => void;
   onUpload: (file: File) => void;
@@ -80,6 +92,9 @@ export function RecordingPanel({
   clips,
   onStart,
   onStop,
+  onStopAndFinish,
+  autoFinish,
+  chainPhase,
   onPauseResume,
   onDeleteClip,
   onUpload,
@@ -96,12 +111,30 @@ export function RecordingPanel({
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
 
+  useEffect(() => {
+    if (recorder.hardCapStopped) {
+      toast.warning(
+        `Hit recording length cap (${settings.recordingLimits.maxMinutes} min) — auto-stopped.`,
+      );
+    }
+  }, [recorder.hardCapStopped, settings.recordingLimits.maxMinutes]);
+
+  useEffect(() => {
+    if (recorder.idleAutoStopped) {
+      toast.warning(
+        `Auto-stopped after ${settings.recordingLimits.idleAutoStopMinutes} min of silence. Start a new clip when you're ready.`,
+      );
+    }
+  }, [recorder.idleAutoStopped, settings.recordingLimits.idleAutoStopMinutes]);
+
   if (idle && clips.length === 0) {
     return <RecordingBlankOptions onStart={onStart} onUpload={onUpload} onSkip={onSkip} />;
   }
 
   return (
     <div className="space-y-3">
+      {chainPhase && <ChainProgressBanner phase={chainPhase} />}
+
       {wasBackgrounded && (
         <div
           role="status"
@@ -137,8 +170,32 @@ export function RecordingPanel({
         onStart={onStart}
         onPauseResume={onPauseResume}
         onStop={onStop}
+        onStopAndFinish={onStopAndFinish}
+        autoFinish={autoFinish}
+        chainActive={!!chainPhase}
         onUpload={onUpload}
       />
+
+      {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}
+
+      {recording && recorder.softWarnReached && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs"
+          style={{
+            borderColor: 'var(--color-caution)',
+            color: 'var(--color-caution)',
+            background: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
+          }}
+        >
+          <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
+          <span>
+            This take has been recording for {Math.round(recorder.durationSec / 60)} min — consider
+            stopping and starting a fresh clip to keep things manageable. Auto-stop at{' '}
+            {settings.recordingLimits.maxMinutes} min.
+          </span>
+        </div>
+      )}
 
       <RecordingNotices
         recorderError={recorder.error}
@@ -184,6 +241,9 @@ function RecordingControlRow({
   onStart,
   onPauseResume,
   onStop,
+  onStopAndFinish,
+  autoFinish,
+  chainActive,
   onUpload,
 }: {
   idle: boolean;
@@ -192,6 +252,9 @@ function RecordingControlRow({
   onStart: () => void;
   onPauseResume: () => void;
   onStop: () => void;
+  onStopAndFinish: () => void;
+  autoFinish: boolean;
+  chainActive: boolean;
   onUpload: (file: File) => void;
 }) {
   return (
@@ -218,8 +281,96 @@ function RecordingControlRow({
           </label>
         </>
       ) : (
-        <ActiveRecordingControls paused={paused} onPauseResume={onPauseResume} onStop={onStop} />
+        <ActiveRecordingControls
+          paused={paused}
+          onPauseResume={onPauseResume}
+          onStop={onStop}
+          onStopAndFinish={onStopAndFinish}
+          autoFinish={autoFinish}
+          chainActive={chainActive}
+        />
       )}
+    </div>
+  );
+}
+
+// Whisper's upload endpoint accepts up to 25 MB. We don't know the exact
+// per-second byte rate of the live recorder (Opus mono ≈ 4 KB/s, but some
+// browsers default to higher bitrates), so estimate conservatively at 8 KB/s
+// and warn well before the cap.
+const ESTIMATED_BYTES_PER_SEC = 8 * 1024;
+const WHISPER_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
+const WARN_THRESHOLD_BYTES = 20 * 1024 * 1024;
+
+function RecordingSizeHint({ durationSec }: { durationSec: number }) {
+  const estimatedBytes = durationSec * ESTIMATED_BYTES_PER_SEC;
+  const estimatedMb = estimatedBytes / (1024 * 1024);
+  const approachingCap = estimatedBytes >= WARN_THRESHOLD_BYTES;
+  const overCap = estimatedBytes >= WHISPER_UPLOAD_LIMIT_BYTES;
+
+  const tone = overCap
+    ? {
+        color: 'var(--color-caution)',
+        bg: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
+        border: 'var(--color-caution)',
+      }
+    : approachingCap
+      ? {
+          color: 'var(--color-pt-accent-fg)',
+          bg: 'color-mix(in oklab, var(--color-pt-accent) 10%, transparent)',
+          border: 'var(--color-pt-accent-border)',
+        }
+      : {
+          color: 'var(--color-fg-subtle)',
+          bg: 'transparent',
+          border: 'var(--color-pt-border)',
+        };
+
+  const message = overCap
+    ? `Estimated ~${estimatedMb.toFixed(1)} MB — past the 25 MB Whisper upload limit. Stop and start a new clip.`
+    : approachingCap
+      ? `Estimated ~${estimatedMb.toFixed(1)} MB of 25 MB. Consider stopping & starting a new clip soon.`
+      : `Estimated ~${estimatedMb.toFixed(1)} MB recorded (Whisper accepts up to 25 MB per clip).`;
+
+  return (
+    <div
+      role="status"
+      className="rounded-md border px-3 py-1.5 text-[11px]"
+      style={{ color: tone.color, background: tone.bg, borderColor: tone.border }}
+    >
+      {message}
+    </div>
+  );
+}
+
+function ChainProgressBanner({ phase }: { phase: NonNullable<ChainPhase> }) {
+  // User-facing label for each chained step. "waiting" and "post-transcribe"
+  // are short transition states sandwiched between visible work — collapse them
+  // into the surrounding label so the banner doesn't flicker.
+  const label = (() => {
+    switch (phase) {
+      case 'stopping':
+      case 'waiting':
+        return 'Saving recording…';
+      case 'transcribing':
+      case 'post-transcribe':
+        return 'Transcribing…';
+      case 'generating':
+        return 'Generating note…';
+    }
+  })();
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs"
+      style={{
+        borderColor: 'var(--color-pt-accent-border)',
+        background: 'color-mix(in oklab, var(--color-pt-accent) 10%, transparent)',
+        color: 'var(--color-pt-accent-fg)',
+      }}
+    >
+      <Loader2 size={14} className="animate-spin" />
+      <span>{label}</span>
     </div>
   );
 }
@@ -290,14 +441,25 @@ function ActiveRecordingControls({
   paused,
   onPauseResume,
   onStop,
+  onStopAndFinish,
+  autoFinish,
+  chainActive,
 }: {
   paused: boolean;
   onPauseResume: () => void;
   onStop: () => void;
+  onStopAndFinish: () => void;
+  autoFinish: boolean;
+  chainActive: boolean;
 }) {
   return (
     <>
-      <button type="button" className="btn btn-secondary" onClick={onPauseResume}>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={onPauseResume}
+        disabled={chainActive}
+      >
         {paused ? (
           <>
             <Play size={14} strokeWidth={2} /> Resume
@@ -308,9 +470,36 @@ function ActiveRecordingControls({
           </>
         )}
       </button>
-      <button type="button" className="btn btn-primary" onClick={onStop}>
-        <Square size={14} strokeWidth={2} /> Stop
-      </button>
+      {autoFinish ? (
+        <>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onStopAndFinish}
+            disabled={chainActive}
+          >
+            <Square size={14} strokeWidth={2} /> Stop &amp; finish
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onStop}
+            disabled={chainActive}
+            title="Stop without auto-transcribing or generating"
+          >
+            Stop only
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onStop}
+          disabled={chainActive}
+        >
+          <Square size={14} strokeWidth={2} /> Stop
+        </button>
+      )}
     </>
   );
 }

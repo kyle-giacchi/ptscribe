@@ -171,8 +171,13 @@ export function TranscriptPanel({
               </button>
             )}
             {hasLocalTranscript && (
-              <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}>
-                <RotateCcw size={14} strokeWidth={2} /> Use Local Transcription
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={onRevertToLocal}
+                title="Restore the on-device draft transcript captured while you were recording."
+              >
+                <RotateCcw size={14} strokeWidth={2} /> Revert to draft transcript
               </button>
             )}
           </div>

@@ -7,6 +7,7 @@ import { migrateLegacyPlaintext } from '@/lib/vault/migration';
 import { isDemoMode, getDemoPassphrase } from '@/lib/demoMode';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { audioRepository } from '@/services/AudioRepository';
+import { dataRepository } from '@/services/DataRepository';
 
 type Mode = 'setup' | 'unlock';
 
@@ -241,6 +242,8 @@ async function resetLocalDataForDemo(): Promise<void> {
   try {
     localStorage.removeItem(STORAGE_KEYS.vault);
     localStorage.removeItem(STORAGE_KEYS.appData);
+    dataRepository.clearCorruptData();
+    localStorage.removeItem(STORAGE_KEYS.pageModes);
   } catch {
     /* ignore — best-effort wipe */
   }
