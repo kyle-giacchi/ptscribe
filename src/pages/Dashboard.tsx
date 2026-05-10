@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sun, Mic, ChevronRight, Inbox, Headphones } from 'lucide-react';
+import { Sun, Mic, ChevronRight, Inbox, Headphones, ClipboardCheck } from 'lucide-react';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -17,7 +17,13 @@ import {
 } from '@/components/design';
 import { shortLabelForType } from '@/utils/labels';
 import { newId } from '@/utils/ids';
-import { UNASSIGNED_PATIENT_ID, type Session, type SessionStatus, type Patient } from '@/types';
+import {
+  UNASSIGNED_PATIENT_ID,
+  type Note,
+  type Session,
+  type SessionStatus,
+  type Patient,
+} from '@/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -72,6 +78,18 @@ export function Dashboard() {
     () => notes.filter((n) => !n.finalized).sort((a, b) => b.updatedAt - a.updatedAt),
     [notes],
   );
+
+  // Sessions that have a draft note — sorted oldest-first so the most overdue
+  // appear at the top of the pending sign-off rail.
+  const pendingSignOff = useMemo(() => {
+    const draftNoteBySessionId = new Map<string, Note>();
+    for (const n of notes) {
+      if (!n.finalized) draftNoteBySessionId.set(n.sessionId, n);
+    }
+    return sessions
+      .filter((s) => draftNoteBySessionId.has(s.id))
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }, [sessions, notes]);
 
   const greetingName = clinician.name?.split(' ')[0] || 'there';
   const dateStr = new Date().toLocaleDateString(undefined, {
@@ -143,6 +161,11 @@ export function Dashboard() {
           </div>
         </SurfaceCard>
 
+        {/* Pending sign-off rail — only shown when there are unfinalized notes */}
+        {pendingSignOff.length > 0 && (
+          <PendingSignOffRail sessions={pendingSignOff} patients={patients} notes={notes} />
+        )}
+
         {/* Stat row */}
         <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
           <StatCard
@@ -177,6 +200,156 @@ export function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Pending Sign-Off Rail ───────────────────────────────────────────────────
+
+const PENDING_RAIL_MAX = 5;
+
+function relativeTime(ms: number): string {
+  const diff = Date.now() - ms;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return mins <= 1 ? 'just now' : `${mins} minutes ago`;
+  const hours = Math.floor(diff / 3_600_000);
+  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  const days = Math.floor(diff / 86_400_000);
+  return days === 1 ? '1 day ago' : `${days} days ago`;
+}
+
+function PendingSignOffRail({
+  sessions,
+  patients,
+  notes,
+}: {
+  sessions: Session[];
+  patients: Patient[];
+  notes: Note[];
+}) {
+  const navigate = useNavigate();
+  const shown = sessions.slice(0, PENDING_RAIL_MAX);
+  const overflow = sessions.length - shown.length;
+
+  // Build a quick lookup: sessionId → note (only draft notes were passed in)
+  const noteBySessionId = useMemo(() => {
+    const map = new Map<string, Note>();
+    for (const n of notes) {
+      if (!n.finalized) map.set(n.sessionId, n);
+    }
+    return map;
+  }, [notes]);
+
+  return (
+    <SurfaceCard>
+      {/* Header */}
+      <div
+        className="flex items-center justify-between"
+        style={{
+          padding: '13px 18px',
+          borderBottom: '1px solid var(--color-pt-border)',
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="flex items-center justify-center"
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              background: 'var(--color-pt-warn-soft, #fff8eb)',
+              color: 'var(--color-pt-warn-fg, #b45309)',
+            }}
+          >
+            <ClipboardCheck size={13} strokeWidth={2} />
+          </span>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+            Pending sign-off
+          </div>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 20,
+              height: 18,
+              padding: '0 6px',
+              borderRadius: 999,
+              background: 'var(--color-pt-warn-soft, #fff8eb)',
+              color: 'var(--color-pt-warn-fg, #b45309)',
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            {sessions.length}
+          </span>
+        </div>
+        {overflow > 0 && (
+          <Link
+            to="/notes"
+            style={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: 'var(--color-pt-accent-fg)',
+              textDecoration: 'none',
+            }}
+          >
+            View all {sessions.length} →
+          </Link>
+        )}
+      </div>
+
+      {/* Row list */}
+      <ul>
+        {shown.map((s, i) => {
+          const patient = patients.find((p) => p.id === s.patientId);
+          const patientName = patient
+            ? `${patient.firstName} ${patient.lastName}`.trim()
+            : 'Unknown patient';
+          const note = noteBySessionId.get(s.id);
+          const ageHours = note ? (Date.now() - note.updatedAt) / 3_600_000 : 0;
+          const ageTone: StatusTone = ageHours > 48 ? 'flagged' : ageHours > 24 ? 'plateau' : 'on-track';
+
+          return (
+            <li key={s.id}>
+              <div
+                className="grid items-center"
+                style={{
+                  gridTemplateColumns: '32px 1fr auto auto',
+                  gap: 12,
+                  padding: '11px 18px',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--color-pt-border)',
+                }}
+              >
+                <Avatar name={patientName} size={32} />
+                <div className="min-w-0">
+                  <div
+                    className="truncate"
+                    style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-pt-text)' }}
+                  >
+                    {patientName}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}>
+                    {new Date(s.date).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    })}{' '}
+                    · {relativeTime(s.createdAt)}
+                  </div>
+                </div>
+                <StatusBadge tone={ageTone} label={ageLabel(ageHours)} />
+                <PtButton
+                  variant="ghost"
+                  style={{ fontSize: 12, padding: '4px 10px' }}
+                  onClick={() => navigate(`/sessions/${s.id}`)}
+                >
+                  Finish note
+                </PtButton>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </SurfaceCard>
   );
 }
 

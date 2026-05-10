@@ -7,7 +7,11 @@ export function Toaster() {
       offset={16}
       gap={8}
       duration={3200}
+      richColors
+      closeButton
+      containerAriaLabel="Notifications"
       toastOptions={{
+        closeButtonAriaLabel: 'Dismiss notification',
         classNames: {
           toast:
             'card !bg-[var(--color-surface)] !border-[var(--color-border)] !text-[var(--color-fg)] !shadow-md !rounded-xl',

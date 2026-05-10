@@ -97,6 +97,67 @@
   --font-display: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ─── Dark mode overrides ─────────────────────────────────────────────────── */
+/* Applied by SettingsProvider via data-theme="dark" on <html>.               */
+/* 'system' mode also resolves to this via prefers-color-scheme.               */
+
+:root[data-theme='dark'] {
+  /* Surfaces — near-black hierarchy */
+  --color-pt-bg: #080b12;
+  --color-pt-surface: #111520;
+  --color-pt-surface-alt: #0d1018;
+  --color-pt-surface-mut: #161a27;
+
+  /* Borders */
+  --color-pt-border: #252b3d;
+  --color-pt-border-strong: #2e3549;
+
+  /* Text — light on dark */
+  --color-pt-text: #e8eaf0;
+  --color-pt-text-2: #8b94aa;
+  --color-pt-text-3: #535d73;
+
+  /* Accent — cyan-teal stays; soft/border darken */
+  --color-pt-accent: #0ea5a8;
+  --color-pt-accent-soft: #0a2a2b;
+  --color-pt-accent-border: #1a5254;
+  --color-pt-accent-fg: #6ed4d6;
+
+  /* Semantic — red */
+  --color-pt-red: #f0354f;
+  --color-pt-red-soft: #2a0a0f;
+  --color-pt-red-border: #5a1420;
+  --color-pt-red-fg: #f7879a;
+
+  /* Semantic — amber */
+  --color-pt-amber: #d98b15;
+  --color-pt-amber-soft: #231500;
+  --color-pt-amber-border: #553200;
+  --color-pt-amber-fg: #f0bb6e;
+
+  /* Semantic — violet */
+  --color-pt-violet: #8b76e0;
+  --color-pt-violet-soft: #140f2e;
+  --color-pt-violet-border: #2d2460;
+  --color-pt-violet-fg: #c0b5f0;
+
+  /* Semantic — slate */
+  --color-pt-slate: #636d82;
+  --color-pt-slate-soft: #111520;
+  --color-pt-slate-border: #252b3d;
+  --color-pt-slate-fg: #b0b9cc;
+
+  /* Landing / overlay */
+  --color-pt-landing-bg: oklch(12% 0.012 240);
+  --color-pt-overlay: oklch(0.06 0.02 250 / 0.6);
+
+  /* Shadows — softer, darker */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.6);
+  --shadow-banner: 0 18px 50px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
 html,
 body,
 #root {

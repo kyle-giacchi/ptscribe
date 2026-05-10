@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildUserPrompt } from './prompts';
+import { buildSystemPrompt, buildUserPrompt } from './prompts';
 import type { Note, NoteTemplate, Patient } from '@/types';
 
 const basePatient: Patient = {
@@ -28,6 +28,71 @@ const baseTemplate: NoteTemplate = {
 };
 
 const baseTranscript = 'Patient reports left knee pain rated 6 out of 10.';
+
+describe('buildSystemPrompt', () => {
+  const templateWithPrompt: NoteTemplate = {
+    ...baseTemplate,
+    systemPrompt: 'You are a physical therapy documentation assistant.\n\n## Subjective\n## Objective\n## Assessment\n## Plan',
+  };
+
+  it('appends the tone block after the base system prompt', () => {
+    const result = buildSystemPrompt(templateWithPrompt, 'narrative');
+    expect(result).toContain(templateWithPrompt.systemPrompt.trimEnd());
+    expect(result).toContain('# Tone & style');
+  });
+
+  it('preserves the full base system prompt verbatim', () => {
+    const result = buildSystemPrompt(templateWithPrompt, 'narrative');
+    expect(result.startsWith(templateWithPrompt.systemPrompt.trimEnd())).toBe(true);
+  });
+
+  it('defaults to narrative tone when no toneStyle is supplied', () => {
+    const result = buildSystemPrompt(templateWithPrompt);
+    expect(result).toContain('flowing professional prose');
+  });
+
+  it('includes narrative tone instruction for narrative style', () => {
+    const result = buildSystemPrompt(templateWithPrompt, 'narrative');
+    expect(result).toContain('flowing professional prose');
+  });
+
+  it('includes bullet-point / abbreviation instruction for terse style', () => {
+    const result = buildSystemPrompt(templateWithPrompt, 'terse');
+    expect(result).toContain('bullet-point shorthand');
+    expect(result).toContain('PROM');
+  });
+
+  it('includes anatomical / formal instruction for clinical style', () => {
+    const result = buildSystemPrompt(templateWithPrompt, 'clinical');
+    expect(result).toContain('formal clinical documentation style');
+    expect(result).toContain('anatomical');
+  });
+
+  it('produces different output for each tone style', () => {
+    const narrative = buildSystemPrompt(templateWithPrompt, 'narrative');
+    const terse = buildSystemPrompt(templateWithPrompt, 'terse');
+    const clinical = buildSystemPrompt(templateWithPrompt, 'clinical');
+    expect(narrative).not.toBe(terse);
+    expect(narrative).not.toBe(clinical);
+    expect(terse).not.toBe(clinical);
+  });
+
+  it('strips trailing whitespace from the base prompt before appending', () => {
+    const templateWithTrailing: NoteTemplate = {
+      ...baseTemplate,
+      systemPrompt: 'Base prompt.   \n  \n',
+    };
+    const result = buildSystemPrompt(templateWithTrailing, 'narrative');
+    // The tone block must follow the trimmed base with a blank-line separator
+    expect(result).toMatch(/Base prompt\.\s*\n\n# Tone & style/);
+  });
+
+  it('works with an empty system prompt on the template', () => {
+    const result = buildSystemPrompt(baseTemplate, 'terse');
+    expect(result).toContain('# Tone & style');
+    expect(result).toContain('bullet-point shorthand');
+  });
+});
 
 describe('buildUserPrompt', () => {
   it('includes a pseudonym patient ID and omits the real name', () => {

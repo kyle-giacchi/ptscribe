@@ -41,15 +41,38 @@ export function PatientRow({
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 8,
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
             }}
           >
-            {displayName}
+            <span
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flexShrink: 1,
+              }}
+            >
+              {displayName}
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                color: 'var(--color-pt-text-3)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                fontFamily: 'monospace',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {patient.mrn ? `MRN ${patient.mrn}` : patient.id.slice(0, 8)}
+            </span>
           </div>
           {patient.primaryDiagnosis && (
             <div

@@ -93,6 +93,8 @@ const NoteSchema = z.object({
   sections: z.array(NoteSectionSchema),
   finalized: z.boolean(),
   finalizedAt: z.number().int().optional(),
+  editedAfterFinalizedAt: z.number().int().optional(),
+  editedAfterFinalizedCount: z.number().int().optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
@@ -233,6 +235,7 @@ const SettingsSchema = z.object({
   ui: z.object({
     sidebarCollapsed: z.boolean(),
     densityMode: z.enum(['cozy', 'compact']),
+    theme: z.enum(['system', 'light', 'dark']),
   }),
   retention: z.object({
     autoDeleteAudioAfterDays: z.number().int().positive().optional(),
@@ -296,11 +299,11 @@ export function defaultAppData(): AppData {
         generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
       },
       audio: {
-        silenceDetection: { enabled: false, sensitivity: 'medium', padMs: 400 },
-        speedUp: { enabled: false, speed: 1.5 },
+        silenceDetection: { enabled: true, sensitivity: 'medium', padMs: 400 },
+        speedUp: { enabled: true, speed: 1.5 },
       },
       security: { idleLockMinutes: 10 },
-      session: { autoFinish: true },
+      session: { autoFinish: false },
       recordingLimits: {
         softWarnAtMinutes: 75,
         maxMinutes: 90,
@@ -308,7 +311,7 @@ export function defaultAppData(): AppData {
       },
       orgPolicy: { toneStyle: 'narrative' },
       firstRun: {},
-      ui: { sidebarCollapsed: false, densityMode: 'cozy' },
+      ui: { sidebarCollapsed: false, densityMode: 'cozy', theme: 'system' },
       retention: {},
     },
   };

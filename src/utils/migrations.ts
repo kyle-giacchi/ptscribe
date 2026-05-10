@@ -37,6 +37,11 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   90 min hard cap, 10 min idle auto-stop), `Settings.orgPolicy` (active template
  *   id + tone style), and `Settings.firstRun` (role + onboarding state) to support
  *   business-owner persona work. No structural changes to other slices.
+ * - v13 → v14: Adds optional `Note.editedAfterFinalizedAt` (ms timestamp of first
+ *   post-finalization edit) and `Note.editedAfterFinalizedCount` (number of saves
+ *   after finalization) to all existing notes. Both default to absent.
+ * - v14 → v15: Adds `Settings.ui.theme` ('system' | 'light' | 'dark'). Defaults to
+ *   'system' so existing users inherit OS preference with no visible change.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -44,9 +49,11 @@ export function migrate(data: unknown): AppData {
     throw new Error('migrate: data has no numeric version field');
   }
   if (version > CURRENT_VERSION) {
-    throw new Error(
-      `migrate: data version ${version} is newer than CURRENT_VERSION ${CURRENT_VERSION}`,
+    console.warn(
+      `[migrations] Data version ${version} is newer than this app's CURRENT_VERSION ${CURRENT_VERSION}. ` +
+        'Loading as-is — some fields may be unrecognised. Upgrade the app to avoid data loss.',
     );
+    return data as AppData;
   }
 
   let working = data as Record<string, unknown>;
@@ -86,6 +93,12 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 12) {
     working = migrateV12ToV13(working);
+  }
+  if ((working as { version?: number }).version === 13) {
+    working = migrateV13ToV14(working);
+  }
+  if ((working as { version?: number }).version === 14) {
+    working = migrateV14ToV15(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -287,14 +300,14 @@ function migrateV12ToV13(input: Record<string, unknown>): Record<string, unknown
 function migrateV11ToV12(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input, version: 12 } as Record<string, unknown>;
 
-  // 1. session.autoFinish setting (default true).
+  // 1. session.autoFinish setting (default false).
   const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
   const existingSession = (settings.session as Record<string, unknown> | undefined) ?? undefined;
   next.settings = {
     ...settings,
     session: {
       autoFinish:
-        typeof existingSession?.autoFinish === 'boolean' ? existingSession.autoFinish : true,
+        typeof existingSession?.autoFinish === 'boolean' ? existingSession.autoFinish : false,
     },
   };
 
@@ -351,6 +364,31 @@ function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> 
             ? existingSu.speed
             : 1.5,
       },
+    },
+  };
+  return next;
+}
+
+function migrateV13ToV14(input: Record<string, unknown>): Record<string, unknown> {
+  // New fields are optional and default to absent — no structural transformation needed.
+  // editedAfterFinalizedAt and editedAfterFinalizedCount are written at runtime by
+  // NotesProvider when a finalized note is unlocked and then saved.
+  return { ...input, version: 14 };
+}
+
+function migrateV14ToV15(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 15 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingUi = (settings.ui as Record<string, unknown> | undefined) ?? {};
+  const existingTheme = existingUi.theme;
+  next.settings = {
+    ...settings,
+    ui: {
+      ...existingUi,
+      theme:
+        existingTheme === 'system' || existingTheme === 'light' || existingTheme === 'dark'
+          ? existingTheme
+          : 'system',
     },
   };
   return next;
