@@ -7,21 +7,32 @@ Non-obvious rules that break things silently if violated. Read before editing an
 `App.tsx` wraps providers in this exact order (outermost first):
 
 ```
-BrowserRouter
-  AppDataProvider          <- owns localStorage read/write
-    ClinicianProvider
-      PatientsProvider
-        SessionsProvider
-          NotesProvider
-            TemplatesProvider
-              ExercisesProvider
-                PlansProvider
-                  SettingsProvider
-                    FirstRunGuard
-                      Routes
+ErrorBoundary                    <- catches any uncaught render error
+  BrowserRouter
+    AuthProvider                 <- BetterAuth session (passkey + magic link)
+      Routes
+        AppGate?                 <- gate code prompt in demo mode only
+          VaultGate              <- passphrase prompt; gates AppDataProvider
+            AppDataProvider      <- owns localStorage read/write
+              ClinicianProvider
+                PatientsProvider
+                  SessionsProvider
+                    NotesProvider
+                      TemplatesProvider
+                        ExercisesProvider
+                          PlansProvider
+                            SettingsProvider
+                              IdleLockProvider   <- auto-locks vault on idle
+                                DemoBootstrap    <- seeds demo data if needed
+                                  FirstRunGuard
+                                    Routes (app routes)
 ```
 
 All slice providers call `useAppData()` internally — they must be nested inside `AppDataProvider`. Reordering slice providers among themselves is safe. Moving any slice provider outside `AppDataProvider` will throw at runtime.
+
+`VaultGate` must wrap `AppDataProvider` — it gates access until the vault is unlocked (or no vault is configured). `AppGate` only appears in demo mode and sits outside `VaultGate`.
+
+`IdleLockProvider` reads from `useSettings()` so it must stay inside `SettingsProvider`. It calls `vault.lock()` after the configured idle duration.
 
 `FirstRunGuard` calls `useClinician()` so it must stay inside `ClinicianProvider`. Its current innermost position (just before `<Routes>`) is intentional.
 
