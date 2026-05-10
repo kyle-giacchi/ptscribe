@@ -37,6 +37,8 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
 
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     if (args.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    // Tracks throws that should propagate immediately without retrying (non-transient errors).
+    let nonRetryable = false;
     try {
       const res = await apiFetch('/api/generate', {
         method: 'POST',
@@ -55,6 +57,7 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
 
       if (!res.ok) {
         if (!RETRYABLE_STATUSES.has(res.status) || attempt === RETRY_DELAYS_MS.length) {
+          nonRetryable = true;
           const errBody = await safeReadText(res);
           throw new Error(`Generate proxy failed (${res.status}): ${errBody || res.statusText}`);
         }
@@ -62,13 +65,14 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
       } else {
         const data = (await res.json()) as { text?: string; error?: string };
         if (typeof data.text !== 'string' || data.text.length === 0) {
+          nonRetryable = true;
           throw new Error(data.error || 'Generate proxy response had no text content');
         }
         return { text: data.text };
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      if (attempt === RETRY_DELAYS_MS.length) throw err;
+      if (nonRetryable || attempt === RETRY_DELAYS_MS.length) throw err;
       lastError = err;
     }
 
