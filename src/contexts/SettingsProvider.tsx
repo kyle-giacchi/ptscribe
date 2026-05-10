@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useAppData } from './AppDataProvider';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import type {
@@ -55,6 +55,32 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { appData, updateSettingsSlice } = useAppData();
   const settings = appData.settings;
+
+  // Apply data-theme to <html> so CSS [data-theme="dark"] overrides take effect.
+  // 'system' resolves via matchMedia; 'light'/'dark' are explicit overrides.
+  useEffect(() => {
+    const theme = settings.ui.theme ?? 'system';
+
+    function applyTheme(dark: boolean) {
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    }
+
+    if (theme === 'light') {
+      applyTheme(false);
+      return;
+    }
+    if (theme === 'dark') {
+      applyTheme(true);
+      return;
+    }
+
+    // 'system' — mirror OS preference and watch for changes
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    applyTheme(mq.matches);
+    const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [settings.ui.theme]);
 
   const value = useMemo<SettingsContextValue>(
     () => ({

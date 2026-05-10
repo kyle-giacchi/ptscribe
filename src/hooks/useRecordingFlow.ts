@@ -1,0 +1,298 @@
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { toast } from 'sonner';
+import { audioRepository } from '@/services/AudioRepository';
+import { mergeAudioBlobs } from '@/lib/audio/merge';
+import { newId } from '@/utils/ids';
+import type { UseRecorder } from '@/hooks/useRecorder';
+import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
+import type { Session, SessionClip } from '@/types';
+
+export interface UseRecordingFlowParams {
+  session: Session | undefined;
+  recorder: UseRecorder;
+  live: UseLiveTranscript;
+  sortedClips: SessionClip[];
+  patchSession: (patch: Partial<Session>) => void;
+  patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
+  patchClip: (clipId: string, patch: Partial<SessionClip>) => void;
+  setError: (msg: string | null) => void;
+  setActiveTab: (tab: 'record' | 'review') => void;
+  setTranscript: (next: string) => void;
+  setMergedAudioBlob: (blob: Blob | null) => void;
+  setIsMerging: (v: boolean) => void;
+  /** Triggered after each saved clip; runs the local-Whisper background pass. */
+  runLocalTranscription: (clipId: string, blob: Blob) => Promise<void>;
+}
+
+export interface UseRecordingFlowResult {
+  // Recording state for UI
+  backgroundWarningDismissed: boolean;
+  setBackgroundWarningDismissed: (v: boolean) => void;
+  // Active clip ref (exposed so the auto-record deep link hook can read it if needed)
+  activeClipIdRef: MutableRefObject<string | null>;
+  // Handlers
+  handleStartRecording: () => Promise<void>;
+  handleStopRecording: () => Promise<void>;
+  handlePauseResume: () => void;
+  handleStopAndFinish: () => void;
+  handleUploadAudio: (file: File) => Promise<void>;
+  handleDeleteClip: (clipId: string) => Promise<void>;
+  handleRecordingComplete: () => Promise<void>;
+}
+
+/**
+ * Owns the recording lifecycle handlers + ancillary state for a session.
+ * Wires the recorder/live hooks to clip + session mutations, schedules the
+ * local-Whisper background pass after each saved clip, and merges clips for
+ * Review-tab playback when the user finishes recording.
+ */
+export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFlowResult {
+  const {
+    session,
+    recorder,
+    live,
+    sortedClips,
+    patchSession,
+    patchClips,
+    patchClip,
+    setError,
+    setActiveTab,
+    setTranscript,
+    setMergedAudioBlob,
+    setIsMerging,
+    runLocalTranscription,
+  } = params;
+
+  const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
+  // Re-arm the dismiss flag every time a new recording starts so the warning
+  // resurfaces for the next session if it gets backgrounded again.
+  useEffect(() => {
+    if (recorder.status !== 'recording') return;
+    const id = window.setTimeout(() => setBackgroundWarningDismissed(false), 0);
+    return () => window.clearTimeout(id);
+  }, [recorder.status]);
+
+  // Tracks the clip currently being recorded, so stop() knows which clip to update.
+  const activeClipIdRef = useRef<string | null>(null);
+
+  // ── Recording controls ───────────────────────────────────────────────────
+  async function handleStartRecording() {
+    setError(null);
+    if (!session) return;
+
+    const clipId = newId();
+    const now = Date.now();
+    activeClipIdRef.current = clipId;
+    patchClips((clips) => [
+      ...clips,
+      {
+        id: clipId,
+        index: clips.length,
+        durationSec: 0,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    patchSession({ status: 'recording' });
+
+    const ok = await recorder.start(clipId);
+    if (!ok) {
+      activeClipIdRef.current = null;
+      patchClips((clips) => clips.filter((c) => c.id !== clipId));
+      patchSession({ status: 'draft' });
+      toast.error(
+        'Could not access microphone. Check that microphone permission is granted in your browser settings.',
+      );
+      return;
+    }
+
+    if (live.supported) {
+      live.reset();
+      live.start();
+    }
+  }
+
+  function handlePauseResume() {
+    if (recorder.status === 'recording') {
+      recorder.pause();
+      live.stop();
+    } else if (recorder.status === 'paused') {
+      recorder.resume();
+      if (live.supported) live.start();
+    }
+  }
+
+  async function handleStopRecording() {
+    if (!session) return;
+    const clipId = activeClipIdRef.current;
+    activeClipIdRef.current = null;
+
+    const finalBlob = await recorder.stop();
+    const durationSec = recorder.durationSec;
+    live.stop();
+
+    if (clipId) {
+      if (finalBlob) {
+        try {
+          await audioRepository.save(clipId, finalBlob);
+        } catch (e) {
+          setError(`Could not save audio: ${(e as Error).message}`);
+          patchClip(clipId, {
+            status: 'failed',
+            errorMessage: (e as Error).message,
+          });
+          return;
+        }
+        // Chunk cleanup is best-effort — failure doesn't affect the saved clip.
+        audioRepository.clearChunks(clipId).catch(() => {});
+        patchClip(clipId, { status: 'ready', durationSec });
+        runLocalTranscription(clipId, finalBlob);
+      } else {
+        try {
+          await audioRepository.remove(clipId);
+        } catch {
+          /* ignore */
+        }
+        patchClips((clips) =>
+          clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
+        );
+      }
+    }
+
+    if (clipId && live.finalText.trim()) {
+      patchClip(clipId, { liveTranscript: live.finalText.trim() });
+    }
+    live.reset();
+    patchSession({ status: 'draft' });
+  }
+
+  // C3: Stop & finish now only stops the recording and switches to Review.
+  // Transcription and note generation are explicit user-triggered steps.
+  function handleStopAndFinish() {
+    void handleStopRecording().then(() => setActiveTab('review'));
+  }
+
+  // ── Audio upload ─────────────────────────────────────────────────────────
+  async function handleUploadAudio(file: File) {
+    const MAX_BYTES = 25 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      toast.error('File too large — Whisper accepts up to 25 MB.');
+      return;
+    }
+    if (file.type && !/^(audio|video)\//.test(file.type)) {
+      toast.error('Please upload an audio file (MP3, M4A, WAV, OGG, WebM, etc.).');
+      return;
+    }
+
+    const clipId = newId();
+    const now = Date.now();
+    patchClips((clips) => [
+      ...clips,
+      {
+        id: clipId,
+        index: clips.length,
+        durationSec: 0,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+
+    const tid = toast.loading('Uploading file…', { duration: Infinity });
+    try {
+      const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'audio/mpeg' });
+
+      let durationSec = 0;
+      try {
+        const url = URL.createObjectURL(blob);
+        let metaHandled = false;
+        durationSec = await new Promise<number>((resolve) => {
+          const audio = new Audio();
+          audio.onloadedmetadata = () => {
+            URL.revokeObjectURL(url);
+            if (!metaHandled) { metaHandled = true; resolve(isFinite(audio.duration) ? audio.duration : 0); }
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(url);
+            if (!metaHandled) { metaHandled = true; resolve(0); }
+          };
+          audio.src = url;
+        });
+      } catch {
+        /* duration stays 0 */
+      }
+
+      await audioRepository.save(clipId, blob);
+      patchClip(clipId, { status: 'ready', durationSec });
+
+      toast.success(`Added "${file.name}"`, { id: tid });
+      runLocalTranscription(clipId, blob);
+    } catch (e) {
+      patchClips((clips) =>
+        clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
+      );
+      toast.error(`Upload failed: ${(e as Error).message}`, { id: tid });
+    }
+  }
+
+  // ── Clip management ──────────────────────────────────────────────────────
+  async function handleDeleteClip(clipId: string) {
+    try {
+      await audioRepository.remove(clipId);
+    } catch {
+      /* ignore */
+    }
+    patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
+  }
+
+  // ── Recording complete — merge clips + compile live transcripts ──────────
+  async function handleRecordingComplete() {
+    const readyClips = sortedClips.filter(
+      (c) => c.status === 'ready' || c.status === 'transcribed',
+    );
+    if (readyClips.length > 0) {
+      setIsMerging(true);
+      try {
+        const loaded = await Promise.all(readyClips.map((c) => audioRepository.load(c.id)));
+        const blobs = loaded.filter((b): b is Blob => b !== null);
+        const dropped = readyClips.length - blobs.length;
+        if (dropped > 0) {
+          toast.info(`${dropped} clip${dropped === 1 ? '' : 's'} could not be loaded for playback.`);
+        }
+        if (blobs.length > 0) setMergedAudioBlob(await mergeAudioBlobs(blobs));
+      } catch (e) {
+        toast.error(`Could not combine clips: ${(e as Error).message}`);
+      } finally {
+        setIsMerging(false);
+      }
+    }
+
+    const liveTexts = sortedClips
+      .filter((c) => c.liveTranscript?.trim())
+      .map((c) => c.liveTranscript!.trim());
+    if (liveTexts.length > 0) {
+      const src = session?.transcriptSource;
+      if (src === undefined || src === 'webspeech') {
+        const merged = liveTexts.join('\n\n');
+        setTranscript(merged);
+        patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
+      }
+    }
+
+    setActiveTab('review');
+  }
+
+  return {
+    backgroundWarningDismissed,
+    setBackgroundWarningDismissed,
+    activeClipIdRef,
+    handleStartRecording,
+    handleStopRecording,
+    handlePauseResume,
+    handleStopAndFinish,
+    handleUploadAudio,
+    handleDeleteClip,
+    handleRecordingComplete,
+  };
+}

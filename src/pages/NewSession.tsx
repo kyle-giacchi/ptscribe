@@ -9,13 +9,11 @@ import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { newId } from '@/utils/ids';
 import { isSameDay } from '@/utils/dates';
-import { isSameDayWarningSuppressed } from '@/utils/sameDaySuppression';
 import { useToggle } from '@/hooks/useToggle';
 import { PatientRow } from '@/components/new-session/PatientRow';
 import { TemplateSection } from '@/components/new-session/TemplateSection';
 import { StartBar } from '@/components/new-session/StartBar';
 import { NewTemplateModal } from '@/components/new-session/NewTemplateModal';
-import { SameDayModal } from '@/components/new-session/SameDayModal';
 import { UNASSIGNED_PATIENT_ID } from '@/types';
 import type { NoteFormat, NoteTemplate, Patient, Session, SessionType } from '@/types';
 
@@ -53,12 +51,18 @@ export function NewSession() {
   const [showAllTemplates, showAllTemplatesOn, showAllTemplatesOff] = useToggle();
   const [creatingTemplate, openCreatingTemplate, closeCreatingTemplate] = useToggle();
   const [query, setQuery] = useState('');
-  const [sameDayModal, setSameDayModal] = useState<Session[] | null>(null);
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === patientId),
     [patients, patientId],
   );
+
+  const todaySessions = useMemo<Session[]>(() => {
+    if (!patientId) return [];
+    return sessionsForPatient(patientId).filter(
+      (s) => s.status !== 'finalized' && isSameDay(s.date, Date.now()),
+    );
+  }, [patientId, sessionsForPatient]);
 
   const filteredPatients = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -109,14 +113,25 @@ export function NewSession() {
 
   function handleStart() {
     if (!patientId) return;
-    const todaySessions = sessionsForPatient(patientId).filter(
-      (s) => s.status !== 'finalized' && isSameDay(s.date, Date.now()),
-    );
-    if (todaySessions.length > 0 && !isSameDayWarningSuppressed()) {
-      setSameDayModal(todaySessions);
-    } else {
-      doCreateSession();
-    }
+    doCreateSession();
+  }
+
+  function handleQuickNote() {
+    if (!patientId) return;
+    const now = Date.now();
+    const session: Session = {
+      id: newId(),
+      patientId,
+      type: sessionType,
+      date: now,
+      status: 'draft',
+      clips: [],
+      templateId: effectiveTemplateId || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addSession(session);
+    navigate(`/sessions/${session.id}?mode=quick`);
   }
 
   function handleRecordWithoutPatient() {
@@ -323,6 +338,33 @@ export function NewSession() {
             )}
           </SurfaceCard>
 
+          {/* Same-day inline note */}
+          {todaySessions.length > 0 && (
+            <p
+              style={{
+                margin: 0,
+                padding: '8px 12px',
+                borderRadius: 8,
+                background: 'var(--color-pt-surface-mut)',
+                border: '1px solid var(--color-pt-border)',
+                fontSize: 12.5,
+                color: 'var(--color-pt-text-3)',
+                lineHeight: 1.4,
+              }}
+            >
+              Note: this patient already has a session today (started at{' '}
+              {todaySessions
+                .map((s) =>
+                  new Date(s.date).toLocaleTimeString(undefined, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  }),
+                )
+                .join(', ')}
+              ).
+            </p>
+          )}
+
           {/* Visit type + Template */}
           <SurfaceCard padding={16}>
             <div style={{ display: 'grid', gap: 16 }}>
@@ -391,6 +433,27 @@ export function NewSession() {
           <div style={{ textAlign: 'center' }}>
             <button
               type="button"
+              disabled={!patientId}
+              onClick={handleQuickNote}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--color-pt-border)',
+                borderRadius: 8,
+                padding: '7px 16px',
+                fontSize: 12.5,
+                color: patientId ? 'var(--color-pt-text-2)' : 'var(--color-pt-text-3)',
+                cursor: patientId ? 'pointer' : 'default',
+                fontFamily: 'inherit',
+                opacity: patientId ? 1 : 0.5,
+              }}
+            >
+              Quick Note — type directly, no recording
+            </button>
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
               onClick={handleRecordWithoutPatient}
               style={{
                 background: 'transparent',
@@ -417,16 +480,6 @@ export function NewSession() {
         onCreate={handleCreateTemplate}
       />
 
-      <SameDayModal
-        sessions={sameDayModal}
-        patient={selectedPatient}
-        onClose={() => setSameDayModal(null)}
-        onContinue={(sessionId) => navigate(`/sessions/${sessionId}`)}
-        onCreateNew={() => {
-          setSameDayModal(null);
-          doCreateSession();
-        }}
-      />
     </div>
   );
 }
