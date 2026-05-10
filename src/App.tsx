@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AppDataProvider } from '@/contexts/AppDataProvider';
 import { ClinicianProvider } from '@/contexts/ClinicianProvider';
 import { PatientsProvider } from '@/contexts/PatientsProvider';
@@ -16,6 +16,7 @@ import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
 import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { isDemoMode } from '@/lib/demoMode';
 import { Setup } from '@/pages/Setup';
 import { Landing } from '@/pages/Landing';
@@ -73,6 +74,32 @@ function AppProviders() {
                                     <Route path="/exercises" element={<Exercises />} />
                                     <Route path="/settings" element={<Settings />} />
                                   </Route>
+                                  <Route
+                                    path="*"
+                                    element={
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          height: '100%',
+                                          gap: 12,
+                                          color: 'var(--color-fg)',
+                                          fontSize: 15,
+                                        }}
+                                      >
+                                        <span style={{ fontSize: 32, lineHeight: 1 }}>404</span>
+                                        <span>Page not found</span>
+                                        <Link
+                                          to="/today"
+                                          style={{ color: 'var(--color-accent)', fontSize: 14 }}
+                                        >
+                                          Go to dashboard
+                                        </Link>
+                                      </div>
+                                    }
+                                  />
                                 </Routes>
                               </Suspense>
                             </FirstRunGuard>
@@ -93,27 +120,29 @@ function AppProviders() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route
-            path="*"
-            element={
-              isDemoMode() ? (
-                <AppGate>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Navigate to="/home" replace />} />
+            <Route path="/home" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route
+              path="*"
+              element={
+                isDemoMode() ? (
+                  <AppGate>
+                    <AppProviders />
+                  </AppGate>
+                ) : (
                   <AppProviders />
-                </AppGate>
-              ) : (
-                <AppProviders />
-              )
-            }
-          />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+                )
+              }
+            />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

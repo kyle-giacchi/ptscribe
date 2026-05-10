@@ -126,15 +126,12 @@ function ClipRow({
             aria-label="Delete clip"
             onClick={() => setPendingDelete(true)}
             disabled={blocked}
-            className="transition-colors hover:bg-[var(--color-pt-surface-mut)] disabled:opacity-40"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] disabled:opacity-40"
             style={{
-              padding: 6,
               borderRadius: 6,
               border: '1px solid var(--color-pt-border)',
               background: 'var(--color-pt-surface)',
               color: 'var(--color-pt-red)',
-              display: 'inline-flex',
-              alignItems: 'center',
               cursor: blocked ? 'not-allowed' : 'pointer',
             }}
           >

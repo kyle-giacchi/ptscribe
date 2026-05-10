@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { Toaster } from '@/components/ui/Toaster';
+import { OfflineIndicator } from './OfflineIndicator';
 import { duration, ease } from '@/lib/motion';
 import { isDemoMode } from '@/lib/demoMode';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -46,6 +47,7 @@ export function AppShell() {
   if (isDemoMode()) {
     return (
       <div className="h-[100dvh] w-[100dvw] overflow-hidden">
+        <OfflineIndicator />
         <div
           className="grid h-full w-full overflow-hidden"
           style={{ ...shellBox, gridTemplateRows: 'auto auto 1fr' }}
@@ -76,6 +78,7 @@ export function AppShell() {
 
   return (
     <div className="h-[100dvh] w-[100dvw] overflow-hidden">
+      <OfflineIndicator />
       <div
         className="app-shell-grid grid h-full w-full overflow-hidden"
         style={shellBox}
