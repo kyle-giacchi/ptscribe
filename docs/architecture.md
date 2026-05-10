@@ -39,15 +39,19 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 ## Boot sequence
 
 1. `main.tsx` renders `<App />` inside `<StrictMode>`.
-2. `App.tsx` instantiates the provider tree (see [invariants.md](invariants.md) for nesting order).
-3. `AppDataProvider` calls `dataRepository.load()` synchronously in the `useState` initializer.
+2. `App.tsx` wraps everything in `<ErrorBoundary>` — any uncaught render error shows a "reload" screen rather than a blank page.
+3. `AuthProvider` (BetterAuth) resolves the session. Public routes (`/home`, `/login`, `/auth/callback`) render outside the app provider tree.
+4. `VaultGate` checks for an existing vault. If one exists but is locked it shows the passphrase prompt; if none exists it renders children immediately.
+5. `AppDataProvider` calls `dataRepository.load()` synchronously in the `useState` initializer.
    - `DataRepository.load()` reads `safeLocalStorage.getItem('ptnotes.appData')`.
-   - Runs `migrate(parsed)` to bring old versions up to current.
+   - Runs `migrate(parsed)` to bring old versions up to current (currently v15).
    - Runs `AppDataSchema.safeParse(migrated)`. On failure, logs and returns `null`.
    - `AppDataProvider` falls back to `defaultAppData()` when `load()` returns `null`. The default seeds built-in templates (SOAP, Evaluation, Progress, Discharge) and the built-in exercise library.
-4. Slice providers read their slice from `appData` via `useAppData()`.
-5. `FirstRunGuard` fires a `useEffect` after first render. If `clinician.name` is empty and path is not `/setup`, it redirects to `/setup`.
-6. The Setup wizard collects the clinician's name + credentials (and optional AI keys) and navigates to `/`.
+   - For authenticated non-demo users, calls `navigator.storage.persist()` to request durable storage.
+6. Slice providers read their slice from `appData` via `useAppData()`.
+7. `IdleLockProvider` arms a timer (duration from `settings.security.idleLockMinutes`) that calls `vault.lock()` on idle.
+8. `FirstRunGuard` fires a `useEffect` after first render. If `clinician.name` is empty and path is not `/setup`, it redirects to `/setup`.
+9. The Setup wizard collects the clinician's name + credentials (and optional AI keys) and navigates to `/today`.
 
 ## Units and coordinate systems
 
@@ -72,6 +76,8 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 | `ExercisesProvider` | `useExercises()` | `addExercise`, `updateExercise` (no-op for builtins), `removeExercise` (no-op for builtins)                                                                                                                                                                                                                                            |
 | `PlansProvider`     | `usePlans()`     | `addPlan`, `updatePlan`, `removePlan`, `setPlans`                                                                                                                                                                                                                                                                                      |
 | `SettingsProvider`  | `useSettings()`  | `updateAi(patch)`, `setDensity('cozy' \| 'compact')`, `setSidebarCollapsed(bool)`, `setRetentionDays(n?)`                                                                                                                                                                                                                              |
+| `IdleLockProvider`  | —                | No mutators. Reads `settings.security.idleLockMinutes`; calls `vault.lock()` after that many minutes of inactivity. Must be inside `SettingsProvider`.                                                                                                                                                                                  |
+| `AuthProvider`      | `useAuth()`      | Wraps BetterAuth (passkey + magic link, served via Worker at `/api/auth`). Sits at router level, outside the app provider tree. Exposes `isAuthenticated`, `user`, `signOut`.                                                                                                                                                           |
 
 `AppDataProvider` owns persistence. Slice providers are thin wrappers that give domain-scoped mutators; they read from `appData` and delegate writes back up via `updateXSlice`.
 
@@ -83,11 +89,12 @@ Without this split, every consumer of a single global context would re-render on
 
 ## Storage key namespace
 
-| Store                       | Key / name                                   | Contents                                      |
-| --------------------------- | -------------------------------------------- | --------------------------------------------- |
-| `localStorage`              | `ptnotes.appData`                            | Full `AppData` JSON blob (≤ 5 MB)             |
-| `localStorage`              | `ptnotes.vault`                              | Wrapped DEK + KDF params; tab-scoped key only |
-| IndexedDB (`ptnotes-audio`) | object store `recordings`, key = `sessionId` | Raw audio Blob per session                    |
+| Store                       | Key / name                                      | Contents                                                            |
+| --------------------------- | ----------------------------------------------- | ------------------------------------------------------------------- |
+| `localStorage`              | `ptnotes.appData`                               | Full `AppData` JSON blob (≤ 5 MB)                                   |
+| `localStorage`              | `ptnotes.vault`                                 | Wrapped DEK + KDF params; tab-scoped key only                       |
+| IndexedDB (`ptnotes-audio`) | object store `recordings`, key = `clipId`       | Final consolidated audio Blob per clip (written on recorder stop)   |
+| IndexedDB (`ptnotes-audio`) | object store `recording_chunks`, key = `clipId` | Per-chunk write-ahead log during recording; cleared after clip save |
 
 Defined in `src/lib/storageKeys.ts`.
 
@@ -104,8 +111,9 @@ AI calls flow `browser → our Cloudflare Worker → provider`. Provider credent
 
 Wire details:
 
-- `/api/transcribe` accepts `Content-Type: application/octet-stream` (raw bytes, no base64). Optional `x-ptscribe-model` and `x-ptscribe-language` headers override defaults. Response is `{ text: string }`.
-- `/api/generate` accepts a JSON body forwarded near-verbatim to Anthropic. The Worker injects the API key and the `anthropic-version` header; the browser does not.
+- `/api/transcribe` accepts `Content-Type: application/octet-stream` (raw bytes, no base64). Optional `x-ptscribe-model` and `x-ptscribe-language` headers override defaults. Response is `{ text: string }`. Client retries up to 3 times on network errors or 408/425/429/5xx with delays of 500 ms → 1.5 s → 4 s.
+- `/api/generate` accepts a JSON body forwarded near-verbatim to Anthropic. The Worker injects the API key, `anthropic-version`, and the per-tone-style system-prompt block. Client retries up to 2 times on 429/5xx with delays of 1 s → 3 s.
+- Prompt caching: `callAnthropic` sends `cacheSystem: true` by default — the Worker marks the system prompt with `cache_control: ephemeral` so Anthropic caches it across calls that share the same template.
 - Local development: `vite.config.ts` proxies `/api/*` → `http://localhost:8787` (the wrangler dev server). `npm run dev` and `wrangler dev` run side by side.
 - Provider value `'none'` short-circuits both calls so the workflow stays manual (Web Speech for live transcript, hand-edited notes).
 
