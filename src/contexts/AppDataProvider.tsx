@@ -24,6 +24,8 @@ import { defaultAppData } from '@/schemas';
 import { dataRepository } from '@/services/DataRepository';
 import { audioRepository } from '@/services/AudioRepository';
 import { vault } from '@/lib/vault/vault';
+import { AuthContext } from '@/contexts/AuthContext';
+import { isDemoMode } from '@/lib/demoMode';
 
 const SAVE_DEBOUNCE_MS = 300;
 
@@ -50,6 +52,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [corruptWarning, setCorruptWarning] = useState(false);
   const [twoTabWarning, setTwoTabWarning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAuthenticated = useContext(AuthContext)?.isAuthenticated ?? false;
+
+  useEffect(() => {
+    if (!isDemoMode() && isAuthenticated && navigator.storage?.persist) {
+      void navigator.storage.persist();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,11 +84,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // Purge orphaned recording chunks — chunks whose clipId no longer
       // exists in any session (tab crash mid-recording or reset-without-stop).
       const activeClipIds = new Set(data.sessions.flatMap((s) => s.clips.map((c) => c.id)));
-      void audioRepository.listChunkSessionIds().then((chunkIds) => {
-        for (const id of chunkIds) {
-          if (!activeClipIds.has(id)) void audioRepository.clearChunks(id);
-        }
-      });
+      void audioRepository
+        .listChunkSessionIds()
+        .then((chunkIds) => {
+          for (const id of chunkIds) {
+            if (!activeClipIds.has(id)) {
+              void audioRepository.clearChunks(id).catch((err: unknown) => {
+                console.warn(`[AppDataProvider] Failed to clear orphaned chunks for clip ${id}:`, err);
+              });
+            }
+          }
+        })
+        .catch((err: unknown) => {
+          console.warn('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
+        });
     })();
     return () => {
       cancelled = true;
@@ -170,7 +188,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateSettingsSlice: (next) => merge('settings', next),
       bulkUpdate,
       resetAll: () => {
-        setAppData(defaultAppData());
+        const fresh = defaultAppData();
+        setAppData(fresh);
+        scheduleSave(fresh);
       },
     };
   }, [appData, merge, bulkUpdate]);
@@ -199,7 +219,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           role="alert"
           style={{
             position: 'fixed',
-            top: corruptWarning ? 44 : 0,
+            top: corruptWarning ? 44 : 0, // 44 ≈ single-line corrupt banner height (10px padding × 2 + 13px font + border)
             left: 0,
             right: 0,
             zIndex: 9999,

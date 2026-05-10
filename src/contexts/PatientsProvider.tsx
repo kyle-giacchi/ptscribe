@@ -25,12 +25,16 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
       const patientSessions = appData.sessions.filter((s) => s.patientId === id);
       const sessionIds = new Set(patientSessions.map((s) => s.id));
 
-      // Crypto-shred: fire-and-forget deletion of encrypted audio blobs from IndexedDB.
-      for (const session of patientSessions) {
-        for (const clip of session.clips) {
-          void audioRepository.remove(clip.id);
-        }
-      }
+      // Crypto-shred: delete encrypted audio blobs from IndexedDB.
+      // Use allSettled so a single IndexedDB failure doesn't block the record deletion below.
+      const removePromises = patientSessions.flatMap((session) =>
+        session.clips.map((clip) =>
+          audioRepository.remove(clip.id).catch((err: unknown) => {
+            console.warn(`[PatientsProvider] Failed to delete audio for clip ${clip.id}:`, err);
+          }),
+        ),
+      );
+      void Promise.allSettled(removePromises);
 
       updateNotesSlice((notes) => notes.filter((n) => !sessionIds.has(n.sessionId)));
       updatePlansSlice((plans) => plans.filter((p) => p.patientId !== id));

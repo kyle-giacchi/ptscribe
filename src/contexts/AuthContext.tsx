@@ -13,7 +13,7 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 function mapSession(session: AuthSession): AppUser {
   const u = session.user as AuthSession['user'] & {

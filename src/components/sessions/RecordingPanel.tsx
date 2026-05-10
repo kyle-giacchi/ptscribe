@@ -11,7 +11,9 @@ import {
   AlertTriangle,
   Info,
   ArrowRight,
+  X,
 } from 'lucide-react';
+import { formatDuration } from '@/utils/format';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAudioProcessing } from '@/hooks/useAudioProcessing';
 import { Select, TextInput } from '@/components/ui/Field';
@@ -22,14 +24,6 @@ import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import type { SessionClip } from '@/types';
 
-export type ChainPhase =
-  | 'stopping'
-  | 'waiting'
-  | 'transcribing'
-  | 'post-transcribe'
-  | 'generating'
-  | null;
-
 export interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
@@ -38,7 +32,6 @@ export interface RecordingPanelProps {
   onStop: () => void;
   onStopAndFinish: () => void;
   autoFinish: boolean;
-  chainPhase: ChainPhase;
   onPauseResume: () => void;
   onDeleteClip: (clipId: string) => void;
   onUpload: (file: File) => void;
@@ -60,28 +53,140 @@ function RecordingBlankOptions({
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2 py-2">
-      <button type="button" className="btn btn-primary" onClick={onStart}>
-        <Mic size={14} strokeWidth={2} /> Record
+    <div className="flex flex-col items-center gap-5 py-8">
+      <button
+        type="button"
+        onClick={onStart}
+        aria-label="Start recording"
+        style={{
+          width: 88,
+          height: 88,
+          borderRadius: '50%',
+          background: 'var(--color-pt-accent)',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 0 0 0 var(--color-pt-accent)',
+          transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
+          (e.currentTarget as HTMLButtonElement).style.boxShadow =
+            '0 0 0 8px color-mix(in oklab, var(--color-pt-accent) 20%, transparent)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 0 0 var(--color-pt-accent)';
+        }}
+        onMouseDown={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)';
+        }}
+        onMouseUp={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
+        }}
+      >
+        <Mic size={34} strokeWidth={2} color="#ffffff" />
       </button>
-      <label className="btn btn-secondary cursor-pointer">
-        <Upload size={14} strokeWidth={2} /> Upload Audio
-        <input
-          type="file"
-          accept="audio/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              onUpload(file);
-              e.target.value = '';
-            }
-          }}
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+          Tap to start recording
+        </p>
+        <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+          Or upload an existing audio file
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="btn btn-secondary cursor-pointer text-sm">
+          <Upload size={13} strokeWidth={2} /> Upload
+          <input
+            type="file"
+            accept="audio/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                onUpload(file);
+                e.target.value = '';
+              }
+            }}
+          />
+        </label>
+        <button type="button" className="btn btn-ghost text-sm" onClick={onSkip}>
+          Skip <ArrowRight size={13} strokeWidth={2} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ActiveRecordingCard({
+  durationSec,
+  paused,
+  chainActive,
+  autoFinish,
+  onPauseResume,
+  onStop,
+  onStopAndFinish,
+}: {
+  durationSec: number;
+  paused: boolean;
+  chainActive: boolean;
+  autoFinish: boolean;
+  onPauseResume: () => void;
+  onStop: () => void;
+  onStopAndFinish: () => void;
+}) {
+  return (
+    <div
+      className="rounded-xl border"
+      style={{
+        borderColor: paused
+          ? 'var(--color-pt-border)'
+          : 'color-mix(in oklab, var(--color-pt-red) 25%, var(--color-pt-border))',
+        background: paused
+          ? 'var(--color-pt-surface-alt)'
+          : 'color-mix(in oklab, var(--color-pt-red) 4%, var(--color-pt-surface))',
+        padding: '16px 20px',
+      }}
+    >
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className="relative flex h-2.5 w-2.5 shrink-0">
+          {!paused && (
+            <span
+              className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+              style={{ background: 'var(--color-pt-red)' }}
+            />
+          )}
+          <span
+            className="relative inline-flex h-2.5 w-2.5 rounded-full"
+            style={{ background: paused ? 'var(--color-pt-text-3)' : 'var(--color-pt-red)' }}
+          />
+        </span>
+        <span
+          className="text-[11px] font-bold uppercase tracking-widest"
+          style={{ color: paused ? 'var(--color-pt-text-2)' : 'var(--color-pt-red)' }}
+        >
+          {paused ? 'Paused' : 'Recording'}
+        </span>
+        <span
+          className="font-mono text-2xl font-semibold tabular-nums"
+          style={{ color: 'var(--color-pt-text)', marginLeft: 'auto' }}
+        >
+          {formatDuration(durationSec)}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <ActiveRecordingControls
+          paused={paused}
+          onPauseResume={onPauseResume}
+          onStop={onStop}
+          onStopAndFinish={onStopAndFinish}
+          autoFinish={autoFinish}
+          chainActive={chainActive}
         />
-      </label>
-      <button type="button" className="btn btn-ghost" onClick={onSkip}>
-        Skip <ArrowRight size={14} strokeWidth={2} />
-      </button>
+      </div>
     </div>
   );
 }
@@ -94,7 +199,6 @@ export function RecordingPanel({
   onStop,
   onStopAndFinish,
   autoFinish,
-  chainPhase,
   onPauseResume,
   onDeleteClip,
   onUpload,
@@ -111,6 +215,10 @@ export function RecordingPanel({
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
 
+  // Persistent banner flag: set when idle-auto-stop fires, cleared when the PT
+  // resumes recording or explicitly dismisses the notice.
+  const [wasAutoStopped, setWasAutoStopped] = useState(false);
+
   useEffect(() => {
     if (recorder.hardCapStopped) {
       toast.warning(
@@ -121,11 +229,16 @@ export function RecordingPanel({
 
   useEffect(() => {
     if (recorder.idleAutoStopped) {
-      toast.warning(
-        `Auto-stopped after ${settings.recordingLimits.idleAutoStopMinutes} min of silence. Start a new clip when you're ready.`,
-      );
+      setWasAutoStopped(true);
     }
-  }, [recorder.idleAutoStopped, settings.recordingLimits.idleAutoStopMinutes]);
+  }, [recorder.idleAutoStopped]);
+
+  // Clear the banner the moment a new recording begins.
+  useEffect(() => {
+    if (recorder.status === 'recording') {
+      setWasAutoStopped(false);
+    }
+  }, [recorder.status]);
 
   if (idle && clips.length === 0) {
     return <RecordingBlankOptions onStart={onStart} onUpload={onUpload} onSkip={onSkip} />;
@@ -133,8 +246,6 @@ export function RecordingPanel({
 
   return (
     <div className="space-y-3">
-      {chainPhase && <ChainProgressBanner phase={chainPhase} />}
-
       {wasBackgrounded && (
         <div
           role="status"
@@ -163,18 +274,72 @@ export function RecordingPanel({
         </div>
       )}
 
-      <RecordingControlRow
-        idle={idle}
-        recording={recording}
-        paused={recorder.status === 'paused'}
-        onStart={onStart}
-        onPauseResume={onPauseResume}
-        onStop={onStop}
-        onStopAndFinish={onStopAndFinish}
-        autoFinish={autoFinish}
-        chainActive={!!chainPhase}
-        onUpload={onUpload}
-      />
+      {wasAutoStopped && !recording && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-xs"
+          style={{
+            borderColor: 'var(--color-caution)',
+            color: 'var(--color-caution)',
+            background: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
+          }}
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
+            <span>
+              Recording auto-stopped after {settings.recordingLimits.idleAutoStopMinutes} min of
+              inactivity. Tap <strong>Resume</strong> to start a new clip.
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 py-0.5 text-xs"
+              style={{ color: 'var(--color-caution)' }}
+              onClick={() => {
+                setWasAutoStopped(false);
+                void onStart();
+              }}
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 p-0.5"
+              aria-label="Dismiss auto-stop notice"
+              style={{ color: 'var(--color-caution)' }}
+              onClick={() => setWasAutoStopped(false)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {recording ? (
+        <ActiveRecordingCard
+          durationSec={recorder.durationSec}
+          paused={recorder.status === 'paused'}
+          chainActive={false}
+          autoFinish={autoFinish}
+          onPauseResume={onPauseResume}
+          onStop={onStop}
+          onStopAndFinish={onStopAndFinish}
+        />
+      ) : (
+        <RecordingControlRow
+          idle={idle}
+          recording={false}
+          paused={false}
+          onStart={onStart}
+          onPauseResume={onPauseResume}
+          onStop={onStop}
+          onStopAndFinish={onStopAndFinish}
+          autoFinish={autoFinish}
+          chainActive={false}
+          onUpload={onUpload}
+        />
+      )}
 
       {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}
 
@@ -339,38 +504,6 @@ function RecordingSizeHint({ durationSec }: { durationSec: number }) {
       style={{ color: tone.color, background: tone.bg, borderColor: tone.border }}
     >
       {message}
-    </div>
-  );
-}
-
-function ChainProgressBanner({ phase }: { phase: NonNullable<ChainPhase> }) {
-  // User-facing label for each chained step. "waiting" and "post-transcribe"
-  // are short transition states sandwiched between visible work — collapse them
-  // into the surrounding label so the banner doesn't flicker.
-  const label = (() => {
-    switch (phase) {
-      case 'stopping':
-      case 'waiting':
-        return 'Saving recording…';
-      case 'transcribing':
-      case 'post-transcribe':
-        return 'Transcribing…';
-      case 'generating':
-        return 'Generating note…';
-    }
-  })();
-  return (
-    <div
-      role="status"
-      className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs"
-      style={{
-        borderColor: 'var(--color-pt-accent-border)',
-        background: 'color-mix(in oklab, var(--color-pt-accent) 10%, transparent)',
-        color: 'var(--color-pt-accent-fg)',
-      }}
-    >
-      <Loader2 size={14} className="animate-spin" />
-      <span>{label}</span>
     </div>
   );
 }

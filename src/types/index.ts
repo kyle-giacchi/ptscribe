@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 13;
+export const APP_DATA_VERSION = 15;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -122,6 +122,17 @@ export interface Note {
   sections: NoteSection[];
   finalized: boolean;
   finalizedAt?: number;
+  /**
+   * Timestamp (ms) of the first save after a finalized note was unlocked and
+   * edited. Set on the first qualifying save; never overwritten after that.
+   */
+  editedAfterFinalizedAt?: number;
+  /**
+   * Running count of save operations that occurred after finalization.
+   * Incremented each time `updateNote` is called while `finalized` was true
+   * at the time of unlock.
+   */
+  editedAfterFinalizedCount?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -266,6 +277,7 @@ export interface PlanOfCare {
 export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'local' | 'none';
 export type GenerationProvider = 'anthropic' | 'none';
 export type DensityMode = 'cozy' | 'compact';
+export type ThemeMode = 'system' | 'light' | 'dark';
 
 export interface AISettings {
   transcription: {
@@ -371,6 +383,7 @@ export interface Settings {
   ui: {
     sidebarCollapsed: boolean;
     densityMode: DensityMode;
+    theme: ThemeMode;
   };
   retention: {
     autoDeleteAudioAfterDays?: number;

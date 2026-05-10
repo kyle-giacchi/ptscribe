@@ -468,7 +468,19 @@ export function Settings() {
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 12 }}>
           <Eyebrow>Appearance</Eyebrow>
-          <div style={{ maxWidth: 280 }}>
+          <div style={{ maxWidth: 280, display: 'grid', gap: 10 }}>
+            <Field label="Theme">
+              <Select
+                value={settings.ui.theme ?? 'system'}
+                onChange={(e) =>
+                  updateUi({ theme: e.target.value as 'system' | 'light' | 'dark' })
+                }
+              >
+                <option value="system">System (follow OS preference)</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </Select>
+            </Field>
             <Field label="Density">
               <Select
                 value={settings.ui.densityMode}
