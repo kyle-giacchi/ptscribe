@@ -47,6 +47,62 @@ export interface AppDataContextValue {
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
+/** Remove audio clips whose createdAt timestamp predates `cutoffMs`. Fire-and-forget per clip. */
+export function purgeStaleAudio(
+  sessions: AppData['sessions'],
+  repo: { remove: (id: string) => Promise<void> },
+  cutoffMs: number,
+): void {
+  for (const session of sessions) {
+    for (const clip of session.clips) {
+      if (clip.createdAt < cutoffMs) void repo.remove(clip.id);
+    }
+  }
+}
+
+/**
+ * Clear recording chunks whose clipId is not in `activeClipIds`.
+ * Orphans accumulate when a tab crashes mid-recording or a reset happens without stopping first.
+ */
+export async function purgeOrphanChunks(
+  activeClipIds: Set<string>,
+  repo: {
+    listChunkSessionIds: () => Promise<string[]>;
+    clearChunks: (id: string) => Promise<void>;
+  },
+): Promise<void> {
+  let chunkIds: string[];
+  try {
+    chunkIds = await repo.listChunkSessionIds();
+  } catch (err) {
+    console.warn('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
+    return;
+  }
+  for (const id of chunkIds) {
+    if (!activeClipIds.has(id)) {
+      void repo.clearChunks(id).catch((err: unknown) => {
+        console.warn(`[AppDataProvider] Failed to clear orphaned chunks for clip ${id}:`, err);
+      });
+    }
+  }
+}
+
+function handleSaveError(err: unknown): void {
+  console.error('AppData save failed', err);
+  const msg = err instanceof Error ? err.message : '';
+  if (msg.includes('QuotaExceeded') || msg.includes('quota') || msg.includes('storage')) {
+    toast.error(
+      'Storage quota exceeded — your data could not be saved. Free up space or export a backup.',
+    );
+  } else if (msg.includes('vault') && msg.includes('another tab')) {
+    toast.error(
+      'Vault is open in another tab — save blocked. Close the other tab or lock the vault there.',
+    );
+  } else {
+    toast.error('Failed to save data. Check the console for details.');
+  }
+}
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [appData, setAppData] = useState<AppData | null>(null);
   const [corruptWarning, setCorruptWarning] = useState(false);
@@ -70,34 +126,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       if (dataRepository.hasCorruptData()) setCorruptWarning(true);
       if (vault.isTwoTabConflict()) setTwoTabWarning(true);
 
-      // Purge audio blobs beyond the retention window (fire-and-forget).
       const days = data.settings.retention.autoDeleteAudioAfterDays;
       if (days) {
-        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-        for (const session of data.sessions) {
-          for (const clip of session.clips) {
-            if (clip.createdAt < cutoff) void audioRepository.remove(clip.id);
-          }
-        }
+        purgeStaleAudio(data.sessions, audioRepository, Date.now() - days * 24 * 60 * 60 * 1000);
       }
 
-      // Purge orphaned recording chunks — chunks whose clipId no longer
-      // exists in any session (tab crash mid-recording or reset-without-stop).
       const activeClipIds = new Set(data.sessions.flatMap((s) => s.clips.map((c) => c.id)));
-      void audioRepository
-        .listChunkSessionIds()
-        .then((chunkIds) => {
-          for (const id of chunkIds) {
-            if (!activeClipIds.has(id)) {
-              void audioRepository.clearChunks(id).catch((err: unknown) => {
-                console.warn(`[AppDataProvider] Failed to clear orphaned chunks for clip ${id}:`, err);
-              });
-            }
-          }
-        })
-        .catch((err: unknown) => {
-          console.warn('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
-        });
+      void purgeOrphanChunks(activeClipIds, audioRepository);
     })();
     return () => {
       cancelled = true;
@@ -113,21 +148,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const scheduleSave = useCallback((next: AppData) => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      dataRepository.save(next).catch((err: unknown) => {
-        console.error('AppData save failed', err);
-        const msg = err instanceof Error ? err.message : '';
-        if (msg.includes('QuotaExceeded') || msg.includes('quota') || msg.includes('storage')) {
-          toast.error(
-            'Storage quota exceeded — your data could not be saved. Free up space or export a backup.',
-          );
-        } else if (msg.includes('vault') && msg.includes('another tab')) {
-          toast.error(
-            'Vault is open in another tab — save blocked. Close the other tab or lock the vault there.',
-          );
-        } else {
-          toast.error('Failed to save data. Check the console for details.');
-        }
-      });
+      dataRepository.save(next).catch(handleSaveError);
     }, SAVE_DEBOUNCE_MS);
   }, []);
 

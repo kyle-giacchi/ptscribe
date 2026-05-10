@@ -1,6 +1,6 @@
 # CLAUDE.md — PTScribe
 
-**PTScribe** is a 100% client-side note-taking + transcription app for physical therapists, modeled on Heidi-style "record the visit, get a structured note." Tracks patients, sessions (audio + transcript + generated note), customizable templates, an exercise library, and per-patient plans of care. Headline workflow: open a session → record (or dictate) → transcribe (Cloudflare Workers AI Whisper) → generate a structured note (Anthropic) → finalize.
+**PTScribe** is a note-taking + transcription app for physical therapists, modeled on Heidi-style "record the visit, get a structured note." All clinical data stays on-device (`localStorage` + IndexedDB). Tracks patients, sessions (audio + transcript + generated note), customizable templates, an exercise library, and per-patient plans of care. Headline workflow: open a session → record (or dictate) → transcribe (Cloudflare Workers AI / Deepgram Nova-3) → generate a structured note (Anthropic) → finalize. A Cloudflare Worker serves as the AI proxy (`/api/*`) and auth backend (`/api/auth`); it never stores clinical data.
 
 ## Before editing
 
@@ -31,7 +31,7 @@
 npm run dev              Dev server on port 8080
 npm run build            Production build
 npm run build:dev        Dev-mode build (no minification)
-npm run lint             ESLint — baseline is 0 errors. The 10 react-refresh/only-export-components warnings (9 slice providers + 1 PDF helper module) are accepted.
+npm run lint             ESLint. Target: 0 errors. Note: pre-commit hook runs typecheck + vitest but NOT lint — run this manually before PRs.
 npm run format           Prettier write
 npm run format:check     Prettier check (CI gate)
 npm run preview          Preview production build locally
@@ -45,7 +45,9 @@ npm run test:e2e:update  Update Playwright snapshots
 
 ## Stack
 
-See [README.md](README.md) for the full stack overview. Key agent-relevant detail: AI calls go through our Cloudflare Worker proxy (`/api/transcribe`, `/api/generate`) — credentials are server-side secrets; the browser never sees them.
+See [README.md](README.md) for the full stack overview. Key agent-relevant details:
+- AI calls go through our Cloudflare Worker proxy (`/api/transcribe`, `/api/generate`) — provider credentials are server-side secrets; the browser never sees them.
+- Auth (BetterAuth with passkey + magic link) is also served by the Worker at `/api/auth`.
 
 ## Documentation
 
@@ -66,7 +68,7 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 
 ## Hard rules
 
-- **No backend.** No auth, no server, no analytics. All data is `localStorage` (`AppData`) + IndexedDB (audio) — both client-side.
+- **All clinical data is client-side.** `AppData` lives in `localStorage`; audio lives in IndexedDB. Do not add a server-side database, telemetry, or analytics that exfiltrates session content. The Cloudflare Worker is a proxy only — it never stores or logs clinical data.
 - **AI calls go through our Worker proxy.** Whisper and Anthropic are reached via `POST /api/transcribe` and `POST /api/generate` on our Cloudflare Worker; provider credentials are server-side secrets the browser never sees. Requests carry the `AppGate` 6-digit code in `x-ptscribe-key` (obscurity, not auth — abuse caps live server-side). Settings still surfaces a HIPAA disclaimer because data still leaves the device.
 - **Single write path.** Components/hooks never touch `localStorage` or IndexedDB directly — go through a slice provider mutator → `updateXSlice` → `DataRepository.save()`, or through `AudioRepository` for audio Blobs.
 - **Validate only at I/O boundaries.** `AppDataSchema.safeParse()` runs on load and on JSON import. Skip it for in-memory state.
