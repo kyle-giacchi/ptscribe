@@ -6,7 +6,7 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 
 | Topic                                                                    | File:Line                                                                  |
 | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Provider nesting order                                                   | [invariants.md:5](invariants.md#provider-nesting-order)                    |
+| Provider nesting order (ErrorBoundary → AuthProvider → VaultGate → AppDataProvider → … → IdleLockProvider → FirstRunGuard) | [invariants.md:5](invariants.md#provider-nesting-order) |
 | Single write path (component → slice → AppDataProvider → DataRepository) | [invariants.md:25](invariants.md#single-write-path)                        |
 | Schema validation rule (`safeParse` only on load/import)                 | [invariants.md:48](invariants.md#schema-validation-at-boundaries)          |
 | Slice mutator pattern (`add` / `update` / `remove` / `set`)              | [invariants.md:58](invariants.md#slice-mutator-pattern)                    |
@@ -40,12 +40,12 @@ Provider hierarchy, data flow, boot sequence, persistence (localStorage + Indexe
 | ------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Layering                  | One-way dependency direction (`pages → hooks → contexts → services`).                                    |
 | Data flow                 | Mutation chain with 300ms debounce. Audio takes a parallel path through `AudioRepository`.               |
-| Boot sequence             | `main.tsx` → `App.tsx` → load + migrate + safeParse → first-run redirect.                                |
+| Boot sequence             | `main.tsx` → `ErrorBoundary` → `AuthProvider` → `VaultGate` → `AppDataProvider` (load + migrate v15 + safeParse) → `IdleLockProvider` → first-run redirect. |
 | Units & coordinates       | Dates = ms timestamps; durations = minutes; IDs = UUID; transcripts/notes = strings.                     |
 | Provider responsibilities | Master table of every hook + every mutator.                                                              |
 | Why slice providers       | Re-render scoping rationale.                                                                             |
 | Storage key namespace     | `ptnotes.appData` (localStorage) + `ptnotes-audio` IDB store.                                            |
-| AI services               | Cloudflare Workers AI Whisper (transcription) + Anthropic (generation), browser-direct, BYO credentials. |
+| AI services               | Cloudflare Workers AI / Deepgram Nova-3 (transcription) + Anthropic claude-sonnet-4-6 (generation); both Worker-proxied — browser never sees provider credentials. |
 | Schema validation         | `safeParse` on load and on JSON import; never `parse` in render.                                         |
 
 ### [docs/invariants.md](invariants.md)
@@ -70,7 +70,7 @@ Non-obvious rules that fail silently if violated. **Read first before any cross-
 
 ### [docs/style-guide.md](style-guide.md)
 
-UI/UX style guide: soft gray-blue ground + soft orange accent, motion timing scale, typography pairing (Fraunces + Manrope), component conventions. Read before any visual change.
+UI/UX style guide: dark navy frame + white card surface, cyan-teal accent, Inter typography, motion timing, component conventions (`.btn`, `.card`, inline confirmation, toast). Read before any visual change.
 
 ### [docs/personas.md](personas.md)
 

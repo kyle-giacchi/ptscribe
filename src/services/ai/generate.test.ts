@@ -1,5 +1,33 @@
-import { describe, it, expect } from 'vitest';
-import { extractJson } from './generate';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { extractJson, generateNote } from './generate';
+import type { GenerateNoteArgs } from './generate';
+import { callAnthropic } from './client/anthropic';
+import type { NoteTemplate, Patient } from '@/types';
+
+vi.mock('./client/anthropic');
+vi.mock('@/lib/clinical/prompts', () => ({
+  buildUserPrompt: vi.fn().mockReturnValue('mock user prompt'),
+}));
+
+const mockCallAnthropic = vi.mocked(callAnthropic);
+
+const mockTemplate = {
+  systemPrompt: 'You are a PT assistant.',
+  sections: [
+    { key: 'subjective', label: 'Subjective', defaultContent: '' },
+    { key: 'plan', label: 'Plan', defaultContent: '' },
+  ],
+} as unknown as NoteTemplate;
+
+const mockPatient = { id: 'p-1', name: 'Jane Doe' } as unknown as Patient;
+
+const baseArgs: GenerateNoteArgs = {
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-6',
+  template: mockTemplate,
+  transcript: 'Patient presents with knee pain.',
+  patient: mockPatient,
+};
 
 describe('extractJson', () => {
   it('parses a bare JSON object', () => {
@@ -44,5 +72,61 @@ describe('extractJson', () => {
 
   it('throws on an empty string', () => {
     expect(() => extractJson('')).toThrow('AI response did not contain a JSON object');
+  });
+});
+
+describe('generateNote', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('maps sections from the template using the JSON keys in the model response', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({
+      text: '{"subjective":"knee pain on flexion","plan":"strengthening exercises"}',
+    });
+
+    const result = await generateNote(baseArgs);
+
+    expect(result.sections).toEqual([
+      { key: 'subjective', label: 'Subjective', body: 'knee pain on flexion' },
+      { key: 'plan', label: 'Plan', body: 'strengthening exercises' },
+    ]);
+  });
+
+  it('sets body to empty string when the model omits a section key', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({
+      text: '{"subjective":"knee pain"}',
+    });
+
+    const result = await generateNote(baseArgs);
+
+    expect(result.sections[0].body).toBe('knee pain');
+    expect(result.sections[1].body).toBe('');
+  });
+
+  it('passes model, systemPrompt, and toneStyle through to callAnthropic', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+    await generateNote({ ...baseArgs, toneStyle: 'terse' });
+
+    expect(mockCallAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'claude-sonnet-4-6',
+        system: mockTemplate.systemPrompt,
+        toneStyle: 'terse',
+      }),
+    );
+  });
+
+  it('throws for the "none" provider', async () => {
+    await expect(generateNote({ ...baseArgs, provider: 'none' })).rejects.toThrow(
+      'AI generation is disabled',
+    );
+  });
+
+  it('throws for an unknown provider', async () => {
+    await expect(
+      generateNote({ ...baseArgs, provider: 'bogus' as GenerateNoteArgs['provider'] }),
+    ).rejects.toThrow('Unknown generation provider: bogus');
   });
 });
