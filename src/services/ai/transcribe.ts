@@ -1,6 +1,5 @@
 import type { TranscriptionProvider } from '@/types';
 import { transcribeWithCloudflare } from './client/cloudflare';
-import { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } from './client/localWhisper';
 
 export interface TranscribeArgs {
   blob: Blob;
@@ -26,8 +25,12 @@ const backends: Record<TranscriptionProvider, Backend> = {
     });
     return { text: out.text, source: 'whisper' };
   },
-  local: (args) =>
-    transcribeLocally(args.blob, args.model || LOCAL_WHISPER_DEFAULT_MODEL, args.onProgress),
+  local: async (args) => {
+    const { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } = await import(
+      './client/localWhisper'
+    );
+    return transcribeLocally(args.blob, args.model || LOCAL_WHISPER_DEFAULT_MODEL, args.onProgress);
+  },
   webspeech: () => {
     // Live web-speech transcription accumulates separately via the
     // useTranscription hook; this code path is only reached for

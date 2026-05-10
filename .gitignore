@@ -6,6 +6,12 @@ groupfinanceapp.xlsx
 # Brainstorm artifacts
 .superpowers/
 
+# Internal planning / analysis docs (not for public repo)
+docs/superpowers/
+docs/analysis/
+docs/personas.md
+docs/future-concerns.md
+
 # Build & deps
 node_modules/
 dist/

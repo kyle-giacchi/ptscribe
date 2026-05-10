@@ -669,11 +669,14 @@ function VisitRow({
   const summary = session.transcript?.slice(0, 90).trim() || labelForType(session.type);
   const pendingSign = note && !note.finalized;
 
+  const noteBadgeTone = note?.finalized ? 'on-track' : note ? 'next' : ('done' as const);
+  const noteBadgeLabel = note?.finalized ? 'Final' : note ? 'Draft' : 'No Note';
+
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '110px 1fr auto auto',
+        gridTemplateColumns: '110px 1fr auto auto auto',
         gap: 14,
         alignItems: 'center',
         padding: '12px 18px',
@@ -701,6 +704,7 @@ function VisitRow({
       >
         {summary}
       </div>
+      <StatusBadge tone={noteBadgeTone} label={noteBadgeLabel} />
       {pendingSign && note ? (
         <button
           type="button"

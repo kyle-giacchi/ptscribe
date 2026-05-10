@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { migrate, CURRENT_VERSION } from './migrations';
 import { AppDataSchema, defaultAppData } from '@/schemas';
+import { UNASSIGNED_PATIENT_ID } from '@/types';
 
 const baseV2Session = {
   id: 'session-1',
@@ -63,11 +64,24 @@ function v3AppData(overrides: Record<string, unknown> = {}): Record<string, unkn
 }
 
 describe('migrate: future-version guard', () => {
-  it('throws when data version is newer than CURRENT_VERSION', () => {
+  it('returns data as-is when version is newer than CURRENT_VERSION', () => {
     const data = { ...defaultAppData(), version: CURRENT_VERSION + 1 };
-    expect(() => migrate(data)).toThrow(
-      `data version ${CURRENT_VERSION + 1} is newer than CURRENT_VERSION`,
-    );
+    const result = migrate(data);
+    expect(result.version).toBe(CURRENT_VERSION + 1);
+  });
+
+  it('logs a warning when data version is newer than CURRENT_VERSION', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const data = { ...defaultAppData(), version: CURRENT_VERSION + 1 };
+      migrate(data);
+      expect(warnSpy).toHaveBeenCalledOnce();
+      const warnMsg = warnSpy.mock.calls[0][0] as string;
+      expect(warnMsg).toContain(`${CURRENT_VERSION + 1}`);
+      expect(warnMsg).toContain('newer than');
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('throws when data has no version field', () => {
@@ -582,6 +596,306 @@ describe('migrate v12 → v13', () => {
 
   it('produces output that passes AppDataSchema.safeParse', () => {
     const result = migrate(v12AppData());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+// ─── Migration robustness: missing-fields at boundary ───────────────────────
+
+/**
+ * v10 → v11: adds tenantId. Test with an object that has no tenantId at all.
+ */
+describe('migrate v10 → v11: missing-fields robustness', () => {
+  function v10Minimal(): Record<string, unknown> {
+    const seed = defaultAppData();
+    // Remove tenantId to simulate data that never had it.
+    const { tenantId: _t, ...rest } = seed as unknown as Record<string, unknown>;
+    void _t;
+    return { ...rest, version: 10 };
+  }
+
+  it('does not throw when tenantId is absent', () => {
+    expect(() => migrate(v10Minimal())).not.toThrow();
+  });
+
+  it("defaults tenantId to 'local' when absent", () => {
+    const result = migrate(v10Minimal());
+    expect(result.tenantId).toBe('local');
+  });
+
+  it('preserves an existing tenantId', () => {
+    const data = { ...v10Minimal(), tenantId: 'org-abc' };
+    const result = migrate(data);
+    expect(result.tenantId).toBe('org-abc');
+  });
+
+  it('does not throw when tenantId is null (corrupt)', () => {
+    const data = { ...v10Minimal(), tenantId: null };
+    expect(() => migrate(data)).not.toThrow();
+  });
+
+  it('produces output that passes AppDataSchema.safeParse', () => {
+    const result = migrate(v10Minimal());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+/**
+ * v11 → v12: adds settings.session.autoFinish + seeds Unassigned patient.
+ * Test with settings that have no session block and patients array that is missing.
+ */
+describe('migrate v11 → v12: missing-fields robustness', () => {
+  function v11Minimal(): Record<string, unknown> {
+    const seed = defaultAppData();
+    const settings = { ...(seed.settings as unknown as Record<string, unknown>) } as Record<string, unknown>;
+    delete settings.session;
+    return {
+      ...seed,
+      version: 11,
+      settings,
+      // Also remove patients to ensure it seeds Unassigned even from empty array.
+      patients: [],
+    };
+  }
+
+  it('does not throw when settings.session is absent', () => {
+    expect(() => migrate(v11Minimal())).not.toThrow();
+  });
+
+  it('defaults autoFinish to false when settings.session is absent', () => {
+    const result = migrate(v11Minimal());
+    expect(result.settings.session.autoFinish).toBe(false);
+  });
+
+  it('seeds the Unassigned patient when patients array is empty', () => {
+    const result = migrate(v11Minimal());
+    const unassigned = result.patients.find(
+      (p) => p.id === UNASSIGNED_PATIENT_ID,
+    );
+    expect(unassigned).toBeDefined();
+    expect(unassigned?.firstName).toBe('Unassigned');
+  });
+
+  it('does not duplicate the Unassigned patient when already present', () => {
+    const base = v11Minimal();
+    const now = Date.now();
+    (base.patients as Record<string, unknown>[]).push({
+      id: UNASSIGNED_PATIENT_ID,
+      firstName: 'Unassigned',
+      lastName: '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const result = migrate(base);
+    const count = result.patients.filter((p) => p.id === UNASSIGNED_PATIENT_ID).length;
+    expect(count).toBe(1);
+  });
+
+  it('does not throw when patients is null (corrupt)', () => {
+    const base = { ...v11Minimal(), patients: null };
+    expect(() => migrate(base)).not.toThrow();
+  });
+
+  it('seeds Unassigned patient even when patients field is null (corrupt)', () => {
+    const base = { ...v11Minimal(), patients: null };
+    const result = migrate(base);
+    const unassigned = result.patients.find(
+      (p) => p.id === UNASSIGNED_PATIENT_ID,
+    );
+    expect(unassigned).toBeDefined();
+  });
+
+  it('produces output that passes AppDataSchema.safeParse', () => {
+    const result = migrate(v11Minimal());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+/**
+ * v12 → v13: adds recordingLimits, orgPolicy, firstRun.
+ * Test with settings that have all three blocks missing (already covered above)
+ * plus null values on each field.
+ */
+describe('migrate v12 → v13: null/corrupt field robustness', () => {
+  it('does not throw when recordingLimits fields are null', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        recordingLimits: {
+          softWarnAtMinutes: null,
+          maxMinutes: null,
+          idleAutoStopMinutes: null,
+        },
+      } as unknown,
+    };
+    expect(() => migrate(data)).not.toThrow();
+  });
+
+  it('falls back to defaults when recordingLimits fields are null', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        recordingLimits: {
+          softWarnAtMinutes: null,
+          maxMinutes: null,
+          idleAutoStopMinutes: null,
+        },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.recordingLimits).toEqual({
+      softWarnAtMinutes: 75,
+      maxMinutes: 90,
+      idleAutoStopMinutes: 10,
+    });
+  });
+
+  it('does not throw when orgPolicy.toneStyle is null', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        orgPolicy: { toneStyle: null, activeTemplateId: null },
+      } as unknown,
+    };
+    expect(() => migrate(data)).not.toThrow();
+  });
+
+  it('falls back to narrative toneStyle when value is null', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        orgPolicy: { toneStyle: null },
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.orgPolicy.toneStyle).toBe('narrative');
+  });
+
+  it('does not throw when firstRun is null', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        firstRun: null,
+      } as unknown,
+    };
+    expect(() => migrate(data)).not.toThrow();
+  });
+
+  it('produces an empty firstRun object when the field is null (corrupt)', () => {
+    const seed = defaultAppData();
+    const data: Record<string, unknown> = {
+      ...seed,
+      version: 12,
+      settings: {
+        ...seed.settings,
+        firstRun: null,
+      } as unknown,
+    };
+    const result = migrate(data);
+    expect(result.settings.firstRun).toEqual({});
+  });
+});
+
+// ─── Chain-migration robustness ──────────────────────────────────────────────
+
+describe('full chain migration from v1', () => {
+  it('migrates v1 data all the way to CURRENT_VERSION without throwing', () => {
+    expect(() => migrate(v1AppData())).not.toThrow();
+  });
+
+  it('produces CURRENT_VERSION output from v1 data', () => {
+    const result = migrate(v1AppData());
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it('produces schema-valid output from v1 data', () => {
+    const result = migrate(v1AppData());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+describe('full chain migration from v5', () => {
+  function v5Minimal(): Record<string, unknown> {
+    const seed = defaultAppData();
+    return {
+      ...seed,
+      version: 5,
+      settings: {
+        ...seed.settings,
+        // Strip fields added in later migrations to simulate genuine v5 data.
+        audio: { silenceDetection: seed.settings.audio.silenceDetection },
+        security: undefined,
+        session: undefined,
+        recordingLimits: undefined,
+        orgPolicy: undefined,
+        firstRun: undefined,
+      } as unknown,
+      tenantId: undefined,
+      patients: [],
+    };
+  }
+
+  it('migrates v5 data all the way to CURRENT_VERSION without throwing', () => {
+    expect(() => migrate(v5Minimal())).not.toThrow();
+  });
+
+  it('produces CURRENT_VERSION output from v5 data', () => {
+    const result = migrate(v5Minimal());
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it('produces schema-valid output from v5 data', () => {
+    const result = migrate(v5Minimal());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+describe('full chain migration from v9', () => {
+  function v9Minimal(): Record<string, unknown> {
+    const seed = defaultAppData();
+    return {
+      ...seed,
+      version: 9,
+      // Omit tenantId, session settings, and v13 slices to simulate genuine v9 data.
+      settings: {
+        ...seed.settings,
+        session: undefined,
+        recordingLimits: undefined,
+        orgPolicy: undefined,
+        firstRun: undefined,
+      } as unknown,
+      tenantId: undefined,
+      patients: [],
+    };
+  }
+
+  it('migrates v9 data all the way to CURRENT_VERSION without throwing', () => {
+    expect(() => migrate(v9Minimal())).not.toThrow();
+  });
+
+  it('produces CURRENT_VERSION output from v9 data', () => {
+    const result = migrate(v9Minimal());
+    expect(result.version).toBe(CURRENT_VERSION);
+  });
+
+  it('produces schema-valid output from v9 data', () => {
+    const result = migrate(v9Minimal());
     expect(AppDataSchema.safeParse(result).success).toBe(true);
   });
 });

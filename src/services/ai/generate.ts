@@ -8,7 +8,7 @@ import type {
   ToneStyle,
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
-import { buildSystemPrompt, buildUserPrompt } from '@/lib/clinical/prompts';
+import { buildUserPrompt } from '@/lib/clinical/prompts';
 
 export interface GenerateNoteArgs {
   provider: GenerationProvider;
@@ -40,7 +40,11 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
 
     const result = await callAnthropic({
       model: args.model || 'claude-sonnet-4-6',
-      system: buildSystemPrompt(args.template, args.toneStyle),
+      // Send the raw template system prompt WITHOUT the tone block. The Worker
+      // appends the tone block server-side from its static TONE_BLOCKS constant,
+      // so the string Anthropic caches is always built from a stable source.
+      system: args.template.systemPrompt,
+      toneStyle: args.toneStyle,
       user: userPrompt,
       signal: args.signal,
     });
@@ -76,6 +80,18 @@ export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNote
  * wrap JSON in markdown fences or add a leading sentence; this is forgiving.
  */
 export function extractJson(text: string): Record<string, unknown> {
+  // Prefer a bare JSON object in the raw text — avoids matching a prose code fence that precedes the JSON block.
+  const bareStart = text.indexOf('{');
+  const bareEnd = text.lastIndexOf('}');
+  if (bareStart !== -1 && bareEnd > bareStart) {
+    try {
+      return JSON.parse(text.slice(bareStart, bareEnd + 1)) as Record<string, unknown>;
+    } catch {
+      // Fall through to fence-based extraction.
+    }
+  }
+
+  // Fall back: extract from the first code fence.
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidate = fenced ? fenced[1] : text;
   const start = candidate.indexOf('{');
@@ -83,9 +99,8 @@ export function extractJson(text: string): Record<string, unknown> {
   if (start === -1 || end === -1 || end <= start) {
     throw new Error('AI response did not contain a JSON object');
   }
-  const slice = candidate.slice(start, end + 1);
   try {
-    return JSON.parse(slice) as Record<string, unknown>;
+    return JSON.parse(candidate.slice(start, end + 1)) as Record<string, unknown>;
   } catch (e) {
     throw new Error(`Failed to parse AI JSON: ${(e as Error).message}`, { cause: e });
   }

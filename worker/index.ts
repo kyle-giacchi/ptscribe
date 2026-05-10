@@ -29,9 +29,31 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
 }
 
+type ToneStyle = 'narrative' | 'terse' | 'clinical';
+
+/**
+ * Tone blocks are kept server-side so the composed system prompt is built from
+ * a static constant — the exact string that Anthropic caches never varies due
+ * to client-side reconstruction differences.
+ */
+const TONE_BLOCKS: Record<ToneStyle, string> = {
+  narrative: 'Write in flowing professional prose. Full sentences. Clinical but readable.',
+  terse:
+    'Write in bullet-point shorthand. Phrases over sentences. Skip articles where ambiguity is low. Prefer abbreviations a PT will recognize (PROM, AROM, MMT, WBAT, NWB, etc.).',
+  clinical:
+    'Write in formal clinical documentation style. Third-person passive where natural. Use precise anatomical and biomechanical terminology. Cite specific measurements when transcript supplies them.',
+};
+
+const DEFAULT_TONE: ToneStyle = 'narrative';
+
 interface GenerateBody {
   model?: string;
+  /** Raw template system prompt — WITHOUT the tone block. The Worker appends
+   *  the tone block from TONE_BLOCKS so the cached string is always built from
+   *  a server-side constant. */
   system?: string;
+  /** Tone style key. Defaults to 'narrative'. */
+  toneStyle?: ToneStyle;
   user?: string;
   maxTokens?: number;
   temperature?: number;
@@ -103,10 +125,11 @@ function withSecurityHeaders(res: Response, url: URL): Response {
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' https://fonts.googleapis.com",
+    "style-src-attr 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "media-src 'self' blob:",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self' https://huggingface.co https://*.huggingface.co https://cdn-lfs.huggingface.co",
     "worker-src 'self' blob:",
     "object-src 'none'",
@@ -122,7 +145,7 @@ function withSecurityHeaders(res: Response, url: URL): Response {
   headers.set('Referrer-Policy', 'no-referrer');
   headers.set(
     'Permissions-Policy',
-    'camera=(), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()',
+    'camera=(), geolocation=(), payment=(), usb=(), bluetooth=(), magnetometer=(), accelerometer=(), gyroscope=()',
   );
   // HSTS only meaningful for HTTPS clients; safe to send unconditionally because
   // browsers ignore it on HTTP. Cloudflare is HTTPS-only in production.
@@ -398,11 +421,18 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
   }
 
+  // Compose the final system prompt server-side so the cached string is built
+  // from a static constant (TONE_BLOCKS) rather than a client-reconstructed
+  // string, guaranteeing stable Anthropic prompt-cache keys.
+  const toneStyle: ToneStyle =
+    body.toneStyle && body.toneStyle in TONE_BLOCKS ? body.toneStyle : DEFAULT_TONE;
+  const finalSystem = `${body.system.trimEnd()}\n\n# Tone & style\n${TONE_BLOCKS[toneStyle]}`;
+
   const cacheSystem = body.cacheSystem !== false;
   const systemBlocks = [
     cacheSystem
-      ? { type: 'text', text: body.system, cache_control: { type: 'ephemeral' } }
-      : { type: 'text', text: body.system },
+      ? { type: 'text', text: finalSystem, cache_control: { type: 'ephemeral' } }
+      : { type: 'text', text: finalSystem },
   ];
 
   const upstream = await fetch('https://api.anthropic.com/v1/messages', {
@@ -470,7 +500,8 @@ async function checkGlobalDailyLimit(env: Env): Promise<{ allowed: boolean }> {
 
 async function checkRateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
   if (!env.RATE_LIMIT) return { allowed: true };
-
+  // KV read → increment → write is not atomic: two simultaneous requests at the limit
+  // can both pass. Acceptable at this traffic scale; do not assume strong consistency.
   const now = Date.now();
   const minuteKey = `rl:min:${ip}:${Math.floor(now / 60_000)}`;
   const dayKey = `rl:day:${ip}:${Math.floor(now / 86_400_000)}`;
