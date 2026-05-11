@@ -12,7 +12,7 @@ import {
 describe('SUPPORTED_SPEEDS / DEFAULT_SPEED', () => {
   it('exposes the locked-in speed factor list', () => {
     expect(SUPPORTED_SPEEDS).toEqual([1.25, 1.5, 1.75]);
-    expect(DEFAULT_SPEED).toBe(1.5);
+    expect(DEFAULT_SPEED).toBe(1.25);
   });
 });
 

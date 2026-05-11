@@ -362,7 +362,7 @@ function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> 
         speed:
           existingSu?.speed === 1.25 || existingSu?.speed === 1.5 || existingSu?.speed === 1.75
             ? existingSu.speed
-            : 1.5,
+            : 1.25,
       },
     },
   };

@@ -300,7 +300,7 @@ export function defaultAppData(): AppData {
       },
       audio: {
         silenceDetection: { enabled: true, sensitivity: 'medium', padMs: 400 },
-        speedUp: { enabled: true, speed: 1.5 },
+        speedUp: { enabled: true, speed: 1.25 },
       },
       security: { idleLockMinutes: 10 },
       session: { autoFinish: false },

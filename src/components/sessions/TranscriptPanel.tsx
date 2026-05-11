@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Sparkles, Loader2, Layers, Info, RotateCcw, ChevronDown, Search } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
-  getTranscribableClips,
   mergeClipTranscriptsWithMarkers,
   stripClipMarkers,
 } from '@/utils/clips';
@@ -97,12 +96,6 @@ export function TranscriptPanel({
   const [findStr, setFindStr] = useState('');
   const [replaceStr, setReplaceStr] = useState('');
   const [replaceCount, setReplaceCount] = useState<number | null>(null);
-  const transcribableClips = getTranscribableClips(clips);
-  const latestId = transcribableClips.at(-1)?.id ?? '';
-  const [selectedClipId, setSelectedClipId] = useState(latestId);
-  const activeClipId = transcribableClips.some((c) => c.id === selectedClipId)
-    ? selectedClipId
-    : latestId;
 
   const budgetSpent = transcribeUsed >= transcribeCap;
 
@@ -127,7 +120,7 @@ export function TranscriptPanel({
     if (hasUserEdits) {
       setPendingOverwrite(true);
     } else {
-      onCreateTranscript(transcribableClips.length > 1 ? activeClipId : undefined);
+      onCreateTranscript();
     }
   }
 
@@ -161,7 +154,7 @@ export function TranscriptPanel({
           onCancel={() => setPendingOverwrite(false)}
           onConfirm={() => {
             setPendingOverwrite(false);
-            onCreateTranscript(transcribableClips.length > 1 ? activeClipId : undefined);
+            onCreateTranscript();
           }}
         />
       ) : pendingRemerge ? (
@@ -178,29 +171,13 @@ export function TranscriptPanel({
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             {canTranscribe && (
-              <>
-                {transcribableClips.length > 1 && (
-                  <select
-                    className="input h-8 py-0 text-sm"
-                    value={activeClipId}
-                    onChange={(e) => setSelectedClipId(e.target.value)}
-                    disabled={transcribing}
-                  >
-                    {transcribableClips.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        Clip {clips.findIndex((x) => x.id === c.id) + 1}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <CreateTranscriptButton
-                  busy={transcribing}
-                  disabled={budgetSpent}
-                  used={transcribeUsed}
-                  cap={transcribeCap}
-                  onClick={handleCreateClick}
-                />
-              </>
+              <CreateTranscriptButton
+                busy={transcribing}
+                disabled={budgetSpent}
+                used={transcribeUsed}
+                cap={transcribeCap}
+                onClick={handleCreateClick}
+              />
             )}
             {canRemerge && (
               <button type="button" className="btn btn-ghost" onClick={handleRemergeClick}>
