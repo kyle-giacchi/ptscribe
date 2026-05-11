@@ -54,18 +54,20 @@ function ClipRow({
     clip.status === 'transcribing' ||
     clip.status === 'transcribed' ||
     clip.status === 'failed';
+
   return (
     <div
-      className="rounded-lg border"
+      className="overflow-hidden rounded-xl"
       style={{
-        borderColor: 'var(--color-pt-border)',
+        border: '1px solid var(--color-pt-border)',
         background: 'var(--color-pt-surface)',
-        padding: 10,
       }}
     >
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Header row */}
+      <div className="flex items-start gap-3 px-3.5 pt-3.5 pb-3">
+        {/* Ordinal badge */}
         <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
           style={{
             background: 'var(--color-pt-surface-alt)',
             color: 'var(--color-pt-text-2)',
@@ -74,17 +76,22 @@ function ClipRow({
         >
           {ordinal}
         </div>
+
+        {/* Clip info */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text)' }}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--color-pt-text)' }}>
               Clip {ordinal}
             </span>
             <ClipStatusBadge status={clip.status} />
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <span
-              className="font-mono text-[11px] tabular-nums"
+              className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums"
               style={{ color: 'var(--color-pt-text-3)' }}
             >
-              <Clock size={11} className="-mt-0.5 inline" /> {formatDuration(clip.durationSec)}
+              <Clock size={10} />
+              {formatDuration(clip.durationSec)}
             </span>
             <span className="text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
               {new Date(clip.createdAt).toLocaleTimeString([], {
@@ -94,24 +101,30 @@ function ClipRow({
             </span>
           </div>
           {clip.errorMessage && (
-            <p className="mt-1 text-[11px] break-words" style={{ color: 'var(--color-negative)' }}>
+            <p
+              className="mt-1 break-words text-[11px]"
+              style={{ color: 'var(--color-negative)' }}
+            >
               {clip.errorMessage}
             </p>
           )}
         </div>
+
+        {/* Delete control */}
         {pendingDelete ? (
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               className="btn btn-ghost py-0.5 text-xs"
               onClick={() => setPendingDelete(false)}
+              style={{ touchAction: 'manipulation' }}
             >
               Cancel
             </button>
             <button
               type="button"
               className="btn btn-ghost py-0.5 text-xs"
-              style={{ color: 'var(--color-negative)' }}
+              style={{ color: 'var(--color-negative)', touchAction: 'manipulation' }}
               onClick={() => {
                 setPendingDelete(false);
                 onDelete();
@@ -126,39 +139,44 @@ function ClipRow({
             aria-label="Delete clip"
             onClick={() => setPendingDelete(true)}
             disabled={blocked}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] disabled:opacity-40"
+            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-pt-red-soft)] disabled:opacity-40"
             style={{
-              borderRadius: 6,
-              border: '1px solid var(--color-pt-border)',
-              background: 'var(--color-pt-surface)',
               color: 'var(--color-pt-red)',
               cursor: blocked ? 'not-allowed' : 'pointer',
+              touchAction: 'manipulation',
             }}
           >
-            <Trash2 size={12} strokeWidth={2} />
+            <Trash2 size={14} strokeWidth={2} />
           </button>
         )}
       </div>
+
       {showWaveform && (
-        <div className="mt-2">
+        <div className="px-3.5 pb-3">
           <PlaybackWaveform audioKey={clip.id} />
         </div>
       )}
+
       {clip.status === 'transcribed' && clip.transcript && (
-        <details className="mt-2">
-          <summary
-            className="cursor-pointer text-[11px]"
-            style={{ color: 'var(--color-pt-text-2)' }}
-          >
-            View transcript ({wordCount(clip.transcript)} words)
-          </summary>
-          <p
-            className="mt-1 text-xs leading-relaxed whitespace-pre-wrap"
-            style={{ color: 'var(--color-pt-text)' }}
-          >
-            {clip.transcript}
-          </p>
-        </details>
+        <div
+          className="border-t px-3.5 pb-3 pt-2.5"
+          style={{ borderColor: 'var(--color-pt-border)' }}
+        >
+          <details>
+            <summary
+              className="cursor-pointer select-none text-[11px] font-medium"
+              style={{ color: 'var(--color-pt-text-2)' }}
+            >
+              View transcript ({wordCount(clip.transcript)} words)
+            </summary>
+            <p
+              className="mt-2 whitespace-pre-wrap text-xs leading-relaxed"
+              style={{ color: 'var(--color-pt-text)' }}
+            >
+              {clip.transcript}
+            </p>
+          </details>
+        </div>
       )}
     </div>
   );
@@ -168,16 +186,16 @@ export function ClipStatusBadge({ status }: { status: ClipStatus }) {
   const meta = clipBadgeMeta(status);
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
       style={{
         background: meta.bg,
         color: meta.fg,
         border: `1px solid ${meta.border}`,
       }}
     >
-      {status === 'transcribing' && <Loader2 size={10} className="animate-spin" />}
-      {status === 'transcribed' && <CheckCircle2 size={10} />}
-      {status === 'failed' && <XCircle size={10} />}
+      {status === 'transcribing' && <Loader2 size={9} className="animate-spin" />}
+      {status === 'transcribed' && <CheckCircle2 size={9} />}
+      {status === 'failed' && <XCircle size={9} />}
       {meta.label}
     </span>
   );
@@ -193,37 +211,37 @@ export function clipBadgeMeta(status: ClipStatus): {
     case 'pending':
       return {
         label: 'Recording',
-        bg: 'var(--color-pt-surface-alt)',
-        fg: 'var(--color-pt-text-2)',
-        border: 'var(--color-pt-border)',
+        bg: 'var(--color-pt-red-soft)',
+        fg: 'var(--color-pt-red-fg)',
+        border: 'var(--color-pt-red-border)',
       };
     case 'ready':
       return {
         label: 'Ready',
-        bg: 'var(--color-pt-surface-alt)',
-        fg: 'var(--color-pt-text-2)',
-        border: 'var(--color-pt-border)',
+        bg: 'var(--color-pt-slate-soft)',
+        fg: 'var(--color-pt-slate-fg)',
+        border: 'var(--color-pt-slate-border)',
       };
     case 'transcribing':
       return {
         label: 'Transcribing',
-        bg: 'var(--color-pt-surface-alt)',
-        fg: 'var(--color-pt-text)',
-        border: 'var(--color-pt-border)',
+        bg: 'var(--color-pt-amber-soft)',
+        fg: 'var(--color-pt-amber-fg)',
+        border: 'var(--color-pt-amber-border)',
       };
     case 'transcribed':
       return {
         label: 'Transcribed',
-        bg: 'var(--color-pt-surface-alt)',
-        fg: 'var(--color-positive, var(--color-pt-text))',
-        border: 'var(--color-positive, var(--color-pt-border))',
+        bg: 'var(--color-pt-accent-soft)',
+        fg: 'var(--color-pt-accent-fg)',
+        border: 'var(--color-pt-accent-border)',
       };
     case 'failed':
       return {
         label: 'Failed',
-        bg: 'var(--color-pt-surface-alt)',
-        fg: 'var(--color-negative)',
-        border: 'var(--color-negative)',
+        bg: 'var(--color-pt-red-soft)',
+        fg: 'var(--color-pt-red-fg)',
+        border: 'var(--color-pt-red-border)',
       };
   }
 }

@@ -4,7 +4,7 @@ import { mixToMono } from './pcm';
 
 export const SUPPORTED_SPEEDS = [1.25, 1.5, 1.75] as const;
 export type SpeedFactor = (typeof SUPPORTED_SPEEDS)[number];
-export const DEFAULT_SPEED: SpeedFactor = 1.5;
+export const DEFAULT_SPEED: SpeedFactor = 1.25;
 
 export interface SpeedUpReport {
   originalSec: number;
