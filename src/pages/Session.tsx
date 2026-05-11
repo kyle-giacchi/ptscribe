@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Copy,
   LockOpen,
-  Receipt,
   Trash2,
 } from 'lucide-react';
 import { MicStatusPill, PtButton, type MicState } from '@/components/design';
@@ -19,7 +18,6 @@ import { useAppData } from '@/contexts/AppDataProvider';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useLiveTranscript } from '@/hooks/useLiveTranscript';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
-import { formatCostRange } from '@/lib/clinical/cost';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import type { Session, SessionClip } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
@@ -340,26 +338,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 </div>
               </div>
             )}
-            {sortedClips.length === 0 && recorder.status !== 'recording' && (
-              <div
-                title={`Approximate upper bound — assumes the full ${settings.recordingLimits.maxMinutes}-minute cap is used.`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  border: '1px solid var(--color-pt-border)',
-                  background: 'var(--color-pt-surface-mut)',
-                  fontSize: 11.5,
-                  color: 'var(--color-pt-text-3)',
-                  width: 'fit-content',
-                }}
-              >
-                <Receipt size={12} strokeWidth={2} />
-                {formatCostRange(settings.recordingLimits.maxMinutes)}
-              </div>
-            )}
             <RecordingPanel
               recorder={recorder}
               live={live}
@@ -466,8 +444,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           ))}
       </div>
 
-      {/* ── Bottom action bar ─────────────────────────────── */}
-      <div
+      {/* ── Bottom action bar (review tab only) ─────────────── */}
+      {activeTab === 'review' && <div
         className="flex items-center gap-3 rounded-lg px-4 py-3"
         style={{
           margin: '0 22px 22px',
@@ -551,7 +529,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             </PtButton>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── Debug drawer ──────────────────────────────────── */}
       {drawerOpen && (
