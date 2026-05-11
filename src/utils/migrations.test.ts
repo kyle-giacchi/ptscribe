@@ -392,12 +392,12 @@ describe('migrate v8 → v9', () => {
 });
 
 describe('migrate v5 → v6', () => {
-  it('injects default audio.speedUp (disabled, 1.5×) when missing', () => {
+  it('injects default audio.speedUp (disabled, 1.25×) when missing', () => {
     const data = v5AppData();
     const result = migrate(data);
 
     expect(result.version).toBe(CURRENT_VERSION);
-    expect(result.settings.audio.speedUp).toEqual({ enabled: false, speed: 1.5 });
+    expect(result.settings.audio.speedUp).toEqual({ enabled: false, speed: 1.25 });
   });
 
   it('preserves an existing audio.speedUp block if one is somehow present', () => {

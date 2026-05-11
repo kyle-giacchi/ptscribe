@@ -12,12 +12,12 @@ import {
   Info,
   ArrowRight,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAudioProcessing } from '@/hooks/useAudioProcessing';
 import { Select, TextInput } from '@/components/ui/Field';
-import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { BlobWaveform } from '@/components/audio/BlobWaveform';
 import { ClipsList } from '@/components/sessions/ClipsList';
 import type { UseRecorder } from '@/hooks/useRecorder';
@@ -43,6 +43,79 @@ export interface RecordingPanelProps {
   onDismissBackgroundWarning: () => void;
 }
 
+// ── Shared banner for all status/warning/info notices ─────────────────────────
+function StatusBanner({
+  icon,
+  color,
+  children,
+  action,
+  onDismiss,
+}: {
+  icon: ReactNode;
+  color: 'caution' | 'negative' | 'info';
+  children: ReactNode;
+  action?: ReactNode;
+  onDismiss?: () => void;
+}) {
+  const tokens =
+    color === 'caution'
+      ? {
+          border: 'var(--color-pt-amber-border)',
+          accent: 'var(--color-pt-amber)',
+          bg: 'color-mix(in oklab, var(--color-pt-amber) 8%, var(--color-pt-surface))',
+          fg: 'var(--color-pt-amber-fg)',
+        }
+      : color === 'negative'
+        ? {
+            border: 'var(--color-pt-red-border)',
+            accent: 'var(--color-pt-red)',
+            bg: 'color-mix(in oklab, var(--color-pt-red) 6%, var(--color-pt-surface))',
+            fg: 'var(--color-pt-red-fg)',
+          }
+        : {
+            border: 'var(--color-pt-accent-border)',
+            accent: 'var(--color-pt-accent)',
+            bg: 'color-mix(in oklab, var(--color-pt-accent) 7%, var(--color-pt-surface))',
+            fg: 'var(--color-pt-accent-fg)',
+          };
+
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-xs"
+      style={{
+        borderTop: `1px solid ${tokens.border}`,
+        borderRight: `1px solid ${tokens.border}`,
+        borderBottom: `1px solid ${tokens.border}`,
+        borderLeft: `3px solid ${tokens.accent}`,
+        background: tokens.bg,
+        color: tokens.fg,
+      }}
+    >
+      <span style={{ marginTop: 1, flexShrink: 0 }}>{icon}</span>
+      <span className="flex-1 leading-relaxed">{children}</span>
+      {action}
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="ml-1 flex shrink-0 items-center justify-center rounded transition-opacity hover:opacity-70"
+          style={{
+            color: tokens.fg,
+            minHeight: 24,
+            minWidth: 24,
+            touchAction: 'manipulation',
+          }}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Idle entry point — no clips yet ───────────────────────────────────────────
 function RecordingBlankOptions({
   onStart,
   onUpload,
@@ -53,57 +126,54 @@ function RecordingBlankOptions({
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-5 py-8">
-      <button
-        type="button"
-        onClick={onStart}
-        aria-label="Start recording"
-        style={{
-          width: 88,
-          height: 88,
-          borderRadius: '50%',
-          background: 'var(--color-pt-accent)',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 0 0 0 var(--color-pt-accent)',
-          transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow =
-            '0 0 0 8px color-mix(in oklab, var(--color-pt-accent) 20%, transparent)';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 0 0 var(--color-pt-accent)';
-        }}
-        onMouseDown={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.95)';
-        }}
-        onMouseUp={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)';
-        }}
-      >
-        <Mic size={34} strokeWidth={2} color="#ffffff" />
-      </button>
-      <div className="flex flex-col items-center gap-1 text-center">
-        <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+    <div className="flex flex-col items-center gap-8 px-4 py-12">
+      {/* Mic button with breathing ring */}
+      <div className="relative flex items-center justify-center">
+        <span
+          className="absolute animate-ping rounded-full"
+          style={{
+            width: 120,
+            height: 120,
+            background: 'color-mix(in oklab, var(--color-pt-accent) 16%, transparent)',
+            animationDuration: '2.4s',
+          }}
+        />
+        <button
+          type="button"
+          onClick={onStart}
+          aria-label="Start recording"
+          className="relative flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-offset-2"
+          style={{
+            width: 96,
+            height: 96,
+            background: 'var(--color-pt-accent)',
+            boxShadow: '0 8px 28px color-mix(in oklab, var(--color-pt-accent) 38%, transparent)',
+            touchAction: 'manipulation',
+          }}
+        >
+          <Mic size={38} strokeWidth={1.75} color="#ffffff" />
+        </button>
+      </div>
+
+      <div className="flex flex-col items-center gap-2 text-center">
+        <p className="text-base font-semibold" style={{ color: 'var(--color-pt-text)' }}>
           Tap to start recording
         </p>
-        <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
-          Or upload an existing audio file
+        <p
+          className="max-w-[280px] text-sm leading-relaxed"
+          style={{ color: 'var(--color-pt-text-2)' }}
+        >
+          Capture the session in real time, or upload an existing audio file
         </p>
       </div>
-      <div className="flex items-center gap-2">
-        <label className="btn btn-secondary cursor-pointer text-sm">
-          <Upload size={13} strokeWidth={2} /> Upload
+
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <label className="btn btn-secondary cursor-pointer" style={{ touchAction: 'manipulation' }}>
+          <Upload size={14} strokeWidth={2} /> Upload audio
           <input
             type="file"
             accept="audio/*"
-            style={{ display: 'none' }}
+            className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
@@ -113,14 +183,20 @@ function RecordingBlankOptions({
             }}
           />
         </label>
-        <button type="button" className="btn btn-ghost text-sm" onClick={onSkip}>
-          Skip <ArrowRight size={13} strokeWidth={2} />
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={onSkip}
+          style={{ touchAction: 'manipulation' }}
+        >
+          Skip <ArrowRight size={14} strokeWidth={2} />
         </button>
       </div>
     </div>
   );
 }
 
+// ── Active recording state ─────────────────────────────────────────────────────
 function ActiveRecordingCard({
   durationSec,
   paused,
@@ -138,59 +214,156 @@ function ActiveRecordingCard({
   onStop: () => void;
   onStopAndFinish: () => void;
 }) {
+  const accentColor = paused ? 'var(--color-pt-amber)' : 'var(--color-pt-red)';
+  const accentBorder = paused ? 'var(--color-pt-amber-border)' : 'var(--color-pt-red-border)';
+  const accentFg = paused ? 'var(--color-pt-amber-fg)' : 'var(--color-pt-red-fg)';
+  const accentBg = paused
+    ? 'color-mix(in oklab, var(--color-pt-amber) 5%, var(--color-pt-surface))'
+    : 'color-mix(in oklab, var(--color-pt-red) 5%, var(--color-pt-surface))';
+
   return (
     <div
-      className="rounded-xl border"
+      className="rounded-xl"
       style={{
-        borderColor: paused
-          ? 'var(--color-pt-border)'
-          : 'color-mix(in oklab, var(--color-pt-red) 25%, var(--color-pt-border))',
-        background: paused
-          ? 'var(--color-pt-surface-alt)'
-          : 'color-mix(in oklab, var(--color-pt-red) 4%, var(--color-pt-surface))',
-        padding: '16px 20px',
+        borderTop: `1px solid ${accentBorder}`,
+        borderRight: `1px solid ${accentBorder}`,
+        borderBottom: `1px solid ${accentBorder}`,
+        borderLeft: `4px solid ${accentColor}`,
+        background: accentBg,
+        padding: '18px 20px',
       }}
     >
-      <div className="mb-4 flex items-center gap-2.5">
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          {!paused && (
+      {/* Status row */}
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex items-center gap-2">
+          <span className="relative flex h-3 w-3 shrink-0">
+            {!paused && (
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-65"
+                style={{ background: accentColor }}
+              />
+            )}
             <span
-              className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-              style={{ background: 'var(--color-pt-red)' }}
+              className="relative inline-flex h-3 w-3 rounded-full"
+              style={{ background: accentColor }}
             />
-          )}
+          </span>
           <span
-            className="relative inline-flex h-2.5 w-2.5 rounded-full"
-            style={{ background: paused ? 'var(--color-pt-text-3)' : 'var(--color-pt-red)' }}
-          />
+            className="text-[11px] font-bold uppercase tracking-widest"
+            style={{ color: accentFg }}
+          >
+            {paused ? 'Paused' : 'Recording'}
+          </span>
         </span>
         <span
-          className="text-[11px] font-bold uppercase tracking-widest"
-          style={{ color: paused ? 'var(--color-pt-text-2)' : 'var(--color-pt-red)' }}
-        >
-          {paused ? 'Paused' : 'Recording'}
-        </span>
-        <span
-          className="font-mono text-2xl font-semibold tabular-nums"
-          style={{ color: 'var(--color-pt-text)', marginLeft: 'auto' }}
+          className="ml-auto font-mono text-3xl font-semibold tabular-nums"
+          style={{ color: 'var(--color-pt-text)', letterSpacing: '-0.02em' }}
         >
           {formatDuration(durationSec)}
         </span>
       </div>
+
+      {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
-        <ActiveRecordingControls
-          paused={paused}
-          onPauseResume={onPauseResume}
-          onStop={onStop}
-          onStopAndFinish={onStopAndFinish}
-          autoFinish={autoFinish}
-          chainActive={chainActive}
-        />
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={onPauseResume}
+          disabled={chainActive}
+          style={{ minHeight: 44, touchAction: 'manipulation' }}
+        >
+          {paused ? (
+            <>
+              <Play size={15} strokeWidth={2} /> Resume
+            </>
+          ) : (
+            <>
+              <Pause size={15} strokeWidth={2} /> Pause
+            </>
+          )}
+        </button>
+        {autoFinish ? (
+          <>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onStopAndFinish}
+              disabled={chainActive}
+              style={{ minHeight: 44, touchAction: 'manipulation' }}
+            >
+              <Square size={15} strokeWidth={2} /> Stop &amp; finish
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onStop}
+              disabled={chainActive}
+              title="Stop without auto-transcribing or generating"
+              style={{ minHeight: 44, touchAction: 'manipulation' }}
+            >
+              Stop only
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onStop}
+            disabled={chainActive}
+            style={{ minHeight: 44, touchAction: 'manipulation' }}
+          >
+            <Square size={15} strokeWidth={2} /> Stop
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
+// ── Add-another-clip row (shown when clips exist and recorder is idle) ─────────
+function ClipsActionRow({
+  onStart,
+  onUpload,
+}: {
+  onStart: () => void;
+  onUpload: (file: File) => void;
+}) {
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 rounded-xl px-4 py-3"
+      style={{
+        border: '1px solid var(--color-pt-border)',
+        background: 'var(--color-pt-surface-alt)',
+      }}
+    >
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={onStart}
+        style={{ touchAction: 'manipulation' }}
+      >
+        <Mic size={14} strokeWidth={2} /> Add clip
+      </button>
+      <label className="btn btn-ghost cursor-pointer" style={{ touchAction: 'manipulation' }}>
+        <Upload size={14} strokeWidth={2} /> Upload audio
+        <input
+          type="file"
+          accept="audio/*"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              onUpload(file);
+              e.target.value = '';
+            }
+          }}
+        />
+      </label>
+    </div>
+  );
+}
+
+// ── Main panel ─────────────────────────────────────────────────────────────────
 export function RecordingPanel({
   recorder,
   live,
@@ -215,8 +388,6 @@ export function RecordingPanel({
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
 
-  // Persistent banner flag: set when idle-auto-stop fires, cleared when the PT
-  // resumes recording or explicitly dismisses the notice.
   const [wasAutoStopped, setWasAutoStopped] = useState(false);
 
   useEffect(() => {
@@ -233,7 +404,6 @@ export function RecordingPanel({
     }
   }, [recorder.idleAutoStopped]);
 
-  // Clear the banner the moment a new recording begins.
   useEffect(() => {
     if (recorder.status === 'recording') {
       setWasAutoStopped(false);
@@ -247,55 +417,25 @@ export function RecordingPanel({
   return (
     <div className="space-y-3">
       {wasBackgrounded && (
-        <div
-          role="status"
-          className="flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-xs"
-          style={{
-            borderColor: 'var(--color-caution)',
-            color: 'var(--color-caution)',
-            background: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
-          }}
+        <StatusBanner
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          color="caution"
+          onDismiss={onDismissBackgroundWarning}
         >
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
-            <span>
-              This tab was backgrounded during recording. Audio kept saving, but on mobile the OS
-              may have paused or trimmed the clip. Verify duration after stopping.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onDismissBackgroundWarning}
-            className="btn btn-ghost shrink-0 py-0.5 text-xs"
-            style={{ color: 'var(--color-caution)' }}
-          >
-            Dismiss
-          </button>
-        </div>
+          This tab was backgrounded during recording. Audio kept saving, but on mobile the OS may
+          have paused or trimmed the clip. Verify duration after stopping.
+        </StatusBanner>
       )}
 
       {wasAutoStopped && !recording && (
-        <div
-          role="status"
-          className="flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-xs"
-          style={{
-            borderColor: 'var(--color-caution)',
-            color: 'var(--color-caution)',
-            background: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
-          }}
-        >
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
-            <span>
-              Recording auto-stopped after {settings.recordingLimits.idleAutoStopMinutes} min of
-              inactivity. Tap <strong>Resume</strong> to start a new clip.
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
+        <StatusBanner
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          color="caution"
+          action={
             <button
               type="button"
-              className="btn btn-ghost shrink-0 py-0.5 text-xs"
-              style={{ color: 'var(--color-caution)' }}
+              className="btn btn-ghost shrink-0 py-0.5 text-xs font-medium"
+              style={{ color: 'var(--color-pt-amber-fg)', touchAction: 'manipulation' }}
               onClick={() => {
                 setWasAutoStopped(false);
                 void onStart();
@@ -303,17 +443,12 @@ export function RecordingPanel({
             >
               Resume
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost shrink-0 p-0.5"
-              aria-label="Dismiss auto-stop notice"
-              style={{ color: 'var(--color-caution)' }}
-              onClick={() => setWasAutoStopped(false)}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
+          }
+          onDismiss={() => setWasAutoStopped(false)}
+        >
+          Recording auto-stopped after {settings.recordingLimits.idleAutoStopMinutes} min of
+          inactivity.
+        </StatusBanner>
       )}
 
       {recording ? (
@@ -327,39 +462,17 @@ export function RecordingPanel({
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
-        <RecordingControlRow
-          idle={idle}
-          recording={false}
-          paused={false}
-          onStart={onStart}
-          onPauseResume={onPauseResume}
-          onStop={onStop}
-          onStopAndFinish={onStopAndFinish}
-          autoFinish={autoFinish}
-          chainActive={false}
-          onUpload={onUpload}
-        />
+        <ClipsActionRow onStart={onStart} onUpload={onUpload} />
       )}
 
       {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}
 
       {recording && recorder.softWarnReached && (
-        <div
-          role="status"
-          className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs"
-          style={{
-            borderColor: 'var(--color-caution)',
-            color: 'var(--color-caution)',
-            background: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
-          }}
-        >
-          <AlertTriangle className="mt-[1px] h-3.5 w-3.5 shrink-0" />
-          <span>
-            This take has been recording for {Math.round(recorder.durationSec / 60)} min — consider
-            stopping and starting a fresh clip to keep things manageable. Auto-stop at{' '}
-            {settings.recordingLimits.maxMinutes} min.
-          </span>
-        </div>
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
+          This take has been recording for {Math.round(recorder.durationSec / 60)} min — consider
+          stopping and starting a fresh clip. Auto-stop at {settings.recordingLimits.maxMinutes}{' '}
+          min.
+        </StatusBanner>
       )}
 
       <RecordingNotices
@@ -373,96 +486,35 @@ export function RecordingPanel({
       <ClipsList clips={clips} recordingDisabled={recording} onDeleteClip={onDeleteClip} />
 
       {idle && clips.length > 0 && (
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-1">
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary w-full sm:w-auto"
             disabled={isMerging}
             onClick={onRecordingComplete}
+            style={{ minHeight: 44, touchAction: 'manipulation' }}
           >
             {isMerging ? (
               <>
-                <Loader2 size={14} className="animate-spin" /> Combining clips…
+                <Loader2 size={15} className="animate-spin" /> Combining clips…
               </>
             ) : (
               <>
-                <CheckCircle2 size={14} strokeWidth={2} /> Recording Complete
+                <CheckCircle2 size={15} strokeWidth={2} /> Recording Complete
               </>
             )}
           </button>
         </div>
       )}
 
-      {!recording && <AudioPreviewSection clips={clips} mergedAudioBlob={mergedAudioBlob} />}
+      {mergedAudioBlob && <AudioPreviewSection mergedAudioBlob={mergedAudioBlob} />}
 
       <LiveTranscriptPreview live={live} />
     </div>
   );
 }
 
-function RecordingControlRow({
-  idle,
-  paused,
-  onStart,
-  onPauseResume,
-  onStop,
-  onStopAndFinish,
-  autoFinish,
-  chainActive,
-  onUpload,
-}: {
-  idle: boolean;
-  recording: boolean;
-  paused: boolean;
-  onStart: () => void;
-  onPauseResume: () => void;
-  onStop: () => void;
-  onStopAndFinish: () => void;
-  autoFinish: boolean;
-  chainActive: boolean;
-  onUpload: (file: File) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {idle ? (
-        <>
-          <button type="button" className="btn btn-secondary" onClick={onStart}>
-            <Mic size={14} strokeWidth={2} /> Add clip
-          </button>
-          <label className="btn btn-ghost cursor-pointer">
-            <Upload size={14} strokeWidth={2} /> Upload audio
-            <input
-              type="file"
-              accept="audio/*"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  onUpload(file);
-                  e.target.value = '';
-                }
-              }}
-            />
-          </label>
-        </>
-      ) : (
-        <ActiveRecordingControls
-          paused={paused}
-          onPauseResume={onPauseResume}
-          onStop={onStop}
-          onStopAndFinish={onStopAndFinish}
-          autoFinish={autoFinish}
-          chainActive={chainActive}
-        />
-      )}
-    </div>
-  );
-}
-
-// Whisper's upload endpoint accepts up to 25 MB. We don't know the exact
-// per-second byte rate of the live recorder (Opus mono ≈ 4 KB/s, but some
-// browsers default to higher bitrates), so estimate conservatively at 8 KB/s
-// and warn well before the cap.
+// ── Estimated file size hint ───────────────────────────────────────────────────
 const ESTIMATED_BYTES_PER_SEC = 8 * 1024;
 const WHISPER_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
 const WARN_THRESHOLD_BYTES = 20 * 1024 * 1024;
@@ -473,37 +525,31 @@ function RecordingSizeHint({ durationSec }: { durationSec: number }) {
   const approachingCap = estimatedBytes >= WARN_THRESHOLD_BYTES;
   const overCap = estimatedBytes >= WHISPER_UPLOAD_LIMIT_BYTES;
 
-  const tone = overCap
-    ? {
-        color: 'var(--color-caution)',
-        bg: 'color-mix(in oklab, var(--color-caution) 10%, transparent)',
-        border: 'var(--color-caution)',
-      }
-    : approachingCap
-      ? {
-          color: 'var(--color-pt-accent-fg)',
-          bg: 'color-mix(in oklab, var(--color-pt-accent) 10%, transparent)',
-          border: 'var(--color-pt-accent-border)',
-        }
-      : {
-          color: 'var(--color-fg-subtle)',
-          bg: 'transparent',
-          border: 'var(--color-pt-border)',
-        };
-
-  const message = overCap
-    ? `Estimated ~${estimatedMb.toFixed(1)} MB — past the 25 MB Whisper upload limit. Stop and start a new clip.`
-    : approachingCap
-      ? `Estimated ~${estimatedMb.toFixed(1)} MB of 25 MB. Consider stopping & starting a new clip soon.`
-      : `Estimated ~${estimatedMb.toFixed(1)} MB recorded (Whisper accepts up to 25 MB per clip).`;
-
+  if (overCap) {
+    return (
+      <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+        Estimated ~{estimatedMb.toFixed(1)} MB — past the 25 MB Whisper upload limit. Stop and
+        start a new clip.
+      </StatusBanner>
+    );
+  }
+  if (approachingCap) {
+    return (
+      <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
+        Estimated ~{estimatedMb.toFixed(1)} MB of 25 MB. Consider stopping &amp; starting a new
+        clip soon.
+      </StatusBanner>
+    );
+  }
   return (
     <div
-      role="status"
-      className="rounded-md border px-3 py-1.5 text-[11px]"
-      style={{ color: tone.color, background: tone.bg, borderColor: tone.border }}
+      className="rounded-md px-3 py-1.5 text-[11px]"
+      style={{
+        border: '1px solid var(--color-pt-border)',
+        color: 'var(--color-pt-text-3)',
+      }}
     >
-      {message}
+      Estimated ~{estimatedMb.toFixed(1)} MB recorded (Whisper accepts up to 25 MB per clip).
     </div>
   );
 }
@@ -523,32 +569,45 @@ function RecordingNotices({
 }) {
   return (
     <>
+      {webspeechProvider && (
+        <div
+          className="flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+          style={{
+            background: 'var(--color-pt-accent-soft)',
+            color: 'var(--color-pt-accent-fg)',
+            border: '1px solid var(--color-pt-accent-border)',
+          }}
+        >
+          <CheckCircle2 size={10} strokeWidth={2.5} />
+          Local Transcription Enabled
+        </div>
+      )}
       {recorderError && (
-        <p className="text-xs" style={{ color: 'var(--color-negative)' }}>
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
           {recorderError}
-        </p>
+        </StatusBanner>
       )}
       {hasFailedClip && (
-        <p className="text-xs" style={{ color: 'var(--color-caution)' }}>
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
           One or more clips failed to transcribe. Open the Transcription step to retry.
-        </p>
+        </StatusBanner>
       )}
       {webspeechProvider && !liveSupported && (
-        <p className="text-xs" style={{ color: 'var(--color-caution)' }}>
-          This browser doesn't support live transcription. Switch transcription to Cloudflare in
-          Settings to transcribe recordings.
-        </p>
+        <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
+          This browser doesn&apos;t support live transcription. Switch transcription to Cloudflare
+          in Settings to transcribe recordings.
+        </StatusBanner>
       )}
       {webspeechProvider && liveSupported && (
-        <p className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
-          Browser transcription can't tell speakers apart, which can muddle the generated note when
-          the patient and clinician both talk. Upgrade to Cloudflare Nova-3 for speaker labeling.
+        <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+          Browser transcription can&apos;t tell speakers apart, which can muddle the generated note.
+          Upgrade to Cloudflare Nova-3 for speaker labeling.
         </p>
       )}
       {webspeechProvider && liveSupported && liveError && (
-        <p className="text-xs" style={{ color: 'var(--color-negative)' }}>
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
           Live transcription error: {liveError}. {liveErrorHint(liveError)}
-        </p>
+        </StatusBanner>
       )}
     </>
   );
@@ -570,73 +629,7 @@ function liveErrorHint(err: string): string {
   }
 }
 
-function ActiveRecordingControls({
-  paused,
-  onPauseResume,
-  onStop,
-  onStopAndFinish,
-  autoFinish,
-  chainActive,
-}: {
-  paused: boolean;
-  onPauseResume: () => void;
-  onStop: () => void;
-  onStopAndFinish: () => void;
-  autoFinish: boolean;
-  chainActive: boolean;
-}) {
-  return (
-    <>
-      <button
-        type="button"
-        className="btn btn-secondary"
-        onClick={onPauseResume}
-        disabled={chainActive}
-      >
-        {paused ? (
-          <>
-            <Play size={14} strokeWidth={2} /> Resume
-          </>
-        ) : (
-          <>
-            <Pause size={14} strokeWidth={2} /> Pause
-          </>
-        )}
-      </button>
-      {autoFinish ? (
-        <>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onStopAndFinish}
-            disabled={chainActive}
-          >
-            <Square size={14} strokeWidth={2} /> Stop &amp; finish
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={onStop}
-            disabled={chainActive}
-            title="Stop without auto-transcribing or generating"
-          >
-            Stop only
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onStop}
-          disabled={chainActive}
-        >
-          <Square size={14} strokeWidth={2} /> Stop
-        </button>
-      )}
-    </>
-  );
-}
-
+// ── Audio track row within AudioPreviewSection ─────────────────────────────────
 function AudioTrackRow({
   label,
   savedSec,
@@ -650,25 +643,25 @@ function AudioTrackRow({
 }) {
   return (
     <div
-      className="rounded-md border"
+      className="rounded-lg"
       style={{
-        borderColor: 'var(--color-pt-border)',
+        border: '1px solid var(--color-pt-border)',
         background: 'var(--color-pt-surface-alt)',
-        padding: 10,
+        padding: '10px 12px',
       }}
     >
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2.5 flex items-center gap-2">
         <span
-          className="text-[11px] font-semibold tracking-wide uppercase"
+          className="text-[11px] font-semibold uppercase tracking-wide"
           style={{ color: 'var(--color-pt-text-2)' }}
         >
           {label}
         </span>
         {savedSec != null && savedSec > 0 && (
           <span
-            className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
             style={{
-              background: 'color-mix(in oklab, var(--color-pt-accent) 12%, transparent)',
+              background: 'var(--color-pt-accent-soft)',
               color: 'var(--color-pt-accent-fg)',
               border: '1px solid var(--color-pt-accent-border)',
             }}
@@ -687,29 +680,10 @@ function AudioTrackRow({
   );
 }
 
-function AudioPreviewSection({
-  clips,
-  mergedAudioBlob,
-}: {
-  clips: SessionClip[];
-  mergedAudioBlob: Blob | null;
-}) {
+// ── Collapsible audio preview + processing section ────────────────────────────
+function AudioPreviewSection({ mergedAudioBlob }: { mergedAudioBlob: Blob }) {
   const { settings, updateAudio } = useSettings();
-  const playableClips = clips.filter(
-    (c) => c.status === 'ready' || c.status === 'transcribing' || c.status === 'transcribed',
-  );
-
-  const [selectedId, setSelectedId] = useState<string>('');
-
-  const activeId = playableClips.some((c) => c.id === selectedId)
-    ? selectedId
-    : (playableClips.at(-1)?.id ?? '');
-
-  // Pin selection once the first clip appears so subsequent uploads
-  // don't auto-jump the view and wipe compiled silence/speed results.
-  useEffect(() => {
-    if (!selectedId && activeId) setSelectedId(activeId);
-  }, [activeId, selectedId]);
+  const [open, setOpen] = useState(true);
 
   const {
     activeSilenced,
@@ -722,285 +696,290 @@ function AudioPreviewSection({
     compileSpeed,
     resetSilence,
     resetSpeed,
-  } = useAudioProcessing(activeId);
-
-  if (playableClips.length === 0) return null;
+  } = useAudioProcessing(mergedAudioBlob);
 
   const sd = settings.audio.silenceDetection;
   const su = settings.audio.speedUp;
-  const ordinalOf = (clipId: string) => clips.findIndex((c) => c.id === clipId) + 1;
 
   return (
     <div
-      className="rounded-lg border"
+      className="overflow-hidden rounded-xl"
       style={{
-        borderColor: 'var(--color-pt-border)',
+        border: '1px solid var(--color-pt-border)',
         background: 'var(--color-pt-surface)',
-        padding: 12,
       }}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-          {mergedAudioBlob ? 'Combined Audio' : 'Audio Preview'}
+      {/* Header row */}
+      <div
+        className="flex items-center gap-2 px-4 py-3"
+        style={{
+          borderBottom: open ? '1px solid var(--color-pt-border)' : undefined,
+        }}
+      >
+        <span className="flex-1 text-xs font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+          Combined Audio
         </span>
-        {!mergedAudioBlob && (
-          <select
-            value={activeId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            disabled={playableClips.length <= 1}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? 'Collapse audio preview' : 'Expand audio preview'}
+          className="flex items-center justify-center rounded p-1 transition-colors hover:bg-[var(--color-pt-surface-alt)]"
+          style={{ touchAction: 'manipulation' }}
+        >
+          <ChevronDown
+            size={15}
+            strokeWidth={2}
             style={{
-              background: 'var(--color-pt-surface-alt)',
-              color: 'var(--color-pt-text)',
-              border: '1px solid var(--color-pt-border)',
-              borderRadius: 6,
-              padding: '2px 8px',
-              fontSize: 12,
-              cursor: playableClips.length > 1 ? 'pointer' : 'default',
-              opacity: playableClips.length <= 1 ? 0.6 : 1,
+              color: 'var(--color-pt-text-3)',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 200ms ease',
             }}
-          >
-            {playableClips.map((c) => (
-              <option key={c.id} value={c.id}>
-                Clip {ordinalOf(c.id)}
-              </option>
-            ))}
-          </select>
-        )}
+          />
+        </button>
       </div>
 
-      <div className="space-y-2">
-        {/* Full audio track */}
-        <AudioTrackRow label="Full Audio">
-          {mergedAudioBlob ? (
+      {open && (
+        <div className="space-y-2 px-4 pb-4 pt-3">
+          <AudioTrackRow label="Full Audio">
             <BlobWaveform blob={mergedAudioBlob} />
-          ) : activeId ? (
-            <PlaybackWaveform audioKey={activeId} />
-          ) : null}
-        </AudioTrackRow>
+          </AudioTrackRow>
 
-        {/* Silence trimming — toggle + settings + result all in one card */}
-        <AudioTrackRow label="Silence Removed" savedSec={activeSilenced?.savedSec}>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={sd.enabled}
-                  onChange={(e) =>
-                    updateAudio({ silenceDetection: { ...sd, enabled: e.target.checked } })
+          <AudioTrackRow label="Silence Removed" savedSec={activeSilenced?.savedSec}>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={sd.enabled}
+                    onChange={(e) =>
+                      updateAudio({ silenceDetection: { ...sd, enabled: e.target.checked } })
+                    }
+                  />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: 'var(--color-pt-text-2)' }}
+                  >
+                    Silence trimming
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-ghost p-0.5"
+                  aria-label="About silence trimming"
+                  title={
+                    'Removes quiet gaps before transcription. The original recording is never changed.\n\n' +
+                    'Sensitivity:\n' +
+                    '  • Aggressive — best for long dead-air gaps.\n' +
+                    '  • Balanced — recommended for most PT sessions.\n' +
+                    '  • Relaxed — only drops very long, obvious silences.\n\n' +
+                    'Pad (ms) keeps audio around speech edges to avoid clipping words. Try 400–600 ms if sentences are cut off.'
                   }
-                />
-                <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
-                  Silence trimming
-                </span>
-              </label>
-              <button
-                type="button"
-                className="btn btn-ghost p-0.5"
-                aria-label="About silence trimming"
-                title={
-                  'Removes quiet gaps before transcription. The original recording is never changed.\n\n' +
-                  'Sensitivity:\n' +
-                  '  • Aggressive — best for long dead-air gaps.\n' +
-                  '  • Balanced — recommended for most PT sessions.\n' +
-                  '  • Relaxed — only drops very long, obvious silences.\n\n' +
-                  'Pad (ms) keeps audio around speech edges to avoid clipping words. Try 400–600 ms if sentences are cut off.'
-                }
-                style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
-              >
-                <Info size={13} />
-              </button>
-              {sd.enabled && (
-                <>
+                  style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
+                >
+                  <Info size={13} />
+                </button>
+                {sd.enabled && (
+                  <>
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
+                        Sensitivity
+                      </span>
+                      <Select
+                        value={sd.sensitivity}
+                        className="h-7 py-0 text-xs"
+                        onChange={(e) =>
+                          updateAudio({
+                            silenceDetection: {
+                              ...sd,
+                              sensitivity: e.target.value as 'low' | 'medium' | 'high',
+                            },
+                          })
+                        }
+                      >
+                        <option value="low">Aggressive</option>
+                        <option value="medium">Balanced</option>
+                        <option value="high">Relaxed</option>
+                      </Select>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
+                        Pad (ms)
+                      </span>
+                      <TextInput
+                        type="number"
+                        min={0}
+                        max={2000}
+                        step={50}
+                        value={String(sd.padMs)}
+                        className="h-7 w-20 py-0 text-xs"
+                        onChange={(e) => {
+                          const n = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
+                          updateAudio({ silenceDetection: { ...sd, padMs: n } });
+                        }}
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+              {sd.enabled &&
+                (activeSilenced ? (
+                  <div className="space-y-1.5">
+                    <BlobWaveform blob={activeSilenced.blob} />
+                    <button
+                      type="button"
+                      className="btn btn-ghost py-0.5 text-[11px]"
+                      onClick={resetSilence}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-xs"
+                      disabled={compilingSilence}
+                      onClick={() => void compileSilence()}
+                    >
+                      {compilingSilence ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" /> Applying…
+                        </>
+                      ) : (
+                        'Apply'
+                      )}
+                    </button>
+                    {activeSilenceError && (
+                      <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
+                        {activeSilenceError}
+                      </p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </AudioTrackRow>
+
+          <AudioTrackRow
+            label={`Speed Up (${su.speed}×)`}
+            savedSec={activeSpedup?.savedSec}
+            note={!activeSilenced ? 'Uses combined audio (no silence-removed clip)' : undefined}
+          >
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={su.enabled}
+                    onChange={(e) =>
+                      updateAudio({ speedUp: { ...su, enabled: e.target.checked } })
+                    }
+                  />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: 'var(--color-pt-text-2)' }}
+                  >
+                    Speed up
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-ghost p-0.5"
+                  aria-label="About speed up"
+                  title={
+                    'Compresses playback time by removing inter-word gaps. The original recording is never changed.\n\n' +
+                    '  • 1.25× — subtle; saves ~20% of playback time.\n' +
+                    '  • 1.5× — recommended for most sessions; saves ~33%.\n' +
+                    '  • 1.75× — aggressive; saves ~43%.'
+                  }
+                  style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
+                >
+                  <Info size={13} />
+                </button>
+                {su.enabled && (
                   <label className="flex items-center gap-2">
                     <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
-                      Sensitivity
+                      Speed
                     </span>
                     <Select
-                      value={sd.sensitivity}
+                      value={String(su.speed)}
                       className="h-7 py-0 text-xs"
                       onChange={(e) =>
                         updateAudio({
-                          silenceDetection: {
-                            ...sd,
-                            sensitivity: e.target.value as 'low' | 'medium' | 'high',
+                          speedUp: {
+                            ...su,
+                            speed: Number(e.target.value) as 1.25 | 1.5 | 1.75,
                           },
                         })
                       }
                     >
-                      <option value="low">Aggressive</option>
-                      <option value="medium">Balanced</option>
-                      <option value="high">Relaxed</option>
+                      <option value="1.25">1.25× — subtle</option>
+                      <option value="1.5">1.5× — recommended</option>
+                      <option value="1.75">1.75× — aggressive</option>
                     </Select>
                   </label>
-                  <label className="flex items-center gap-2">
-                    <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
-                      Pad (ms)
-                    </span>
-                    <TextInput
-                      type="number"
-                      min={0}
-                      max={2000}
-                      step={50}
-                      value={String(sd.padMs)}
-                      className="h-7 w-20 py-0 text-xs"
-                      onChange={(e) => {
-                        const n = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
-                        updateAudio({ silenceDetection: { ...sd, padMs: n } });
-                      }}
-                    />
-                  </label>
-                </>
-              )}
-            </div>
-            {sd.enabled &&
-              (activeSilenced ? (
-                <div className="space-y-1.5">
-                  <BlobWaveform blob={activeSilenced.blob} />
-                  <button
-                    type="button"
-                    className="btn btn-ghost py-0.5 text-[11px]"
-                    onClick={resetSilence}
-                  >
-                    Reset
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    className="btn btn-secondary text-xs"
-                    disabled={compilingSilence || !activeId}
-                    onClick={() => void compileSilence()}
-                  >
-                    {compilingSilence ? (
-                      <>
-                        <Loader2 size={12} className="animate-spin" /> Applying…
-                      </>
-                    ) : (
-                      'Apply'
+                )}
+              </div>
+              {su.enabled &&
+                (activeSpedup ? (
+                  <div className="space-y-1.5">
+                    <BlobWaveform blob={activeSpedup.blob} />
+                    <button
+                      type="button"
+                      className="btn btn-ghost py-0.5 text-[11px]"
+                      onClick={resetSpeed}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <button
+                      type="button"
+                      className="btn btn-secondary text-xs"
+                      disabled={compilingSpeed}
+                      onClick={() => void compileSpeed()}
+                    >
+                      {compilingSpeed ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" /> Applying…
+                        </>
+                      ) : (
+                        'Apply'
+                      )}
+                    </button>
+                    {activeSpeedError && (
+                      <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
+                        {activeSpeedError}
+                      </p>
                     )}
-                  </button>
-                  {activeSilenceError && (
-                    <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
-                      {activeSilenceError}
-                    </p>
-                  )}
-                </div>
-              ))}
-          </div>
-        </AudioTrackRow>
-
-        {/* Speed up — toggle + settings + result all in one card */}
-        <AudioTrackRow
-          label={`Speed Up (${su.speed}×)`}
-          savedSec={activeSpedup?.savedSec}
-          note={!activeSilenced ? 'Uses full audio (no silence-removed clip)' : undefined}
-        >
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={su.enabled}
-                  onChange={(e) => updateAudio({ speedUp: { ...su, enabled: e.target.checked } })}
-                />
-                <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
-                  Speed up
-                </span>
-              </label>
-              <button
-                type="button"
-                className="btn btn-ghost p-0.5"
-                aria-label="About speed up"
-                title={
-                  'Compresses playback time by removing inter-word gaps. The original recording is never changed.\n\n' +
-                  '  • 1.25× — subtle; saves ~20% of playback time.\n' +
-                  '  • 1.5× — recommended for most sessions; saves ~33%.\n' +
-                  '  • 1.75× — aggressive; saves ~43%.'
-                }
-                style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
-              >
-                <Info size={13} />
-              </button>
-              {su.enabled && (
-                <label className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
-                    Speed
-                  </span>
-                  <Select
-                    value={String(su.speed)}
-                    className="h-7 py-0 text-xs"
-                    onChange={(e) =>
-                      updateAudio({
-                        speedUp: { ...su, speed: Number(e.target.value) as 1.25 | 1.5 | 1.75 },
-                      })
-                    }
-                  >
-                    <option value="1.25">1.25× — subtle</option>
-                    <option value="1.5">1.5× — recommended</option>
-                    <option value="1.75">1.75× — aggressive</option>
-                  </Select>
-                </label>
-              )}
+                  </div>
+                ))}
             </div>
-            {su.enabled &&
-              (activeSpedup ? (
-                <div className="space-y-1.5">
-                  <BlobWaveform blob={activeSpedup.blob} />
-                  <button
-                    type="button"
-                    className="btn btn-ghost py-0.5 text-[11px]"
-                    onClick={resetSpeed}
-                  >
-                    Reset
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    className="btn btn-secondary text-xs"
-                    disabled={compilingSpeed}
-                    onClick={() => void compileSpeed()}
-                  >
-                    {compilingSpeed ? (
-                      <>
-                        <Loader2 size={12} className="animate-spin" /> Applying…
-                      </>
-                    ) : (
-                      'Apply'
-                    )}
-                  </button>
-                  {activeSpeedError && (
-                    <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
-                      {activeSpeedError}
-                    </p>
-                  )}
-                </div>
-              ))}
-          </div>
-        </AudioTrackRow>
-      </div>
+          </AudioTrackRow>
+        </div>
+      )}
     </div>
   );
 }
 
+// ── Live transcript overlay ────────────────────────────────────────────────────
 function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
   if (!(live.listening || live.interimText || live.finalText)) return null;
   return (
     <div
-      className="rounded-lg border px-3 py-2 text-xs"
+      className="rounded-lg px-3.5 py-2.5 text-xs"
       style={{
-        borderColor: 'var(--color-border-soft)',
-        background: 'var(--color-surface-2)',
-        color: 'var(--color-fg-muted)',
+        border: '1px solid var(--color-pt-accent-border)',
+        background: 'var(--color-pt-accent-soft)',
+        color: 'var(--color-pt-text-2)',
       }}
     >
-      <span className="font-medium">Live: </span>
-      <span style={{ color: 'var(--color-fg)' }}>{live.finalText}</span>
+      <span className="font-semibold" style={{ color: 'var(--color-pt-accent-fg)' }}>
+        Live:{' '}
+      </span>
+      <span style={{ color: 'var(--color-pt-text)' }}>{live.finalText}</span>
       {live.interimText && (
-        <span className="italic" style={{ color: 'var(--color-fg-subtle)' }}>
+        <span className="italic" style={{ color: 'var(--color-pt-text-3)' }}>
           {' '}
           {live.interimText}
         </span>

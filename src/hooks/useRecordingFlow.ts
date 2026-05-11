@@ -268,16 +268,15 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     }
 
-    const liveTexts = sortedClips
-      .filter((c) => c.liveTranscript?.trim())
-      .map((c) => c.liveTranscript!.trim());
-    if (liveTexts.length > 0) {
-      const src = session?.transcriptSource;
-      if (src === undefined || src === 'webspeech') {
-        const merged = liveTexts.join('\n\n');
-        setTranscript(merged);
-        patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
-      }
+    // Compile from best available per-clip transcript — uses local Whisper result where
+    // available, falls back to WebSpeech liveTranscript where not (e.g. Whisper failed).
+    const compiledTexts = sortedClips
+      .map((c) => (c.transcript || c.localTranscript || c.liveTranscript)?.trim())
+      .filter((t): t is string => Boolean(t));
+    if (compiledTexts.length > 0) {
+      const merged = compiledTexts.join('\n\n');
+      setTranscript(merged);
+      patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
     }
 
     setActiveTab('review');
