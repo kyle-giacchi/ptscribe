@@ -15,8 +15,7 @@ export interface PatientsContextValue {
 const PatientsContext = createContext<PatientsContextValue | null>(null);
 
 export function PatientsProvider({ children }: { children: ReactNode }) {
-  const { appData, updatePatientsSlice, updateSessionsSlice, updateNotesSlice, updatePlansSlice } =
-    useAppData();
+  const { appData, updatePatientsSlice, bulkUpdate } = useAppData();
   const patients = appData.patients;
 
   const removePatient = useCallback(
@@ -36,18 +35,14 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
       );
       void Promise.allSettled(removePromises);
 
-      updateNotesSlice((notes) => notes.filter((n) => !sessionIds.has(n.sessionId)));
-      updatePlansSlice((plans) => plans.filter((p) => p.patientId !== id));
-      updateSessionsSlice((sessions) => sessions.filter((s) => s.patientId !== id));
-      updatePatientsSlice((p) => p.filter((patient) => patient.id !== id));
+      bulkUpdate({
+        notes: appData.notes.filter((n) => !sessionIds.has(n.sessionId)),
+        plans: appData.plans.filter((p) => p.patientId !== id),
+        sessions: appData.sessions.filter((s) => s.patientId !== id),
+        patients: appData.patients.filter((p) => p.id !== id),
+      });
     },
-    [
-      appData.sessions,
-      updatePatientsSlice,
-      updateSessionsSlice,
-      updateNotesSlice,
-      updatePlansSlice,
-    ],
+    [appData, bulkUpdate],
   );
 
   const value = useMemo<PatientsContextValue>(() => {
