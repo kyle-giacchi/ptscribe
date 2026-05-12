@@ -382,7 +382,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               </div>
             </div>
           ) : (
-            <>
+            <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {quickMode && (
                 <div
                   style={{
@@ -399,7 +399,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   record audio from the Record tab if needed.
                 </div>
               )}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
               <TranscriptPanel
                 transcript={transcript}
                 clips={sortedClips}
@@ -421,6 +420,28 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 onCreateTranscript={handleCreateTranscript}
                 onRevertToLocal={handleRevertToLocal}
               />
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '6px 0',
+                }}
+              >
+                <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: '0.09em',
+                    textTransform: 'uppercase',
+                    color: 'var(--color-fg-subtle)',
+                  }}
+                >
+                  Note
+                </span>
+                <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
+              </div>
               <NotePanel
                 patient={patient}
                 note={note}
@@ -440,7 +461,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 onSectionChange={handleSectionChange}
               />
             </div>
-            </>
           ))}
       </div>
 

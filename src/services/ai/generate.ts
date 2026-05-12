@@ -6,9 +6,19 @@ import type {
   Patient,
   SessionType,
   ToneStyle,
+  TranscriptSource,
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
 import { buildUserPrompt } from '@/lib/clinical/prompts';
+
+// Appended to the system prompt when no AI (diarized) transcript is available.
+// Browser speech recognition captures a single merged audio stream with no
+// speaker labels, so we explicitly signal this to the model.
+const NO_DIARIZATION_NOTE =
+  '\n\n# Transcript speaker context\n' +
+  'This transcript was captured using browser speech recognition without speaker diarization. ' +
+  'The clinician and patient voices are merged into a single audio stream — use clinical context ' +
+  'to infer who is speaking rather than relying on speaker labels.';
 
 export interface GenerateNoteArgs {
   provider: GenerationProvider;
@@ -19,6 +29,7 @@ export interface GenerateNoteArgs {
   priorNote?: Note;
   sessionType?: SessionType;
   toneStyle?: ToneStyle;
+  transcriptSource?: TranscriptSource;
   signal?: AbortSignal;
 }
 
@@ -38,12 +49,17 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       sessionType: args.sessionType,
     });
 
+    const system =
+      args.transcriptSource === 'whisper'
+        ? args.template.systemPrompt
+        : args.template.systemPrompt.trimEnd() + NO_DIARIZATION_NOTE;
+
     const result = await callAnthropic({
       model: args.model || 'claude-sonnet-4-6',
       // Send the raw template system prompt WITHOUT the tone block. The Worker
       // appends the tone block server-side from its static TONE_BLOCKS constant,
       // so the string Anthropic caches is always built from a stable source.
-      system: args.template.systemPrompt,
+      system,
       toneStyle: args.toneStyle,
       user: userPrompt,
       signal: args.signal,
