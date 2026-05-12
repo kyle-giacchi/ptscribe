@@ -47,13 +47,19 @@ let dek: CryptoKey | null = null;
 
 type VaultMsg = { type: 'vault:unlocked' } | { type: 'vault:locked' } | { type: 'vault:query' };
 type ConflictHandler = (conflicted: boolean) => void;
+type RemoteLockHandler = () => void;
 
 let otherTabHasVault = false;
 const conflictHandlers = new Set<ConflictHandler>();
+const remoteLockHandlers = new Set<RemoteLockHandler>();
 let bc: BroadcastChannel | null = null;
 
 function notifyConflict(conflicted: boolean): void {
   conflictHandlers.forEach((h) => h(conflicted));
+}
+
+function notifyRemoteLock(): void {
+  remoteLockHandlers.forEach((h) => h());
 }
 
 if (typeof BroadcastChannel !== 'undefined') {
@@ -65,6 +71,12 @@ if (typeof BroadcastChannel !== 'undefined') {
     } else if (e.data.type === 'vault:locked') {
       otherTabHasVault = false;
       notifyConflict(false);
+      // If this tab is still unlocked, lock it too so all tabs stay in sync.
+      if (dek !== null) {
+        dek = null;
+        void auditLog.append('vault:locked');
+        notifyRemoteLock();
+      }
     } else if (e.data.type === 'vault:query') {
       if (dek !== null) bc?.postMessage({ type: 'vault:unlocked' });
     }
@@ -268,5 +280,11 @@ export const vault = {
   onConflictChange(handler: ConflictHandler): () => void {
     conflictHandlers.add(handler);
     return () => conflictHandlers.delete(handler);
+  },
+
+  /** Subscribe to be notified when another tab locks the vault. */
+  onRemoteLock(handler: RemoteLockHandler): () => void {
+    remoteLockHandlers.add(handler);
+    return () => remoteLockHandlers.delete(handler);
   },
 };

@@ -22,6 +22,7 @@ import { Setup } from '@/pages/Setup';
 import { Landing } from '@/pages/Landing';
 import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
+import { OrgNew } from '@/pages/OrgNew';
 
 const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Patients = lazy(() => import('@/pages/Patients').then((m) => ({ default: m.Patients })));
@@ -128,6 +129,7 @@ export default function App() {
             <Route path="/home" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/org/new" element={<OrgNew />} />
             <Route
               path="*"
               element={
