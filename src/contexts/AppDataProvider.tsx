@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -28,8 +27,7 @@ import { vault } from '@/lib/vault/vault';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { AuthContext } from '@/contexts/AuthContext';
 import { isDemoMode } from '@/lib/demoMode';
-
-const SAVE_DEBOUNCE_MS = 300;
+import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 
 type SliceUpdater<T> = T | ((prev: T) => T);
 
@@ -109,7 +107,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [appData, setAppData] = useState<AppData | null>(null);
   const [corruptWarning, setCorruptWarning] = useState(false);
   const [twoTabWarning, setTwoTabWarning] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAuthenticated = useContext(AuthContext)?.isAuthenticated ?? false;
 
   useEffect(() => {
@@ -126,8 +123,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       let data = loaded ?? defaultAppData();
 
       // Reset any sessions that were left in a transitional state (e.g. due to
-      // a browser crash or tab close mid-transcription / mid-generation).
-      const transitional: SessionStatus[] = ['transcribing', 'generating'];
+      // a browser crash or tab close mid-recording / mid-transcription / mid-generation).
+      const transitional: SessionStatus[] = ['recording', 'transcribing', 'generating'];
       const hasStuck = data.sessions.some((s) => transitional.includes(s.status));
       if (hasStuck) {
         data = {
@@ -182,12 +179,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const scheduleSave = useCallback((next: AppData) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      dataRepository.save(next).catch(handleSaveError);
-    }, SAVE_DEBOUNCE_MS);
-  }, []);
+  const scheduleSave = useDebouncedSave<AppData>((next) => {
+    void dataRepository.save(next).catch(handleSaveError);
+  });
 
   const merge = useCallback(
     <K extends keyof AppData>(key: K, value: SliceUpdater<AppData[K]>) => {
@@ -225,12 +219,6 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     },
     [scheduleSave],
   );
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
 
   const value = useMemo<AppDataContextValue | null>(() => {
     if (!appData) return null;

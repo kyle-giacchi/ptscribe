@@ -75,6 +75,12 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
 
+  // Used by the auto-stop finalization effect below to always call the latest
+  // handleStopRecording without including it in the effect's dep array.
+  const handleStopRecordingRef = useRef<() => Promise<void>>(async () => {});
+  // Guards against calling finalization twice for the same auto-stop event.
+  const autoStopFinalizedRef = useRef(false);
+
   // ── Recording controls ───────────────────────────────────────────────────
   async function handleStartRecording() {
     setError(null);
@@ -281,6 +287,29 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
     setActiveTab('review');
   }
+
+  // Keep ref current so the effect below always invokes the latest closure.
+  handleStopRecordingRef.current = handleStopRecording;
+
+  // When the hard cap or idle auto-stop fires, the MediaRecorder stops itself
+  // internally — handleStopRecording is never called by user action, so the clip
+  // stays 'pending' and audio is never persisted to IDB in the same session.
+  // This effect detects that condition and finalizes the clip immediately so the
+  // user doesn't need to reload to trigger useAudioRecovery.
+  useEffect(() => {
+    const autoStopped = recorder.hardCapStopped || recorder.idleAutoStopped;
+    if (!autoStopped) {
+      autoStopFinalizedRef.current = false;
+      return;
+    }
+    if (autoStopFinalizedRef.current) return;
+    if (recorder.status !== 'stopped') return;
+    autoStopFinalizedRef.current = true;
+    void handleStopRecordingRef.current();
+    // handleStopRecordingRef is a stable ref — intentionally excluded from deps.
+    // recorder.hardCapStopped / idleAutoStopped / status are the real signals.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.hardCapStopped, recorder.idleAutoStopped, recorder.status]);
 
   return {
     backgroundWarningDismissed,
