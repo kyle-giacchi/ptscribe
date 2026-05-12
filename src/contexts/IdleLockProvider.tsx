@@ -22,6 +22,14 @@ export function IdleLockProvider({ children }: { children: ReactNode }) {
   const minutes = settings.security.idleLockMinutes;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Show a toast when another tab broadcasts a vault lock so the clinician
+  // knows this tab's session has also been locked.
+  useEffect(() => {
+    return vault.onRemoteLock(() => {
+      toast.message('Vault locked by another tab.');
+    });
+  }, []);
+
   useEffect(() => {
     if (minutes <= 0) return;
     const timeoutMs = minutes * 60 * 1000;
