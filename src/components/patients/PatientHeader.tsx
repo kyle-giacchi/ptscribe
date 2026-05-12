@@ -116,7 +116,10 @@ export function PatientHeader({
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 22, marginTop: 18 }}>
+      <div
+        className="[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ display: 'flex', gap: 22, marginTop: 18, overflowX: 'auto' }}
+      >
         {TABS.map((t) => {
           const active = tab === t.value;
           return (
@@ -133,6 +136,8 @@ export function PatientHeader({
                 fontSize: 13,
                 fontWeight: active ? 600 : 500,
                 cursor: 'pointer',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
               }}
             >
               {t.label}

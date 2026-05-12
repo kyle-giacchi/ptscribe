@@ -91,6 +91,13 @@ export function Settings() {
   const importRef = useRef<HTMLInputElement>(null);
   const [showFullDisclosure, setShowFullDisclosure] = useState(false);
 
+  // ── iOS "Add to Home Screen" detection ───────────────────────────────────
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !('MSStream' in window);
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as { standalone?: boolean }).standalone === true;
+  const showIOSBanner = isIOS && !isStandalone;
+
   // ── A1 "Security & compliance" summary card ────────────────────────────────
   // Decision: keep the existing Vault & security and Data retention cards as-is
   // (they own the actual mutators) and render a compact summary here that
@@ -195,6 +202,28 @@ export function Settings() {
           Clinician profile, AI providers, and your local data.
         </p>
       </div>
+
+      {showIOSBanner && (
+        <div
+          style={{
+            borderTop: '1px solid var(--color-pt-accent-border)',
+            borderRight: '1px solid var(--color-pt-accent-border)',
+            borderBottom: '1px solid var(--color-pt-accent-border)',
+            borderLeft: '3px solid var(--color-pt-accent)',
+            background:
+              'color-mix(in oklab, var(--color-pt-accent) 7%, var(--color-pt-surface))',
+            borderRadius: 10,
+            padding: '12px 14px',
+            fontSize: 13,
+            color: 'var(--color-pt-accent-fg)',
+            lineHeight: 1.55,
+          }}
+        >
+          For the best experience on iPhone, tap the <strong>Share</strong> button and select{' '}
+          <strong>Add to Home Screen</strong>. This gives PTScribe more reliable storage and
+          prevents the screen from dimming during sessions.
+        </div>
+      )}
 
       <SurfaceCard padding={18}>
         <div style={{ display: 'grid', gap: 12 }}>
