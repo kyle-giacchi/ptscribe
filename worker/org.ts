@@ -5,31 +5,33 @@ import { createAuth } from './auth';
 import { sendOrgInviteEmail } from './email';
 import type { Env } from './index';
 
+const VALID_ROLES = new Set(['admin', 'manager', 'standard', 'student']);
+
 interface OrgDb {
   org_invite_token: {
     token: string;
-    org_name: string | null;
-    expires_at: number;
-    consumed_at: number | null;
+    orgName: string | null;
+    expiresAt: number;
+    consumedAt: number | null;
   };
   organization: {
     id: string;
     name: string;
-    contact_email: string;
+    contactEmail: string;
     phone: string;
-    created_at: number;
+    createdAt: number;
   };
   user: {
     id: string;
     name: string;
     email: string;
-    email_verified: number;
+    emailVerified: number;
     image: string | null;
-    plan_tier: string;
-    tenant_id: string | null;
+    planTier: string;
+    tenantId: string | null;
     role: string;
-    created_at: number;
-    updated_at: number;
+    createdAt: number;
+    updatedAt: number;
   };
 }
 
@@ -65,14 +67,14 @@ async function handleValidateToken(request: Request, env: Env): Promise<Response
   const db = new Kysely<OrgDb>({ dialect: new D1Dialect({ database: env.DB }) });
   const row = await db
     .selectFrom('org_invite_token')
-    .select(['org_name', 'expires_at', 'consumed_at'])
+    .select(['orgName', 'expiresAt', 'consumedAt'])
     .where('token', '=', body.token)
     .executeTakeFirst();
 
   if (!row) return orgJson({ valid: false, consumed: false });
-  if (row.consumed_at !== null) return orgJson({ valid: false, consumed: true });
-  if (row.expires_at < Date.now()) return orgJson({ valid: false, consumed: false });
-  return orgJson({ valid: true, consumed: false, orgName: row.org_name ?? undefined });
+  if (row.consumedAt !== null) return orgJson({ valid: false, consumed: true });
+  if (row.expiresAt < Date.now()) return orgJson({ valid: false, consumed: false });
+  return orgJson({ valid: true, consumed: false, orgName: row.orgName ?? undefined });
 }
 
 async function handleCreateOrg(
@@ -105,40 +107,41 @@ async function handleCreateOrg(
 
   const tokenRow = await db
     .selectFrom('org_invite_token')
-    .select(['expires_at', 'consumed_at'])
+    .select(['expiresAt', 'consumedAt'])
     .where('token', '=', token)
     .executeTakeFirst();
 
   if (!tokenRow) return orgError('INVALID_TOKEN', 'Invalid token', 400);
-  if (tokenRow.consumed_at !== null) return orgError('TOKEN_CONSUMED', 'Token already used', 400);
-  if (tokenRow.expires_at < Date.now()) return orgError('TOKEN_EXPIRED', 'Token expired', 400);
+  if (tokenRow.consumedAt !== null) return orgError('TOKEN_CONSUMED', 'Token already used', 400);
+  if (tokenRow.expiresAt < Date.now()) return orgError('TOKEN_EXPIRED', 'Token expired', 400);
 
   const userRow = await db
     .selectFrom('user')
-    .select(['tenant_id'])
+    .select(['tenantId'])
     .where('id', '=', userId)
     .executeTakeFirst();
 
-  if (userRow?.tenant_id) return orgError('ALREADY_IN_ORG', 'User already in an org', 409);
+  if (userRow?.tenantId) return orgError('ALREADY_IN_ORG', 'User already in an org', 409);
 
   const orgId = crypto.randomUUID();
   const now = Date.now();
 
-  await db
-    .updateTable('org_invite_token')
-    .set({ consumed_at: now })
-    .where('token', '=', token)
-    .execute();
-
+  // Create org and assign owner first; consume token last so it remains valid on any failure.
   await db
     .insertInto('organization')
-    .values({ id: orgId, name: org.name, contact_email: org.contactEmail, phone: org.phone, created_at: now })
+    .values({ id: orgId, name: org.name, contactEmail: org.contactEmail, phone: org.phone, createdAt: now })
     .execute();
 
   await db
     .updateTable('user')
-    .set({ tenant_id: orgId, role: 'owner' })
+    .set({ tenantId: orgId, role: 'owner' })
     .where('id', '=', userId)
+    .execute();
+
+  await db
+    .updateTable('org_invite_token')
+    .set({ consumedAt: now })
+    .where('token', '=', token)
     .execute();
 
   const validInvites = (invites as Array<{ email?: string; role?: string }>).filter(
@@ -146,7 +149,8 @@ async function handleCreateOrg(
       typeof inv.email === 'string' && inv.email.length > 0,
   );
   for (const inv of validInvites) {
-    ctx.waitUntil(sendOrgInviteEmail(env, inv.email, org.name, inv.role ?? 'standard'));
+    const role = VALID_ROLES.has(inv.role ?? '') ? inv.role! : 'standard';
+    ctx.waitUntil(sendOrgInviteEmail(env, inv.email, org.name, role));
   }
 
   return orgJson({ ok: true, orgId });
