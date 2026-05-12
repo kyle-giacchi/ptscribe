@@ -27,6 +27,7 @@ const baseArgs: GenerateNoteArgs = {
   template: mockTemplate,
   transcript: 'Patient presents with knee pain.',
   patient: mockPatient,
+  transcriptSource: 'whisper',
 };
 
 describe('extractJson', () => {
@@ -115,6 +116,26 @@ describe('generateNote', () => {
         system: mockTemplate.systemPrompt,
         toneStyle: 'terse',
       }),
+    );
+  });
+
+  it('appends speaker-context section when transcriptSource is not whisper', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+    await generateNote({ ...baseArgs, transcriptSource: 'webspeech' });
+
+    const call = mockCallAnthropic.mock.calls[0][0];
+    expect(call.system).toContain(mockTemplate.systemPrompt);
+    expect(call.system).toContain('without speaker diarization');
+  });
+
+  it('does not append speaker-context section when transcriptSource is whisper', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+    await generateNote({ ...baseArgs, transcriptSource: 'whisper' });
+
+    expect(mockCallAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({ system: mockTemplate.systemPrompt }),
     );
   });
 
