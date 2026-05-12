@@ -13,6 +13,7 @@ import type {
   Clinician,
   Patient,
   Session,
+  SessionStatus,
   Note,
   NoteTemplate,
   Exercise,
@@ -24,6 +25,7 @@ import { defaultAppData } from '@/schemas';
 import { dataRepository } from '@/services/DataRepository';
 import { audioRepository } from '@/services/AudioRepository';
 import { vault } from '@/lib/vault/vault';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { AuthContext } from '@/contexts/AuthContext';
 import { isDemoMode } from '@/lib/demoMode';
 
@@ -121,7 +123,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const loaded = await dataRepository.load();
       if (cancelled) return;
-      const data = loaded ?? defaultAppData();
+      let data = loaded ?? defaultAppData();
+
+      // Reset any sessions that were left in a transitional state (e.g. due to
+      // a browser crash or tab close mid-transcription / mid-generation).
+      const transitional: SessionStatus[] = ['transcribing', 'generating'];
+      const hasStuck = data.sessions.some((s) => transitional.includes(s.status));
+      if (hasStuck) {
+        data = {
+          ...data,
+          sessions: data.sessions.map((s) =>
+            transitional.includes(s.status) ? { ...s, status: 'draft' as const } : s,
+          ),
+        };
+        toast.info('One or more sessions were interrupted — reopened as drafts.');
+      }
+
       setAppData(data);
       if (dataRepository.hasCorruptData()) setCorruptWarning(true);
       if (vault.isTwoTabConflict()) setTwoTabWarning(true);
@@ -143,6 +160,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return vault.onConflictChange((conflicted) => {
       setTwoTabWarning(conflicted);
     });
+  }, []);
+
+  // Reload state when another tab writes to localStorage so tabs don't
+  // overwrite each other with stale in-memory copies. The `storage` event
+  // fires on every tab *except* the one that wrote.
+  useEffect(() => {
+    let cancelled = false;
+    const handler = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEYS.appData || e.newValue === null) return;
+      void (async () => {
+        const reloaded = await dataRepository.load();
+        if (cancelled || !reloaded) return;
+        setAppData(reloaded);
+      })();
+    };
+    window.addEventListener('storage', handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('storage', handler);
+    };
   }, []);
 
   const scheduleSave = useCallback((next: AppData) => {
