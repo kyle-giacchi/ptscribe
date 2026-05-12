@@ -166,15 +166,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // overwrite each other with stale in-memory copies. The `storage` event
   // fires on every tab *except* the one that wrote.
   useEffect(() => {
+    let cancelled = false;
     const handler = (e: StorageEvent) => {
       if (e.key !== STORAGE_KEYS.appData || e.newValue === null) return;
       void (async () => {
         const reloaded = await dataRepository.load();
-        if (reloaded) setAppData(reloaded);
+        if (cancelled || !reloaded) return;
+        setAppData(reloaded);
       })();
     };
     window.addEventListener('storage', handler);
     return () => {
+      cancelled = true;
       window.removeEventListener('storage', handler);
     };
   }, []);
