@@ -6,6 +6,7 @@
  *
  * Routes:
  *   POST /api/auth/**      → Better Auth handler (no gate required)
+ *   POST /api/org/**       → Org management handler (no gate required, session auth)
  *   POST /api/transcribe   body = audio/* (the actual MIME, e.g. audio/webm) → { text }
  *   POST /api/generate     body = JSON {model, system, user, ...}            → { text }
  *
@@ -13,6 +14,7 @@
  */
 
 import { createAuth } from './auth';
+import { handleOrgRoute } from './org';
 
 export interface Env {
   AI: Ai;
@@ -89,6 +91,8 @@ export default {
       } else {
         res = await createAuth(env, ctx).handler(request);
       }
+    } else if (url.pathname.startsWith('/api/org/')) {
+      res = await handleOrgRoute(request, env, ctx, url.pathname);
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
     } else {
