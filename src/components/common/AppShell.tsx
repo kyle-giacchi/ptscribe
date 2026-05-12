@@ -107,7 +107,7 @@ export function AppShell() {
             />
             <motion.div
               className="absolute inset-y-0 left-0"
-              style={{ width: 220 }}
+              style={{ width: 220, paddingLeft: 'env(safe-area-inset-left)' }}
               initial={{ x: -220 }}
               animate={{ x: 0 }}
               exit={{ x: -220 }}
