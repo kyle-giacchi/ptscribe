@@ -2,18 +2,18 @@
 -- Apply with: wrangler d1 migrations apply ptscribe-auth [--remote]
 
 CREATE TABLE IF NOT EXISTS "organization" (
-  "id"           TEXT    NOT NULL PRIMARY KEY,
-  "name"         TEXT    NOT NULL,
-  "contactEmail" TEXT    NOT NULL,
-  "phone"        TEXT    NOT NULL,
-  "createdAt"    INTEGER NOT NULL
+  "id"            TEXT    NOT NULL PRIMARY KEY,
+  "name"          TEXT    NOT NULL,
+  "contact_email" TEXT    NOT NULL,
+  "phone"         TEXT    NOT NULL,
+  "created_at"    INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS "orgInviteToken" (
+CREATE TABLE IF NOT EXISTS "org_invite_token" (
   "token"       TEXT    NOT NULL PRIMARY KEY,
-  "orgName"     TEXT,
-  "expiresAt"   INTEGER NOT NULL,
-  "consumedAt"  INTEGER
+  "org_name"    TEXT,
+  "expires_at"  INTEGER NOT NULL,
+  "consumed_at" INTEGER
 );
 
-CREATE INDEX IF NOT EXISTS "orgInviteToken_token_idx" ON "orgInviteToken"("token");
+CREATE INDEX IF NOT EXISTS "org_invite_token_token_idx" ON "org_invite_token"("token");
