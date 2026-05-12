@@ -26,7 +26,6 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 let idCounter = 0;
 vi.mock('@/utils/ids', () => ({ newId: () => `id-${++idCounter}` }));
 
-// Helper: stub global.fetch with a mock and return the spy for chaining
 function stubFetch(implementation?: (...args: unknown[]) => unknown) {
   const spy = vi.fn(implementation);
   vi.stubGlobal('fetch', spy);
@@ -46,8 +45,8 @@ function renderOrgNew(token = 'valid-token') {
 
 beforeEach(() => {
   idCounter = 0;
-  vi.resetAllMocks();
   vi.unstubAllGlobals();
+  vi.resetAllMocks();
 });
 
 describe('token gate', () => {
@@ -64,8 +63,8 @@ describe('token gate', () => {
     });
     renderOrgNew('bad-token');
     await waitFor(() => {
-      expect(screen.getByText('Unable to continue')).toBeTruthy();
-      expect(screen.getByText(/invalid or has expired/i)).toBeTruthy();
+      expect(screen.getByText('Unable to continue')).toBeInTheDocument();
+      expect(screen.getByText(/invalid or has expired/i)).toBeInTheDocument();
     });
   });
 
@@ -76,7 +75,7 @@ describe('token gate', () => {
     });
     renderOrgNew('used-token');
     await waitFor(() => {
-      expect(screen.getByText(/already been used/i)).toBeTruthy();
+      expect(screen.getByText(/already been used/i)).toBeInTheDocument();
     });
   });
 
@@ -87,7 +86,7 @@ describe('token gate', () => {
     });
     renderOrgNew();
     await waitFor(() => {
-      expect(screen.getByText('Organization details')).toBeTruthy();
+      expect(screen.getByText('Organization details')).toBeInTheDocument();
     });
   });
 
@@ -188,7 +187,7 @@ describe('Step 2 → Step 3 navigation', () => {
 
   it('reaches invite step after filling Step 1', async () => {
     await fillStep1AndAdvance();
-    expect(screen.getByText('Invite your team')).toBeTruthy();
+    expect(screen.getByText('Invite your team')).toBeInTheDocument();
   });
 
   it('Back on invite step returns to details', async () => {
@@ -199,22 +198,20 @@ describe('Step 2 → Step 3 navigation', () => {
 
   it('Review step shows org summary', async () => {
     await fillStep1AndAdvance();
-    // The "Review" button on step 2 — use the button element specifically
     fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
     await waitFor(() => {
-      expect(screen.getByText('Review & confirm')).toBeTruthy();
-      expect(screen.getByText('My Practice')).toBeTruthy();
-      expect(screen.getByText('admin@mypractice.com')).toBeTruthy();
+      expect(screen.getByText('Review & confirm')).toBeInTheDocument();
+      expect(screen.getByText('My Practice')).toBeInTheDocument();
+      expect(screen.getByText('admin@mypractice.com')).toBeInTheDocument();
     });
   });
 });
 
 describe('Submission', () => {
-  async function reachReviewStep() {
-    const spy = stubFetch().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ valid: true, consumed: false }),
-    });
+  async function reachReviewStep(submitMock: { ok: boolean; json: () => Promise<unknown> }) {
+    stubFetch()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ valid: true, consumed: false }) })
+      .mockResolvedValueOnce(submitMock);
     renderOrgNew();
     await waitFor(() => screen.getByText('Organization details'));
     fireEvent.change(screen.getByPlaceholderText('Coastline Physical Therapy'), { target: { value: 'Test Org' } });
@@ -224,41 +221,28 @@ describe('Submission', () => {
     await waitFor(() => screen.getByText('Invite your team'));
     fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
     await waitFor(() => screen.getByText('Review & confirm'));
-    return spy;
   }
 
   it('navigates to /today on success', async () => {
-    const spy = await reachReviewStep();
-    spy.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: true, orgId: 'org-1' }),
-    });
+    await reachReviewStep({ ok: true, json: async () => ({ ok: true, orgId: 'org-1' }) });
     fireEvent.click(screen.getByText('Create Organization'));
     await waitFor(() => screen.getByText('Dashboard'));
   });
 
   it('shows error banner on failure without navigating', async () => {
-    const spy = await reachReviewStep();
-    spy.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ code: 'INTERNAL', error: 'Oops' }),
-    });
+    await reachReviewStep({ ok: false, json: async () => ({ code: 'INTERNAL', error: 'Oops' }) });
     fireEvent.click(screen.getByText('Create Organization'));
     await waitFor(() => {
-      expect(screen.getByText(/still valid/i)).toBeTruthy();
-      expect(screen.getByText('Review & confirm')).toBeTruthy();
+      expect(screen.getByText(/still valid/i)).toBeInTheDocument();
+      expect(screen.getByText('Review & confirm')).toBeInTheDocument();
     });
   });
 
   it('shows TOKEN_CONSUMED message on that specific error', async () => {
-    const spy = await reachReviewStep();
-    spy.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ code: 'TOKEN_CONSUMED', error: 'Token already used' }),
-    });
+    await reachReviewStep({ ok: false, json: async () => ({ code: 'TOKEN_CONSUMED', error: 'Token already used' }) });
     fireEvent.click(screen.getByText('Create Organization'));
     await waitFor(() => {
-      expect(screen.getByText(/already used/i)).toBeTruthy();
+      expect(screen.getByText(/already used/i)).toBeInTheDocument();
     });
   });
 });
