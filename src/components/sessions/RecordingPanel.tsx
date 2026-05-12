@@ -246,7 +246,7 @@ function ActiveRecordingCard({
             />
           </span>
           <span
-            className="text-[11px] font-bold uppercase tracking-widest"
+            className="text-[12px] font-bold uppercase tracking-widest"
             style={{ color: accentFg }}
           >
             {paused ? 'Paused' : 'Recording'}
@@ -402,6 +402,18 @@ export function RecordingPanel({
   }, [recorder.idleAutoStopped]);
 
   useEffect(() => {
+    if (recorder.recorderInterrupted) {
+      toast.warning('Recording was interrupted while the tab was in the background. Audio has been saved.');
+    }
+  }, [recorder.recorderInterrupted]);
+
+  useEffect(() => {
+    if (recorder.micDisconnected) {
+      toast.warning('Microphone disconnected — recording stopped and audio saved.');
+    }
+  }, [recorder.micDisconnected]);
+
+  useEffect(() => {
     if (recorder.status === 'recording') {
       setWasAutoStopped(false);
     }
@@ -419,8 +431,7 @@ export function RecordingPanel({
           color="caution"
           onDismiss={onDismissBackgroundWarning}
         >
-          This tab was backgrounded during recording. Audio kept saving, but on mobile the OS may
-          have paused or trimmed the clip. Verify duration after stopping.
+          Tab was in the background — recording continued. Verify the clip duration after stopping.
         </StatusBanner>
       )}
 
@@ -540,7 +551,7 @@ function RecordingSizeHint({ durationSec }: { durationSec: number }) {
   }
   return (
     <div
-      className="rounded-md px-3 py-1.5 text-[11px]"
+      className="rounded-md px-3 py-1.5 text-[12px]"
       style={{
         border: '1px solid var(--color-pt-border)',
         color: 'var(--color-pt-text-3)',
@@ -568,7 +579,7 @@ function RecordingNotices({
     <>
       {webspeechProvider && (
         <div
-          className="flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+          className="flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium"
           style={{
             background: 'var(--color-pt-accent-soft)',
             color: 'var(--color-pt-accent-fg)',

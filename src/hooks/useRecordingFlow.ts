@@ -140,6 +140,15 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
     if (clipId) {
       if (finalBlob) {
+        // Best-effort storage estimate — warn if blob would consume >80% of remaining quota.
+        if (navigator?.storage?.estimate) {
+          navigator.storage.estimate().then((est) => {
+            const available = (est.quota ?? 0) - (est.usage ?? 0);
+            if (available > 0 && finalBlob.size > available * 0.8) {
+              toast.warning('Device storage is low — this recording may not save completely.');
+            }
+          }).catch(() => {});
+        }
         try {
           await audioRepository.save(clipId, finalBlob);
         } catch (e) {
@@ -297,7 +306,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   // This effect detects that condition and finalizes the clip immediately so the
   // user doesn't need to reload to trigger useAudioRecovery.
   useEffect(() => {
-    const autoStopped = recorder.hardCapStopped || recorder.idleAutoStopped;
+    const autoStopped =
+      recorder.hardCapStopped ||
+      recorder.idleAutoStopped ||
+      recorder.recorderInterrupted ||
+      recorder.micDisconnected;
     if (!autoStopped) {
       autoStopFinalizedRef.current = false;
       return;
@@ -307,9 +320,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     autoStopFinalizedRef.current = true;
     void handleStopRecordingRef.current();
     // handleStopRecordingRef is a stable ref — intentionally excluded from deps.
-    // recorder.hardCapStopped / idleAutoStopped / status are the real signals.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.hardCapStopped, recorder.idleAutoStopped, recorder.status]);
+  }, [recorder.hardCapStopped, recorder.idleAutoStopped, recorder.recorderInterrupted, recorder.micDisconnected, recorder.status]);
 
   return {
     backgroundWarningDismissed,
