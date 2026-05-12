@@ -68,6 +68,17 @@ describe('token gate', () => {
     });
   });
 
+  it('shows already-in-org gate when user has an existing org', async () => {
+    stubFetch().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: true, consumed: false, alreadyInOrg: true }),
+    });
+    renderOrgNew();
+    await waitFor(() => {
+      expect(screen.getByText(/already associated with an organization/i)).toBeInTheDocument();
+    });
+  });
+
   it('shows consumed message for used token', async () => {
     stubFetch().mockResolvedValueOnce({
       ok: true,

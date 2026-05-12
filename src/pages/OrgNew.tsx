@@ -78,9 +78,11 @@ export function OrgNew() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
         });
-        const data = (await res.json()) as { valid: boolean; consumed: boolean; orgName?: string };
+        const data = (await res.json()) as { valid: boolean; consumed: boolean; orgName?: string; alreadyInOrg?: boolean };
         if (cancelled) return;
-        if (!data.valid && data.consumed) {
+        if (data.alreadyInOrg) {
+          setGate({ status: 'invalid', message: 'Your account is already associated with an organization.' });
+        } else if (!data.valid && data.consumed) {
           setGate({ status: 'invalid', message: 'This invite link has already been used. Contact support if you believe this is an error.' });
         } else if (!data.valid) {
           setGate({ status: 'invalid', message: 'This invite link is invalid or has expired.' });
