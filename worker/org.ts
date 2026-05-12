@@ -45,7 +45,7 @@ export async function handleOrgRoute(
     return orgError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
   }
   if (pathname === '/api/org/validate-token') {
-    return handleValidateToken(request, env);
+    return handleValidateToken(request, env, ctx);
   }
   if (pathname === '/api/org/create') {
     return handleCreateOrg(request, env, ctx);
@@ -53,7 +53,11 @@ export async function handleOrgRoute(
   return orgError('NOT_FOUND', 'Not found', 404);
 }
 
-async function handleValidateToken(request: Request, env: Env): Promise<Response> {
+async function handleValidateToken(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   let body: { token?: string };
   try {
     body = (await request.json()) as { token?: string };
@@ -74,6 +78,36 @@ async function handleValidateToken(request: Request, env: Env): Promise<Response
   if (!row) return orgJson({ valid: false, consumed: false });
   if (row.consumedAt !== null) return orgJson({ valid: false, consumed: true });
   if (row.expiresAt < Date.now()) return orgJson({ valid: false, consumed: false });
+
+  // Check if the authenticated user is already assigned to an org.
+  // If their tenantId points to a deleted org (orphaned), auto-repair by clearing it.
+  const sessionData = await createAuth(env, ctx).api.getSession({ headers: request.headers });
+  if (sessionData?.user) {
+    const userRow = await db
+      .selectFrom('user')
+      .select(['tenantId'])
+      .where('id', '=', sessionData.user.id)
+      .executeTakeFirst();
+
+    if (userRow?.tenantId) {
+      const orgRow = await db
+        .selectFrom('organization')
+        .select(['id'])
+        .where('id', '=', userRow.tenantId)
+        .executeTakeFirst();
+
+      if (orgRow) {
+        return orgJson({ valid: true, consumed: false, alreadyInOrg: true });
+      }
+      // Orphaned tenantId — org no longer exists; clear it so the user can proceed.
+      await db
+        .updateTable('user')
+        .set({ tenantId: null })
+        .where('id', '=', sessionData.user.id)
+        .execute();
+    }
+  }
+
   return orgJson({ valid: true, consumed: false, orgName: row.orgName ?? undefined });
 }
 
@@ -132,11 +166,19 @@ async function handleCreateOrg(
     .values({ id: orgId, name: org.name, contactEmail: org.contactEmail, phone: org.phone, createdAt: now })
     .execute();
 
-  await db
+  // Conditional update: only succeeds if tenantId is still NULL (guards concurrent submissions).
+  const userUpdate = await db
     .updateTable('user')
     .set({ tenantId: orgId, role: 'owner' })
     .where('id', '=', userId)
+    .where('tenantId', 'is', null)
     .execute();
+
+  if (userUpdate.numUpdatedRows === 0n) {
+    // A concurrent request assigned an org between our check and this write — roll back.
+    await db.deleteFrom('organization').where('id', '=', orgId).execute();
+    return orgError('ALREADY_IN_ORG', 'User already in an org', 409);
+  }
 
   await db
     .updateTable('org_invite_token')
