@@ -33,6 +33,10 @@ export interface UseRecorder {
   hardCapStopped: boolean;
   /** Set when the recorder auto-stopped after sustained silence past idleAutoStopMinutes. */
   idleAutoStopped: boolean;
+  /** Set when the MediaRecorder was killed unexpectedly (OS suspended the tab). Audio from in-memory chunks is saved automatically. */
+  recorderInterrupted: boolean;
+  /** Set when the microphone track ended mid-recording (device disconnected, permission revoked). Audio from in-memory chunks is saved automatically. */
+  micDisconnected: boolean;
 }
 
 const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -46,6 +50,10 @@ const CHUNK_TIMESLICE_MS = 5000;
 // the idle-auto-stop check; quiet keystrokes and HVAC hum stay below this.
 const VOICE_RMS_THRESHOLD = 0.00316;
 const ANALYSER_FFT_SIZE = 2048;
+
+// How often the heartbeat checks that MediaRecorder is still alive while we
+// expect it to be recording. Catches silent death when onstop never fires.
+const HEARTBEAT_INTERVAL_MS = 3000;
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;
@@ -70,15 +78,22 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const [softWarnReached, setSoftWarnReached] = useState(false);
   const [hardCapStopped, setHardCapStopped] = useState(false);
   const [idleAutoStopped, setIdleAutoStopped] = useState(false);
+  const [recorderInterrupted, setRecorderInterrupted] = useState(false);
+  const [micDisconnected, setMicDisconnected] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const chunkIndexRef = useRef<number>(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef<number>(0);
   const accumulatedRef = useRef<number>(0);
   const stopResolveRef = useRef<((b: Blob | null) => void) | null>(null);
+  /** True while we expect the recorder to be active; guards unexpected-stop detection. */
+  const shouldBeRecordingRef = useRef(false);
+  /** Mime type of the current recording, saved for blob reconstruction in interruption paths. */
+  const currentMimeRef = useRef('audio/webm');
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -102,36 +117,15 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     visibilityHandlerRef.current = null;
   }, []);
 
-  const attachVisibilityHandler = useCallback(() => {
-    if (typeof document === 'undefined') return;
-    detachVisibilityHandler();
-    const handler = () => {
-      if (document.hidden) {
-        setWasBackgrounded(true);
-        return;
-      }
-      // Returned to foreground. Re-acquire wake lock only if we are still
-      // actively recording — the browser auto-released it when we hid.
-      const r = recorderRef.current;
-      if (!r || r.state !== 'recording') return;
-      void acquireWakeLock().then((sentinel) => {
-        if (!sentinel) return;
-        if (recorderRef.current?.state !== 'recording') {
-          // We stopped between acquire and resolve; release immediately.
-          void releaseWakeLock(sentinel);
-          return;
-        }
-        wakeLockRef.current = sentinel;
-      });
-    };
-    visibilityHandlerRef.current = handler;
-    document.addEventListener('visibilitychange', handler);
-  }, [detachVisibilityHandler]);
-
   const teardown = useCallback(() => {
+    shouldBeRecordingRef.current = false;
     if (tickRef.current) {
       clearInterval(tickRef.current);
       tickRef.current = null;
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
     }
     if (analyserRef.current) {
       try {
@@ -234,6 +228,75 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     setDurationSec(accumulatedRef.current);
   }, []);
 
+  /**
+   * Builds the final blob from whatever in-memory chunks exist and transitions
+   * to stopped state. Called when the recorder dies unexpectedly — either the
+   * OS suspended the tab (backgrounded) or the microphone track ended.
+   * `shouldBeRecordingRef` is the guard against double-firing.
+   */
+  const finalizeInterrupted = useCallback(
+    (micEnded: boolean) => {
+      if (!shouldBeRecordingRef.current) return;
+      shouldBeRecordingRef.current = false;
+      tickPause();
+      if (micEnded) {
+        setMicDisconnected(true);
+      } else {
+        setRecorderInterrupted(true);
+      }
+      const chunks = chunksRef.current;
+      const mime = currentMimeRef.current;
+      if (chunks.length > 0) {
+        const finalBlob = new Blob(chunks, { type: mime });
+        setBlob(finalBlob);
+        if (stopResolveRef.current) {
+          stopResolveRef.current(finalBlob);
+          stopResolveRef.current = null;
+        }
+      } else if (stopResolveRef.current) {
+        stopResolveRef.current(null);
+        stopResolveRef.current = null;
+      }
+      setStatus('stopped');
+      teardown();
+    },
+    [tickPause, teardown],
+  );
+
+  const attachVisibilityHandler = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    detachVisibilityHandler();
+    const handler = () => {
+      if (document.hidden) {
+        setWasBackgrounded(true);
+        return;
+      }
+      // Returned to foreground.
+      if (shouldBeRecordingRef.current) {
+        const r = recorderRef.current;
+        if (!r || r.state === 'inactive') {
+          // Recorder died while backgrounded — finalize from in-memory chunks.
+          finalizeInterrupted(false);
+          return;
+        }
+      }
+      // Recorder still alive — re-acquire wake lock only if actively recording.
+      const r = recorderRef.current;
+      if (!r || r.state !== 'recording') return;
+      void acquireWakeLock().then((sentinel) => {
+        if (!sentinel) return;
+        if (recorderRef.current?.state !== 'recording') {
+          // We stopped between acquire and resolve; release immediately.
+          void releaseWakeLock(sentinel);
+          return;
+        }
+        wakeLockRef.current = sentinel;
+      });
+    };
+    visibilityHandlerRef.current = handler;
+    document.addEventListener('visibilitychange', handler);
+  }, [detachVisibilityHandler, finalizeInterrupted]);
+
   const start = useCallback(
     async (clipId: string) => {
       setError(null);
@@ -251,6 +314,12 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
+
+        // Wire a track-ended listener on every audio track. The 'ended' event fires
+        // when the microphone is disconnected or the browser revokes the stream.
+        for (const track of stream.getTracks()) {
+          track.addEventListener('ended', () => finalizeInterrupted(true), { once: true });
+        }
 
         // Web Audio analyser drives the silence-based idle auto-stop. The graph
         // is source → analyser with no connection to destination, so it never
@@ -276,6 +345,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         }
 
         const mimeType = pickMimeType();
+        currentMimeRef.current = mimeType ?? 'audio/webm';
         const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         chunksRef.current = [];
         chunkIndexRef.current = 0;
@@ -297,8 +367,15 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           setBlob(finalBlob);
           setStatus('stopped');
           if (stopResolveRef.current) {
+            // Intentional stop via our stop() call — resolve the waiting promise.
             stopResolveRef.current(finalBlob);
             stopResolveRef.current = null;
+          } else if (shouldBeRecordingRef.current) {
+            // Browser stopped the recorder unexpectedly before the visibility
+            // handler or heartbeat could catch it. Mark as interrupted so
+            // useRecordingFlow can finalize the clip.
+            shouldBeRecordingRef.current = false;
+            setRecorderInterrupted(true);
           }
           teardown();
         };
@@ -314,7 +391,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         setSoftWarnReached(false);
         setHardCapStopped(false);
         setIdleAutoStopped(false);
+        setRecorderInterrupted(false);
+        setMicDisconnected(false);
         recorder.start(CHUNK_TIMESLICE_MS);
+        shouldBeRecordingRef.current = true;
         audioRepository
           .saveChunkMime(clipId, recorder.mimeType || mimeType || 'audio/webm')
           .catch(() => {
@@ -334,6 +414,15 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         attachVisibilityHandler();
         setWasBackgrounded(false);
         tickStart();
+        // Heartbeat: periodically verify the recorder is still alive. Catches
+        // silent death on desktop (OOM, unusual browser behavior) that neither
+        // onstop nor visibilitychange fires for.
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        heartbeatRef.current = setInterval(() => {
+          if (!shouldBeRecordingRef.current) return;
+          const r = recorderRef.current;
+          if (!r || r.state === 'inactive') finalizeInterrupted(false);
+        }, HEARTBEAT_INTERVAL_MS);
         setStatus('recording');
         return true;
       } catch (e) {
@@ -343,7 +432,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         return false;
       }
     },
-    [teardown, tickStart, attachVisibilityHandler],
+    [teardown, tickStart, attachVisibilityHandler, finalizeInterrupted],
   );
 
   const pause = useCallback(() => {
@@ -363,6 +452,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   }, [tickStart]);
 
   const stop = useCallback(() => {
+    shouldBeRecordingRef.current = false;
     const r = recorderRef.current;
     if (!r || r.state === 'inactive') return Promise.resolve(blob);
     return new Promise<Blob | null>((resolve) => {
@@ -384,6 +474,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     setSoftWarnReached(false);
     setHardCapStopped(false);
     setIdleAutoStopped(false);
+    setRecorderInterrupted(false);
+    setMicDisconnected(false);
   }, [teardown]);
 
   return {
@@ -400,5 +492,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     softWarnReached,
     hardCapStopped,
     idleAutoStopped,
+    recorderInterrupted,
+    micDisconnected,
   };
 }
