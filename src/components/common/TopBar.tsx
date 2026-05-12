@@ -135,10 +135,10 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
       type="button"
       aria-label="Open menu"
       onClick={onMenuOpen}
-      className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] md:hidden"
+      className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] md:hidden min-w-[44px] min-h-[44px]"
       style={{
-        width: 34,
-        height: 34,
+        width: 44,
+        height: 44,
         borderRadius: 8,
         border: '1px solid var(--color-pt-border)',
         background: 'var(--color-pt-surface)',
@@ -156,10 +156,10 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
       <button
         type="button"
         aria-label="Notifications"
-        className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+        className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
         style={{
-          width: 34,
-          height: 34,
+          width: 44,
+          height: 44,
           borderRadius: 8,
           border: '1px solid var(--color-pt-border)',
           background: 'var(--color-pt-surface)',
@@ -186,10 +186,10 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
         <Link
           to={`/patients/${patient.id}`}
           aria-label="Back to patient chart"
-          className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+          className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
           style={{
-            width: 30,
-            height: 30,
+            width: 44,
+            height: 44,
             borderRadius: 8,
             border: '1px solid var(--color-pt-border)',
             color: 'var(--color-pt-text-2)',

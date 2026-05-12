@@ -469,6 +469,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         className="flex items-center gap-3 rounded-lg px-4 py-3"
         style={{
           margin: '0 22px 22px',
+          paddingBottom: 'env(safe-area-inset-bottom)',
           background: 'var(--color-pt-surface)',
           border: '1px solid var(--color-pt-border)',
         }}

@@ -87,7 +87,7 @@ export function CommandPalette() {
 
       <AnimatePresence>
         {open && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               className="absolute inset-0"
               style={{ background: 'oklch(0.28 0.03 250 / 0.32)' }}
