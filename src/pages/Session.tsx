@@ -262,6 +262,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         noteFinalized={note?.finalized}
         hasNote={!!note}
         onOpenDrawer={() => setDrawerOpen(true)}
+        recorderStatus={recorder.status}
+        durationSec={recorder.durationSec}
+        autoFinish={settings.session.autoFinish}
+        onStartRecording={() => { setActiveTab('record'); void handleStartRecording(); }}
+        onStopRecording={handleStopRecording}
+        onStopAndFinish={handleStopAndFinish}
+        onPauseResume={handlePauseResume}
       />
 
       {/* ── Scrollable content ────────────────────────────── */}

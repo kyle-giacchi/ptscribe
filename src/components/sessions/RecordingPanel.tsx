@@ -115,59 +115,29 @@ function StatusBanner({
 
 // ── Idle entry point — no clips yet ───────────────────────────────────────────
 function RecordingBlankOptions({
-  onStart,
   onUpload,
   onSkip,
 }: {
-  onStart: () => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-8 px-4 py-12">
-      {/* Mic button with breathing ring */}
-      <div className="relative flex items-center justify-center">
-        <span
-          className="absolute animate-ping rounded-full"
-          style={{
-            width: 120,
-            height: 120,
-            background: 'color-mix(in oklab, var(--color-pt-accent) 16%, transparent)',
-            animationDuration: '2.4s',
-          }}
-        />
-        <button
-          type="button"
-          onClick={onStart}
-          aria-label="Start recording"
-          className="relative flex items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-offset-2"
-          style={{
-            width: 96,
-            height: 96,
-            background: 'var(--color-pt-accent)',
-            boxShadow: '0 8px 28px color-mix(in oklab, var(--color-pt-accent) 38%, transparent)',
-            touchAction: 'manipulation',
-          }}
-        >
-          <Mic size={38} strokeWidth={1.75} color="#ffffff" />
-        </button>
-      </div>
-
-      <div className="flex flex-col items-center gap-2 text-center">
-        <p className="text-base font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-          Tap to start recording
+    <div className="flex flex-col items-center gap-5 px-4 py-10 text-center">
+      <Mic size={32} strokeWidth={1.5} style={{ color: 'var(--color-pt-text-3)', opacity: 0.4 }} />
+      <div>
+        <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text-2)' }}>
+          Ready to record
         </p>
         <p
-          className="max-w-[280px] text-sm leading-relaxed"
-          style={{ color: 'var(--color-pt-text-2)' }}
+          className="mt-1 text-xs leading-relaxed"
+          style={{ color: 'var(--color-pt-text-3)', maxWidth: 240, margin: '4px auto 0' }}
         >
-          Capture the session in real time, or upload an existing audio file
+          Tap <strong>Start</strong> to capture the session, or upload an existing file
         </p>
       </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <label className="btn btn-secondary cursor-pointer" style={{ touchAction: 'manipulation' }}>
-          <Upload size={14} strokeWidth={2} /> Upload audio
+          <Upload size={13} strokeWidth={2} /> Upload audio
           <input
             type="file"
             accept="audio/*"
@@ -421,7 +391,7 @@ export function RecordingPanel({
   }, [recorder.status]);
 
   if (idle && clips.length === 0) {
-    return <RecordingBlankOptions onStart={onStart} onUpload={onUpload} onSkip={onSkip} />;
+    return <RecordingBlankOptions onUpload={onUpload} onSkip={onSkip} />;
   }
 
   return (
