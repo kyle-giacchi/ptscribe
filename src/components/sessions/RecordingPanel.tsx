@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
+import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { ClipsList } from '@/components/sessions/ClipsList';
 import { AudioPreviewSection } from './AudioPreviewSection';
@@ -524,14 +525,13 @@ export function RecordingPanel({
 
 // ── Estimated file size hint ───────────────────────────────────────────────────
 const ESTIMATED_BYTES_PER_SEC = 8 * 1024;
-const WHISPER_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
 const WARN_THRESHOLD_BYTES = 20 * 1024 * 1024;
 
 function RecordingSizeHint({ durationSec }: { durationSec: number }) {
   const estimatedBytes = durationSec * ESTIMATED_BYTES_PER_SEC;
   const estimatedMb = estimatedBytes / (1024 * 1024);
   const approachingCap = estimatedBytes >= WARN_THRESHOLD_BYTES;
-  const overCap = estimatedBytes >= WHISPER_UPLOAD_LIMIT_BYTES;
+  const overCap = estimatedBytes >= MAX_AUDIO_BYTES;
 
   if (overCap) {
     return (

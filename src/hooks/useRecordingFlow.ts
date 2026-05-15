@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { audioRepository } from '@/services/AudioRepository';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { newId } from '@/utils/ids';
+import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import type { Session, SessionClip } from '@/types';
@@ -75,6 +76,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
 
+  // Prevents concurrent saves for the same clipId from corrupting each other mid-encryption.
+  const isSavingRef = useRef<Set<string>>(new Set());
+
   // Used by the auto-stop finalization effect below to always call the latest
   // handleStopRecording without including it in the effect's dep array.
   const handleStopRecordingRef = useRef<() => Promise<void>>(async () => {});
@@ -140,15 +144,32 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
     if (clipId) {
       if (finalBlob) {
-        // Best-effort storage estimate — warn if blob would consume >80% of remaining quota.
+        // Check storage availability before attempting to save.
         if (navigator?.storage?.estimate) {
-          navigator.storage.estimate().then((est) => {
+          try {
+            const est = await navigator.storage.estimate();
             const available = (est.quota ?? 0) - (est.usage ?? 0);
+            if (available > 0 && finalBlob.size > available * 0.9) {
+              // Hard stop — saving would consume more than 90% of remaining space.
+              toast.error('Not enough device storage to save this recording.');
+              patchClip(clipId, {
+                status: 'failed',
+                errorMessage: 'Not enough device storage to save this recording.',
+              });
+              return;
+            }
             if (available > 0 && finalBlob.size > available * 0.8) {
               toast.warning('Device storage is low — this recording may not save completely.');
             }
-          }).catch(() => {});
+          } catch {
+            // Estimate unavailable — proceed with save.
+          }
         }
+        if (isSavingRef.current.has(clipId)) {
+          console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
+          return;
+        }
+        isSavingRef.current.add(clipId);
         try {
           await audioRepository.save(clipId, finalBlob);
         } catch (e) {
@@ -158,9 +179,14 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
             errorMessage: (e as Error).message,
           });
           return;
+        } finally {
+          isSavingRef.current.delete(clipId);
         }
         // Chunk cleanup is best-effort — failure doesn't affect the saved clip.
-        audioRepository.clearChunks(clipId).catch(() => {});
+        audioRepository.clearChunks(clipId).catch((e) => {
+          console.warn('[useRecordingFlow] clearChunks failed:', e);
+          toast.warning('Storage cleanup failed — some space may not be recovered.');
+        });
         patchClip(clipId, { status: 'ready', durationSec });
         runLocalTranscription(clipId, finalBlob);
       } else {
@@ -190,8 +216,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
   // ── Audio upload ─────────────────────────────────────────────────────────
   async function handleUploadAudio(file: File) {
-    const MAX_BYTES = 25 * 1024 * 1024;
-    if (file.size > MAX_BYTES) {
+    if (file.size > MAX_AUDIO_BYTES) {
       toast.error('File too large — Whisper accepts up to 25 MB.');
       return;
     }
@@ -238,7 +263,16 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         /* duration stays 0 */
       }
 
-      await audioRepository.save(clipId, blob);
+      if (isSavingRef.current.has(clipId)) {
+        console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
+        return;
+      }
+      isSavingRef.current.add(clipId);
+      try {
+        await audioRepository.save(clipId, blob);
+      } finally {
+        isSavingRef.current.delete(clipId);
+      }
       patchClip(clipId, { status: 'ready', durationSec });
 
       toast.success(`Added "${file.name}"`, { id: tid });
@@ -256,7 +290,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     try {
       await audioRepository.remove(clipId);
     } catch {
-      /* ignore */
+      toast.error('Could not delete audio — try again');
+      return;
     }
     patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
   }
