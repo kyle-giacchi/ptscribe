@@ -98,7 +98,11 @@ export function useTranscriptionFlow(
         setTranscript(merged);
         patchSession({ transcript: merged, transcriptSource: 'whisper' });
       } else {
-        patchClip(clipId, { status: 'ready', updatedAt: Date.now() });
+        patchClip(clipId, {
+          status: 'failed',
+          errorMessage: 'Transcription returned no text — try again or use cloud transcription',
+          updatedAt: Date.now(),
+        });
       }
     } catch {
       patchClip(clipId, { status: 'ready', updatedAt: Date.now() });

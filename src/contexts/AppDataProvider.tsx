@@ -75,7 +75,7 @@ export async function purgeOrphanChunks(
   try {
     chunkIds = await repo.listChunkSessionIds();
   } catch (err) {
-    console.warn('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
+    console.error('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
     return;
   }
   for (const id of chunkIds) {

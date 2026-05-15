@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { audioRepository } from '@/services/AudioRepository';
@@ -75,6 +76,8 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
   const { addNote, updateNote, finalizeNote, unfinalizeNote, removeNote } = useNotes();
   const { removeSession } = useSessions();
 
+  const isGeneratingRef = useRef(false);
+
   function ensureNote(initialSections?: NoteSection[]): Note {
     if (note) return note;
     const now = Date.now();
@@ -100,57 +103,63 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
 
   // ── Note generation / lifecycle ──────────────────────────────────────────
   async function handleGenerate() {
-    if (!template) return;
-    if (!transcript.trim()) {
-      toast.error('Add a transcript first.');
-      return;
-    }
-    if (settings.ai.generation.provider !== 'anthropic') {
-      toast.error('Enable Anthropic generation in Settings to draft a note.');
-      return;
-    }
-
-    const guard = checkActionGuard('generate');
-    if (!guard.allowed) {
-      toast.error(guard.reason);
-      return;
-    }
-
-    setError(null);
-    setBusy('generating');
-    patchSession({ status: 'generating' });
-    const controller = new AbortController();
-    const abortTimer = setTimeout(() => controller.abort(), 30_000);
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
     try {
-      const result = await generateNote({
-        provider: settings.ai.generation.provider,
-        model: settings.ai.generation.model,
-        template,
-        transcript,
-        patient: patient!,
-        sessionType: session!.type,
-        toneStyle: settings.orgPolicy.toneStyle,
-        transcriptSource: session!.transcriptSource,
-        signal: controller.signal,
-      });
-      if (note) {
-        updateNote(note.id, {
-          sections: result.sections,
-          templateId: template.id,
-          format: template.format,
-        });
-      } else {
-        ensureNote(result.sections);
+      if (!template) return;
+      if (!transcript.trim()) {
+        toast.error('Add a transcript first.');
+        return;
       }
-      recordAction('generate');
-      patchSession({ status: 'ready' });
-      toast.success('Draft note generated');
-    } catch (e) {
-      setError((e as Error).message);
-      patchSession({ status: 'draft' });
+      if (settings.ai.generation.provider !== 'anthropic') {
+        toast.error('Enable Anthropic generation in Settings to draft a note.');
+        return;
+      }
+
+      const guard = checkActionGuard('generate');
+      if (!guard.allowed) {
+        toast.error(guard.reason);
+        return;
+      }
+
+      setError(null);
+      setBusy('generating');
+      patchSession({ status: 'generating' });
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 180_000);
+      try {
+        const result = await generateNote({
+          provider: settings.ai.generation.provider,
+          model: settings.ai.generation.model,
+          template,
+          transcript,
+          patient: patient!,
+          sessionType: session!.type,
+          toneStyle: settings.orgPolicy.toneStyle,
+          transcriptSource: session!.transcriptSource,
+          signal: controller.signal,
+        });
+        if (note) {
+          updateNote(note.id, {
+            sections: result.sections,
+            templateId: template.id,
+            format: template.format,
+          });
+        } else {
+          ensureNote(result.sections);
+        }
+        recordAction('generate');
+        patchSession({ status: 'ready' });
+        toast.success('Draft note generated');
+      } catch (e) {
+        setError((e as Error).message);
+        patchSession({ status: 'draft' });
+      } finally {
+        clearTimeout(abortTimer);
+        setBusy(null);
+      }
     } finally {
-      clearTimeout(abortTimer);
-      setBusy(null);
+      isGeneratingRef.current = false;
     }
   }
 
@@ -196,9 +205,12 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
 
   async function handleDeleteSession() {
     if (isDemoMode() && session?.patientId === DEMO_PATIENT_ID) {
-      await Promise.all(
-        (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})),
+      const demoResults = await Promise.allSettled(
+        (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id)),
       );
+      if (demoResults.some((r) => r.status === 'rejected')) {
+        toast.warning('Some audio could not be removed from storage.');
+      }
       if (note) removeNote(note.id);
       patchSession({ clips: [], status: 'draft', transcript: undefined, noteId: undefined });
       setTranscript('');
@@ -207,9 +219,12 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
       return;
     }
     if (note) removeNote(note.id);
-    await Promise.all(
-      (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id).catch(() => {})),
+    const results = await Promise.allSettled(
+      (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id)),
     );
+    if (results.some((r) => r.status === 'rejected')) {
+      toast.warning('Some audio could not be removed from storage.');
+    }
     removeSession(session!.id);
     navigate('/today', { replace: true });
   }
