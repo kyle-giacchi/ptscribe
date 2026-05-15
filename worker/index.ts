@@ -77,6 +77,7 @@ const ALLOWED_GENERATE_MODELS = new Set([
   'claude-opus-4-7',
 ]);
 
+// Keep aligned with src/lib/audioLimits.ts MAX_AUDIO_BYTES
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 export default {
