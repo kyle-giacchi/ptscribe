@@ -47,6 +47,16 @@ ready  -- finalize -->  finalized
 
 Transitions are owned by the `Session` page. A session can skip transcription entirely if the clinician dictates straight into the note editor (`transcriptSource: 'manual'`).
 
+#### SessionClip status state machine
+
+Each clip (recorded or uploaded) progresses through:
+
+```
+pending  -- audio saved -->  ready  -- auto-transcribe -->  transcribing  -->  transcribed (or failed)
+```
+
+The background auto-transcription effect fires for every clip reaching `status: 'ready'` with no `localTranscript`. The effect calls `transcribeLocalChunked` via the worker pool, then patches the clip with the result. The session-level `transcript` is merged from all transcribed clips.
+
 ### Note
 
 The structured chart note generated from (or written against) a session's transcript.
