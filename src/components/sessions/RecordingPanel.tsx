@@ -118,6 +118,7 @@ function IdleRecordingCard({
   onUpload: (file: File) => void;
   onSkip: () => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="flex flex-col items-center gap-8 py-12">
       <div className="flex flex-col items-center gap-5">
@@ -154,21 +155,24 @@ function IdleRecordingCard({
       </div>
 
       <div className="flex items-center gap-1" style={{ color: 'var(--color-pt-text-3)' }}>
-        <label
-          className="relative flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
-          style={{ touchAction: 'manipulation', cursor: 'pointer' }}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) { onUpload(file); e.target.value = ''; }
+          }}
+        />
+        <button
+          type="button"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
+          style={{ touchAction: 'manipulation' }}
+          onClick={() => fileInputRef.current?.click()}
         >
           <Upload size={11} strokeWidth={2} /> Upload audio
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) { onUpload(file); e.target.value = ''; }
-            }}
-            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-          />
-        </label>
+        </button>
         <span className="text-xs select-none">·</span>
         <button
           type="button"
