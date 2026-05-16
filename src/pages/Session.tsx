@@ -5,8 +5,11 @@ import {
   ArrowLeft,
   CheckCircle2,
   Copy,
+  Loader2,
   LockOpen,
+  Mic,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { MicStatusPill, PtButton, type MicState } from '@/components/design';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -27,6 +30,8 @@ import { useRecordingFlow } from '@/hooks/useRecordingFlow';
 import { useTranscriptionFlow, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useTranscriptionFlow';
 import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
+import { ClipsList } from '@/components/sessions/ClipsList';
+import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { DebugDrawer } from '@/components/sessions/DebugDrawer';
@@ -66,7 +71,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [recordingSkipped, setRecordingSkipped] = useState(quickMode);
   const [pendingDeleteSession, setPendingDeleteSession] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'record' | 'review'>(quickMode ? 'review' : 'record');
+  const [activeTab, setActiveTab] = useState<'record' | 'review' | 'clips'>(quickMode ? 'review' : 'record');
   // Once dismissed per session, the re-record warning does not resurface.
   const [recordWarnDismissed, setRecordWarnDismissed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -262,6 +267,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         noteFinalized={note?.finalized}
         hasNote={!!note}
         onOpenDrawer={() => setDrawerOpen(true)}
+        recorderStatus={recorder.status}
+        durationSec={recorder.durationSec}
+        onStartRecording={() => { setActiveTab('record'); void handleStartRecording(); }}
+        onStopRecording={handleStopRecording}
+        onStopAndFinish={handleStopAndFinish}
+        onPauseResume={handlePauseResume}
       />
 
       {/* ── Scrollable content ────────────────────────────── */}
@@ -344,16 +355,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               clips={sortedClips}
               onStart={handleStartRecording}
               onStop={handleStopRecording}
-              onStopAndFinish={handleStopAndFinish}
-              autoFinish={settings.session.autoFinish}
-
+              onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
               onPauseResume={handlePauseResume}
-              onDeleteClip={handleDeleteClip}
               onUpload={handleUploadAudio}
               onSkip={handleSkipRecording}
-              onRecordingComplete={handleRecordingComplete}
-              isMerging={isMerging}
-              mergedAudioBlob={mergedAudioBlob}
               wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
               onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
             />
@@ -462,6 +467,52 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               />
             </div>
           ))}
+        {/* ③ Clips tab */}
+        {activeTab === 'clips' && (
+          <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => { setActiveTab('record'); void handleStartRecording(); }}
+                style={{ minHeight: 44, touchAction: 'manipulation' }}
+              >
+                <Mic size={14} strokeWidth={2} /> Add clip
+              </button>
+              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation' }}>
+                <Upload size={14} strokeWidth={2} /> Upload audio
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) { void handleUploadAudio(file); e.target.value = ''; }
+                  }}
+                />
+              </label>
+            </div>
+            <ClipsList clips={sortedClips} recordingDisabled={isRecording} onDeleteClip={handleDeleteClip} />
+            {sortedClips.length > 0 && (
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  className="btn btn-primary w-full sm:w-auto"
+                  disabled={isMerging || isRecording}
+                  onClick={() => { void handleRecordingComplete(); setActiveTab('review'); }}
+                  style={{ minHeight: 44, touchAction: 'manipulation' }}
+                >
+                  {isMerging ? (
+                    <><Loader2 size={15} className="animate-spin" /> Combining clips…</>
+                  ) : (
+                    <><CheckCircle2 size={15} strokeWidth={2} /> Generate Notes</>
+                  )}
+                </button>
+              </div>
+            )}
+            {mergedAudioBlob && <AudioPreviewSection mergedAudioBlob={mergedAudioBlob} />}
+          </div>
+        )}
       </div>
 
       {/* ── Bottom action bar (review tab only) ─────────────── */}
@@ -469,6 +520,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         className="flex items-center gap-3 rounded-lg px-4 py-3"
         style={{
           margin: '0 22px 22px',
+          paddingBottom: 'env(safe-area-inset-bottom)',
           background: 'var(--color-pt-surface)',
           border: '1px solid var(--color-pt-border)',
         }}

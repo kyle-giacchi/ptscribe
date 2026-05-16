@@ -87,13 +87,13 @@ function ClipRow({
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
             <span
-              className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums"
+              className="inline-flex items-center gap-1 font-mono text-[12px] tabular-nums"
               style={{ color: 'var(--color-pt-text-3)' }}
             >
               <Clock size={10} />
               {formatDuration(clip.durationSec)}
             </span>
-            <span className="text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
+            <span className="text-[12px]" style={{ color: 'var(--color-pt-text-3)' }}>
               {new Date(clip.createdAt).toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -102,7 +102,7 @@ function ClipRow({
           </div>
           {clip.errorMessage && (
             <p
-              className="mt-1 break-words text-[11px]"
+              className="mt-1 break-words text-[12px]"
               style={{ color: 'var(--color-negative)' }}
             >
               {clip.errorMessage}
@@ -164,7 +164,7 @@ function ClipRow({
         >
           <details>
             <summary
-              className="cursor-pointer select-none text-[11px] font-medium"
+              className="cursor-pointer select-none text-[12px] font-medium"
               style={{ color: 'var(--color-pt-text-2)' }}
             >
               View transcript ({wordCount(clip.transcript)} words)
@@ -186,7 +186,7 @@ export function ClipStatusBadge({ status }: { status: ClipStatus }) {
   const meta = clipBadgeMeta(status);
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide"
       style={{
         background: meta.bg,
         color: meta.fg,
