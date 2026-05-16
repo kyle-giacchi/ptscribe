@@ -69,6 +69,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
   const [sectionCache, setSectionCache] = useState<Map<string, NoteSection[]>>(new Map());
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+  const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
 
   // ── Atomic session/clip patches via functional slice update ──────────────
   function patchSession(patch: Partial<Session>) {
@@ -263,6 +264,23 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setActiveTab('review');
   }
 
+  // ── Upload audio + auto-transcribe ────────────────────────────────────────
+  async function handleUpload(file: File) {
+    const clipId = await handleUploadAudio(file);
+    if (clipId) setProcessingUploadClipId(clipId);
+  }
+
+  useEffect(() => {
+    if (!processingUploadClipId) return;
+    const clip = session?.clips.find((c) => c.id === processingUploadClipId);
+    if (!clip) return;
+    if (clip.status === 'transcribed' || clip.status === 'failed') {
+      setProcessingUploadClipId(null);
+      setActiveTab('review');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.clips, processingUploadClipId]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
 
@@ -280,8 +298,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         note={note}
         template={template}
         templates={templates}
-        recorderStatus={recorder.status}
-        durationSec={recorder.durationSec}
         activeTab={activeTab}
         clipsCount={sortedClips.length}
         hasNote={!!note}
@@ -295,9 +311,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         missingRequiredLabels={missingRequiredLabels}
         pendingDeleteSession={pendingDeleteSession}
         onSetTab={setActiveTab}
-        onStartRecording={() => { setActiveTab('record'); void handleStartRecording(); }}
-        onStopAndFinish={handleStopAndFinish}
-        onPauseResume={handlePauseResume}
         onTemplateChange={handleTemplateChange}
         onManageTemplates={() => setManageTemplatesOpen(true)}
         onGenerate={handleGenerate}
@@ -381,20 +394,23 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 </div>
               </div>
             )}
-            <RecordingPanel
-              recorder={recorder}
-              live={live}
-              clips={sortedClips}
-              whisperLiveText={whisperLiveText}
-              onStart={handleStartRecording}
-              onStop={handleStopRecording}
-              onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
-              onPauseResume={handlePauseResume}
-              onUpload={handleUploadAudio}
-              onSkip={handleSkipRecording}
-              wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
-              onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
-            />
+            {processingUploadClipId ? (
+              <UploadProcessingView />
+            ) : (
+              <RecordingPanel
+                recorder={recorder}
+                live={live}
+                clips={sortedClips}
+                whisperLiveText={whisperLiveText}
+                onStart={handleStartRecording}
+                onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
+                onPauseResume={handlePauseResume}
+                onUpload={handleUpload}
+                onSkip={handleSkipRecording}
+                wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
+                onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
+              />
+            )}
           </div>
         )}
 
@@ -497,16 +513,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               >
                 <Mic size={14} strokeWidth={2} /> Add clip
               </button>
-              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation' }}>
+              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation', position: 'relative' }}>
                 <Upload size={14} strokeWidth={2} /> Upload audio
                 <input
                   type="file"
                   accept="audio/*"
-                  className="sr-only"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) { void handleUploadAudio(file); e.target.value = ''; }
                   }}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
                 />
               </label>
             </div>
@@ -564,6 +580,22 @@ function NotFound() {
         <ArrowLeft size={14} strokeWidth={2} /> Dashboard
       </Link>
       <div className="card">Session not found.</div>
+    </div>
+  );
+}
+
+function UploadProcessingView() {
+  return (
+    <div className="flex flex-col items-center gap-5 py-16">
+      <Loader2 size={48} className="animate-spin" style={{ color: 'var(--color-pt-accent)' }} />
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
+          Processing audio
+        </span>
+        <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+          Transcribing with Whisper — this may take a moment
+        </p>
+      </div>
     </div>
   );
 }
