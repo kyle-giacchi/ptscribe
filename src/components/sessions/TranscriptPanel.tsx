@@ -206,52 +206,51 @@ export function TranscriptPanel({
         className="overflow-hidden rounded-lg border"
         style={{ borderColor: 'var(--color-pt-border)' }}
       >
-        <button
-          type="button"
-          className="flex w-full items-center justify-between px-3 py-2 text-left"
+        <div
+          className="flex w-full items-center px-3 py-2"
           style={{ background: 'var(--color-pt-surface-alt)' }}
-          onClick={() => setTranscriptOpen((o) => !o)}
         >
-          <span
-            className="text-xs font-semibold tracking-wide uppercase"
-            style={{ color: 'var(--color-fg-muted)' }}
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-2 text-left"
+            onClick={() => setTranscriptOpen((o) => !o)}
           >
-            Transcript
-          </span>
-          <div className="flex items-center gap-2">
+            <span
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: 'var(--color-fg-muted)' }}
+            >
+              Transcript
+            </span>
             {transcript.trim() && (
               <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
                 {transcript.trim().split(/\s+/).filter(Boolean).length}w
               </span>
             )}
-            <button
-              type="button"
-              className="btn btn-ghost p-0.5"
-              aria-label="Find and replace"
-              title="Find & Replace"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFnrOpen((o) => !o);
-                setReplaceCount(null);
-              }}
-              style={{
-                color: fnrOpen ? 'var(--color-pt-accent)' : 'var(--color-fg-subtle)',
-                lineHeight: 0,
-              }}
-            >
-              <Search size={13} strokeWidth={2} />
-            </button>
             <ChevronDown
               size={13}
               strokeWidth={2}
               style={{
+                marginLeft: 'auto',
                 color: 'var(--color-fg-subtle)',
                 transform: transcriptOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                 transition: 'transform 200ms ease-out',
               }}
             />
-          </div>
-        </button>
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost p-0.5"
+            aria-label="Find and replace"
+            title="Find & Replace"
+            onClick={() => { setFnrOpen((o) => !o); setReplaceCount(null); }}
+            style={{
+              color: fnrOpen ? 'var(--color-pt-accent)' : 'var(--color-fg-subtle)',
+              lineHeight: 0,
+            }}
+          >
+            <Search size={13} strokeWidth={2} />
+          </button>
+        </div>
         <div
           style={{
             display: 'grid',

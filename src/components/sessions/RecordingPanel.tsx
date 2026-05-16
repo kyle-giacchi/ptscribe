@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   Mic,
@@ -11,6 +11,7 @@ import {
   Info,
   ArrowRight,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
@@ -18,13 +19,14 @@ import { useSettings } from '@/contexts/SettingsProvider';
 import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
-import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
+import type { UseLiveTranscript, TranscriptSegment } from '@/hooks/useLiveTranscript';
 import type { SessionClip } from '@/types';
 
 export interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
   clips: SessionClip[];
+  whisperLiveText: string;
   onStart: () => void;
   onStop: () => void;
   onStopAndFinish: () => void;
@@ -190,12 +192,164 @@ function IdleRecordingCard({
   );
 }
 
+// ── Live transcript helpers ───────────────────────────────────────────────────
+
+function fmtElapsedMarker(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+function fmtWallTime(ms: number): string {
+  const d = new Date(ms);
+  let h = d.getHours();
+  const min = d.getMinutes();
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  return `${h}:${String(min).padStart(2, '0')}${ampm}`;
+}
+
+function LiveTranscriptView({
+  segments,
+  interimText,
+  whisperText = '',
+  expandToFill = false,
+}: {
+  segments: TranscriptSegment[];
+  interimText: string;
+  whisperText?: string;
+  expandToFill?: boolean;
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const hasWebSpeech = segments.length > 0 || !!interimText;
+  const hasContent = hasWebSpeech || !!whisperText;
+  const [showNoSpeechHint, setShowNoSpeechHint] = useState(false);
+
+  // After 8 s with no results at all, surface a hint.
+  useEffect(() => {
+    if (hasContent) {
+      setShowNoSpeechHint(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowNoSpeechHint(true), 8000);
+    return () => window.clearTimeout(t);
+  }, [hasContent]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [segments.length, interimText, whisperText]);
+
+  return (
+    <div
+      className={`w-full rounded-xl overflow-y-auto${expandToFill ? ' flex-1 min-h-0' : ''}`}
+      style={{
+        ...(expandToFill ? {} : { maxHeight: 300 }),
+        background: 'var(--color-pt-surface)',
+        border: '1px solid var(--color-pt-border)',
+      }}
+    >
+      {!hasContent ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-8 px-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full animate-bounce"
+                  style={{ background: 'var(--color-pt-text-3)', animationDelay: `${i * 160}ms` }}
+                />
+              ))}
+            </div>
+            <p className="text-xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
+              Transcribing&hellip;
+            </p>
+          </div>
+          {showNoSpeechHint && (
+            <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
+              Transcription starts after the first audio chunk (~5 s). First run downloads the model (~150 MB).
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="px-4 py-3 flex flex-col gap-1.5">
+          {/* Web Speech API segments take priority when present */}
+          {hasWebSpeech ? (
+            <>
+              {segments.map((seg, i) => {
+                const prev = segments[i - 1];
+                const showDivider =
+                  i > 0 &&
+                  Math.floor(seg.elapsedSec / 60) !== Math.floor(prev.elapsedSec / 60);
+                return (
+                  <div key={seg.wallTime}>
+                    {showDivider && (
+                      <div className="flex items-center gap-2 py-1.5">
+                        <div className="flex-1 h-px" style={{ background: 'var(--color-pt-border)' }} />
+                        <span
+                          className="shrink-0 font-mono text-[10px] font-semibold tabular-nums px-1"
+                          style={{ color: 'var(--color-pt-text-3)' }}
+                        >
+                          {fmtElapsedMarker(Math.floor(seg.elapsedSec / 60) * 60)} |{' '}
+                          {fmtWallTime(seg.wallTime)}
+                        </span>
+                        <div className="flex-1 h-px" style={{ background: 'var(--color-pt-border)' }} />
+                      </div>
+                    )}
+                    <p
+                      className="text-sm leading-relaxed"
+                      style={{
+                        color: 'var(--color-pt-text)',
+                        animation: 'transcript-slide-in 280ms ease-out both',
+                      }}
+                    >
+                      {seg.text.trim()}
+                    </p>
+                  </div>
+                );
+              })}
+              {interimText && (
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
+                  <span className="italic">{interimText}</span>
+                  <span
+                    className="inline-block ml-0.5 w-px align-middle"
+                    style={{
+                      height: '1em',
+                      background: 'var(--color-pt-accent)',
+                      animation: 'transcript-cursor-blink 900ms step-end infinite',
+                    }}
+                  />
+                </p>
+              )}
+            </>
+          ) : (
+            /* Whisper chunk transcript — full accumulated text, updates every ~5 s */
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
+              {whisperText}
+              <span
+                className="inline-block ml-0.5 w-px align-middle"
+                style={{
+                  height: '1em',
+                  background: 'var(--color-pt-accent)',
+                  animation: 'transcript-cursor-blink 900ms step-end infinite',
+                }}
+              />
+            </p>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Active recording state ─────────────────────────────────────────────────────
 function ActiveRecordingCard({
   durationSec,
   paused,
   chainActive,
   live,
+  whisperLiveText,
   onPauseResume,
   onStop,
   onStopAndFinish,
@@ -204,14 +358,242 @@ function ActiveRecordingCard({
   paused: boolean;
   chainActive: boolean;
   live: UseLiveTranscript;
+  whisperLiveText: string;
   onPauseResume: () => void;
   onStop: () => void;
   onStopAndFinish: () => void;
 }) {
+  const [transcriptVisible, setTranscriptVisible] = useState(true);
+  const [flags, setFlags] = useState<number[]>([]);
+  // Always-fresh elapsed-sec so the restart callback captures current duration, not a snapshot.
+  const durationSecRef = useRef(durationSec);
+  durationSecRef.current = durationSec;
+
   const micState: MicState = paused ? 'paused' : 'connected';
   const accentColor = paused ? 'var(--color-pt-amber)' : 'var(--color-pt-red)';
   const accentFg = paused ? 'var(--color-pt-amber-fg)' : 'var(--color-pt-red-fg)';
 
+  // ── Two-column layout: transcript left, controls right ──────────────────────
+  // Activate whenever live captions are on OR Whisper has produced any text.
+  if (live.listening || !!whisperLiveText) {
+    return (
+      <div className="flex gap-0" style={{ minHeight: 480 }}>
+        {/* Left: Transcript panel */}
+        <div className="flex-1 flex flex-col gap-3 min-w-0 pr-5">
+          <div className="flex items-center justify-between">
+            <p
+              className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: 'var(--color-pt-text-3)' }}
+            >
+              Transcript · Live
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  live.stop();
+                  window.setTimeout(() => live.start(() => durationSecRef.current), 150);
+                }}
+                title="Restart live captions"
+                className="flex items-center justify-center rounded transition-opacity hover:opacity-70"
+                style={{ color: 'var(--color-pt-text-3)', minHeight: 44, minWidth: 32, touchAction: 'manipulation' }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={transcriptVisible}
+                onClick={() => setTranscriptVisible((v) => !v)}
+                className="flex items-center gap-1.5"
+                style={{ touchAction: 'manipulation', minHeight: 44 }}
+              >
+                <span className="text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
+                  visible
+                </span>
+                <span
+                  className="relative inline-flex h-5 w-9 rounded-full transition-colors duration-200"
+                  style={{
+                    background: transcriptVisible
+                      ? 'var(--color-pt-accent)'
+                      : 'var(--color-pt-border-strong)',
+                  }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+                    style={{ transform: transcriptVisible ? 'translateX(16px)' : 'translateX(0)' }}
+                  />
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {transcriptVisible ? (
+            <LiveTranscriptView
+              segments={live.segments}
+              interimText={live.interimText}
+              whisperText={whisperLiveText}
+              expandToFill
+            />
+          ) : (
+            <div
+              className="flex-1 rounded-xl flex items-center justify-center"
+              style={{
+                border: '1px dashed var(--color-pt-border)',
+                background: 'var(--color-pt-surface)',
+              }}
+            >
+              <p className="text-xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
+                Transcript hidden
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Vertical divider */}
+        <div className="w-px self-stretch shrink-0" style={{ background: 'var(--color-pt-border)' }} />
+
+        {/* Right: Controls panel */}
+        <div className="flex flex-col gap-3 shrink-0 pl-5" style={{ width: 224 }}>
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: 'var(--color-pt-text-3)' }}
+          >
+            Controls
+          </p>
+
+          {/* Timer */}
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              {!paused && (
+                <span
+                  className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-65"
+                  style={{ background: accentColor }}
+                />
+              )}
+              <span
+                className="relative inline-flex h-2.5 w-2.5 rounded-full"
+                style={{ background: accentColor }}
+              />
+            </span>
+            <span
+              className="font-mono font-semibold tabular-nums"
+              style={{
+                color: 'var(--color-pt-text)',
+                fontSize: 40,
+                letterSpacing: '-0.03em',
+                lineHeight: 1,
+              }}
+            >
+              {formatDuration(durationSec)}
+            </span>
+            <span
+              className="self-end pb-0.5 text-[11px] font-bold uppercase tracking-widest"
+              style={{ color: accentFg }}
+            >
+              {paused ? 'Paused' : 'Rec'}
+            </span>
+          </div>
+
+          {/* Waveform */}
+          <Waveform micState={micState} height={40} />
+
+          {/* Stop & generate */}
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            onClick={onStopAndFinish}
+            disabled={chainActive}
+            style={{ minHeight: 44, touchAction: 'manipulation' }}
+          >
+            <Square size={14} strokeWidth={2} /> Stop &amp; generate notes
+          </button>
+
+          {/* Pause / Resume */}
+          <button
+            type="button"
+            className="btn btn-secondary w-full"
+            onClick={onPauseResume}
+            disabled={chainActive}
+            style={{ minHeight: 44, touchAction: 'manipulation' }}
+          >
+            {paused ? (
+              <>
+                <Play size={14} strokeWidth={2} /> Resume
+              </>
+            ) : (
+              <>
+                <Pause size={14} strokeWidth={2} /> Pause
+              </>
+            )}
+          </button>
+
+          {/* Stop only */}
+          <button
+            type="button"
+            className="btn btn-ghost w-full text-sm"
+            onClick={onStop}
+            disabled={chainActive}
+            title="Stop without auto-transcribing or generating"
+            style={{ minHeight: 40, touchAction: 'manipulation' }}
+          >
+            Stop only
+          </button>
+
+          {/* Flag for note */}
+          <div
+            className="flex flex-col gap-2 pt-3 mt-1"
+            style={{ borderTop: '1px solid var(--color-pt-border)' }}
+          >
+            <div>
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: 'var(--color-pt-text-3)' }}
+              >
+                Flag for note
+              </p>
+              <p
+                className="text-xs leading-relaxed mt-0.5"
+                style={{ color: 'var(--color-pt-text-3)' }}
+              >
+                Tap when something matters — we'll mark it for review.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary w-full"
+              onClick={() => setFlags((prev) => [...prev, durationSec])}
+              style={{ minHeight: 44, touchAction: 'manipulation' }}
+            >
+              + Flag this moment
+            </button>
+
+            {flags.length > 0 && (
+              <div
+                className="rounded-lg px-3 py-2"
+                style={{
+                  background: 'var(--color-pt-surface)',
+                  border: '1px solid var(--color-pt-border)',
+                }}
+              >
+                <p
+                  className="text-xs font-semibold mb-0.5"
+                  style={{ color: 'var(--color-pt-text-2)' }}
+                >
+                  {flags.length} flag{flags.length !== 1 ? 's' : ''} this visit
+                </p>
+                <p className="font-mono text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
+                  {flags.map((s) => formatDuration(s)).join(' · ')}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Single-column layout (live transcript off) ──────────────────────────────
   return (
     <div className="flex flex-col items-center gap-6 py-4">
       {/* Status label */}
@@ -301,22 +683,26 @@ function ActiveRecordingCard({
       </div>
 
       {/* Live transcript toggle */}
-      {live.supported && (
-        <div
-          className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-4"
-          style={{
-            background: 'var(--color-pt-surface)',
-            border: '1px solid var(--color-pt-border)',
-          }}
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-              Live transcript
-            </p>
-            <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
-              {live.listening ? 'On — following along' : 'Hidden — toggle to follow along'}
-            </p>
-          </div>
+      <div
+        className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+        style={{
+          background: 'var(--color-pt-surface)',
+          border: '1px solid var(--color-pt-border)',
+        }}
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+            Live transcript
+          </p>
+          <p className="text-xs" style={{ color: live.error ? 'var(--color-caution)' : !live.supported ? 'var(--color-pt-text-3)' : 'var(--color-pt-text-3)' }}>
+            {!live.supported
+              ? 'Not available in this browser (Chrome/Edge required)'
+              : live.error
+                ? `Captions paused: ${live.error}`
+                : 'Toggle to follow along in real-time'}
+          </p>
+        </div>
+        {live.supported && (
           <button
             type="button"
             role="switch"
@@ -327,53 +713,22 @@ function ActiveRecordingCard({
           >
             <span
               className="text-[11px] font-bold uppercase tracking-wide"
-              style={{
-                color: live.listening ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
-              }}
+              style={{ color: 'var(--color-pt-text-3)' }}
             >
-              {live.listening ? 'ON' : 'OFF'}
+              OFF
             </span>
             <span
-              className="relative inline-flex h-6 w-11 rounded-full transition-colors duration-200"
-              style={{
-                background: live.listening
-                  ? 'var(--color-pt-accent)'
-                  : 'var(--color-pt-border-strong)',
-              }}
+              className="relative inline-flex h-6 w-11 rounded-full"
+              style={{ background: 'var(--color-pt-border-strong)' }}
             >
               <span
-                className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
-                style={{
-                  transform: live.listening ? 'translateX(20px)' : 'translateX(0)',
-                }}
+                className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow"
+                style={{ transform: 'translateX(0)' }}
               />
             </span>
           </button>
-        </div>
-      )}
-
-      {/* Live transcript text */}
-      {live.listening && (live.finalText || live.interimText) && (
-        <div
-          className="w-full rounded-lg px-3.5 py-2.5 text-xs"
-          style={{
-            border: '1px solid var(--color-pt-accent-border)',
-            background: 'var(--color-pt-accent-soft)',
-            color: 'var(--color-pt-text-2)',
-          }}
-        >
-          <span className="font-semibold" style={{ color: 'var(--color-pt-accent-fg)' }}>
-            Live:{' '}
-          </span>
-          <span style={{ color: 'var(--color-pt-text)' }}>{live.finalText}</span>
-          {live.interimText && (
-            <span className="italic" style={{ color: 'var(--color-pt-text-3)' }}>
-              {' '}
-              {live.interimText}
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -383,6 +738,7 @@ export function RecordingPanel({
   recorder,
   live,
   clips,
+  whisperLiveText,
   onStart,
   onStop,
   onStopAndFinish,
@@ -478,6 +834,7 @@ export function RecordingPanel({
           paused={recorder.status === 'paused'}
           chainActive={false}
           live={live}
+          whisperLiveText={whisperLiveText}
           onPauseResume={onPauseResume}
           onStop={onStop}
           onStopAndFinish={onStopAndFinish}
@@ -598,9 +955,9 @@ function RecordingNotices({
           Upgrade to Cloudflare Nova-3 for speaker labeling.
         </p>
       )}
-      {webspeechProvider && liveSupported && liveError && (
+      {liveSupported && liveError && (
         <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
-          Live transcription error: {liveError}. {liveErrorHint(liveError)}
+          Live captions stopped: {liveErrorHint(liveError)}
         </StatusBanner>
       )}
     </>
