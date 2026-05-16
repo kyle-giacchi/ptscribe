@@ -117,12 +117,12 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
                   className="flex items-start gap-3 px-4 py-3"
                   style={{
                     borderBottom: '1px solid var(--color-pt-border)',
-                    background: isActive ? 'color-mix(in oklab, var(--color-pt-accent) 6%, var(--color-pt-surface))' : undefined,
+                    background: isActive
+                      ? 'color-mix(in oklab, var(--color-pt-accent) 6%, var(--color-pt-surface))'
+                      : undefined,
+                    cursor: isActive ? 'default' : 'pointer',
                   }}
-                  onClick={() => {
-                    onChange(t.id);
-                    setOpen(false);
-                  }}
+                  onClick={!isActive ? () => { onChange(t.id); setOpen(false); } : undefined}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="flex items-center gap-2">
@@ -146,6 +146,20 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
                       {sectionSummary}
                     </p>
                   </div>
+                  {!isActive && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost shrink-0 text-xs"
+                      style={{ height: 28, padding: '0 10px' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onChange(t.id);
+                        setOpen(false);
+                      }}
+                    >
+                      Use
+                    </button>
+                  )}
                 </div>
               );
             })}
