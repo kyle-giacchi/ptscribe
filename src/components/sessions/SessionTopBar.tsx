@@ -1,12 +1,12 @@
 // src/components/sessions/SessionTopBar.tsx
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { isDemoMode } from '@/lib/demoMode';
 import {
   ArrowLeft, CheckCircle2, Copy, FileText, List, LockOpen,
-  Mic, Pause, Play, Square, Sparkles, Loader2,
+  Mic, Sparkles, Loader2,
 } from 'lucide-react';
 import { TemplateDropdown } from './TemplateDropdown';
-import { formatDuration } from '@/utils/format';
 import type { Patient, Session, Note, NoteTemplate } from '@/types';
 
 type Busy = null | 'transcribing' | 'generating';
@@ -17,8 +17,6 @@ export interface SessionTopBarProps {
   note: Note | undefined;
   template: NoteTemplate | undefined;
   templates: NoteTemplate[];
-  recorderStatus: string;
-  durationSec: number;
   activeTab: 'record' | 'review' | 'clips';
   clipsCount: number;
   hasNote: boolean;
@@ -32,9 +30,6 @@ export interface SessionTopBarProps {
   missingRequiredLabels: string[];
   pendingDeleteSession: boolean;
   onSetTab: (tab: 'record' | 'review' | 'clips') => void;
-  onStartRecording: () => void;
-  onStopAndFinish: () => void;
-  onPauseResume: () => void;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
   onGenerate: () => void;
@@ -53,12 +48,11 @@ const SESSION_TYPE_LABEL: Record<string, string> = {
 
 export function SessionTopBar({
   patient, session, note, template, templates,
-  recorderStatus, durationSec,
   activeTab, clipsCount, hasNote, noteFinalized,
   busy, transcript, totalDurationSec,
   generateUsed, generateCap, generationReady,
   missingRequiredLabels, pendingDeleteSession,
-  onSetTab, onStartRecording, onStopAndFinish, onPauseResume,
+  onSetTab,
   onTemplateChange, onManageTemplates,
   onGenerate, onCopyTranscript, onCopyNote, onFinalize, onUnfinalize,
 }: SessionTopBarProps) {
@@ -77,6 +71,23 @@ export function SessionTopBar({
 
   return (
     <div style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface)' }}>
+
+      {isDemoMode() && (
+        <div
+          style={{
+            background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
+            borderBottom: '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
+            padding: '5px 22px',
+            fontSize: 11.5,
+            color: 'var(--color-caution)',
+            textAlign: 'center',
+            lineHeight: 1.4,
+          }}
+        >
+          Demo mode — data uses a shared passphrase embedded in the source code. Do not enter real
+          patient information.
+        </div>
+      )}
 
       {/* ── Row 1: patient breadcrumb ── */}
       <div className="flex items-start gap-3 px-5 pt-3">
@@ -133,14 +144,6 @@ export function SessionTopBar({
             badgeHighlight={!!noteFinalized}
           />
         </div>
-        <div style={{ flex: 1 }} />
-        <CompactRecordingControl
-          status={recorderStatus}
-          durationSec={durationSec}
-          onStart={onStartRecording}
-          onStopAndFinish={onStopAndFinish}
-          onPauseResume={onPauseResume}
-        />
       </div>
 
       {/* ── Row 3: Review-only action cluster ── */}
@@ -269,56 +272,6 @@ function TabPill({
   );
 }
 
-function CompactRecordingControl({
-  status, durationSec, onStart, onStopAndFinish, onPauseResume,
-}: {
-  status: string;
-  durationSec: number;
-  onStart: () => void;
-  onStopAndFinish: () => void;
-  onPauseResume: () => void;
-}) {
-  const isRecording = status === 'recording';
-  const isPaused = status === 'paused';
-  const active = isRecording || isPaused;
-
-  if (!active) {
-    return (
-      <button type="button" onClick={onStart} aria-label="Start recording"
-        className="inline-flex items-center gap-1.5 rounded-lg transition-opacity hover:opacity-90 active:scale-95"
-        style={{ padding: '6px 14px', height: 32, fontSize: 12.5, fontWeight: 600, color: '#ffffff', background: 'var(--color-pt-accent)', border: 'none', cursor: 'pointer', touchAction: 'manipulation', boxSizing: 'border-box' }}>
-        <Mic size={13} strokeWidth={2} /> Start
-      </button>
-    );
-  }
-
-  const accentColor = isPaused ? 'var(--color-pt-amber)' : 'var(--color-pt-red)';
-  const borderColor = isPaused ? 'var(--color-pt-amber-border)' : 'var(--color-pt-red-border)';
-  const bg = isPaused
-    ? 'color-mix(in oklab, var(--color-pt-amber) 8%, var(--color-pt-surface))'
-    : 'color-mix(in oklab, var(--color-pt-red) 6%, var(--color-pt-surface))';
-
-  return (
-    <div className="flex items-center gap-0.5"
-      style={{ border: `1px solid ${borderColor}`, borderRadius: 8, background: bg, padding: '0 2px 0 10px', height: 32 }}>
-      <span className="relative mr-1.5 flex h-2 w-2 shrink-0">
-        {isRecording && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-65" style={{ background: accentColor }} />}
-        <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: accentColor }} />
-      </span>
-      <span className="font-mono tabular-nums" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)', minWidth: 38 }}>
-        {formatDuration(durationSec)}
-      </span>
-      <button type="button" onClick={onPauseResume} aria-label={isPaused ? 'Resume' : 'Pause'}
-        className="flex items-center justify-center rounded" style={{ width: 28, height: 28, color: 'var(--color-pt-text-2)', border: 'none', background: 'transparent', cursor: 'pointer', touchAction: 'manipulation' }}>
-        {isPaused ? <Play size={12} strokeWidth={2.5} /> : <Pause size={12} strokeWidth={2.5} />}
-      </button>
-      <button type="button" onClick={onStopAndFinish} aria-label="Stop recording"
-        className="flex items-center justify-center rounded" style={{ width: 28, height: 28, color: 'var(--color-pt-text-2)', border: 'none', background: 'transparent', cursor: 'pointer', touchAction: 'manipulation' }}>
-        <Square size={12} strokeWidth={2.5} />
-      </button>
-    </div>
-  );
-}
 
 function StatusBadge({ status, finalized }: { status: string; finalized: boolean }) {
   const label = finalized ? 'final' : status === 'ready' ? 'ready' : 'draft';
