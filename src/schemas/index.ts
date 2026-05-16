@@ -311,7 +311,7 @@ export function defaultAppData(): AppData {
       },
       orgPolicy: { toneStyle: 'narrative' },
       firstRun: {},
-      ui: { sidebarCollapsed: false, densityMode: 'cozy', theme: 'system' },
+      ui: { sidebarCollapsed: false, densityMode: 'cozy', theme: 'light' },
       retention: {},
     },
   };
