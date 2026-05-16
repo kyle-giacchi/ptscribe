@@ -37,7 +37,7 @@ export interface UseRecordingFlowResult {
   handleStopRecording: () => Promise<void>;
   handlePauseResume: () => void;
   handleStopAndFinish: () => void;
-  handleUploadAudio: (file: File) => Promise<void>;
+  handleUploadAudio: (file: File) => Promise<string | null>;
   handleDeleteClip: (clipId: string) => Promise<void>;
   handleRecordingComplete: () => Promise<void>;
 }
@@ -259,14 +259,14 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   }
 
   // ── Audio upload ─────────────────────────────────────────────────────────
-  async function handleUploadAudio(file: File) {
+  async function handleUploadAudio(file: File): Promise<string | null> {
     if (file.size > MAX_AUDIO_BYTES) {
       toast.error('File too large — Whisper accepts up to 25 MB.');
-      return;
+      return null;
     }
     if (file.type && !/^(audio|video)\//.test(file.type)) {
       toast.error('Please upload an audio file (MP3, M4A, WAV, OGG, WebM, etc.).');
-      return;
+      return null;
     }
 
     const clipId = newId();
@@ -309,7 +309,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
       if (isSavingRef.current.has(clipId)) {
         console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
-        return;
+        return null;
       }
       isSavingRef.current.add(clipId);
       try {
@@ -320,11 +320,13 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       patchClip(clipId, { status: 'ready', durationSec });
 
       toast.success(`Added "${file.name}"`, { id: tid });
+      return clipId;
     } catch (e) {
       patchClips((clips) =>
         clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
       );
       toast.error(`Upload failed: ${(e as Error).message}`, { id: tid });
+      return null;
     }
   }
 

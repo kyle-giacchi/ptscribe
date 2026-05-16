@@ -13,6 +13,8 @@ import { labelForType } from '@/utils/labels';
 
 export function AppShell() {
   const location = useLocation();
+  const sessionMatch = useMatch('/sessions/:id');
+  const isSessionPage = !!sessionMatch;
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -50,23 +52,25 @@ export function AppShell() {
         <OfflineIndicator />
         <div
           className="grid h-full w-full overflow-hidden"
-          style={{ ...shellBox, gridTemplateRows: 'auto auto 1fr' }}
+          style={{ ...shellBox, gridTemplateRows: isSessionPage ? '1fr' : 'auto auto 1fr' }}
         >
-          <DemoTopBar />
-          <div
-            style={{
-              background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
-              borderBottom: '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
-              padding: '5px 22px',
-              fontSize: 11.5,
-              color: 'var(--color-caution)',
-              textAlign: 'center',
-              lineHeight: 1.4,
-            }}
-          >
-            Demo mode — data uses a shared passphrase embedded in the source code. Do not enter real
-            patient information.
-          </div>
+          {!isSessionPage && <DemoTopBar />}
+          {!isSessionPage && (
+            <div
+              style={{
+                background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
+                borderBottom: '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
+                padding: '5px 22px',
+                fontSize: 11.5,
+                color: 'var(--color-caution)',
+                textAlign: 'center',
+                lineHeight: 1.4,
+              }}
+            >
+              Demo mode — data uses a shared passphrase embedded in the source code. Do not enter real
+              patient information.
+            </div>
+          )}
           <main className="overflow-auto" style={mainStyle}>
             {pageTransition}
           </main>

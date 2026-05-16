@@ -28,7 +28,6 @@ export interface RecordingPanelProps {
   clips: SessionClip[];
   whisperLiveText: string;
   onStart: () => void;
-  onStop: () => void;
   onStopAndFinish: () => void;
   onPauseResume: () => void;
   onUpload: (file: File) => void;
@@ -120,65 +119,64 @@ function IdleRecordingCard({
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-5 py-8">
-      <div className="relative">
-        <span
-          className="absolute inset-0 animate-ping rounded-full"
-          style={{ background: 'var(--color-pt-accent)', opacity: 0.15 }}
-        />
-        <button
-          type="button"
-          onClick={onStart}
-          aria-label="Start recording"
-          className="relative flex items-center justify-center rounded-full"
-          style={{
-            width: 80,
-            height: 80,
-            background: 'var(--color-pt-accent)',
-            touchAction: 'manipulation',
-          }}
-        >
-          <Mic size={28} strokeWidth={1.75} style={{ color: 'white' }} />
-        </button>
+    <div className="flex flex-col items-center gap-8 py-12">
+      <div className="flex flex-col items-center gap-5">
+        <div className="relative">
+          <span
+            className="absolute inset-0 animate-ping rounded-full"
+            style={{ background: 'var(--color-pt-accent)', opacity: 0.15 }}
+          />
+          <button
+            type="button"
+            onClick={onStart}
+            aria-label="Start recording"
+            className="relative flex items-center justify-center rounded-full"
+            style={{
+              width: 144,
+              height: 144,
+              background: 'var(--color-pt-accent)',
+              touchAction: 'manipulation',
+              boxShadow: '0 8px 32px color-mix(in srgb, var(--color-pt-accent) 35%, transparent)',
+            }}
+          >
+            <Mic size={52} strokeWidth={1.5} style={{ color: 'white' }} />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
+            Start Recording
+          </span>
+          <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+            Tap the mic to begin
+          </p>
+        </div>
       </div>
 
-      <span
-        className="font-mono tabular-nums"
-        style={{ fontSize: 28, color: 'var(--color-pt-text-3)', letterSpacing: '0.02em' }}
-      >
-        00:00
-      </span>
-
-      <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
-        Tap to begin recording
-      </p>
-
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex items-center gap-1" style={{ color: 'var(--color-pt-text-3)' }}>
         <label
-          className="btn btn-secondary cursor-pointer"
-          style={{ minHeight: 40, touchAction: 'manipulation' }}
+          className="relative flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
+          style={{ touchAction: 'manipulation', cursor: 'pointer' }}
         >
-          <Upload size={13} strokeWidth={2} /> Upload audio
+          <Upload size={11} strokeWidth={2} /> Upload audio
           <input
             type="file"
             accept="audio/*"
-            className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) {
-                onUpload(file);
-                e.target.value = '';
-              }
+              if (file) { onUpload(file); e.target.value = ''; }
             }}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
           />
         </label>
+        <span className="text-xs select-none">·</span>
         <button
           type="button"
-          className="btn btn-ghost"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
           onClick={onSkip}
-          style={{ minHeight: 40, touchAction: 'manipulation' }}
+          style={{ touchAction: 'manipulation' }}
         >
-          Skip <ArrowRight size={14} strokeWidth={2} />
+          Skip <ArrowRight size={11} strokeWidth={2} />
         </button>
       </div>
     </div>
@@ -345,7 +343,6 @@ function ActiveRecordingCard({
   live,
   whisperLiveText,
   onPauseResume,
-  onStop,
   onStopAndFinish,
 }: {
   durationSec: number;
@@ -354,11 +351,9 @@ function ActiveRecordingCard({
   live: UseLiveTranscript;
   whisperLiveText: string;
   onPauseResume: () => void;
-  onStop: () => void;
   onStopAndFinish: () => void;
 }) {
   const [transcriptVisible, setTranscriptVisible] = useState(true);
-  const [flags, setFlags] = useState<number[]>([]);
   // Always-fresh elapsed-sec so the restart callback captures current duration, not a snapshot.
   const durationSecRef = useRef(durationSec);
   durationSecRef.current = durationSec;
@@ -492,17 +487,6 @@ function ActiveRecordingCard({
           {/* Waveform */}
           <Waveform micState={micState} height={40} />
 
-          {/* Stop & generate */}
-          <button
-            type="button"
-            className="btn btn-primary w-full"
-            onClick={onStopAndFinish}
-            disabled={chainActive}
-            style={{ minHeight: 44, touchAction: 'manipulation' }}
-          >
-            <Square size={14} strokeWidth={2} /> Stop &amp; generate notes
-          </button>
-
           {/* Pause / Resume */}
           <button
             type="button"
@@ -522,66 +506,16 @@ function ActiveRecordingCard({
             )}
           </button>
 
-          {/* Stop only */}
+          {/* Finish recording */}
           <button
             type="button"
-            className="btn btn-ghost w-full text-sm"
-            onClick={onStop}
+            className="btn btn-primary w-full"
+            onClick={onStopAndFinish}
             disabled={chainActive}
-            title="Stop without auto-transcribing or generating"
-            style={{ minHeight: 40, touchAction: 'manipulation' }}
+            style={{ minHeight: 44, touchAction: 'manipulation' }}
           >
-            Stop only
+            <Square size={14} strokeWidth={2} /> Finish Recording
           </button>
-
-          {/* Flag for note */}
-          <div
-            className="flex flex-col gap-2 pt-3 mt-1"
-            style={{ borderTop: '1px solid var(--color-pt-border)' }}
-          >
-            <div>
-              <p
-                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-                style={{ color: 'var(--color-pt-text-3)' }}
-              >
-                Flag for note
-              </p>
-              <p
-                className="text-xs leading-relaxed mt-0.5"
-                style={{ color: 'var(--color-pt-text-3)' }}
-              >
-                Tap when something matters — we'll mark it for review.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-secondary w-full"
-              onClick={() => setFlags((prev) => [...prev, durationSec])}
-              style={{ minHeight: 44, touchAction: 'manipulation' }}
-            >
-              + Flag this moment
-            </button>
-
-            {flags.length > 0 && (
-              <div
-                className="rounded-lg px-3 py-2"
-                style={{
-                  background: 'var(--color-pt-surface)',
-                  border: '1px solid var(--color-pt-border)',
-                }}
-              >
-                <p
-                  className="text-xs font-semibold mb-0.5"
-                  style={{ color: 'var(--color-pt-text-2)' }}
-                >
-                  {flags.length} flag{flags.length !== 1 ? 's' : ''} this visit
-                </p>
-                <p className="font-mono text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
-                  {flags.map((s) => formatDuration(s)).join(' · ')}
-                </p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -662,17 +596,7 @@ function ActiveRecordingCard({
           disabled={chainActive}
           style={{ minHeight: 44, touchAction: 'manipulation' }}
         >
-          <Square size={15} strokeWidth={2} /> Stop &amp; generate notes
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={onStop}
-          disabled={chainActive}
-          title="Stop without auto-transcribing or generating"
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
-        >
-          Stop only
+          <Square size={15} strokeWidth={2} /> Finish Recording
         </button>
       </div>
 
@@ -734,7 +658,6 @@ export function RecordingPanel({
   clips,
   whisperLiveText,
   onStart,
-  onStop,
   onStopAndFinish,
   onPauseResume,
   onUpload,
@@ -830,7 +753,6 @@ export function RecordingPanel({
           live={live}
           whisperLiveText={whisperLiveText}
           onPauseResume={onPauseResume}
-          onStop={onStop}
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
@@ -886,17 +808,7 @@ function RecordingSizeHint({ durationSec }: { durationSec: number }) {
       </StatusBanner>
     );
   }
-  return (
-    <div
-      className="rounded-md px-3 py-1.5 text-[12px]"
-      style={{
-        border: '1px solid var(--color-pt-border)',
-        color: 'var(--color-pt-text-3)',
-      }}
-    >
-      Estimated ~{estimatedMb.toFixed(1)} MB recorded (Whisper accepts up to 25 MB per clip).
-    </div>
-  );
+  return null;
 }
 
 function RecordingNotices({
