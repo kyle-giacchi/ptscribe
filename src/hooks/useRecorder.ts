@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { audioRepository } from '@/services/AudioRepository';
 import { acquireWakeLock, releaseWakeLock } from '@/lib/wakeLock';
 import type { RecordingLimitsSettings } from '@/types';
@@ -37,6 +37,13 @@ export interface UseRecorder {
   recorderInterrupted: boolean;
   /** Set when the microphone track ended mid-recording (device disconnected, permission revoked). Audio from in-memory chunks is saved automatically. */
   micDisconnected: boolean;
+  /**
+   * Set this ref's `.current` to receive the accumulated audio blob on every
+   * MediaRecorder chunk tick (~5 s intervals). The blob spans all chunks from
+   * the start of the clip (capped at the last 3 min so Whisper stays fast).
+   * Clear it to stop receiving callbacks.
+   */
+  onChunk: MutableRefObject<((blob: Blob, mimeType: string) => void) | null>;
 }
 
 const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -104,6 +111,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   useEffect(() => {
     limitsRef.current = options.limits;
   }, [options.limits]);
+
+  // Exposed so callers can subscribe to accumulated-audio callbacks without re-creating the recorder.
+  const onChunkRef = useRef<((blob: Blob, mimeType: string) => void) | null>(null);
 
   const [wasBackgrounded, setWasBackgrounded] = useState(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -359,6 +369,19 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           audioRepository.appendChunk(clipId, index, e.data).catch(() => {
             /* best-effort */
           });
+          // Notify live-Whisper subscriber with the accumulated blob.
+          // Cap at ~3 min (36 × 5 s) so Whisper processing stays fast on long recordings.
+          // Always include chunk 0 (container header) so the blob is decodable.
+          const cb = onChunkRef.current;
+          if (cb) {
+            const chunks = chunksRef.current;
+            const MAX_LIVE_CHUNKS = 36;
+            const liveChunks =
+              chunks.length > MAX_LIVE_CHUNKS
+                ? [chunks[0], ...chunks.slice(-(MAX_LIVE_CHUNKS - 1))]
+                : chunks;
+            cb(new Blob(liveChunks, { type: currentMimeRef.current }), currentMimeRef.current);
+          }
         };
         recorder.onstop = () => {
           const finalBlob = new Blob(chunksRef.current, {
@@ -494,5 +517,6 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     idleAutoStopped,
     recorderInterrupted,
     micDisconnected,
+    onChunk: onChunkRef,
   };
 }

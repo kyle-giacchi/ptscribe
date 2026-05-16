@@ -122,7 +122,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     generateUsed,
     checkActionGuard,
     recordAction,
-    runLocalTranscription,
     handleCreateTranscript,
     handleRevertToLocal,
     handleRemergeFromClips,
@@ -142,11 +141,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setTranscript,
     setMergedAudioBlob,
     setIsMerging,
-    runLocalTranscription,
   });
   const {
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
+    whisperLiveText,
     handleStartRecording,
     handleStopRecording,
     handlePauseResume,
@@ -289,7 +288,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
         {/* ① Record tab */}
         {activeTab === 'record' && (
-          <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {showRecordWarning && (
               <div
                 style={{
@@ -353,6 +352,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               recorder={recorder}
               live={live}
               clips={sortedClips}
+              whisperLiveText={whisperLiveText}
               onStart={handleStartRecording}
               onStop={handleStopRecording}
               onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}

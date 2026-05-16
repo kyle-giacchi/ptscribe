@@ -1,6 +1,6 @@
 import type { TranscribeResult } from '../transcribe';
 
-export const LOCAL_WHISPER_DEFAULT_MODEL = 'onnx-community/whisper-tiny.en';
+export const LOCAL_WHISPER_DEFAULT_MODEL = 'Xenova/whisper-tiny.en';
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
@@ -68,6 +68,18 @@ async function blobToFloat32(blob: Blob): Promise<Float32Array> {
   source.start();
   const resampled = await offlineCtx.startRendering();
   return resampled.getChannelData(0).slice();
+}
+
+/**
+ * Starts the worker and warms up the Whisper pipeline so the first real
+ * transcription doesn't have to wait for the model download. Safe to call
+ * multiple times — the worker is a singleton and pipeline load is idempotent.
+ */
+export function preloadLocalWhisper(model = LOCAL_WHISPER_DEFAULT_MODEL): void {
+  const worker = getWorker();
+  const id = ++_idCounter;
+  _pending.set(id, { resolve: () => {}, reject: () => {} });
+  worker.postMessage({ id, type: 'preload', model });
 }
 
 export async function transcribeLocally(

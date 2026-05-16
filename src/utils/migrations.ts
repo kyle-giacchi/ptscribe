@@ -43,6 +43,10 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   after finalization) to all existing notes. Both default to absent.
  * - v14 → v15: Adds `Settings.ui.theme` ('system' | 'light' | 'dark'). Defaults to
  *   'system' so existing users inherit OS preference with no visible change.
+ * - v15 → v16: Changes default theme from 'system' to 'light'. Existing 'system'
+ *   users are migrated to 'light' so the app always shows the designed light palette
+ *   instead of picking up an unexpected OS dark mode. Users can still opt in to dark
+ *   or system from Settings.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -100,6 +104,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 14) {
     working = migrateV14ToV15(working);
+  }
+  if ((working as { version?: number }).version === 15) {
+    working = migrateV15ToV16(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -396,7 +403,21 @@ function migrateV14ToV15(input: Record<string, unknown>): Record<string, unknown
       theme:
         existingTheme === 'system' || existingTheme === 'light' || existingTheme === 'dark'
           ? existingTheme
-          : 'system',
+          : 'light',
+    },
+  };
+  return next;
+}
+
+function migrateV15ToV16(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 16 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingUi = (settings.ui as Record<string, unknown> | undefined) ?? {};
+  next.settings = {
+    ...settings,
+    ui: {
+      ...existingUi,
+      theme: existingUi.theme === 'system' ? 'light' : existingUi.theme,
     },
   };
   return next;

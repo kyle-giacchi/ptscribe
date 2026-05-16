@@ -36,13 +36,20 @@ function getCtor(): SpeechRecCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+export interface TranscriptSegment {
+  text: string;
+  elapsedSec: number;
+  wallTime: number;
+}
+
 export interface UseLiveTranscript {
   supported: boolean;
   listening: boolean;
   finalText: string;
   interimText: string;
+  segments: TranscriptSegment[];
   error: string | null;
-  start: () => void;
+  start: (getElapsedSec?: () => number) => void;
   stop: () => void;
   reset: () => void;
 }
@@ -51,9 +58,11 @@ export function useLiveTranscript(): UseLiveTranscript {
   const [listening, setListening] = useState(false);
   const [finalText, setFinalText] = useState('');
   const [interimText, setInterimText] = useState('');
+  const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
   const isMountedRef = useRef(true);
+  const getElapsedSecRef = useRef<(() => number) | undefined>(undefined);
   const Ctor = getCtor();
   const supported = Ctor !== null;
 
@@ -70,11 +79,12 @@ export function useLiveTranscript(): UseLiveTranscript {
     [],
   );
 
-  const start = useCallback(() => {
+  const start = useCallback((getElapsedSec?: () => number) => {
     if (!Ctor) {
       setError('Live transcription is not supported in this browser.');
       return;
     }
+    getElapsedSecRef.current = getElapsedSec;
     setError(null);
     const rec = new Ctor();
     rec.continuous = true;
@@ -90,7 +100,12 @@ export function useLiveTranscript(): UseLiveTranscript {
         if (r.isFinal) appended += text;
         else interim += text;
       }
-      if (appended) setFinalText((prev) => (prev + ' ' + appended).trim());
+      if (appended) {
+        const elapsedSec = getElapsedSecRef.current?.() ?? 0;
+        const wallTime = Date.now();
+        setFinalText((prev) => (prev + ' ' + appended).trim());
+        setSegments((prev) => [...prev, { text: appended.trim(), elapsedSec, wallTime }]);
+      }
       setInterimText(interim);
     };
     rec.onerror = (ev) => {
@@ -119,8 +134,9 @@ export function useLiveTranscript(): UseLiveTranscript {
   const reset = useCallback(() => {
     setFinalText('');
     setInterimText('');
+    setSegments([]);
     setError(null);
   }, []);
 
-  return { supported, listening, finalText, interimText, error, start, stop, reset };
+  return { supported, listening, finalText, interimText, segments, error, start, stop, reset };
 }

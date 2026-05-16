@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
 import { audioRepository } from '@/services/AudioRepository';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
+import { transcribeLocally, preloadLocalWhisper, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
 import { newId } from '@/utils/ids';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import type { UseRecorder } from '@/hooks/useRecorder';
@@ -21,8 +22,6 @@ export interface UseRecordingFlowParams {
   setTranscript: (next: string) => void;
   setMergedAudioBlob: (blob: Blob | null) => void;
   setIsMerging: (v: boolean) => void;
-  /** Triggered after each saved clip; runs the local-Whisper background pass. */
-  runLocalTranscription: (clipId: string, blob: Blob) => Promise<void>;
 }
 
 export interface UseRecordingFlowResult {
@@ -31,6 +30,8 @@ export interface UseRecordingFlowResult {
   setBackgroundWarningDismissed: (v: boolean) => void;
   // Active clip ref (exposed so the auto-record deep link hook can read it if needed)
   activeClipIdRef: MutableRefObject<string | null>;
+  // Growing Whisper transcript captured from audio chunks during recording
+  whisperLiveText: string;
   // Handlers
   handleStartRecording: () => Promise<void>;
   handleStopRecording: () => Promise<void>;
@@ -43,9 +44,8 @@ export interface UseRecordingFlowResult {
 
 /**
  * Owns the recording lifecycle handlers + ancillary state for a session.
- * Wires the recorder/live hooks to clip + session mutations, schedules the
- * local-Whisper background pass after each saved clip, and merges clips for
- * Review-tab playback when the user finishes recording.
+ * Wires the recorder/live hooks to clip + session mutations, and merges clips
+ * for Review-tab playback when the user finishes recording.
  */
 export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFlowResult {
   const {
@@ -61,10 +61,18 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     setTranscript,
     setMergedAudioBlob,
     setIsMerging,
-    runLocalTranscription,
   } = params;
 
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
+  const [whisperLiveText, setWhisperLiveText] = useState('');
+
+  // Warm up the Whisper worker + model as soon as the session mounts so the
+  // first transcription result doesn't have to wait for a cold model download.
+  useEffect(() => { preloadLocalWhisper(); }, []);
+
+  // Always-current ref so the live-transcript callback reads the latest duration.
+  const durationSecRef = useRef(0);
+  durationSecRef.current = recorder.durationSec;
   // Re-arm the dismiss flag every time a new recording starts so the warning
   // resurfaces for the next session if it gets backgrounded again.
   useEffect(() => {
@@ -75,6 +83,36 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
+
+  // ── Live Whisper chunk processing (leaky-bucket) ─────────────────────────
+  // At most one Whisper job runs at a time; if a new chunk arrives while one
+  // is in flight, it replaces the pending blob so we always process fresh audio.
+  const whisperRunningRef = useRef(false);
+  const whisperPendingRef = useRef<Blob | null>(null);
+
+  async function processWhisperChunk() {
+    const blob = whisperPendingRef.current;
+    if (!blob) { whisperRunningRef.current = false; return; }
+    whisperPendingRef.current = null;
+    try {
+      const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
+      if (result.text.trim()) setWhisperLiveText(result.text);
+    } catch (err) {
+      console.error('[Whisper live preview]', err);
+    }
+    if (whisperPendingRef.current) {
+      void processWhisperChunk();
+    } else {
+      whisperRunningRef.current = false;
+    }
+  }
+
+  function handleChunk(blob: Blob) {
+    whisperPendingRef.current = blob;
+    if (whisperRunningRef.current) return;
+    whisperRunningRef.current = true;
+    void processWhisperChunk();
+  }
 
   // Prevents concurrent saves for the same clipId from corrupting each other mid-encryption.
   const isSavingRef = useRef<Set<string>>(new Set());
@@ -106,6 +144,10 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     ]);
     patchSession({ status: 'recording' });
 
+    setWhisperLiveText('');
+    whisperPendingRef.current = null;
+    recorder.onChunk.current = handleChunk;
+
     const ok = await recorder.start(clipId);
     if (!ok) {
       activeClipIdRef.current = null;
@@ -119,7 +161,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
     if (live.supported) {
       live.reset();
-      live.start();
+      live.start(() => durationSecRef.current);
     }
   }
 
@@ -129,7 +171,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       live.stop();
     } else if (recorder.status === 'paused') {
       recorder.resume();
-      if (live.supported) live.start();
+      if (live.supported) live.start(() => durationSecRef.current);
     }
   }
 
@@ -137,6 +179,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     if (!session) return;
     const clipId = activeClipIdRef.current;
     activeClipIdRef.current = null;
+
+    recorder.onChunk.current = null;
+    whisperPendingRef.current = null;
 
     const finalBlob = await recorder.stop();
     const durationSec = recorder.durationSec;
@@ -188,7 +233,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
           toast.warning('Storage cleanup failed — some space may not be recovered.');
         });
         patchClip(clipId, { status: 'ready', durationSec });
-        runLocalTranscription(clipId, finalBlob);
       } else {
         try {
           await audioRepository.remove(clipId);
@@ -276,7 +320,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       patchClip(clipId, { status: 'ready', durationSec });
 
       toast.success(`Added "${file.name}"`, { id: tid });
-      runLocalTranscription(clipId, blob);
     } catch (e) {
       patchClips((clips) =>
         clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
@@ -362,6 +405,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
     activeClipIdRef,
+    whisperLiveText,
     handleStartRecording,
     handleStopRecording,
     handlePauseResume,
