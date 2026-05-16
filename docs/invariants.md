@@ -186,6 +186,43 @@ Banner anatomy:
 
 The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is local `useState` in the component that owns the action. Confirm handlers clear the guard then call the actual action. Cancel handlers clear the guard only. This pattern is used in `ClipsList` (delete clip), `TranscriptPanel` (overwrite transcript, re-merge), `NotePanel` (replace draft), and `Session` (delete session).
 
+## Local-first transcription
+
+**Every audio clip — recorded or uploaded — is always sent through local Whisper first, regardless of the user's configured transcription provider.**
+
+The background auto-transcription effect in `useTranscriptionFlow` fires for every clip that reaches `status: 'ready'` with no `localTranscript`. It always calls `transcribeClipBlob` with `forceLocal: true` (whisper-tiny.en in-browser via `src/lib/audio/whisper.worker.ts`). The result is stored in both `localTranscript` and `transcript` so the Review tab populates without any manual action.
+
+Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit user action** that upgrades the local result. It does not replace the background pass — it runs on top of it.
+
+**Do not gate the background pass behind a provider check.** The comment "when the user has chosen the 'local' provider" in `useTranscriptionFlow` is historical and wrong — it has been corrected. The background pass runs for all provider configurations.
+
+**Do not skip the background pass for uploaded clips.** Uploaded files go through the same `status: 'pending' → 'ready'` transition as recorded clips; the background effect picks them up identically. The `UploadProcessingView` in `Session.tsx` waits for `status === 'transcribed' | 'failed'` before navigating to the Review tab — if you bypass the background pass, that view hangs forever.
+
+Consequences of violating this rule:
+- Uploaded audio silently skips local transcription and the "Processing audio" screen hangs with no escape for the user.
+- Users on the 'local' provider get no automatic transcript.
+- `localTranscript` is never populated, breaking the "Revert to local" flow in `TranscriptPanel`.
+
+### Worker pool and device guards
+
+True parallelism requires one worker per concurrent inference job. The ONNX runtime session inside `whisper.worker.ts` is not concurrency-safe on a single worker — a second `transcribe` message posted while the first is in flight will corrupt or block the session. `transcribeFloat32Parallel` therefore spawns a pool of independent workers, each holding its own model instance.
+
+**Pool-size formula** (computed once per call from `navigator.hardwareConcurrency` and `navigator.deviceMemory`):
+
+| Condition | Pool size |
+| --- | --- |
+| `deviceMemory < 4` OR `hardwareConcurrency ≤ 4` | 1 (sequential) |
+| `hardwareConcurrency ≤ 8` | 2 |
+| `hardwareConcurrency > 8` | 3 (capped at chunk count) |
+
+Rationale: each worker loads a full copy of the whisper-tiny ONNX weights (~40 MB). On devices with less than 4 GB RAM, or on constrained environments like iOS WKWebView, loading multiple 40 MB models risks OOM — pool size 1 eliminates that risk entirely. Mid-range devices cap at 2; high-core-count desktops get 3. Pool size is always capped at the actual chunk count so idle workers are never spawned.
+
+**Shared state across pool workers.** `_pending` (the in-flight job map) and `_idCounter` are owned by the calling context (the main thread or a coordinator), not by the workers themselves. Each job gets a unique `_idCounter`-derived ID before dispatch; workers reply with that ID so the promise can be resolved. Since IDs are unique and the map is never touched by workers directly, this is safe with any pool size.
+
+**Sequential fallback.** When pool size resolves to 1, `transcribeFloat32Parallel` routes through the same single-worker path as the non-parallel `transcribeFloat32`. No special case required — the pool loop with N=1 is equivalent.
+
+**Do not collapse the pool back to a singleton** as a "simplification." Low-end and low-memory devices already get pool size 1 automatically via the formula above. Removing the pool and hardcoding N=1 breaks parallel throughput for capable devices with no benefit to constrained ones. The complexity is load-bearing.
+
 ## Type changes ripple
 
 Adding a new field to a domain type requires all four of:
