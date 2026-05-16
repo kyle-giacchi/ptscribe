@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CheckCircle2,
-  Copy,
-  Loader2,
-  LockOpen,
-  Mic,
-  Trash2,
-  Upload,
-} from 'lucide-react';
-import { MicStatusPill, PtButton, type MicState } from '@/components/design';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Mic, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -21,8 +11,7 @@ import { useAppData } from '@/contexts/AppDataProvider';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useLiveTranscript } from '@/hooks/useLiveTranscript';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
-import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
-import type { Session, SessionClip } from '@/types';
+import type { Session, SessionClip, NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
@@ -35,7 +24,8 @@ import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { DebugDrawer } from '@/components/sessions/DebugDrawer';
-import { SessionTabBar } from '@/components/sessions/SessionTabBar';
+import { SessionTopBar } from '@/components/sessions/SessionTopBar';
+import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
 
 type Busy = null | 'transcribing' | 'generating';
 
@@ -77,6 +67,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
+  const [sectionCache, setSectionCache] = useState<Map<string, NoteSection[]>>(new Map());
+  const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+  const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
 
   // ── Atomic session/clip patches via functional slice update ──────────────
   function patchSession(patch: Partial<Session>) {
@@ -182,9 +175,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const {
     handleGenerate,
     handleSectionChange,
+    handleReplaceSections,
     handleFinalize,
     handleUnfinalize,
-    handleDeleteSession,
     handleCopyNoteMarkdown,
     missingRequiredLabels,
   } = generation;
@@ -222,10 +215,34 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleCopyNoteMarkdown(md);
   }
 
+  function handleCopyTranscript() {
+    navigator.clipboard.writeText(transcript).then(
+      () => toast.success('Transcript copied'),
+      () => toast.error('Copy failed'),
+    );
+  }
+
+  function handleTemplateChange(newTemplateId: string) {
+    const newTpl = templates.find((t) => t.id === newTemplateId);
+    if (!newTpl) return;
+    // Snapshot sections for the template we're leaving
+    if (note?.sections && session?.templateId) {
+      setSectionCache((prev) => {
+        const next = new Map(prev);
+        next.set(session!.templateId!, note!.sections);
+        return next;
+      });
+    }
+    patchSession({ templateId: newTemplateId });
+    // Restore cached sections for the incoming template, or reset to empty
+    const cached = sectionCache.get(newTemplateId);
+    const targetSections =
+      cached ?? newTpl.sections.map((s) => ({ key: s.key, label: s.label, body: '' }));
+    if (note) handleReplaceSections(targetSections);
+  }
+
   // ── Derived display values ────────────────────────────────────────────────
   const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
-  const micState = deriveMicState(recorder.status);
-  const isDemo = isDemoMode() && session.patientId === DEMO_PATIENT_ID;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
   const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
@@ -237,16 +254,33 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const hasUserEdits = transcript.trim().length > 0 && transcript.trim() !== currentClipMerge;
 
   // Show a strong warning when the user navigates back to Record after a note has been generated.
-  // A generated note represents expensive AI work that becomes stale if more clips are added.
-  // The warning is per-session dismissible — once acknowledged it does not re-surface.
-  const showRecordWarning =
-    activeTab === 'record' && !recordWarnDismissed && !!note;
+  const showRecordWarning = activeTab === 'record' && !recordWarnDismissed && !!note;
+
+  const totalDurationSec = sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0);
 
   // ── Skip recording step ───────────────────────────────────────────────────
   function handleSkipRecording() {
     setRecordingSkipped(true);
     setActiveTab('review');
   }
+
+  // ── Upload audio + auto-transcribe ────────────────────────────────────────
+  async function handleUpload(file: File) {
+    const clipId = await handleUploadAudio(file);
+    if (clipId) setProcessingUploadClipId(clipId);
+  }
+
+  useEffect(() => {
+    if (!processingUploadClipId) return;
+    const clip = session?.clips.find((c) => c.id === processingUploadClipId);
+    if (!clip) return;
+
+    if (clip.status === 'transcribed' || clip.status === 'failed') {
+      setProcessingUploadClipId(null);
+      setActiveTab('review');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.clips, processingUploadClipId]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
@@ -258,20 +292,33 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         </div>
       )}
 
-      {/* ── Tab bar ───────────────────────────────────────── */}
-      <SessionTabBar
+      {/* ── Top bar (replaces SessionTabBar) ──────────────── */}
+      <SessionTopBar
+        patient={patient}
+        session={session}
+        note={note}
+        template={template}
+        templates={templates}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
         clipsCount={sortedClips.length}
-        noteFinalized={note?.finalized}
         hasNote={!!note}
-        onOpenDrawer={() => setDrawerOpen(true)}
-        recorderStatus={recorder.status}
-        durationSec={recorder.durationSec}
-        onStartRecording={() => { setActiveTab('record'); void handleStartRecording(); }}
-        onStopRecording={handleStopRecording}
-        onStopAndFinish={handleStopAndFinish}
-        onPauseResume={handlePauseResume}
+        noteFinalized={note?.finalized}
+        busy={busy}
+        transcript={transcript}
+        totalDurationSec={totalDurationSec}
+        generateUsed={generateUsed}
+        generateCap={MAX_GENERATES_PER_SESSION}
+        generationReady={settings.ai.generation.provider === 'anthropic'}
+        missingRequiredLabels={missingRequiredLabels}
+        pendingDeleteSession={pendingDeleteSession}
+        onSetTab={setActiveTab}
+        onTemplateChange={handleTemplateChange}
+        onManageTemplates={() => setManageTemplatesOpen(true)}
+        onGenerate={handleGenerate}
+        onCopyTranscript={handleCopyTranscript}
+        onCopyNote={handleCopyNote}
+        onFinalize={handleFinalize}
+        onUnfinalize={handleUnfinalize}
       />
 
       {/* ── Scrollable content ────────────────────────────── */}
@@ -348,20 +395,23 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 </div>
               </div>
             )}
-            <RecordingPanel
-              recorder={recorder}
-              live={live}
-              clips={sortedClips}
-              whisperLiveText={whisperLiveText}
-              onStart={handleStartRecording}
-              onStop={handleStopRecording}
-              onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
-              onPauseResume={handlePauseResume}
-              onUpload={handleUploadAudio}
-              onSkip={handleSkipRecording}
-              wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
-              onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
-            />
+            {processingUploadClipId ? (
+              <UploadProcessingView />
+            ) : (
+              <RecordingPanel
+                recorder={recorder}
+                live={live}
+                clips={sortedClips}
+                whisperLiveText={whisperLiveText}
+                onStart={handleStartRecording}
+                onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
+                onPauseResume={handlePauseResume}
+                onUpload={handleUpload}
+                onSkip={handleSkipRecording}
+                wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
+                onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
+              />
+            )}
           </div>
         )}
 
@@ -387,86 +437,71 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               </div>
             </div>
           ) : (
-            <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {quickMode && (
-                <div
-                  style={{
-                    padding: '9px 14px',
-                    borderRadius: 8,
-                    border: '1px solid var(--color-pt-border)',
-                    background: 'var(--color-pt-surface-mut)',
-                    fontSize: 12.5,
-                    color: 'var(--color-pt-text-3)',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Quick note mode — type your note directly in the sections below. You can still
-                  record audio from the Record tab if needed.
-                </div>
-              )}
-              <TranscriptPanel
-                transcript={transcript}
-                clips={sortedClips}
-                canRemerge={hasTranscribedClip}
-                canTranscribe={novaEligible}
-                transcribing={busy === 'transcribing'}
-                transcribeUsed={transcribeUsed}
-                transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
-                hasUserEdits={hasUserEdits}
-                hasLocalTranscript={hasLocalTranscript}
-                onChange={setTranscript}
-                onCommit={() =>
-                  patchSession({
-                    transcript,
-                    transcriptSource: session.transcriptSource ?? 'manual',
-                  })
-                }
-                onRemerge={handleRemergeFromClips}
-                onCreateTranscript={handleCreateTranscript}
-                onRevertToLocal={handleRevertToLocal}
-              />
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '6px 0',
-                }}
-              >
-                <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    letterSpacing: '0.09em',
-                    textTransform: 'uppercase',
-                    color: 'var(--color-fg-subtle)',
-                  }}
-                >
-                  Note
-                </span>
-                <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                gap: 24,
+                alignItems: 'start',
+              }}
+            >
+              {/* ── Left: Clinical Note ── */}
+              <div>
+                {quickMode && (
+                  <div
+                    style={{
+                      padding: '9px 14px',
+                      borderRadius: 8,
+                      border: '1px solid var(--color-pt-border)',
+                      background: 'var(--color-pt-surface-mut)',
+                      fontSize: 12.5,
+                      color: 'var(--color-pt-text-3)',
+                      lineHeight: 1.5,
+                      marginBottom: 12,
+                    }}
+                  >
+                    Quick note mode — type your note directly in the sections below.
+                  </div>
+                )}
+                <NotePanel
+                  patient={patient}
+                  note={note}
+                  template={template}
+                  transcript={transcript}
+                  totalDurationSec={totalDurationSec}
+                  busy={busy}
+                  onSectionChange={handleSectionChange}
+                />
               </div>
-              <NotePanel
-                patient={patient}
-                note={note}
-                template={template}
-                templates={templates}
-                transcript={transcript}
-                totalDurationSec={sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0)}
-                busy={busy}
-                generateUsed={generateUsed}
-                generateCap={MAX_GENERATES_PER_SESSION}
-                generationProvider={settings.ai.generation.provider}
-                generationModel={settings.ai.generation.model}
-                generationReady={settings.ai.generation.provider === 'anthropic'}
-                onTemplateChange={(id) => patchSession({ templateId: id })}
-                onGenerate={handleGenerate}
-                onUnfinalize={handleUnfinalize}
-                onSectionChange={handleSectionChange}
-              />
+
+              {/* ── Right: Transcript ── */}
+              <div>
+                <TranscriptPanel
+                  transcript={transcript}
+                  clips={sortedClips}
+                  canRemerge={hasTranscribedClip}
+                  canTranscribe={novaEligible}
+                  transcribing={busy === 'transcribing'}
+                  transcribeUsed={transcribeUsed}
+                  transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
+                  hasUserEdits={hasUserEdits}
+                  hasLocalTranscript={hasLocalTranscript}
+                  totalDurationSec={totalDurationSec}
+                  onChange={setTranscript}
+                  onCommit={() =>
+                    patchSession({
+                      transcript,
+                      transcriptSource: session.transcriptSource ?? 'manual',
+                    })
+                  }
+                  onRemerge={handleRemergeFromClips}
+                  onCreateTranscript={handleCreateTranscript}
+                  onRevertToLocal={handleRevertToLocal}
+                />
+              </div>
             </div>
           ))}
+
         {/* ③ Clips tab */}
         {activeTab === 'clips' && (
           <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -479,16 +514,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               >
                 <Mic size={14} strokeWidth={2} /> Add clip
               </button>
-              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation' }}>
+              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation', position: 'relative' }}>
                 <Upload size={14} strokeWidth={2} /> Upload audio
                 <input
                   type="file"
                   accept="audio/*"
-                  className="sr-only"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) { void handleUploadAudio(file); e.target.value = ''; }
                   }}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
                 />
               </label>
             </div>
@@ -515,93 +550,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         )}
       </div>
 
-      {/* ── Bottom action bar (review tab only) ─────────────── */}
-      {activeTab === 'review' && <div
-        className="flex items-center gap-3 rounded-lg px-4 py-3"
-        style={{
-          margin: '0 22px 22px',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          background: 'var(--color-pt-surface)',
-          border: '1px solid var(--color-pt-border)',
-        }}
-      >
-        {/* Left cluster: status + destructive delete */}
-        <div className="flex items-center gap-2">
-          <MicStatusPill state={micState} elapsedSec={recorder.durationSec} />
-          {pendingDeleteSession ? (
-            <>
-              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
-                {isDemo ? 'Restart demo?' : 'Delete session?'}
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost py-0.5 text-xs"
-                onClick={() => setPendingDeleteSession(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost py-0.5 text-xs"
-                style={{ color: isDemo ? undefined : 'var(--color-negative)' }}
-                onClick={handleDeleteSession}
-              >
-                {isDemo ? 'Restart' : 'Delete'}
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-ghost p-2"
-              aria-label={isDemo ? 'Restart demo' : 'Delete session'}
-              title={isDemo ? 'Restart demo' : 'Delete session'}
-              style={{ color: isDemo ? undefined : 'var(--color-pt-red)' }}
-              onClick={() => setPendingDeleteSession(true)}
-            >
-              <Trash2 size={14} strokeWidth={2} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Right cluster: copy + primary action */}
-        <div className="flex items-center gap-2">
-          {note && !pendingDeleteSession && (
-            <PtButton
-              variant="ghost"
-              iconLeft={<Copy size={14} strokeWidth={2} />}
-              onClick={handleCopyNote}
-              title="Copy full note as markdown"
-            >
-              Copy note
-            </PtButton>
-          )}
-          {note?.finalized ? (
-            <PtButton
-              variant="ghost"
-              iconLeft={<LockOpen size={14} strokeWidth={2} />}
-              onClick={handleUnfinalize}
-            >
-              Unlock note
-            </PtButton>
-          ) : (
-            <PtButton
-              variant="primary"
-              iconLeft={<CheckCircle2 size={14} strokeWidth={2} />}
-              disabled={!note || missingRequiredLabels.length > 0}
-              onClick={handleFinalize}
-              title={
-                missingRequiredLabels.length > 0
-                  ? `Required sections empty: ${missingRequiredLabels.join(', ')}`
-                  : undefined
-              }
-            >
-              End &amp; sign
-            </PtButton>
-          )}
-        </div>
-      </div>}
+      {/* ── Manage templates modal ────────────────────────── */}
+      <ManageTemplatesModal
+        open={manageTemplatesOpen}
+        onClose={() => setManageTemplatesOpen(false)}
+      />
 
       {/* ── Debug drawer ──────────────────────────────────── */}
       {drawerOpen && (
@@ -619,19 +572,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   );
 }
 
-function deriveMicState(status: string): MicState {
-  switch (status) {
-    case 'recording':
-      return 'connected';
-    case 'paused':
-      return 'paused';
-    case 'error':
-      return 'disconnected';
-    default:
-      return 'idle';
-  }
-}
-
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
 function NotFound() {
@@ -641,6 +581,22 @@ function NotFound() {
         <ArrowLeft size={14} strokeWidth={2} /> Dashboard
       </Link>
       <div className="card">Session not found.</div>
+    </div>
+  );
+}
+
+function UploadProcessingView() {
+  return (
+    <div className="flex flex-col items-center gap-5 py-16">
+      <Loader2 size={48} className="animate-spin" style={{ color: 'var(--color-pt-accent)' }} />
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
+          Processing audio
+        </span>
+        <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+          Transcribing with Whisper — this may take a moment
+        </p>
+      </div>
     </div>
   );
 }
@@ -664,4 +620,3 @@ function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss
     </div>
   );
 }
-
