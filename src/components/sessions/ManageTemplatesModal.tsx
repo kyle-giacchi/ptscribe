@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Templates } from '@/pages/Templates';
 
@@ -7,6 +8,15 @@ interface ManageTemplatesModalProps {
 }
 
 export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
@@ -16,7 +26,10 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl w-full"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Manage Templates"
+        className="flex flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl w-full"
         style={{
           maxWidth: 700,
           maxHeight: '90dvh',
@@ -36,7 +49,7 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
           </span>
           <button
             type="button"
-            className="btn btn-ghost p-1.5"
+            className="btn btn-ghost p-2.5"
             onClick={onClose}
             aria-label="Close"
             autoFocus
