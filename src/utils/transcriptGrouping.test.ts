@@ -34,4 +34,13 @@ describe('parseTranscriptSegments', () => {
     expect(segs).toHaveLength(2);
     expect(segs[0].speaker).toBeNull();
   });
+
+  it('parses SPEAKER_x diarized format from Deepgram output', () => {
+    const t = 'SPEAKER_0: Good morning.\nSPEAKER_1: Hello, doing well.';
+    const segs = parseTranscriptSegments(t, 120);
+    expect(segs).toHaveLength(2);
+    expect(segs[0].speaker).toBe('SPEAKER_0');
+    expect(segs[0].text).toBe('Good morning.');
+    expect(segs[1].speaker).toBe('SPEAKER_1');
+  });
 });

@@ -6,7 +6,8 @@
 
 > This is a wholesale pivot from a personal-finance app to a Heidi-style clinical
 > note-taking and transcription app for physical therapists. The slice-provider
-> + single-write-path architecture is retained; the domain is replaced.
+>
+> - single-write-path architecture is retained; the domain is replaced.
 
 ---
 
@@ -86,18 +87,18 @@ AppDataProvider
 
 ## 3. Pages & Navigation
 
-| Path           | Page             | Purpose                                                                       |
-| -------------- | ---------------- | ----------------------------------------------------------------------------- |
-| `/setup`       | Setup wizard     | First-run: clinician profile, optional API keys, HIPAA disclaimer, sample patient. |
-| `/`            | Dashboard        | Today's sessions, recent unfinalized notes, quick "New session" action.       |
-| `/patients`    | Patients list    | Searchable list, status, last-visit date.                                     |
-| `/patients/:id`| Patient detail   | Demographics, plan of care, session history, prescriptions.                   |
-| `/sessions/new`| New session      | Patient picker → recording flow.                                              |
-| `/sessions/:id`| Session detail   | Recording, transcript, generated note editor, attached prescriptions.         |
-| `/notes`       | Notes library    | Cross-patient search and filter.                                              |
-| `/templates`   | Templates        | View / edit / clone note templates.                                           |
-| `/exercises`   | Exercise library | Searchable, categorized; create/edit exercises.                               |
-| `/settings`    | Settings         | Clinician profile, API keys, model selection, export/erase.                   |
+| Path            | Page             | Purpose                                                                            |
+| --------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `/setup`        | Setup wizard     | First-run: clinician profile, optional API keys, HIPAA disclaimer, sample patient. |
+| `/`             | Dashboard        | Today's sessions, recent unfinalized notes, quick "New session" action.            |
+| `/patients`     | Patients list    | Searchable list, status, last-visit date.                                          |
+| `/patients/:id` | Patient detail   | Demographics, plan of care, session history, prescriptions.                        |
+| `/sessions/new` | New session      | Patient picker → recording flow.                                                   |
+| `/sessions/:id` | Session detail   | Recording, transcript, generated note editor, attached prescriptions.              |
+| `/notes`        | Notes library    | Cross-patient search and filter.                                                   |
+| `/templates`    | Templates        | View / edit / clone note templates.                                                |
+| `/exercises`    | Exercise library | Searchable, categorized; create/edit exercises.                                    |
+| `/settings`     | Settings         | Clinician profile, API keys, model selection, export/erase.                        |
 
 Sidebar order: Dashboard, Patients, Sessions(implicit via patient/new), Notes, Templates, Exercises, Settings.
 
@@ -110,7 +111,7 @@ type ID = string; // UUID
 
 interface Clinician {
   name: string;
-  credentials: string;        // "DPT, OCS"
+  credentials: string; // "DPT, OCS"
   npi?: string;
   practiceName?: string;
   practiceAddress?: string;
@@ -123,13 +124,13 @@ interface Patient {
   id: ID;
   firstName: string;
   lastName: string;
-  dob?: number;               // ms timestamp
+  dob?: number; // ms timestamp
   sex?: 'F' | 'M' | 'X';
-  mrn?: string;               // medical record number (clinic-assigned)
+  mrn?: string; // medical record number (clinic-assigned)
   primaryDiagnosis?: string;
   icd10?: string;
   referringProvider?: string;
-  notes?: string;             // free-form patient-level notes
+  notes?: string; // free-form patient-level notes
   status: 'active' | 'discharged' | 'on_hold';
   createdAt: number;
   updatedAt: number;
@@ -142,13 +143,13 @@ interface Session {
   id: ID;
   patientId: ID;
   type: SessionType;
-  date: number;               // ms timestamp
+  date: number; // ms timestamp
   durationMin?: number;
   status: SessionStatus;
-  audioRef?: ID;              // key into AudioRepository (IndexedDB)
+  audioRef?: ID; // key into AudioRepository (IndexedDB)
   transcript?: string;
   transcriptSource?: 'whisper' | 'webspeech' | 'manual';
-  noteId?: ID;                // optional final note
+  noteId?: ID; // optional final note
   templateId?: ID;
   createdAt: number;
   updatedAt: number;
@@ -157,9 +158,9 @@ interface Session {
 type NoteFormat = 'soap' | 'evaluation' | 'progress' | 'discharge' | 'custom';
 
 interface NoteSection {
-  key: string;                // 'subjective', 'objective', 'assessment', 'plan', etc.
+  key: string; // 'subjective', 'objective', 'assessment', 'plan', etc.
   label: string;
-  body: string;               // markdown-ish
+  body: string; // markdown-ish
 }
 
 interface Note {
@@ -180,15 +181,25 @@ interface NoteTemplate {
   name: string;
   format: NoteFormat;
   sections: { key: string; label: string; promptHint?: string }[];
-  systemPrompt: string;       // sent to the LLM to shape generated output
-  builtin: boolean;           // bundled defaults can't be deleted, only cloned
+  systemPrompt: string; // sent to the LLM to shape generated output
+  builtin: boolean; // bundled defaults can't be deleted, only cloned
   createdAt: number;
   updatedAt: number;
 }
 
 type BodyRegion =
-  | 'cervical' | 'thoracic' | 'lumbar' | 'shoulder' | 'elbow' | 'wrist_hand'
-  | 'hip' | 'knee' | 'ankle_foot' | 'core' | 'gait_balance' | 'other';
+  | 'cervical'
+  | 'thoracic'
+  | 'lumbar'
+  | 'shoulder'
+  | 'elbow'
+  | 'wrist_hand'
+  | 'hip'
+  | 'knee'
+  | 'ankle_foot'
+  | 'core'
+  | 'gait_balance'
+  | 'other';
 
 interface Exercise {
   id: ID;
@@ -196,9 +207,9 @@ interface Exercise {
   region: BodyRegion;
   category: 'strength' | 'mobility' | 'stability' | 'cardio' | 'neuro' | 'manual_therapy';
   instructions: string;
-  defaultDosage?: string;     // "3x10, daily" — free text
-  cues?: string;              // therapist cues
-  videoUrl?: string;          // optional external link
+  defaultDosage?: string; // "3x10, daily" — free text
+  cues?: string; // therapist cues
+  videoUrl?: string; // optional external link
   builtin: boolean;
   createdAt: number;
   updatedAt: number;
@@ -219,7 +230,7 @@ interface PlanOfCare {
 interface Prescription {
   id: ID;
   exerciseId: ID;
-  dosage: string;             // "3x10, 2x/day"
+  dosage: string; // "3x10, 2x/day"
   notes?: string;
 }
 
@@ -247,10 +258,10 @@ interface AppData {
 
 ### Storage layout
 
-| Key                          | Contents                                                |
-| ---------------------------- | ------------------------------------------------------- |
-| `ptnotes.appData` (localStorage) | Full `AppData` minus audio blobs.                   |
-| IndexedDB `ptnotes-audio` / `recordings` | `{ sessionId → Blob }`.                     |
+| Key                                      | Contents                          |
+| ---------------------------------------- | --------------------------------- |
+| `ptnotes.appData` (localStorage)         | Full `AppData` minus audio blobs. |
+| IndexedDB `ptnotes-audio` / `recordings` | `{ sessionId → Blob }`.           |
 
 Storage cap: 5 MB enforced for `ptnotes.appData` (existing `MAX_OBJECT_BYTES`).
 Audio is unbounded (IndexedDB), with optional auto-delete via the retention setting.
@@ -327,16 +338,16 @@ Setup wizard and Settings both display:
 
 ## 7. Provider Hierarchy & Mutators
 
-| Slice          | Hook              | Mutators                                                        |
-| -------------- | ----------------- | --------------------------------------------------------------- |
-| Clinician      | `useClinician`    | `setClinician(partial)`                                         |
-| Patients       | `usePatients`     | `addPatient` / `updatePatient` / `removePatient`                |
-| Sessions       | `useSessions`     | `addSession` / `updateSession` / `removeSession` / `setStatus`  |
-| Notes          | `useNotes`        | `addNote` / `updateNote` / `finalizeNote` / `removeNote`        |
-| Templates      | `useTemplates`    | `addTemplate` / `updateTemplate` / `cloneTemplate` / `removeTemplate` |
-| Exercises      | `useExercises`    | `addExercise` / `updateExercise` / `removeExercise`             |
-| Plans          | `usePlans`        | `addPlan` / `updatePlan` / `removePlan` / `addPrescription` / `removePrescription` |
-| Settings       | `useSettings`     | `updateSettings(partial)`                                       |
+| Slice     | Hook           | Mutators                                                                           |
+| --------- | -------------- | ---------------------------------------------------------------------------------- |
+| Clinician | `useClinician` | `setClinician(partial)`                                                            |
+| Patients  | `usePatients`  | `addPatient` / `updatePatient` / `removePatient`                                   |
+| Sessions  | `useSessions`  | `addSession` / `updateSession` / `removeSession` / `setStatus`                     |
+| Notes     | `useNotes`     | `addNote` / `updateNote` / `finalizeNote` / `removeNote`                           |
+| Templates | `useTemplates` | `addTemplate` / `updateTemplate` / `cloneTemplate` / `removeTemplate`              |
+| Exercises | `useExercises` | `addExercise` / `updateExercise` / `removeExercise`                                |
+| Plans     | `usePlans`     | `addPlan` / `updatePlan` / `removePlan` / `addPrescription` / `removePrescription` |
+| Settings  | `useSettings`  | `updateSettings(partial)`                                                          |
 
 Built-in templates and exercises are inserted on first run. Users can clone but not delete builtins.
 
