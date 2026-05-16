@@ -7,7 +7,6 @@ import {
   Play,
   Upload,
   CheckCircle2,
-  Loader2,
   AlertTriangle,
   Info,
   ArrowRight,
@@ -16,8 +15,8 @@ import {
 import { formatDuration } from '@/utils/format';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { ClipsList } from '@/components/sessions/ClipsList';
-import { AudioPreviewSection } from './AudioPreviewSection';
+import { Waveform } from '@/components/design/Waveform';
+import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import type { SessionClip } from '@/types';
@@ -29,14 +28,9 @@ export interface RecordingPanelProps {
   onStart: () => void;
   onStop: () => void;
   onStopAndFinish: () => void;
-  autoFinish: boolean;
   onPauseResume: () => void;
-  onDeleteClip: (clipId: string) => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
-  onRecordingComplete: () => void;
-  isMerging: boolean;
-  mergedAudioBlob: Blob | null;
   wasBackgrounded: boolean;
   onDismissBackgroundWarning: () => void;
 }
@@ -113,30 +107,62 @@ function StatusBanner({
   );
 }
 
-// ── Idle entry point — no clips yet ───────────────────────────────────────────
-function RecordingBlankOptions({
+// ── Idle entry point — mirrors ActiveRecordingCard but for the "not yet started" state ──
+function IdleRecordingCard({
+  onStart,
   onUpload,
   onSkip,
 }: {
+  onStart: () => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-5 px-4 py-10 text-center">
-      <Mic size={32} strokeWidth={1.5} style={{ color: 'var(--color-pt-text-3)', opacity: 0.4 }} />
-      <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text-2)' }}>
-          Ready to record
-        </p>
-        <p
-          className="mt-1 text-xs leading-relaxed"
-          style={{ color: 'var(--color-pt-text-3)', maxWidth: 240, margin: '4px auto 0' }}
+    <div className="flex flex-col items-center gap-6 py-4">
+      <p
+        className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: 'var(--color-pt-text-3)' }}
+      >
+        Ready · Record
+      </p>
+
+      <div className="flex items-center gap-3">
+        <span className="relative flex h-3 w-3 shrink-0">
+          <span
+            className="relative inline-flex h-3 w-3 rounded-full"
+            style={{ background: 'var(--color-pt-border-strong)' }}
+          />
+        </span>
+        <span
+          className="font-mono font-semibold tabular-nums"
+          style={{
+            color: 'var(--color-pt-text-3)',
+            fontSize: 56,
+            letterSpacing: '-0.03em',
+            lineHeight: 1,
+          }}
         >
-          Tap <strong>Start</strong> to capture the session, or upload an existing file
-        </p>
+          0:00
+        </span>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <label className="btn btn-secondary cursor-pointer" style={{ touchAction: 'manipulation' }}>
+
+      <div className="w-full">
+        <Waveform micState="idle" height={56} />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onStart}
+          style={{ minHeight: 44, touchAction: 'manipulation' }}
+        >
+          <Mic size={15} strokeWidth={2} /> Start recording
+        </button>
+        <label
+          className="btn btn-secondary cursor-pointer"
+          style={{ minHeight: 44, touchAction: 'manipulation' }}
+        >
           <Upload size={13} strokeWidth={2} /> Upload audio
           <input
             type="file"
@@ -155,7 +181,7 @@ function RecordingBlankOptions({
           type="button"
           className="btn btn-ghost"
           onClick={onSkip}
-          style={{ touchAction: 'manipulation' }}
+          style={{ minHeight: 44, touchAction: 'manipulation' }}
         >
           Skip <ArrowRight size={14} strokeWidth={2} />
         </button>
@@ -169,7 +195,7 @@ function ActiveRecordingCard({
   durationSec,
   paused,
   chainActive,
-  autoFinish,
+  live,
   onPauseResume,
   onStop,
   onStopAndFinish,
@@ -177,62 +203,65 @@ function ActiveRecordingCard({
   durationSec: number;
   paused: boolean;
   chainActive: boolean;
-  autoFinish: boolean;
+  live: UseLiveTranscript;
   onPauseResume: () => void;
   onStop: () => void;
   onStopAndFinish: () => void;
 }) {
+  const micState: MicState = paused ? 'paused' : 'connected';
   const accentColor = paused ? 'var(--color-pt-amber)' : 'var(--color-pt-red)';
-  const accentBorder = paused ? 'var(--color-pt-amber-border)' : 'var(--color-pt-red-border)';
   const accentFg = paused ? 'var(--color-pt-amber-fg)' : 'var(--color-pt-red-fg)';
-  const accentBg = paused
-    ? 'color-mix(in oklab, var(--color-pt-amber) 5%, var(--color-pt-surface))'
-    : 'color-mix(in oklab, var(--color-pt-red) 5%, var(--color-pt-surface))';
 
   return (
-    <div
-      className="rounded-xl"
-      style={{
-        borderTop: `1px solid ${accentBorder}`,
-        borderRight: `1px solid ${accentBorder}`,
-        borderBottom: `1px solid ${accentBorder}`,
-        borderLeft: `4px solid ${accentColor}`,
-        background: accentBg,
-        padding: '18px 20px',
-      }}
-    >
-      {/* Status row */}
-      <div className="mb-4 flex items-center gap-3">
-        <span className="flex items-center gap-2">
-          <span className="relative flex h-3 w-3 shrink-0">
-            {!paused && (
-              <span
-                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-65"
-                style={{ background: accentColor }}
-              />
-            )}
+    <div className="flex flex-col items-center gap-6 py-4">
+      {/* Status label */}
+      <p
+        className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: 'var(--color-pt-text-3)' }}
+      >
+        In-Visit · {paused ? 'Paused' : 'Recording'}
+      </p>
+
+      {/* Timer */}
+      <div className="flex items-center gap-3">
+        <span className="relative flex h-3 w-3 shrink-0">
+          {!paused && (
             <span
-              className="relative inline-flex h-3 w-3 rounded-full"
+              className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-65"
               style={{ background: accentColor }}
             />
-          </span>
+          )}
           <span
-            className="text-[12px] font-bold uppercase tracking-widest"
-            style={{ color: accentFg }}
-          >
-            {paused ? 'Paused' : 'Recording'}
-          </span>
+            className="relative inline-flex h-3 w-3 rounded-full"
+            style={{ background: accentColor }}
+          />
         </span>
         <span
-          className="ml-auto font-mono text-3xl font-semibold tabular-nums"
-          style={{ color: 'var(--color-pt-text)', letterSpacing: '-0.02em' }}
+          className="font-mono font-semibold tabular-nums"
+          style={{
+            color: 'var(--color-pt-text)',
+            fontSize: 56,
+            letterSpacing: '-0.03em',
+            lineHeight: 1,
+          }}
         >
           {formatDuration(durationSec)}
         </span>
+        <span
+          className="self-end pb-1 text-[11px] font-bold uppercase tracking-widest"
+          style={{ color: accentFg }}
+        >
+          {paused ? 'Paused' : 'Recording'}
+        </span>
+      </div>
+
+      {/* Waveform */}
+      <div className="w-full">
+        <Waveform micState={micState} height={56} />
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"
           className="btn btn-secondary"
@@ -250,83 +279,101 @@ function ActiveRecordingCard({
             </>
           )}
         </button>
-        {autoFinish ? (
-          <>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onStopAndFinish}
-              disabled={chainActive}
-              style={{ minHeight: 44, touchAction: 'manipulation' }}
-            >
-              <Square size={15} strokeWidth={2} /> Stop &amp; finish
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={onStop}
-              disabled={chainActive}
-              title="Stop without auto-transcribing or generating"
-              style={{ minHeight: 44, touchAction: 'manipulation' }}
-            >
-              Stop only
-            </button>
-          </>
-        ) : (
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onStopAndFinish}
+          disabled={chainActive}
+          style={{ minHeight: 44, touchAction: 'manipulation' }}
+        >
+          <Square size={15} strokeWidth={2} /> Stop &amp; generate notes
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={onStop}
+          disabled={chainActive}
+          title="Stop without auto-transcribing or generating"
+          style={{ minHeight: 44, touchAction: 'manipulation' }}
+        >
+          Stop only
+        </button>
+      </div>
+
+      {/* Live transcript toggle */}
+      {live.supported && (
+        <div
+          className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+          style={{
+            background: 'var(--color-pt-surface)',
+            border: '1px solid var(--color-pt-border)',
+          }}
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+              Live transcript
+            </p>
+            <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+              {live.listening ? 'On — following along' : 'Hidden — toggle to follow along'}
+            </p>
+          </div>
           <button
             type="button"
-            className="btn btn-primary"
-            onClick={onStop}
-            disabled={chainActive}
-            style={{ minHeight: 44, touchAction: 'manipulation' }}
+            role="switch"
+            aria-checked={live.listening}
+            onClick={() => (live.listening ? live.stop() : live.start())}
+            className="flex items-center gap-2"
+            style={{ touchAction: 'manipulation', flexShrink: 0, minHeight: 44 }}
           >
-            <Square size={15} strokeWidth={2} /> Stop
+            <span
+              className="text-[11px] font-bold uppercase tracking-wide"
+              style={{
+                color: live.listening ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
+              }}
+            >
+              {live.listening ? 'ON' : 'OFF'}
+            </span>
+            <span
+              className="relative inline-flex h-6 w-11 rounded-full transition-colors duration-200"
+              style={{
+                background: live.listening
+                  ? 'var(--color-pt-accent)'
+                  : 'var(--color-pt-border-strong)',
+              }}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
+                style={{
+                  transform: live.listening ? 'translateX(20px)' : 'translateX(0)',
+                }}
+              />
+            </span>
           </button>
-        )}
-      </div>
-    </div>
-  );
-}
+        </div>
+      )}
 
-// ── Add-another-clip row (shown when clips exist and recorder is idle) ─────────
-function ClipsActionRow({
-  onStart,
-  onUpload,
-}: {
-  onStart: () => void;
-  onUpload: (file: File) => void;
-}) {
-  return (
-    <div
-      className="flex flex-wrap items-center gap-2 rounded-xl px-4 py-3"
-      style={{
-        border: '1px solid var(--color-pt-border)',
-        background: 'var(--color-pt-surface-alt)',
-      }}
-    >
-      <button
-        type="button"
-        className="btn btn-secondary"
-        onClick={onStart}
-        style={{ touchAction: 'manipulation' }}
-      >
-        <Mic size={14} strokeWidth={2} /> Add clip
-      </button>
-      <label className="btn btn-ghost cursor-pointer" style={{ touchAction: 'manipulation' }}>
-        <Upload size={14} strokeWidth={2} /> Upload audio
-        <input
-          type="file"
-          accept="audio/*"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              onUpload(file);
-              e.target.value = '';
-            }
+      {/* Live transcript text */}
+      {live.listening && (live.finalText || live.interimText) && (
+        <div
+          className="w-full rounded-lg px-3.5 py-2.5 text-xs"
+          style={{
+            border: '1px solid var(--color-pt-accent-border)',
+            background: 'var(--color-pt-accent-soft)',
+            color: 'var(--color-pt-text-2)',
           }}
-        />
-      </label>
+        >
+          <span className="font-semibold" style={{ color: 'var(--color-pt-accent-fg)' }}>
+            Live:{' '}
+          </span>
+          <span style={{ color: 'var(--color-pt-text)' }}>{live.finalText}</span>
+          {live.interimText && (
+            <span className="italic" style={{ color: 'var(--color-pt-text-3)' }}>
+              {' '}
+              {live.interimText}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -339,14 +386,9 @@ export function RecordingPanel({
   onStart,
   onStop,
   onStopAndFinish,
-  autoFinish,
   onPauseResume,
-  onDeleteClip,
   onUpload,
   onSkip,
-  onRecordingComplete,
-  isMerging,
-  mergedAudioBlob,
   wasBackgrounded,
   onDismissBackgroundWarning,
 }: RecordingPanelProps) {
@@ -390,8 +432,8 @@ export function RecordingPanel({
     }
   }, [recorder.status]);
 
-  if (idle && clips.length === 0) {
-    return <RecordingBlankOptions onUpload={onUpload} onSkip={onSkip} />;
+  if (idle && !wasAutoStopped) {
+    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} />;
   }
 
   return (
@@ -435,13 +477,13 @@ export function RecordingPanel({
           durationSec={recorder.durationSec}
           paused={recorder.status === 'paused'}
           chainActive={false}
-          autoFinish={autoFinish}
+          live={live}
           onPauseResume={onPauseResume}
           onStop={onStop}
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
-        <ClipsActionRow onStart={onStart} onUpload={onUpload} />
+        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} />
       )}
 
       {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}
@@ -462,33 +504,7 @@ export function RecordingPanel({
         hasFailedClip={clips.some((c) => c.status === 'failed')}
       />
 
-      <ClipsList clips={clips} recordingDisabled={recording} onDeleteClip={onDeleteClip} />
-
-      {idle && clips.length > 0 && (
-        <div className="flex justify-end pt-1">
-          <button
-            type="button"
-            className="btn btn-primary w-full sm:w-auto"
-            disabled={isMerging}
-            onClick={onRecordingComplete}
-            style={{ minHeight: 44, touchAction: 'manipulation' }}
-          >
-            {isMerging ? (
-              <>
-                <Loader2 size={15} className="animate-spin" /> Combining clips…
-              </>
-            ) : (
-              <>
-                <CheckCircle2 size={15} strokeWidth={2} /> Recording Complete
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {mergedAudioBlob && <AudioPreviewSection mergedAudioBlob={mergedAudioBlob} />}
-
-      <LiveTranscriptPreview live={live} />
+      {!recording && <LiveTranscriptPreview live={live} />}
     </div>
   );
 }
