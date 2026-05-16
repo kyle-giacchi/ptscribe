@@ -35,6 +35,8 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         className="inline-flex items-center gap-1.5 rounded-lg transition-colors"
         style={{
           padding: '5px 10px',
@@ -48,7 +50,7 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
           boxSizing: 'border-box' as const,
         }}
       >
-        <span style={{ color: 'var(--color-fg-subtle)', fontWeight: 400, fontSize: 11 }}>
+        <span style={{ color: 'var(--color-pt-text-2)', fontWeight: 400, fontSize: 11 }}>
           Template
         </span>
         <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -58,7 +60,7 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
           size={12}
           strokeWidth={2}
           style={{
-            color: 'var(--color-fg-subtle)',
+            color: 'var(--color-pt-text-2)',
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 180ms ease',
           }}
@@ -91,24 +93,35 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
           >
             <span
               className="text-[11px] font-semibold tracking-widest uppercase"
-              style={{ color: 'var(--color-fg-muted)', letterSpacing: '0.1em' }}
+              style={{ color: 'var(--color-pt-text-2)' }}
             >
               Choose Template
             </span>
           </div>
 
           {/* Template list */}
-          <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+          <div role="listbox" style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {templates.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
+                No templates available.
+              </p>
+            )}
             {templates.map((t) => {
               const isActive = t.id === template?.id;
               const sectionSummary = t.sections.map((s) => s.label).join(', ');
               return (
                 <div
                   key={t.id}
+                  role="option"
+                  aria-selected={isActive}
                   className="flex items-start gap-3 px-4 py-3"
                   style={{
                     borderBottom: '1px solid var(--color-pt-border)',
                     background: isActive ? 'color-mix(in oklab, var(--color-pt-accent) 6%, var(--color-pt-surface))' : undefined,
+                  }}
+                  onClick={() => {
+                    onChange(t.id);
+                    setOpen(false);
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -129,23 +142,10 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--color-fg-subtle)' }}>
+                    <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--color-pt-text-2)' }}>
                       {sectionSummary}
                     </p>
                   </div>
-                  {!isActive && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost shrink-0 text-xs"
-                      style={{ height: 28, padding: '0 10px' }}
-                      onClick={() => {
-                        onChange(t.id);
-                        setOpen(false);
-                      }}
-                    >
-                      Use
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -159,7 +159,7 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
               borderTop: '1px solid var(--color-pt-border)',
             }}
           >
-            <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+            <span className="text-[11px]" style={{ color: 'var(--color-pt-text-2)' }}>
               Changing template re-generates the note.
             </span>
             <button
