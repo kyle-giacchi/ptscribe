@@ -28,7 +28,7 @@ import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
 import { useRecordingFlow } from '@/hooks/useRecordingFlow';
 import { useTranscriptionFlow, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useTranscriptionFlow';
-import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
+import { useGenerationFlow } from '@/hooks/useGenerationFlow';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsList } from '@/components/sessions/ClipsList';
 import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
@@ -119,7 +119,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setIsMerging,
     debugStats,
     transcribeUsed,
-    generateUsed,
     checkActionGuard,
     recordAction,
     handleCreateTranscript,
@@ -180,7 +179,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction,
   });
   const {
-    handleGenerate,
     handleSectionChange,
     handleFinalize,
     handleUnfinalize,
@@ -451,18 +449,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 patient={patient}
                 note={note}
                 template={template}
-                templates={templates}
                 transcript={transcript}
                 totalDurationSec={sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0)}
                 busy={busy}
-                generateUsed={generateUsed}
-                generateCap={MAX_GENERATES_PER_SESSION}
-                generationProvider={settings.ai.generation.provider}
-                generationModel={settings.ai.generation.model}
-                generationReady={settings.ai.generation.provider === 'anthropic'}
-                onTemplateChange={(id) => patchSession({ templateId: id })}
-                onGenerate={handleGenerate}
-                onUnfinalize={handleUnfinalize}
                 onSectionChange={handleSectionChange}
               />
             </div>
