@@ -72,7 +72,7 @@ export function BlobWaveform({ blob }: { blob: Blob }) {
           {playing ? <Pause size={14} strokeWidth={2} /> : <Play size={14} strokeWidth={2} />}
           {playing ? 'Pause' : 'Play'}
         </button>
-        <div ref={containerRef} className="min-h-14 flex-1 overflow-hidden rounded-md" />
+        <div ref={containerRef} className="min-h-[56px] sm:min-h-20 flex-1 overflow-hidden rounded-md" />
         <span
           className="font-mono text-xs tabular-nums"
           style={{ color: 'var(--color-fg-subtle)' }}

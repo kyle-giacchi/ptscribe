@@ -46,6 +46,10 @@ export function Modal({ open, onClose, title, size = 'md', children }: Props) {
             aria-modal="true"
             aria-label={title}
             className={cn('card-hero relative w-full space-y-4', SIZE[size])}
+            style={{
+              paddingTop: 'env(safe-area-inset-top)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
             initial={{ opacity: 0, scale: 0.97, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 4 }}

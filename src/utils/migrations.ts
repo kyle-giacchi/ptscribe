@@ -1,6 +1,7 @@
 import { APP_DATA_VERSION, UNASSIGNED_PATIENT_ID, type AppData } from '@/types';
 import { BUILTIN_TEMPLATES } from '@/lib/clinical/templates';
 import { newId } from '@/utils/ids';
+import { AppDataSchema } from '@/schemas';
 
 export const CURRENT_VERSION = APP_DATA_VERSION;
 
@@ -105,7 +106,14 @@ export function migrate(data: unknown): AppData {
     throw new Error(`migrate: no migration registered for version ${version}`);
   }
 
-  return working as unknown as AppData;
+  const parsed = AppDataSchema.safeParse(working);
+  if (!parsed.success) {
+    throw new Error(
+      `Migration to v${CURRENT_VERSION} produced invalid data: ${parsed.error.issues[0]?.message ?? 'unknown error'}`,
+    );
+  }
+
+  return parsed.data;
 }
 
 function migrateV1ToV2(input: Record<string, unknown>): Record<string, unknown> {
