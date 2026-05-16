@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
 import { audioRepository } from '@/services/AudioRepository';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
-import { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
+import { transcribeLocally, preloadLocalWhisper, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
 import { newId } from '@/utils/ids';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import type { UseRecorder } from '@/hooks/useRecorder';
@@ -66,6 +66,10 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
   const [whisperLiveText, setWhisperLiveText] = useState('');
 
+  // Warm up the Whisper worker + model as soon as the session mounts so the
+  // first transcription result doesn't have to wait for a cold model download.
+  useEffect(() => { preloadLocalWhisper(); }, []);
+
   // Always-current ref so the live-transcript callback reads the latest duration.
   const durationSecRef = useRef(0);
   durationSecRef.current = recorder.durationSec;
@@ -93,7 +97,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     try {
       const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
       if (result.text.trim()) setWhisperLiveText(result.text);
-    } catch { /* ignore live-preview errors */ }
+    } catch (err) {
+      console.error('[Whisper live preview]', err);
+    }
     if (whisperPendingRef.current) {
       void processWhisperChunk();
     } else {
