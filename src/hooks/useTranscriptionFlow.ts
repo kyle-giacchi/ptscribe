@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { audioRepository } from '@/services/AudioRepository';
 import { transcribe } from '@/services/ai/transcribe';
+import { LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
 import { trimSilence } from '@/lib/audio/silenceTrim';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
@@ -38,7 +39,6 @@ export interface UseTranscriptionFlowResult {
   checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
   // Handlers
-  runLocalTranscription: (clipId: string, blob: Blob) => Promise<void>;
   handleCreateTranscript: (clipId?: string) => Promise<void>;
   handleRevertToLocal: () => void;
   handleRemergeFromClips: () => void;
@@ -72,46 +72,12 @@ export function useTranscriptionFlow(
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
-  const { checkActionGuard, recordAction, transcribeUsed, generateUsed } = useActionGuard();
+  // Tracks which clips are currently being auto-transcribed to prevent duplicate runs.
+  const autoTranscribingRef = useRef(new Set<string>());
+  // Ref so the background-pass effect always calls the latest closure.
+  const transcribeClipBlobRef = useRef<typeof transcribeClipBlob>(transcribeClipBlob);
 
-  // ── Local auto-transcription (always runs in background after any clip is saved) ──
-  async function runLocalTranscription(clipId: string, blob: Blob): Promise<void> {
-    patchClip(clipId, { status: 'transcribing', updatedAt: Date.now() });
-    try {
-      const { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } = await import(
-        '@/services/ai/client/localWhisper'
-      );
-      const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
-      const text = result.text.trim();
-      if (text) {
-        patchClip(clipId, {
-          status: 'transcribed',
-          transcript: text,
-          localTranscript: text,
-          transcriptedAt: Date.now(),
-          errorMessage: undefined,
-        });
-        const otherMerged = mergeClipTranscripts(
-          (sessionRef.current?.clips ?? []).filter((c) => c.id !== clipId),
-        );
-        const merged = [otherMerged, text].filter(Boolean).join('\n\n');
-        setTranscript(merged);
-        patchSession({ transcript: merged, transcriptSource: 'whisper' });
-      } else {
-        patchClip(clipId, {
-          status: 'failed',
-          errorMessage: 'Transcription returned no text — try again or use cloud transcription',
-          updatedAt: Date.now(),
-        });
-      }
-    } catch {
-      patchClip(clipId, { status: 'ready', updatedAt: Date.now() });
-      // Deduplicated by toast ID — only one notice shown even across multiple clips.
-      toast.info('Background transcription unavailable — tap Transcribe to use cloud.', {
-        id: 'local-whisper-fail',
-      });
-    }
-  }
+  const { checkActionGuard, recordAction, transcribeUsed, generateUsed } = useActionGuard();
 
   // ── Transcription ────────────────────────────────────────────────────────
   async function transcribeClipBlob(
@@ -119,6 +85,7 @@ export function useTranscriptionFlow(
     onProgress?: (msg: string) => void,
     useNova?: boolean,
     signal?: AbortSignal,
+    forceLocal?: boolean,
   ): Promise<
     | {
         ok: true;
@@ -168,10 +135,16 @@ export function useTranscriptionFlow(
         }
       }
 
+      const effectiveProvider = useNova ? 'cloudflare' : forceLocal ? 'local' : settings.ai.transcription.provider;
+      const effectiveModel = useNova
+        ? '@cf/deepgram/nova-3'
+        : forceLocal && settings.ai.transcription.provider !== 'local'
+          ? LOCAL_WHISPER_DEFAULT_MODEL
+          : settings.ai.transcription.model;
       const result = await transcribe({
         blob: blobToSend,
-        provider: useNova ? 'cloudflare' : settings.ai.transcription.provider,
-        model: useNova ? '@cf/deepgram/nova-3' : settings.ai.transcription.model,
+        provider: effectiveProvider,
+        model: effectiveModel,
         onProgress,
         signal,
       });
@@ -379,6 +352,75 @@ export function useTranscriptionFlow(
     toast.success('Transcript re-merged from clips.');
   }
 
+  transcribeClipBlobRef.current = transcribeClipBlob;
+
+  // Background local-Whisper pass: automatically transcribes newly-saved clips
+  // when the user has chosen the 'local' provider.  Stores results in both
+  // localTranscript and transcript, then re-merges into the session transcript
+  // so the Review tab populates without any manual action.
+  useEffect(() => {
+    if (!session) return;
+
+    const eligible = session.clips.filter(
+      (c) =>
+        c.status === 'ready' &&
+        !c.localTranscript &&
+        !autoTranscribingRef.current.has(c.id),
+    );
+    if (eligible.length === 0) return;
+
+    for (const clip of eligible) {
+      autoTranscribingRef.current.add(clip.id);
+      patchClip(clip.id, { status: 'transcribing', errorMessage: undefined });
+      const tid = toast.loading(`Transcribing clip ${clip.index + 1}…`, { duration: Infinity });
+
+      transcribeClipBlobRef
+        .current(clip, (msg) => toast.loading(msg, { id: tid }), false, undefined, true)
+        .then((result) => {
+          autoTranscribingRef.current.delete(clip.id);
+          if (result.ok) {
+            patchClip(clip.id, {
+              status: 'transcribed',
+              transcript: result.text,
+              localTranscript: result.text,
+              transcriptedAt: Date.now(),
+              errorMessage: undefined,
+            });
+            toast.success(`Clip ${clip.index + 1} transcribed.`, { id: tid });
+
+            // Merge fresh result with other clips.  sessionRef has the latest
+            // clip list; override this clip's text directly to avoid a race
+            // with the React state update that follows patchClip above.
+            const freshClips = sessionRef.current?.clips ?? [];
+            const merged = [...freshClips]
+              .sort((a, b) => a.createdAt - b.createdAt)
+              .map((c) =>
+                c.id === clip.id
+                  ? result.text
+                  : (c.transcript || c.localTranscript || c.liveTranscript)?.trim(),
+              )
+              .filter((t): t is string => Boolean(t))
+              .join('\n\n');
+            if (merged) {
+              setTranscript(merged);
+              patchSession({ transcript: merged, transcriptSource: 'whisper' });
+            }
+          } else {
+            patchClip(clip.id, { status: 'failed', errorMessage: result.error });
+            toast.error(`Clip ${clip.index + 1}: ${result.error}`, { id: tid });
+          }
+        })
+        .catch((e: Error) => {
+          autoTranscribingRef.current.delete(clip.id);
+          patchClip(clip.id, { status: 'failed', errorMessage: e.message });
+          toast.error(`Clip ${clip.index + 1} transcription failed.`, { id: tid });
+        });
+    }
+    // patchClip / patchSession / setTranscript use functional updates — safe to omit.
+    // transcribeClipBlobRef is a stable ref — intentionally excluded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.clips]);
+
   return {
     mergedAudioBlob,
     setMergedAudioBlob,
@@ -389,7 +431,6 @@ export function useTranscriptionFlow(
     generateUsed,
     checkActionGuard,
     recordAction,
-    runLocalTranscription,
     handleCreateTranscript,
     handleRevertToLocal,
     handleRemergeFromClips,
