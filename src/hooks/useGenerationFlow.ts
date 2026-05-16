@@ -42,6 +42,7 @@ export interface UseGenerationFlowParams {
 export interface UseGenerationFlowResult {
   handleGenerate: () => Promise<void>;
   handleSectionChange: (key: string, body: string) => void;
+  handleReplaceSections: (sections: NoteSection[]) => void;
   handleFinalize: () => void;
   handleUnfinalize: () => void;
   handleDeleteSession: () => Promise<void>;
@@ -163,6 +164,11 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
     }
   }
 
+  function handleReplaceSections(sections: NoteSection[]) {
+    if (!note) return;
+    updateNote(note.id, { sections, updatedAt: Date.now() });
+  }
+
   function handleSectionChange(key: string, body: string) {
     const target = ensureNote();
     const next = target.sections.map((s) => (s.key === key ? { ...s, body } : s));
@@ -240,6 +246,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
   return {
     handleGenerate,
     handleSectionChange,
+    handleReplaceSections,
     handleFinalize,
     handleUnfinalize,
     handleDeleteSession,
