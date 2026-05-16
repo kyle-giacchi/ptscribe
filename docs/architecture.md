@@ -5,17 +5,20 @@
 ```
 src/
   services/       DataRepository (localStorage), AudioRepository (IndexedDB),
-                  ai/transcribe.ts (Cloudflare Whisper), ai/generate.ts (Anthropic)
+                  ai/transcribe.ts (Cloudflare Whisper), ai/generate.ts (Anthropic),
+                  ai/client/localWhisper.ts (client-side Whisper via worker pool)
   contexts/       AppDataProvider (root) + slice providers (one per domain)
-  hooks/          useRecorder, useLiveTranscript
+  hooks/          useRecorder, useLiveTranscript, useRecordingFlow, 
+                  useTranscriptionFlow, useGenerationFlow
   pages/          Route-level components — consume hooks/contexts only
   components/     UI primitives (Field, PageHeader, AppShell, Sidebar) and shared widgets;
                   sessions/ sub-directory holds the Session page panel components
-                  (AccordionSection, ClipsList, RecordingPanel, TranscriptPanel, NotePanel)
+                  (SessionTopBar, AccordionSection, ClipsList, RecordingPanel, 
+                   TranscriptPanel, NotePanel)
   types/          Domain types (index.ts)
   schemas/        Zod schemas mirroring types + defaultAppData factory
   utils/          ids.ts, migrations.ts, downloadFile.ts, markdown.ts
-  lib/            safeStorage.ts, storageKeys.ts, utils.ts
+  lib/            safeStorage.ts, storageKeys.ts, utils.ts, audio/ (VAD, merge, whisper worker)
 ```
 
 Dependencies flow one way: `pages/components` -> `hooks` -> `contexts` -> `services`. Nothing in `services/` imports from `contexts/` or higher.
@@ -79,6 +82,16 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 | `IdleLockProvider`  | —                | No mutators. Reads `settings.security.idleLockMinutes`; calls `vault.lock()` after that many minutes of inactivity. Must be inside `SettingsProvider`.                                                                                                                                                                                  |
 | `AuthProvider`      | `useAuth()`      | Wraps BetterAuth (passkey + magic link, served via Worker at `/api/auth`). Sits at router level, outside the app provider tree. Exposes `isAuthenticated`, `user`, `signOut`.                                                                                                                                                           |
 
+## Session flow hooks
+
+Session pages consume three dedicated flow hooks orchestrating the recording, transcription, and generation workflows:
+
+| Hook                    | Purpose                                                                                                     |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `useRecordingFlow`      | Owns recording lifecycle, clip storage, audio upload, playback state for Review tab. Wires recorder/live hooks to clip/session mutations. |
+| `useTranscriptionFlow`  | Owns background auto-transcription (local Whisper + VAD chunking), explicit cloud transcription, merge/revert helpers for TranscriptPanel. |
+| `useGenerationFlow`     | Owns AI note generation loop, action guard rate-limiting, note CRUD operations wired to Session page controls. |
+
 `AppDataProvider` owns persistence. Slice providers are thin wrappers that give domain-scoped mutators; they read from `appData` and delegate writes back up via `updateXSlice`.
 
 ## Why slice providers
@@ -102,6 +115,24 @@ When the vault is unlocked, every value in `ptnotes.appData` and the `recordings
 
 ## AI services
 
+### Local-first transcription pipeline
+
+**Every audio clip is auto-transcribed locally first, regardless of the user's configured transcription provider.**
+
+Pipeline (from `src/hooks/useTranscriptionFlow.ts`):
+
+1. `blobToFloat32(blob)` — decode audio blob to 16 kHz mono Float32Array via Web Audio API
+2. `findSpeechRangesML(samples)` — Silero ML VAD extracts speech ranges (non-fatal; falls back to full audio on error)
+3. `extractRanges(samples, ranges)` — strip silence between speech ranges
+4. Fixed 3-minute chunking of the speech-only audio
+5. `transcribeFloat32Parallel(chunks, model, onProgress)` — dispatch chunks across a device-capability-sized worker pool
+
+This fires as a background auto-transcription effect (`useTranscriptionFlow` effect) for every clip that reaches `status: 'ready'` with no `localTranscript`. Result is stored in both `localTranscript` and `transcript` so the Review tab populates without user action.
+
+Cloud transcription (Deepgram Nova-3 via Cloudflare Worker) is a **separate, explicit user action** accessed from TranscriptPanel that upgrades the local result. See [invariants.md#local-first-transcription](invariants.md#local-first-transcription) and [invariants.md#worker-pool-and-device-guards](invariants.md#worker-pool-and-device-guards).
+
+### Worker proxy for cloud services
+
 AI calls flow `browser → our Cloudflare Worker → provider`. Provider credentials are server-side secrets (Worker `env`); the browser never sees them. Each request carries the `AppGate` 6-digit code in the `x-ptscribe-key` header — a friction layer, not authentication.
 
 | Browser endpoint       | Worker action                                      | Provider              | Default model                               |
@@ -115,9 +146,9 @@ Wire details:
 - `/api/generate` accepts a JSON body forwarded near-verbatim to Anthropic. The Worker injects the API key, `anthropic-version`, and the per-tone-style system-prompt block. Client retries up to 2 times on 429/5xx with delays of 1 s → 3 s.
 - Prompt caching: `callAnthropic` sends `cacheSystem: true` by default — the Worker marks the system prompt with `cache_control: ephemeral` so Anthropic caches it across calls that share the same template.
 - Local development: `vite.config.ts` proxies `/api/*` → `http://localhost:8787` (the wrangler dev server). `npm run dev` and `wrangler dev` run side by side.
-- Provider value `'none'` short-circuits both calls so the workflow stays manual (Web Speech for live transcript, hand-edited notes).
+- Provider value `'none'` short-circuits cloud calls so the workflow stays manual (local Whisper still runs, Web Speech for live transcript, hand-edited notes).
 
-The Worker source lives at `worker/index.ts`; secrets are managed via `wrangler secret put` and surfaced as `env.PTSCRIBE_GATE`, `env.ANTHROPIC_API_KEY`, etc. The Workers AI binding (`env.AI`) handles Whisper without an explicit token.
+The Worker source lives at `worker/index.ts`; secrets are managed via `wrangler secret put` and surfaced as `env.PTSCRIBE_GATE`, `env.ANTHROPIC_API_KEY`, etc. The Workers AI binding (`env.AI`) handles Nova-3 without an explicit token.
 
 ## Schema validation
 

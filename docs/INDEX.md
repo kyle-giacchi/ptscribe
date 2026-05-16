@@ -18,6 +18,8 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Vault / at-rest encryption boundary (Repository layer)                   | [invariants.md](invariants.md#vault-and-at-rest-encryption)                |
 | Recorder lifecycle (wake lock + visibility)                              | [invariants.md](invariants.md#recorder-lifecycle-wake-lock--visibility)    |
 | Adding a domain field (4-step ripple)                                    | [invariants.md:111](invariants.md#type-changes-ripple)                     |
+| Local-first transcription (background auto-pass for all providers)        | [invariants.md:189](invariants.md#local-first-transcription)               |
+| Worker pool & device guards (pool size formula, ~40 MB per worker)       | [invariants.md:206](invariants.md#worker-pool-and-device-guards)           |
 | Session page panel components (`sessions/` sub-dir)                      | [architecture.md:6](architecture.md#layering)                              |
 | Inline confirmation pattern (no `window.confirm()`)                      | [invariants.md](invariants.md#destructive-actions-use-inline-confirmation) |
 | Boot sequence (load → migrate → safeParse → fallback)                    | [architecture.md:34](architecture.md#boot-sequence)                        |
@@ -65,6 +67,8 @@ Non-obvious rules that fail silently if violated. **Read first before any cross-
 | Worker-proxied AI               | All AI calls go through our Cloudflare Worker; gate code in `x-ptscribe-key` is obscurity, not auth.          |
 | Vault and at-rest encryption    | Repository layer round-trips AppData + audio through AES-GCM; tab-lifetime DEK; no passphrase recovery.       |
 | Recorder lifecycle              | `useRecorder` owns wake lock + `visibilitychange` listener; release on every exit path.                       |
+| Local-first transcription       | Every clip (recorded or uploaded) is auto-transcribed locally via Whisper; cloud transcription is opt-in.     |
+| Worker pool & device guards     | Parallel Whisper workers sized by CPU cores + device RAM; sequential fallback for constrained devices.        |
 | Type changes ripple             | 4-step checklist: types + schema + default + migration.                                                       |
 | Destructive action confirmation | Inline caution banner with `AlertTriangle`; never `window.confirm()`.                                         |
 
