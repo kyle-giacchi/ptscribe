@@ -274,6 +274,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (!processingUploadClipId) return;
     const clip = session?.clips.find((c) => c.id === processingUploadClipId);
     if (!clip) return;
+
     if (clip.status === 'transcribed' || clip.status === 'failed') {
       setProcessingUploadClipId(null);
       setActiveTab('review');
