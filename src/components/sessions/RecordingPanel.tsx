@@ -187,12 +187,6 @@ function IdleRecordingCard({
 
 // ── Live transcript helpers ───────────────────────────────────────────────────
 
-function fmtElapsedMarker(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  return `${h}:${String(m).padStart(2, '0')}`;
-}
-
 function fmtWallTime(ms: number): string {
   const d = new Date(ms);
   let h = d.getHours();
@@ -200,6 +194,21 @@ function fmtWallTime(ms: number): string {
   const ampm = h >= 12 ? 'pm' : 'am';
   h = h % 12 || 12;
   return `${h}:${String(min).padStart(2, '0')}${ampm}`;
+}
+
+function ChatBubble({ children, muted = false }: { children: React.ReactNode; muted?: boolean }) {
+  return (
+    <div
+      className="self-start max-w-[88%] rounded-2xl rounded-tl-sm px-3.5 py-2"
+      style={{
+        background: 'var(--color-pt-surface-alt)',
+        border: '1px solid var(--color-pt-border)',
+        opacity: muted ? 0.6 : 1,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function LiveTranscriptView({
@@ -213,12 +222,11 @@ function LiveTranscriptView({
   whisperText?: string;
   expandToFill?: boolean;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hasWebSpeech = segments.length > 0 || !!interimText;
   const hasContent = hasWebSpeech || !!whisperText;
   const [showNoSpeechHint, setShowNoSpeechHint] = useState(false);
 
-  // After 8 s with no results at all, surface a hint.
   useEffect(() => {
     if (hasContent) {
       setShowNoSpeechHint(false);
@@ -229,12 +237,14 @@ function LiveTranscriptView({
   }, [hasContent]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [segments.length, interimText, whisperText]);
 
   return (
     <div
-      className={`w-full rounded-xl overflow-y-auto${expandToFill ? ' flex-1 min-h-0' : ''}`}
+      ref={containerRef}
+      className={`w-full rounded-xl overflow-y-auto flex flex-col${expandToFill ? ' flex-1 min-h-0' : ''}`}
       style={{
         ...(expandToFill ? {} : { maxHeight: 300 }),
         background: 'var(--color-pt-surface)',
@@ -242,7 +252,7 @@ function LiveTranscriptView({
       }}
     >
       {!hasContent ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-8 px-4">
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 px-4">
           <div className="flex items-center gap-2.5">
             <div className="flex gap-1">
               {[0, 1, 2].map((i) => (
@@ -264,45 +274,51 @@ function LiveTranscriptView({
           )}
         </div>
       ) : (
-        <div className="px-4 py-3 flex flex-col gap-1.5">
-          {/* Web Speech API segments take priority when present */}
-          {hasWebSpeech ? (
-            <>
-              {segments.map((seg, i) => {
-                const prev = segments[i - 1];
-                const showDivider =
-                  i > 0 &&
-                  Math.floor(seg.elapsedSec / 60) !== Math.floor(prev.elapsedSec / 60);
-                return (
-                  <div key={seg.wallTime}>
-                    {showDivider && (
-                      <div className="flex items-center gap-2 py-1.5">
-                        <div className="flex-1 h-px" style={{ background: 'var(--color-pt-border)' }} />
-                        <span
-                          className="shrink-0 font-mono text-[10px] font-semibold tabular-nums px-1"
-                          style={{ color: 'var(--color-pt-text-3)' }}
-                        >
-                          {fmtElapsedMarker(Math.floor(seg.elapsedSec / 60) * 60)} |{' '}
-                          {fmtWallTime(seg.wallTime)}
-                        </span>
-                        <div className="flex-1 h-px" style={{ background: 'var(--color-pt-border)' }} />
-                      </div>
-                    )}
-                    <p
-                      className="text-sm leading-relaxed"
-                      style={{
-                        color: 'var(--color-pt-text)',
-                        animation: 'transcript-slide-in 280ms ease-out both',
-                      }}
+        <>
+          {/* Spacer pushes bubbles to the bottom when content is short */}
+          <div className="flex-1 min-h-3" />
+          <div className="px-3 py-3 flex flex-col gap-2">
+            {hasWebSpeech ? (
+              <>
+                {segments.map((seg) => (
+                  <div
+                    key={seg.wallTime}
+                    className="flex flex-col items-start gap-0.5"
+                    style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
+                  >
+                    <ChatBubble>
+                      <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text)' }}>
+                        {seg.text.trim()}
+                      </p>
+                    </ChatBubble>
+                    <span
+                      className="ml-1 text-[10px] tabular-nums"
+                      style={{ color: 'var(--color-pt-text-3)' }}
                     >
-                      {seg.text.trim()}
-                    </p>
+                      {fmtWallTime(seg.wallTime)}
+                    </span>
                   </div>
-                );
-              })}
-              {interimText && (
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
-                  <span className="italic">{interimText}</span>
+                ))}
+                {interimText && (
+                  <ChatBubble muted>
+                    <p className="text-sm leading-relaxed italic" style={{ color: 'var(--color-pt-text-3)' }}>
+                      {interimText}
+                      <span
+                        className="inline-block ml-0.5 w-px align-middle"
+                        style={{
+                          height: '1em',
+                          background: 'var(--color-pt-accent)',
+                          animation: 'transcript-cursor-blink 900ms step-end infinite',
+                        }}
+                      />
+                    </p>
+                  </ChatBubble>
+                )}
+              </>
+            ) : (
+              <ChatBubble>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
+                  {whisperText}
                   <span
                     className="inline-block ml-0.5 w-px align-middle"
                     style={{
@@ -312,25 +328,10 @@ function LiveTranscriptView({
                     }}
                   />
                 </p>
-              )}
-            </>
-          ) : (
-            /* Whisper chunk transcript — full accumulated text, updates every ~5 s */
-            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
-              {whisperText}
-              <span
-                className="inline-block ml-0.5 w-px align-middle"
-                style={{
-                  height: '1em',
-                  background: 'var(--color-pt-accent)',
-                  animation: 'transcript-cursor-blink 900ms step-end infinite',
-                }}
-              />
-            </p>
-          )}
-
-          <div ref={bottomRef} />
-        </div>
+              </ChatBubble>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

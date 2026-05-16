@@ -1,6 +1,6 @@
 export interface TranscriptSegment {
   text: string;
-  speaker: string | null; // 'Dr' | 'Pt' | null
+  speaker: string | null; // 'Dr' | 'Pt' | 'SPEAKER_0' etc., or null for plain text
   estimatedSec: number; // seconds from session start
   showMinuteDivider: boolean; // true when minute boundary crossed vs prior segment
   minuteLabel: string; // e.g. "02:08" — shown on divider
@@ -22,7 +22,7 @@ export function parseTranscriptSegments(
   if (hasSpeakers) {
     // Split by double newlines OR single newline followed by speaker pattern
     paragraphs = transcript
-      .split(/\n{2,}|\n(?=[A-Z][a-z]*[.:])/g)
+      .split(/\n{2,}|\n(?=[A-Z][a-z]*[.:]|SPEAKER_\d+:)/g)
       .map((l) => l.trim())
       .filter(Boolean);
   } else {
@@ -40,7 +40,8 @@ export function parseTranscriptSegments(
     const text = match ? match[2].trim() : para;
 
     const estimatedSec = (cumulativeWords / totalWords) * totalDurationSec;
-    cumulativeWords += wordCount(para);
+    const textForCount = match ? text : para;
+    cumulativeWords += wordCount(textForCount);
 
     const minute = Math.floor(estimatedSec / 60);
     const showMinuteDivider = minute !== prevMinute;
