@@ -45,6 +45,7 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
           background: open ? 'var(--color-pt-surface-alt)' : 'var(--color-pt-surface)',
           color: 'var(--color-pt-text)',
           cursor: 'pointer',
+          boxSizing: 'border-box' as const,
         }}
       >
         <span style={{ color: 'var(--color-fg-subtle)', fontWeight: 400, fontSize: 11 }}>
