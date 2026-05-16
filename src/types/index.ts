@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 15;
+export const APP_DATA_VERSION = 16;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
