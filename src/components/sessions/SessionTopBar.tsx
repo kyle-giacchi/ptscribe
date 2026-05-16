@@ -1,4 +1,5 @@
 // src/components/sessions/SessionTopBar.tsx
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, CheckCircle2, Copy, FileText, List, LockOpen,
@@ -32,7 +33,6 @@ export interface SessionTopBarProps {
   pendingDeleteSession: boolean;
   onSetTab: (tab: 'record' | 'review' | 'clips') => void;
   onStartRecording: () => void;
-  onStopRecording: () => void;
   onStopAndFinish: () => void;
   onPauseResume: () => void;
   onTemplateChange: (id: string) => void;
@@ -58,7 +58,7 @@ export function SessionTopBar({
   busy, transcript, totalDurationSec,
   generateUsed, generateCap, generationReady,
   missingRequiredLabels, pendingDeleteSession,
-  onSetTab, onStartRecording, onStopRecording, onStopAndFinish, onPauseResume,
+  onSetTab, onStartRecording, onStopAndFinish, onPauseResume,
   onTemplateChange, onManageTemplates,
   onGenerate, onCopyTranscript, onCopyNote, onFinalize, onUnfinalize,
 }: SessionTopBarProps) {
@@ -138,7 +138,6 @@ export function SessionTopBar({
           status={recorderStatus}
           durationSec={durationSec}
           onStart={onStartRecording}
-          onStop={onStopRecording}
           onStopAndFinish={onStopAndFinish}
           onPauseResume={onPauseResume}
         />
@@ -230,7 +229,7 @@ function TabPill({
   label, icon, active, onClick, badge, badgeHighlight,
 }: {
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   active: boolean;
   onClick: () => void;
   badge?: string;
@@ -271,12 +270,11 @@ function TabPill({
 }
 
 function CompactRecordingControl({
-  status, durationSec, onStart, onStop: _onStop, onStopAndFinish, onPauseResume,
+  status, durationSec, onStart, onStopAndFinish, onPauseResume,
 }: {
   status: string;
   durationSec: number;
   onStart: () => void;
-  onStop: () => void;
   onStopAndFinish: () => void;
   onPauseResume: () => void;
 }) {
@@ -311,11 +309,11 @@ function CompactRecordingControl({
         {formatDuration(durationSec)}
       </span>
       <button type="button" onClick={onPauseResume} aria-label={isPaused ? 'Resume' : 'Pause'}
-        className="flex items-center justify-center rounded" style={{ width: 28, height: 28, color: 'var(--color-pt-text-2)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+        className="flex items-center justify-center rounded" style={{ width: 28, height: 28, color: 'var(--color-pt-text-2)', border: 'none', background: 'transparent', cursor: 'pointer', touchAction: 'manipulation' }}>
         {isPaused ? <Play size={12} strokeWidth={2.5} /> : <Pause size={12} strokeWidth={2.5} />}
       </button>
       <button type="button" onClick={onStopAndFinish} aria-label="Stop recording"
-        className="flex items-center justify-center rounded" style={{ width: 28, height: 28, color: 'var(--color-pt-text-2)', border: 'none', background: 'transparent', cursor: 'pointer' }}>
+        className="flex items-center justify-center rounded" style={{ width: 28, height: 28, color: 'var(--color-pt-text-2)', border: 'none', background: 'transparent', cursor: 'pointer', touchAction: 'manipulation' }}>
         <Square size={12} strokeWidth={2.5} />
       </button>
     </div>
