@@ -1,14 +1,11 @@
 import { pipeline, env } from '@huggingface/transformers';
 
-env.useBrowserCache = false;
+env.useBrowserCache = true;
 env.allowLocalModels = false;
 
-type InMsg = {
-  id: number;
-  type: 'transcribe';
-  audio: Float32Array;
-  model: string;
-};
+type InMsg =
+  | { id: number; type: 'transcribe'; audio: Float32Array; model: string }
+  | { id: number; type: 'preload'; model: string };
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
@@ -21,13 +18,18 @@ let currentPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
 let currentModel = '';
 
 self.onmessage = async (e: MessageEvent<InMsg>) => {
-  const { id, audio, model } = e.data;
+  const msg = e.data;
+  const { id, model } = msg;
 
   try {
     if (!currentPipeline || currentModel !== model) {
       currentPipeline = null;
       currentModel = '';
       currentPipeline = await pipeline('automatic-speech-recognition', model, {
+        // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
+        // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
+        // and crashes because the required scale tensor is absent. 'basic' skips it.
+        session_options: { graphOptimizationLevel: 'basic' },
         progress_callback: (p: {
           status: string;
           name?: string;
@@ -40,6 +42,13 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
       currentModel = model;
     }
 
+    // Preload: pipeline is now warm — nothing to transcribe.
+    if (msg.type === 'preload') {
+      post({ id, type: 'result', text: '' });
+      return;
+    }
+
+    const audio = msg.audio;
     type ASROutput = { text: string } | Array<{ text: string }>;
     const raw = await (
       currentPipeline as unknown as (audio: Float32Array, opts: object) => Promise<ASROutput>
@@ -47,8 +56,6 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
       sampling_rate: 16000,
       chunk_length_s: 30,
       stride_length_s: 5,
-      language: 'english',
-      task: 'transcribe',
     });
 
     const text = Array.isArray(raw) ? raw.map((r) => r.text).join(' ') : raw.text;

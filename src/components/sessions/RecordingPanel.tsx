@@ -109,7 +109,7 @@ function StatusBanner({
   );
 }
 
-// ── Idle entry point — mirrors ActiveRecordingCard but for the "not yet started" state ──
+// ── Idle entry point — large centered mic button ─────────────────────────────
 function IdleRecordingCard({
   onStart,
   onUpload,
@@ -120,50 +120,43 @@ function IdleRecordingCard({
   onSkip: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center gap-6 py-4">
-      <p
-        className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-        style={{ color: 'var(--color-pt-text-3)' }}
-      >
-        Ready · Record
-      </p>
-
-      <div className="flex items-center gap-3">
-        <span className="relative flex h-3 w-3 shrink-0">
-          <span
-            className="relative inline-flex h-3 w-3 rounded-full"
-            style={{ background: 'var(--color-pt-border-strong)' }}
-          />
-        </span>
+    <div className="flex flex-col items-center gap-5 py-8">
+      <div className="relative">
         <span
-          className="font-mono font-semibold tabular-nums"
-          style={{
-            color: 'var(--color-pt-text-3)',
-            fontSize: 56,
-            letterSpacing: '-0.03em',
-            lineHeight: 1,
-          }}
-        >
-          0:00
-        </span>
-      </div>
-
-      <div className="w-full">
-        <Waveform micState="idle" height={56} />
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-3">
+          className="absolute inset-0 animate-ping rounded-full"
+          style={{ background: 'var(--color-pt-accent)', opacity: 0.15 }}
+        />
         <button
           type="button"
-          className="btn btn-primary"
           onClick={onStart}
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
+          aria-label="Start recording"
+          className="relative flex items-center justify-center rounded-full"
+          style={{
+            width: 80,
+            height: 80,
+            background: 'var(--color-pt-accent)',
+            touchAction: 'manipulation',
+          }}
         >
-          <Mic size={15} strokeWidth={2} /> Start recording
+          <Mic size={28} strokeWidth={1.75} style={{ color: 'white' }} />
         </button>
+      </div>
+
+      <span
+        className="font-mono tabular-nums"
+        style={{ fontSize: 28, color: 'var(--color-pt-text-3)', letterSpacing: '0.02em' }}
+      >
+        00:00
+      </span>
+
+      <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+        Tap to begin recording
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <label
           className="btn btn-secondary cursor-pointer"
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
+          style={{ minHeight: 40, touchAction: 'manipulation' }}
         >
           <Upload size={13} strokeWidth={2} /> Upload audio
           <input
@@ -183,7 +176,7 @@ function IdleRecordingCard({
           type="button"
           className="btn btn-ghost"
           onClick={onSkip}
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
+          style={{ minHeight: 40, touchAction: 'manipulation' }}
         >
           Skip <ArrowRight size={14} strokeWidth={2} />
         </button>
