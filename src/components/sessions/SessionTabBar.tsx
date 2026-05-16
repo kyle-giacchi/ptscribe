@@ -1,16 +1,15 @@
-import { FileText, Mic, Pause, Play, Settings, Square } from 'lucide-react';
+import { FileText, List, Mic, Pause, Play, Settings, Square } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
 
 export interface SessionTabBarProps {
-  activeTab: 'record' | 'review';
-  setActiveTab: (tab: 'record' | 'review') => void;
+  activeTab: 'record' | 'review' | 'clips';
+  setActiveTab: (tab: 'record' | 'review' | 'clips') => void;
   clipsCount: number;
   noteFinalized?: boolean;
   hasNote: boolean;
   onOpenDrawer: () => void;
   recorderStatus: string;
   durationSec: number;
-  autoFinish: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onStopAndFinish: () => void;
@@ -20,15 +19,13 @@ export interface SessionTabBarProps {
 function CompactRecordingControl({
   status,
   durationSec,
-  autoFinish,
   onStart,
-  onStop,
+  onStop: _onStop,
   onStopAndFinish,
   onPauseResume,
 }: {
   status: string;
   durationSec: number;
-  autoFinish: boolean;
   onStart: () => void;
   onStop: () => void;
   onStopAndFinish: () => void;
@@ -117,7 +114,7 @@ function CompactRecordingControl({
       </button>
       <button
         type="button"
-        onClick={autoFinish ? onStopAndFinish : onStop}
+        onClick={onStopAndFinish}
         aria-label="Stop recording"
         className="flex items-center justify-center rounded transition-colors hover:bg-[var(--color-pt-surface-mut)]"
         style={{
@@ -145,7 +142,6 @@ export function SessionTabBar({
   onOpenDrawer,
   recorderStatus,
   durationSec,
-  autoFinish,
   onStartRecording,
   onStopRecording,
   onStopAndFinish,
@@ -186,7 +182,30 @@ export function SessionTabBar({
         >
           <Mic size={13} strokeWidth={2} />
           Record
-          {clipsCount > 0 && (
+        </button>
+
+        {/* Clips tab — visible when clips exist */}
+        {clipsCount > 0 && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'clips'}
+            onClick={() => setActiveTab('clips')}
+            className="inline-flex items-center gap-1.5 transition-colors"
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: activeTab === 'clips' ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
+              background: activeTab === 'clips' ? 'var(--color-pt-surface)' : 'transparent',
+              boxShadow: activeTab === 'clips' ? '0 1px 2px rgba(26,32,48,0.06)' : 'none',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            <List size={13} strokeWidth={2} />
+            Clips
             <span
               className="tabular-nums"
               style={{
@@ -194,18 +213,16 @@ export function SessionTabBar({
                 fontWeight: 700,
                 padding: '1px 5px',
                 borderRadius: 999,
-                background:
-                  activeTab === 'record'
-                    ? 'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)'
-                    : 'rgba(26,32,48,0.08)',
-                color:
-                  activeTab === 'record' ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+                background: activeTab === 'clips'
+                  ? 'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)'
+                  : 'rgba(26,32,48,0.08)',
+                color: activeTab === 'clips' ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
               }}
             >
               {clipsCount}
             </span>
-          )}
-        </button>
+          </button>
+        )}
 
         {/* Review tab */}
         <button
@@ -252,7 +269,6 @@ export function SessionTabBar({
       <CompactRecordingControl
         status={recorderStatus}
         durationSec={durationSec}
-        autoFinish={autoFinish}
         onStart={onStartRecording}
         onStop={onStopRecording}
         onStopAndFinish={onStopAndFinish}
