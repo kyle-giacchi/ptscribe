@@ -28,7 +28,6 @@ export interface RecordingPanelProps {
   clips: SessionClip[];
   whisperLiveText: string;
   onStart: () => void;
-  onStop: () => void;
   onStopAndFinish: () => void;
   onPauseResume: () => void;
   onUpload: (file: File) => void;
@@ -119,66 +118,69 @@ function IdleRecordingCard({
   onUpload: (file: File) => void;
   onSkip: () => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   return (
-    <div className="flex flex-col items-center gap-5 py-8">
-      <div className="relative">
-        <span
-          className="absolute inset-0 animate-ping rounded-full"
-          style={{ background: 'var(--color-pt-accent)', opacity: 0.15 }}
+    <div className="flex flex-col items-center gap-8 py-12">
+      <div className="flex flex-col items-center gap-5">
+        <div className="relative">
+          <span
+            className="absolute inset-0 animate-ping rounded-full"
+            style={{ background: 'var(--color-pt-accent)', opacity: 0.15 }}
+          />
+          <button
+            type="button"
+            onClick={onStart}
+            aria-label="Start recording"
+            className="relative flex items-center justify-center rounded-full"
+            style={{
+              width: 144,
+              height: 144,
+              background: 'var(--color-pt-accent)',
+              touchAction: 'manipulation',
+              boxShadow: '0 8px 32px color-mix(in srgb, var(--color-pt-accent) 35%, transparent)',
+            }}
+          >
+            <Mic size={52} strokeWidth={1.5} style={{ color: 'white' }} />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
+            Start Recording
+          </span>
+          <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+            Tap the mic to begin
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1" style={{ color: 'var(--color-pt-text-3)' }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) { onUpload(file); e.target.value = ''; }
+          }}
         />
         <button
           type="button"
-          onClick={onStart}
-          aria-label="Start recording"
-          className="relative flex items-center justify-center rounded-full"
-          style={{
-            width: 80,
-            height: 80,
-            background: 'var(--color-pt-accent)',
-            touchAction: 'manipulation',
-          }}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
+          style={{ touchAction: 'manipulation' }}
+          onClick={() => fileInputRef.current?.click()}
         >
-          <Mic size={28} strokeWidth={1.75} style={{ color: 'white' }} />
+          <Upload size={11} strokeWidth={2} /> Upload audio
         </button>
-      </div>
-
-      <span
-        className="font-mono tabular-nums"
-        style={{ fontSize: 28, color: 'var(--color-pt-text-3)', letterSpacing: '0.02em' }}
-      >
-        00:00
-      </span>
-
-      <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
-        Tap to begin recording
-      </p>
-
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <label
-          className="btn btn-secondary cursor-pointer"
-          style={{ minHeight: 40, touchAction: 'manipulation' }}
-        >
-          <Upload size={13} strokeWidth={2} /> Upload audio
-          <input
-            type="file"
-            accept="audio/*"
-            className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                onUpload(file);
-                e.target.value = '';
-              }
-            }}
-          />
-        </label>
+        <span className="text-xs select-none">·</span>
         <button
           type="button"
-          className="btn btn-ghost"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
           onClick={onSkip}
-          style={{ minHeight: 40, touchAction: 'manipulation' }}
+          style={{ touchAction: 'manipulation' }}
         >
-          Skip <ArrowRight size={14} strokeWidth={2} />
+          Skip <ArrowRight size={11} strokeWidth={2} />
         </button>
       </div>
     </div>
@@ -187,12 +189,6 @@ function IdleRecordingCard({
 
 // ── Live transcript helpers ───────────────────────────────────────────────────
 
-function fmtElapsedMarker(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  return `${h}:${String(m).padStart(2, '0')}`;
-}
-
 function fmtWallTime(ms: number): string {
   const d = new Date(ms);
   let h = d.getHours();
@@ -200,6 +196,21 @@ function fmtWallTime(ms: number): string {
   const ampm = h >= 12 ? 'pm' : 'am';
   h = h % 12 || 12;
   return `${h}:${String(min).padStart(2, '0')}${ampm}`;
+}
+
+function ChatBubble({ children, muted = false }: { children: React.ReactNode; muted?: boolean }) {
+  return (
+    <div
+      className="self-start max-w-[88%] rounded-2xl rounded-tl-sm px-3.5 py-2"
+      style={{
+        background: 'var(--color-pt-surface-alt)',
+        border: '1px solid var(--color-pt-border)',
+        opacity: muted ? 0.6 : 1,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function LiveTranscriptView({
@@ -213,12 +224,11 @@ function LiveTranscriptView({
   whisperText?: string;
   expandToFill?: boolean;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hasWebSpeech = segments.length > 0 || !!interimText;
   const hasContent = hasWebSpeech || !!whisperText;
   const [showNoSpeechHint, setShowNoSpeechHint] = useState(false);
 
-  // After 8 s with no results at all, surface a hint.
   useEffect(() => {
     if (hasContent) {
       setShowNoSpeechHint(false);
@@ -229,12 +239,14 @@ function LiveTranscriptView({
   }, [hasContent]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = containerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [segments.length, interimText, whisperText]);
 
   return (
     <div
-      className={`w-full rounded-xl overflow-y-auto${expandToFill ? ' flex-1 min-h-0' : ''}`}
+      ref={containerRef}
+      className={`w-full rounded-xl overflow-y-auto flex flex-col${expandToFill ? ' flex-1 min-h-0' : ''}`}
       style={{
         ...(expandToFill ? {} : { maxHeight: 300 }),
         background: 'var(--color-pt-surface)',
@@ -242,7 +254,7 @@ function LiveTranscriptView({
       }}
     >
       {!hasContent ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-8 px-4">
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 px-4">
           <div className="flex items-center gap-2.5">
             <div className="flex gap-1">
               {[0, 1, 2].map((i) => (
@@ -264,45 +276,51 @@ function LiveTranscriptView({
           )}
         </div>
       ) : (
-        <div className="px-4 py-3 flex flex-col gap-1.5">
-          {/* Web Speech API segments take priority when present */}
-          {hasWebSpeech ? (
-            <>
-              {segments.map((seg, i) => {
-                const prev = segments[i - 1];
-                const showDivider =
-                  i > 0 &&
-                  Math.floor(seg.elapsedSec / 60) !== Math.floor(prev.elapsedSec / 60);
-                return (
-                  <div key={seg.wallTime}>
-                    {showDivider && (
-                      <div className="flex items-center gap-2 py-1.5">
-                        <div className="flex-1 h-px" style={{ background: 'var(--color-pt-border)' }} />
-                        <span
-                          className="shrink-0 font-mono text-[10px] font-semibold tabular-nums px-1"
-                          style={{ color: 'var(--color-pt-text-3)' }}
-                        >
-                          {fmtElapsedMarker(Math.floor(seg.elapsedSec / 60) * 60)} |{' '}
-                          {fmtWallTime(seg.wallTime)}
-                        </span>
-                        <div className="flex-1 h-px" style={{ background: 'var(--color-pt-border)' }} />
-                      </div>
-                    )}
-                    <p
-                      className="text-sm leading-relaxed"
-                      style={{
-                        color: 'var(--color-pt-text)',
-                        animation: 'transcript-slide-in 280ms ease-out both',
-                      }}
+        <>
+          {/* Spacer pushes bubbles to the bottom when content is short */}
+          <div className="flex-1 min-h-3" />
+          <div className="px-3 py-3 flex flex-col gap-2">
+            {hasWebSpeech ? (
+              <>
+                {segments.map((seg) => (
+                  <div
+                    key={seg.wallTime}
+                    className="flex flex-col items-start gap-0.5"
+                    style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
+                  >
+                    <ChatBubble>
+                      <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text)' }}>
+                        {seg.text.trim()}
+                      </p>
+                    </ChatBubble>
+                    <span
+                      className="ml-1 text-[10px] tabular-nums"
+                      style={{ color: 'var(--color-pt-text-3)' }}
                     >
-                      {seg.text.trim()}
-                    </p>
+                      {fmtWallTime(seg.wallTime)}
+                    </span>
                   </div>
-                );
-              })}
-              {interimText && (
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
-                  <span className="italic">{interimText}</span>
+                ))}
+                {interimText && (
+                  <ChatBubble muted>
+                    <p className="text-sm leading-relaxed italic" style={{ color: 'var(--color-pt-text-3)' }}>
+                      {interimText}
+                      <span
+                        className="inline-block ml-0.5 w-px align-middle"
+                        style={{
+                          height: '1em',
+                          background: 'var(--color-pt-accent)',
+                          animation: 'transcript-cursor-blink 900ms step-end infinite',
+                        }}
+                      />
+                    </p>
+                  </ChatBubble>
+                )}
+              </>
+            ) : (
+              <ChatBubble>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
+                  {whisperText}
                   <span
                     className="inline-block ml-0.5 w-px align-middle"
                     style={{
@@ -312,25 +330,10 @@ function LiveTranscriptView({
                     }}
                   />
                 </p>
-              )}
-            </>
-          ) : (
-            /* Whisper chunk transcript — full accumulated text, updates every ~5 s */
-            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
-              {whisperText}
-              <span
-                className="inline-block ml-0.5 w-px align-middle"
-                style={{
-                  height: '1em',
-                  background: 'var(--color-pt-accent)',
-                  animation: 'transcript-cursor-blink 900ms step-end infinite',
-                }}
-              />
-            </p>
-          )}
-
-          <div ref={bottomRef} />
-        </div>
+              </ChatBubble>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -344,7 +347,6 @@ function ActiveRecordingCard({
   live,
   whisperLiveText,
   onPauseResume,
-  onStop,
   onStopAndFinish,
 }: {
   durationSec: number;
@@ -353,11 +355,9 @@ function ActiveRecordingCard({
   live: UseLiveTranscript;
   whisperLiveText: string;
   onPauseResume: () => void;
-  onStop: () => void;
   onStopAndFinish: () => void;
 }) {
   const [transcriptVisible, setTranscriptVisible] = useState(true);
-  const [flags, setFlags] = useState<number[]>([]);
   // Always-fresh elapsed-sec so the restart callback captures current duration, not a snapshot.
   const durationSecRef = useRef(durationSec);
   durationSecRef.current = durationSec;
@@ -491,17 +491,6 @@ function ActiveRecordingCard({
           {/* Waveform */}
           <Waveform micState={micState} height={40} />
 
-          {/* Stop & generate */}
-          <button
-            type="button"
-            className="btn btn-primary w-full"
-            onClick={onStopAndFinish}
-            disabled={chainActive}
-            style={{ minHeight: 44, touchAction: 'manipulation' }}
-          >
-            <Square size={14} strokeWidth={2} /> Stop &amp; generate notes
-          </button>
-
           {/* Pause / Resume */}
           <button
             type="button"
@@ -521,66 +510,16 @@ function ActiveRecordingCard({
             )}
           </button>
 
-          {/* Stop only */}
+          {/* Finish recording */}
           <button
             type="button"
-            className="btn btn-ghost w-full text-sm"
-            onClick={onStop}
+            className="btn btn-primary w-full"
+            onClick={onStopAndFinish}
             disabled={chainActive}
-            title="Stop without auto-transcribing or generating"
-            style={{ minHeight: 40, touchAction: 'manipulation' }}
+            style={{ minHeight: 44, touchAction: 'manipulation' }}
           >
-            Stop only
+            <Square size={14} strokeWidth={2} /> Finish Recording
           </button>
-
-          {/* Flag for note */}
-          <div
-            className="flex flex-col gap-2 pt-3 mt-1"
-            style={{ borderTop: '1px solid var(--color-pt-border)' }}
-          >
-            <div>
-              <p
-                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-                style={{ color: 'var(--color-pt-text-3)' }}
-              >
-                Flag for note
-              </p>
-              <p
-                className="text-xs leading-relaxed mt-0.5"
-                style={{ color: 'var(--color-pt-text-3)' }}
-              >
-                Tap when something matters — we'll mark it for review.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-secondary w-full"
-              onClick={() => setFlags((prev) => [...prev, durationSec])}
-              style={{ minHeight: 44, touchAction: 'manipulation' }}
-            >
-              + Flag this moment
-            </button>
-
-            {flags.length > 0 && (
-              <div
-                className="rounded-lg px-3 py-2"
-                style={{
-                  background: 'var(--color-pt-surface)',
-                  border: '1px solid var(--color-pt-border)',
-                }}
-              >
-                <p
-                  className="text-xs font-semibold mb-0.5"
-                  style={{ color: 'var(--color-pt-text-2)' }}
-                >
-                  {flags.length} flag{flags.length !== 1 ? 's' : ''} this visit
-                </p>
-                <p className="font-mono text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
-                  {flags.map((s) => formatDuration(s)).join(' · ')}
-                </p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );
@@ -661,17 +600,7 @@ function ActiveRecordingCard({
           disabled={chainActive}
           style={{ minHeight: 44, touchAction: 'manipulation' }}
         >
-          <Square size={15} strokeWidth={2} /> Stop &amp; generate notes
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={onStop}
-          disabled={chainActive}
-          title="Stop without auto-transcribing or generating"
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
-        >
-          Stop only
+          <Square size={15} strokeWidth={2} /> Finish Recording
         </button>
       </div>
 
@@ -733,7 +662,6 @@ export function RecordingPanel({
   clips,
   whisperLiveText,
   onStart,
-  onStop,
   onStopAndFinish,
   onPauseResume,
   onUpload,
@@ -829,7 +757,6 @@ export function RecordingPanel({
           live={live}
           whisperLiveText={whisperLiveText}
           onPauseResume={onPauseResume}
-          onStop={onStop}
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
@@ -885,17 +812,7 @@ function RecordingSizeHint({ durationSec }: { durationSec: number }) {
       </StatusBanner>
     );
   }
-  return (
-    <div
-      className="rounded-md px-3 py-1.5 text-[12px]"
-      style={{
-        border: '1px solid var(--color-pt-border)',
-        color: 'var(--color-pt-text-3)',
-      }}
-    >
-      Estimated ~{estimatedMb.toFixed(1)} MB recorded (Whisper accepts up to 25 MB per clip).
-    </div>
-  );
+  return null;
 }
 
 function RecordingNotices({

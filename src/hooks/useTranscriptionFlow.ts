@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { audioRepository } from '@/services/AudioRepository';
 import { transcribe } from '@/services/ai/transcribe';
-import { LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
+import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
+import { findSpeechRangesML } from '@/lib/audio/vadML';
+import { extractRanges } from '@/lib/audio/silenceTrim';
+import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
 import { trimSilence } from '@/lib/audio/silenceTrim';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
@@ -42,6 +45,68 @@ export interface UseTranscriptionFlowResult {
   handleCreateTranscript: (clipId?: string) => Promise<void>;
   handleRevertToLocal: () => void;
   handleRemergeFromClips: () => void;
+}
+
+const LOCAL_CHUNK_SEC = 180; // 3-minute segments fed to the Whisper worker
+
+/**
+ * Local-first transcription pipeline used by the background auto-pass.
+ *
+ * Pipeline: decode → VAD speech extraction → 3-min chunking → Whisper per chunk.
+ * Decodes the blob once to 16 kHz Float32, strips silence with the ML VAD
+ * (Silero), then splits speech-only audio into fixed-length chunks and sends
+ * each Float32Array directly to the Whisper worker. This avoids re-encoding
+ * between steps and prevents a single long file from blocking the worker
+ * indefinitely.
+ *
+ * See docs/invariants.md — "Local-first transcription".
+ */
+async function transcribeLocalChunked(
+  blob: Blob,
+  onProgress?: (msg: string) => void,
+  signal?: AbortSignal,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const SR = 16000;
+
+  onProgress?.('Decoding audio…');
+  const samples = await blobToFloat32(blob);
+
+  // VAD: strip silence — non-fatal; falls back to full audio on error.
+  onProgress?.('Detecting speech…');
+  let speechSamples: Float32Array;
+  try {
+    const ranges = await findSpeechRangesML(samples, SR, DEFAULT_VAD_OPTIONS);
+    speechSamples = ranges.length > 0 ? extractRanges(samples, SR, ranges) : samples;
+  } catch {
+    speechSamples = samples;
+  }
+
+  if (speechSamples.length < SR * 0.5) {
+    return { ok: false, error: 'No speech detected in audio.' };
+  }
+
+  // Split into fixed-size chunks so each worker call stays bounded in time.
+  const chunkLen = SR * LOCAL_CHUNK_SEC;
+  const chunks: Float32Array[] = [];
+  for (let offset = 0; offset < speechSamples.length; offset += chunkLen) {
+    chunks.push(speechSamples.slice(offset, offset + chunkLen));
+  }
+
+  const label = (n: number, total: number) =>
+    total > 1 ? `Transcribing ${n}/${total} chunks…` : 'Transcribing…';
+  onProgress?.(label(0, chunks.length));
+  const texts = await transcribeFloat32Parallel(
+    chunks,
+    LOCAL_WHISPER_DEFAULT_MODEL,
+    (done, total) => { onProgress?.(label(done, total)); },
+  );
+  if (signal?.aborted) return { ok: false, error: 'Aborted.' };
+  const parts = texts.filter((t) => t.trim()).map((t) => t.trim());
+
+  if (parts.length === 0) {
+    return { ok: false, error: 'Whisper returned no text.' };
+  }
+  return { ok: true, text: parts.join(' ') };
 }
 
 /**
@@ -98,6 +163,12 @@ export function useTranscriptionFlow(
     try {
       const original = await audioRepository.load(clip.id);
       if (!original) return { ok: false, error: 'No audio found for this clip.' };
+
+      // Local-first background pass: VAD silence extraction + chunked Whisper.
+      // See docs/invariants.md — "Local-first transcription".
+      if (forceLocal && !useNova) {
+        return await transcribeLocalChunked(original, onProgress, signal);
+      }
 
       let blobToSend: Blob = original;
       let trimReport: { droppedSec: number; originalSec: number } | undefined;
@@ -354,10 +425,12 @@ export function useTranscriptionFlow(
 
   transcribeClipBlobRef.current = transcribeClipBlob;
 
-  // Background local-Whisper pass: automatically transcribes newly-saved clips
-  // when the user has chosen the 'local' provider.  Stores results in both
-  // localTranscript and transcript, then re-merges into the session transcript
-  // so the Review tab populates without any manual action.
+  // Background local-Whisper pass: automatically transcribes every newly-saved clip
+  // regardless of the configured provider.  This is intentional — local Whisper
+  // always runs first so the Review tab populates without any manual action, and
+  // the result is stored in localTranscript.  Cloud transcription (Nova-3) is a
+  // separate explicit user action that upgrades over the local result.
+  // See docs/invariants.md — "Local-first transcription".
   useEffect(() => {
     if (!session) return;
 
