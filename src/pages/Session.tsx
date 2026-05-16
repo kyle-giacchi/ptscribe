@@ -412,6 +412,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
                 hasUserEdits={hasUserEdits}
                 hasLocalTranscript={hasLocalTranscript}
+                totalDurationSec={sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0)}
                 onChange={setTranscript}
                 onCommit={() =>
                   patchSession({
