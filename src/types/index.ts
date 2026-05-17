@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 16;
+export const APP_DATA_VERSION = 17;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -58,7 +58,7 @@ export type SessionStatus =
   | 'generating'
   | 'ready'
   | 'finalized';
-export type TranscriptSource = 'whisper' | 'webspeech' | 'manual';
+export type TranscriptSource = 'whisper' | 'webspeech' | 'manual' | 'nova';
 
 /**
  * One discrete audio take inside a session. A session is a sequence of these.
@@ -72,14 +72,21 @@ export type ClipStatus =
   | 'transcribed' // transcript text populated
   | 'failed'; // last transcription attempt failed
 
+export interface TranscriptChunk {
+  startSec: number; // seconds from clip start (real, not estimated)
+  text: string;
+}
+
 export interface SessionClip {
   id: ID;
   index: number;
   durationSec: number;
   status: ClipStatus;
-  transcript?: string;
-  liveTranscript?: string;
-  localTranscript?: string;
+  transcript?: string;       // active transcript — always the highest tier available
+  liveTranscript?: string;   // Tier 1: Web Speech real-time capture during recording
+  localTranscript?: string;  // Tier 2: local Whisper auto-pass result (frozen, never overwritten by cloud)
+  aiTranscript?: string;     // Tier 3: Nova cloud result (written by explicit AI transcription action)
+  transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
   transcriptedAt?: number;
   errorMessage?: string;
   createdAt: number;
@@ -94,8 +101,10 @@ export interface Session {
   durationMin?: number;
   status: SessionStatus;
   clips: SessionClip[];
-  transcript?: string;
-  liveTranscript?: string;
+  transcript?: string;        // active transcript — always the highest tier available
+  liveTranscript?: string;    // Tier 1: merged Web Speech live transcripts
+  localTranscript?: string;   // Tier 2: merged local Whisper result (frozen after auto-pass)
+  aiTranscript?: string;      // Tier 3: merged Nova cloud result (written on explicit AI transcription)
   transcriptSource?: TranscriptSource;
   noteId?: ID;
   templateId?: ID;

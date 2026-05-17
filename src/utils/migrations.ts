@@ -47,6 +47,11 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   users are migrated to 'light' so the app always shows the designed light palette
  *   instead of picking up an unexpected OS dark mode. Users can still opt in to dark
  *   or system from Settings.
+ * - v16 → v17: Adds three-tier transcription fields. `Session.localTranscript` (Tier 2
+ *   merged local Whisper result) and `Session.aiTranscript` (Tier 3 merged Nova result)
+ *   are new optional fields. `SessionClip.aiTranscript` (Tier 3 per-clip Nova result) is
+ *   also added. `TranscriptSource` gains `'nova'` as a valid value. All new fields default
+ *   to absent — no structural transformation needed.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -107,6 +112,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 15) {
     working = migrateV15ToV16(working);
+  }
+  if ((working as { version?: number }).version === 16) {
+    working = migrateV16ToV17(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -407,6 +415,13 @@ function migrateV14ToV15(input: Record<string, unknown>): Record<string, unknown
     },
   };
   return next;
+}
+
+function migrateV16ToV17(input: Record<string, unknown>): Record<string, unknown> {
+  // New optional fields on Session (localTranscript, aiTranscript) and SessionClip
+  // (aiTranscript) all default to absent. TranscriptSource gains 'nova'. No structural
+  // transformation needed — existing data passes the updated schema as-is.
+  return { ...input, version: 17 };
 }
 
 function migrateV15ToV16(input: Record<string, unknown>): Record<string, unknown> {

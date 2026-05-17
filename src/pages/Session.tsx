@@ -8,6 +8,7 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
+import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useLiveTranscript } from '@/hooks/useLiveTranscript';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
@@ -26,6 +27,7 @@ import { NotePanel } from '@/components/sessions/NotePanel';
 import { DebugDrawer } from '@/components/sessions/DebugDrawer';
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
+import { DemoCompleteModal } from '@/components/common/DemoCompleteModal';
 
 type Busy = null | 'transcribing' | 'generating';
 
@@ -36,7 +38,7 @@ export function SessionPage() {
 
 function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getSession } = useSessions();
-  const { getPatient } = usePatients();
+  const { getPatient, updatePatient } = usePatients();
   const { forSession } = useNotes();
   const { templates, getTemplate } = useTemplates();
   const { settings } = useSettings();
@@ -117,7 +119,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction,
     handleCreateTranscript,
     handleRevertToLocal,
-    handleRemergeFromClips,
   } = transcription;
 
   // ── Recording flow ───────────────────────────────────────────────────────
@@ -138,7 +139,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const {
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
-    whisperLiveText,
+    whisperBubbles,
+    uploadStatus,
     handleStartRecording,
     handleStopRecording,
     handlePauseResume,
@@ -181,6 +183,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleCopyNoteMarkdown,
     missingRequiredLabels,
   } = generation;
+
+  const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
+
+  function handleFinalizeWrapped() {
+    handleFinalize();
+    if (isDemoMode() && patient?.id === DEMO_PATIENT_ID) {
+      updatePatient(DEMO_PATIENT_ID, { status: 'discharged', updatedAt: Date.now() });
+      setDemoCompleteOpen(true);
+    }
+  }
 
   // ── ?autoRecord=1 deep link auto-start ──────────────────────────────────
   // Lets Dashboard / NewSession links jump straight into recording with one tap.
@@ -245,7 +257,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
-  const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
   const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
   // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
   const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
@@ -317,7 +328,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         onGenerate={handleGenerate}
         onCopyTranscript={handleCopyTranscript}
         onCopyNote={handleCopyNote}
-        onFinalize={handleFinalize}
+        onFinalize={handleFinalizeWrapped}
         onUnfinalize={handleUnfinalize}
       />
 
@@ -402,7 +413,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 recorder={recorder}
                 live={live}
                 clips={sortedClips}
-                whisperLiveText={whisperLiveText}
+                whisperBubbles={whisperBubbles}
+                uploadStatus={uploadStatus}
                 onStart={handleStartRecording}
                 onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
                 onPauseResume={handlePauseResume}
@@ -479,7 +491,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 <TranscriptPanel
                   transcript={transcript}
                   clips={sortedClips}
-                  canRemerge={hasTranscribedClip}
                   canTranscribe={novaEligible}
                   transcribing={busy === 'transcribing'}
                   transcribeUsed={transcribeUsed}
@@ -494,7 +505,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       transcriptSource: session.transcriptSource ?? 'manual',
                     })
                   }
-                  onRemerge={handleRemergeFromClips}
                   onCreateTranscript={handleCreateTranscript}
                   onRevertToLocal={handleRevertToLocal}
                 />
@@ -509,7 +519,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => { setActiveTab('record'); void handleStartRecording(); }}
+                onClick={() => setActiveTab('record')}
                 style={{ minHeight: 44, touchAction: 'manipulation' }}
               >
                 <Mic size={14} strokeWidth={2} /> Add clip
@@ -549,6 +559,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           </div>
         )}
       </div>
+
+      {/* ── Demo complete modal ──────────────────────────── */}
+      <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
 
       {/* ── Manage templates modal ────────────────────────── */}
       <ManageTemplatesModal
