@@ -117,7 +117,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction,
     handleCreateTranscript,
     handleRevertToLocal,
-    handleRemergeFromClips,
   } = transcription;
 
   // ── Recording flow ───────────────────────────────────────────────────────
@@ -138,7 +137,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const {
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
-    whisperLiveText,
+    whisperBubbles,
+    uploadStatus,
     handleStartRecording,
     handleStopRecording,
     handlePauseResume,
@@ -245,7 +245,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
-  const hasTranscribedClip = sortedClips.some((c) => c.status === 'transcribed');
   const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
   // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
   const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
@@ -402,7 +401,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 recorder={recorder}
                 live={live}
                 clips={sortedClips}
-                whisperLiveText={whisperLiveText}
+                whisperBubbles={whisperBubbles}
+                uploadStatus={uploadStatus}
                 onStart={handleStartRecording}
                 onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
                 onPauseResume={handlePauseResume}
@@ -479,7 +479,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 <TranscriptPanel
                   transcript={transcript}
                   clips={sortedClips}
-                  canRemerge={hasTranscribedClip}
                   canTranscribe={novaEligible}
                   transcribing={busy === 'transcribing'}
                   transcribeUsed={transcribeUsed}
@@ -494,7 +493,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       transcriptSource: session.transcriptSource ?? 'manual',
                     })
                   }
-                  onRemerge={handleRemergeFromClips}
                   onCreateTranscript={handleCreateTranscript}
                   onRevertToLocal={handleRevertToLocal}
                 />

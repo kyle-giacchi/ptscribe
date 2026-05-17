@@ -12,6 +12,7 @@ import {
   ArrowRight,
   X,
   RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
@@ -20,13 +21,15 @@ import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseLiveTranscript, TranscriptSegment } from '@/hooks/useLiveTranscript';
+import type { UploadStatus } from '@/hooks/useRecordingFlow';
 import type { SessionClip } from '@/types';
 
 export interface RecordingPanelProps {
   recorder: UseRecorder;
   live: UseLiveTranscript;
   clips: SessionClip[];
-  whisperLiveText: string;
+  whisperBubbles: string[];
+  uploadStatus: UploadStatus;
   onStart: () => void;
   onStopAndFinish: () => void;
   onPauseResume: () => void;
@@ -113,12 +116,17 @@ function IdleRecordingCard({
   onStart,
   onUpload,
   onSkip,
+  uploadStatus,
 }: {
   onStart: () => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
+  uploadStatus: UploadStatus;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
+  const hasStatusMessage = uploadStatus.phase !== 'idle';
+
   return (
     <div className="flex flex-col items-center gap-8 py-12">
       <div className="flex flex-col items-center gap-5">
@@ -131,13 +139,15 @@ function IdleRecordingCard({
             type="button"
             onClick={onStart}
             aria-label="Start recording"
-            className="relative flex items-center justify-center rounded-full"
+            disabled={isUploading}
+            className="relative flex items-center justify-center rounded-full transition-opacity"
             style={{
               width: 144,
               height: 144,
               background: 'var(--color-pt-accent)',
               touchAction: 'manipulation',
               boxShadow: '0 8px 32px color-mix(in srgb, var(--color-pt-accent) 35%, transparent)',
+              opacity: isUploading ? 0.45 : 1,
             }}
           >
             <Mic size={52} strokeWidth={1.5} style={{ color: 'white' }} />
@@ -154,34 +164,70 @@ function IdleRecordingCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1" style={{ color: 'var(--color-pt-text-3)' }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="audio/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) { onUpload(file); e.target.value = ''; }
-          }}
-        />
-        <button
-          type="button"
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
-          style={{ touchAction: 'manipulation' }}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload size={11} strokeWidth={2} /> Upload audio
-        </button>
-        <span className="text-xs select-none">·</span>
-        <button
-          type="button"
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs hover:opacity-70 transition-opacity"
-          onClick={onSkip}
-          style={{ touchAction: 'manipulation' }}
-        >
-          Skip <ArrowRight size={11} strokeWidth={2} />
-        </button>
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex items-center gap-1" style={{ color: 'var(--color-pt-text-3)' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) { onUpload(file); e.target.value = ''; }
+            }}
+          />
+          <button
+            type="button"
+            disabled={isUploading}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-opacity"
+            style={{
+              touchAction: 'manipulation',
+              opacity: isUploading ? 0.6 : 1,
+              cursor: isUploading ? 'default' : 'pointer',
+            }}
+            onClick={() => !isUploading && fileInputRef.current?.click()}
+          >
+            {isUploading
+              ? <Loader2 size={11} strokeWidth={2} className="animate-spin" />
+              : <Upload size={11} strokeWidth={2} />
+            }
+            {' '}Upload audio
+          </button>
+          <span className="text-xs select-none">·</span>
+          <button
+            type="button"
+            disabled={isUploading}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-opacity"
+            onClick={onSkip}
+            style={{
+              touchAction: 'manipulation',
+              opacity: isUploading ? 0.45 : 1,
+              cursor: isUploading ? 'default' : 'pointer',
+            }}
+          >
+            Skip <ArrowRight size={11} strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Inline upload status — replaces toast */}
+        <div style={{ minHeight: 18 }}>
+          {hasStatusMessage && (
+            <p
+              key={uploadStatus.message}
+              className="text-xs text-center"
+              style={{
+                color: uploadStatus.phase === 'error'
+                  ? 'var(--color-pt-red-fg)'
+                  : uploadStatus.phase === 'done'
+                    ? 'var(--color-pt-accent-fg)'
+                    : 'var(--color-pt-text-3)',
+                animation: 'transcript-slide-in 200ms ease-out both',
+              }}
+            >
+              {uploadStatus.message}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -216,17 +262,17 @@ function ChatBubble({ children, muted = false }: { children: React.ReactNode; mu
 function LiveTranscriptView({
   segments,
   interimText,
-  whisperText = '',
+  whisperBubbles = [],
   expandToFill = false,
 }: {
   segments: TranscriptSegment[];
   interimText: string;
-  whisperText?: string;
+  whisperBubbles?: string[];
   expandToFill?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const hasWebSpeech = segments.length > 0 || !!interimText;
-  const hasContent = hasWebSpeech || !!whisperText;
+  const hasContent = hasWebSpeech || whisperBubbles.length > 0;
   const [showNoSpeechHint, setShowNoSpeechHint] = useState(false);
 
   useEffect(() => {
@@ -241,7 +287,7 @@ function LiveTranscriptView({
   useEffect(() => {
     const el = containerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [segments.length, interimText, whisperText]);
+  }, [segments.length, interimText, whisperBubbles.length]);
 
   return (
     <div
@@ -318,19 +364,31 @@ function LiveTranscriptView({
                 )}
               </>
             ) : (
-              <ChatBubble>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
-                  {whisperText}
-                  <span
-                    className="inline-block ml-0.5 w-px align-middle"
-                    style={{
-                      height: '1em',
-                      background: 'var(--color-pt-accent)',
-                      animation: 'transcript-cursor-blink 900ms step-end infinite',
-                    }}
-                  />
-                </p>
-              </ChatBubble>
+              whisperBubbles.map((text, i) => {
+                const isLast = i === whisperBubbles.length - 1;
+                return (
+                  <div
+                    key={i}
+                    style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
+                  >
+                    <ChatBubble>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
+                        {text}
+                        {isLast && (
+                          <span
+                            className="inline-block ml-0.5 w-px align-middle"
+                            style={{
+                              height: '1em',
+                              background: 'var(--color-pt-accent)',
+                              animation: 'transcript-cursor-blink 900ms step-end infinite',
+                            }}
+                          />
+                        )}
+                      </p>
+                    </ChatBubble>
+                  </div>
+                );
+              })
             )}
           </div>
         </>
@@ -345,7 +403,7 @@ function ActiveRecordingCard({
   paused,
   chainActive,
   live,
-  whisperLiveText,
+  whisperBubbles,
   onPauseResume,
   onStopAndFinish,
 }: {
@@ -353,7 +411,7 @@ function ActiveRecordingCard({
   paused: boolean;
   chainActive: boolean;
   live: UseLiveTranscript;
-  whisperLiveText: string;
+  whisperBubbles: string[];
   onPauseResume: () => void;
   onStopAndFinish: () => void;
 }) {
@@ -368,7 +426,7 @@ function ActiveRecordingCard({
 
   // ── Two-column layout: transcript left, controls right ──────────────────────
   // Activate whenever live captions are on OR Whisper has produced any text.
-  if (live.listening || !!whisperLiveText) {
+  if (live.listening || whisperBubbles.length > 0) {
     return (
       <div className="flex gap-0" style={{ minHeight: 480 }}>
         {/* Left: Transcript panel */}
@@ -425,7 +483,7 @@ function ActiveRecordingCard({
             <LiveTranscriptView
               segments={live.segments}
               interimText={live.interimText}
-              whisperText={whisperLiveText}
+              whisperBubbles={whisperBubbles}
               expandToFill
             />
           ) : (
@@ -660,7 +718,8 @@ export function RecordingPanel({
   recorder,
   live,
   clips,
-  whisperLiveText,
+  whisperBubbles,
+  uploadStatus,
   onStart,
   onStopAndFinish,
   onPauseResume,
@@ -691,11 +750,7 @@ export function RecordingPanel({
     }
   }, [recorder.idleAutoStopped]);
 
-  useEffect(() => {
-    if (recorder.recorderInterrupted) {
-      toast.warning('Recording was interrupted while the tab was in the background. Audio has been saved.');
-    }
-  }, [recorder.recorderInterrupted]);
+  // recorderInterrupted is covered by the wasBackgrounded StatusBanner above.
 
   useEffect(() => {
     if (recorder.micDisconnected) {
@@ -710,7 +765,7 @@ export function RecordingPanel({
   }, [recorder.status]);
 
   if (idle && !wasAutoStopped) {
-    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} />;
+    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} />;
   }
 
   return (
@@ -755,12 +810,12 @@ export function RecordingPanel({
           paused={recorder.status === 'paused'}
           chainActive={false}
           live={live}
-          whisperLiveText={whisperLiveText}
+          whisperBubbles={whisperBubbles}
           onPauseResume={onPauseResume}
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
-        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} />
+        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} />
       )}
 
       {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}

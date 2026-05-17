@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Sparkles, Loader2, Layers, Info, RotateCcw, ChevronDown,
+  Sparkles, Loader2, Info, RotateCcw, ChevronDown,
   Search, ChevronLeft, ChevronRight, Edit3, Wand2,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
@@ -9,7 +9,7 @@ import {
   mergeClipTranscriptsWithMarkers,
   stripClipMarkers,
 } from '@/utils/clips';
-import { parseTranscriptSegments } from '@/utils/transcriptGrouping';
+import { parseTranscriptSegments, parseChunkedTranscript } from '@/utils/transcriptGrouping';
 import { ConfirmBanner } from './ConfirmBanner';
 
 // ── AI Transcription button ───────────────────────────────────────────────────
@@ -31,7 +31,7 @@ function CreateTranscriptButton({
         {busy ? (
           <><Loader2 size={14} className="animate-spin" /> Transcribing…</>
         ) : (
-          <><Sparkles size={14} strokeWidth={2} /> Generate AI Transcription</>
+          <><Sparkles size={14} strokeWidth={2} /> Improve Transcription</>
         )}
       </button>
       <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-fg-subtle)' }}>
@@ -55,7 +55,6 @@ function CreateTranscriptButton({
 export function TranscriptPanel({
   transcript,
   clips,
-  canRemerge,
   canTranscribe,
   transcribing,
   transcribeUsed,
@@ -65,13 +64,11 @@ export function TranscriptPanel({
   totalDurationSec,
   onChange,
   onCommit,
-  onRemerge,
   onCreateTranscript,
   onRevertToLocal,
 }: {
   transcript: string;
   clips: SessionClip[];
-  canRemerge: boolean;
   canTranscribe: boolean;
   transcribing: boolean;
   transcribeUsed: number;
@@ -81,12 +78,10 @@ export function TranscriptPanel({
   totalDurationSec: number;
   onChange: (next: string) => void;
   onCommit: () => void;
-  onRemerge: () => void;
   onCreateTranscript: (clipId?: string) => void;
   onRevertToLocal: () => void;
 }) {
   const [pendingOverwrite, setPendingOverwrite] = useState(false);
-  const [pendingRemerge, setPendingRemerge] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,10 +99,13 @@ export function TranscriptPanel({
   );
   const showClipMarkers = transcribedClips.length > 1 && !hasUserEdits;
   const displayTranscript = showClipMarkers
-    ? mergeClipTranscriptsWithMarkers(clips, clips)
+    ? mergeClipTranscriptsWithMarkers(clips)
     : transcript;
 
-  const segments = parseTranscriptSegments(transcript, totalDurationSec);
+  const chunkedSegments = clips.some((c) => c.transcriptChunks?.length)
+    ? parseChunkedTranscript(clips)
+    : null;
+  const segments = chunkedSegments ?? parseTranscriptSegments(transcript, totalDurationSec);
   const allMatches = buildMatches(segments, searchQuery);
   const matchCount = allMatches.length;
   const safeIndex = matchCount > 0 ? matchIndex % matchCount : 0;
@@ -119,11 +117,6 @@ export function TranscriptPanel({
   function handleCreateClick() {
     if (hasUserEdits) setPendingOverwrite(true);
     else onCreateTranscript();
-  }
-
-  function handleRemergeClick() {
-    if (hasUserEdits) setPendingRemerge(true);
-    else onRemerge();
   }
 
   function handleReplaceAll() {
@@ -146,7 +139,7 @@ export function TranscriptPanel({
     }
   }
 
-  const showActionRow = canTranscribe || canRemerge || hasLocalTranscript;
+  const showActionRow = canTranscribe || hasLocalTranscript;
 
   return (
     <div className="space-y-3">
@@ -158,13 +151,6 @@ export function TranscriptPanel({
           onCancel={() => setPendingOverwrite(false)}
           onConfirm={() => { setPendingOverwrite(false); onCreateTranscript(); }}
         />
-      ) : pendingRemerge ? (
-        <ConfirmBanner
-          message="You have manual edits that will be lost when clips are re-merged."
-          confirmLabel="Yes, discard edits"
-          onCancel={() => setPendingRemerge(false)}
-          onConfirm={() => { setPendingRemerge(false); onRemerge(); }}
-        />
       ) : showActionRow ? (
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
@@ -174,11 +160,6 @@ export function TranscriptPanel({
                 used={transcribeUsed} cap={transcribeCap}
                 onClick={handleCreateClick}
               />
-            )}
-            {canRemerge && (
-              <button type="button" className="btn btn-ghost" onClick={handleRemergeClick}>
-                <Layers size={14} strokeWidth={2} /> Re-merge from clips
-              </button>
             )}
             {hasLocalTranscript && (
               <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}
