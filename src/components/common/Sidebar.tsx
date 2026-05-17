@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -35,6 +36,19 @@ export function Sidebar({ onClose, className }: SidebarProps) {
   const { clinician } = useClinician();
   const { logout } = useGate();
   const pendingReviewCount = notes.filter((n) => !n.finalized).length;
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [profileOpen]);
 
   const items: Array<NavEntry & { badge?: Badge }> = [
     { to: '/today', label: 'Today', Icon: Calendar },
@@ -69,33 +83,115 @@ export function Sidebar({ onClose, className }: SidebarProps) {
     >
       {/* Brand block */}
       <div style={{ padding: '20px 18px 14px' }}>
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 8,
-              background: 'var(--color-pt-accent)',
-              color: '#ffffff',
-              fontFamily: 'var(--font-mono)',
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            P
+        <div className="flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: 'var(--color-pt-accent)',
+                color: '#ffffff',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              P
+            </div>
+            <div
+              style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: '-0.2px',
+                color: 'var(--color-pt-text)',
+              }}
+            >
+              PTScribe
+            </div>
           </div>
-          <div
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: '-0.2px',
-              color: 'var(--color-pt-text)',
-            }}
-          >
-            PTScribe
+
+          {/* Profile dropdown */}
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              aria-label="User profile"
+              onClick={() => setProfileOpen((o) => !o)}
+              className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 999,
+                border: 'none',
+                background: profileOpen
+                  ? 'var(--color-pt-accent-soft)'
+                  : 'var(--color-pt-surface-mut)',
+                color: profileOpen ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
+                cursor: 'pointer',
+                fontSize: 11.5,
+                fontWeight: 600,
+              }}
+            >
+              {initials}
+            </button>
+
+            {profileOpen && (
+              <div
+                className="absolute z-50"
+                style={{
+                  top: '100%',
+                  left: 0,
+                  marginTop: 6,
+                  minWidth: 160,
+                  background: 'var(--color-pt-surface)',
+                  border: '1px solid var(--color-pt-border)',
+                  borderRadius: 10,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                  padding: '4px 0',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '8px 12px 6px',
+                    borderBottom: '1px solid var(--color-pt-border)',
+                  }}
+                >
+                  <div
+                    className="truncate"
+                    style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)' }}
+                  >
+                    {clinician.name || 'Clinician'}
+                  </div>
+                  <div
+                    className="truncate"
+                    style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}
+                  >
+                    {clinician.credentials || clinician.practiceName || 'PTScribe'}
+                  </div>
+                </div>
+                <NavLink
+                  to="/debug"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onClose?.();
+                  }}
+                  className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+                  style={{
+                    padding: '7px 12px',
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: 'var(--color-pt-text-2)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <Terminal size={13} strokeWidth={1.75} />
+                  <span>Debug</span>
+                </NavLink>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -141,20 +237,6 @@ export function Sidebar({ onClose, className }: SidebarProps) {
               'PTScribe'}
           </div>
         </div>
-        <NavLink
-          to="/admin"
-          aria-label="Admin"
-          onClick={onClose}
-          className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            color: 'var(--color-pt-text-3)',
-          }}
-        >
-          <Terminal size={15} strokeWidth={1.75} />
-        </NavLink>
         <NavLink
           to="/settings"
           aria-label="Settings"

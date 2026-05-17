@@ -63,6 +63,9 @@ export function useWebSpeechTranscript(): UseWebSpeechTranscript {
   const recRef = useRef<SpeechRec | null>(null);
   const isMountedRef = useRef(true);
   const getElapsedSecRef = useRef<(() => number) | undefined>(undefined);
+  // Tracks the next final-result index we expect so Chrome's "flush-all" events
+  // (which replay old results with resultIndex=0) don't create duplicate bubbles.
+  const nextFinalIdxRef = useRef<number>(0);
   const Ctor = getCtor();
   const supported = Ctor !== null;
 
@@ -85,6 +88,7 @@ export function useWebSpeechTranscript(): UseWebSpeechTranscript {
       return;
     }
     getElapsedSecRef.current = getElapsedSec;
+    nextFinalIdxRef.current = 0;
     setError(null);
     const rec = new Ctor();
     rec.continuous = true;
@@ -94,11 +98,16 @@ export function useWebSpeechTranscript(): UseWebSpeechTranscript {
       if (!isMountedRef.current) return;
       let interim = '';
       let appended = '';
-      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+      const startIdx = Math.max(e.resultIndex, nextFinalIdxRef.current);
+      for (let i = startIdx; i < e.results.length; i += 1) {
         const r = e.results[i];
         const text = r[0].transcript;
-        if (r.isFinal) appended += text;
-        else interim += text;
+        if (r.isFinal) {
+          appended += text;
+          nextFinalIdxRef.current = i + 1;
+        } else {
+          interim += text;
+        }
       }
       if (appended) {
         const elapsedSec = getElapsedSecRef.current?.() ?? 0;
@@ -132,6 +141,7 @@ export function useWebSpeechTranscript(): UseWebSpeechTranscript {
   }, []);
 
   const reset = useCallback(() => {
+    nextFinalIdxRef.current = 0;
     setAccumulatedText('');
     setInterimText('');
     setSegments([]);
