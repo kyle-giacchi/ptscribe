@@ -98,6 +98,13 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   /** Mime type of the current recording, saved for blob reconstruction in interruption paths. */
   const currentMimeRef = useRef('audio/webm');
 
+  // ── Pause-triggered segment recorder (Whisper live preview) ─────────────────
+  // A separate short-lived MediaRecorder on the same stream captures each natural
+  // utterance as a standalone, independently decodable blob sent to Whisper.
+  const segmentRecRef = useRef<MediaRecorder | null>(null);
+  const isSpeakingRef = useRef(false);
+  const segmentStartAtRef = useRef(0);
+
   const voiceDetectorRef = useRef<VoiceDetector>(createVoiceDetector());
 
   const limitsRef = useRef<RecordingLimitsSettings | undefined>(options.limits);
@@ -131,6 +138,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       heartbeatRef.current = null;
     }
     voiceDetectorRef.current.teardown();
+    if (segmentRecRef.current) {
+      try { segmentRecRef.current.stop(); } catch { /* best-effort */ }
+      segmentRecRef.current = null;
+    }
+    isSpeakingRef.current = false;
     if (streamRef.current) {
       for (const track of streamRef.current.getTracks()) track.stop();
       streamRef.current = null;
@@ -167,6 +179,45 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       // Sample voice level before limit checks so lastVoiceAtMs stays fresh
       // even when no limits are configured (the analyser is cheap).
       voiceDetectorRef.current.sample(now);
+
+      // ── Pause-triggered segment recording ──────────────────────────────────
+      const silenceMs = now - voiceDetectorRef.current.lastVoiceAtMs;
+      const liveStream = streamRef.current;
+      const mime = currentMimeRef.current;
+      if (!isSpeakingRef.current && silenceMs < 200 && liveStream) {
+        // Voice just started — open a new segment recorder
+        try {
+          const seg = new MediaRecorder(liveStream, mime ? { mimeType: mime } : undefined);
+          seg.ondataavailable = (ev) => {
+            if (ev.data.size > 0) onChunkRef.current?.(ev.data, mime);
+          };
+          seg.start();
+          segmentRecRef.current = seg;
+          segmentStartAtRef.current = now;
+          isSpeakingRef.current = true;
+        } catch { /* best-effort — never break main recording */ }
+      } else if (isSpeakingRef.current) {
+        const segAge = now - segmentStartAtRef.current;
+        if (silenceMs > 800 || segAge > 15_000) {
+          const seg = segmentRecRef.current;
+          segmentRecRef.current = null;
+          isSpeakingRef.current = false;
+          try { seg?.stop(); } catch { /* best-effort */ }
+          // Rotate immediately on max-length if speech is still live
+          if (segAge > 15_000 && silenceMs < 200 && liveStream) {
+            try {
+              const seg2 = new MediaRecorder(liveStream, mime ? { mimeType: mime } : undefined);
+              seg2.ondataavailable = (ev) => {
+                if (ev.data.size > 0) onChunkRef.current?.(ev.data, mime);
+              };
+              seg2.start();
+              segmentRecRef.current = seg2;
+              segmentStartAtRef.current = now;
+              isSpeakingRef.current = true;
+            } catch { /* best-effort */ }
+          }
+        }
+      }
 
       if (!limits) return;
       const totalMin = total / 60;
@@ -313,19 +364,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           audioRepository.appendChunk(clipId, index, e.data).catch(() => {
             /* best-effort */
           });
-          // Notify live-Whisper subscriber with the accumulated blob.
-          // Cap at ~3 min (36 × 5 s) so Whisper processing stays fast on long recordings.
-          // Always include chunk 0 (container header) so the blob is decodable.
-          const cb = onChunkRef.current;
-          if (cb) {
-            const chunks = chunksRef.current;
-            const MAX_LIVE_CHUNKS = 36;
-            const liveChunks =
-              chunks.length > MAX_LIVE_CHUNKS
-                ? [chunks[0], ...chunks.slice(-(MAX_LIVE_CHUNKS - 1))]
-                : chunks;
-            cb(new Blob(liveChunks, { type: currentMimeRef.current }), currentMimeRef.current);
-          }
+          // onChunk is now driven by the pause-triggered segment recorder in the tick,
+          // which produces clean standalone blobs per utterance. Main recorder is IDB only.
         };
         recorder.onstop = () => {
           const finalBlob = new Blob(chunksRef.current, {
@@ -407,6 +447,12 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     if (!r || r.state !== 'recording') return;
     r.pause();
     tickPause();
+    // Stop the in-flight segment so Whisper processes what was captured before the pause.
+    if (segmentRecRef.current) {
+      try { segmentRecRef.current.stop(); } catch { /* best-effort */ }
+      segmentRecRef.current = null;
+    }
+    isSpeakingRef.current = false;
     setStatus('paused');
   }, [tickPause]);
 
