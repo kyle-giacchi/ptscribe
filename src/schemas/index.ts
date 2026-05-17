@@ -45,6 +45,11 @@ const PatientSchema = z.object({
 
 // ─── Session ────────────────────────────────────────────────────────────────
 
+const TranscriptChunkSchema = z.object({
+  startSec: z.number().min(0),
+  text: z.string(),
+});
+
 const SessionClipSchema = z.object({
   id: z.string().min(1),
   index: z.number().int().min(0),
@@ -53,6 +58,7 @@ const SessionClipSchema = z.object({
   transcript: z.string().optional(),
   liveTranscript: z.string().optional(),
   localTranscript: z.string().optional(),
+  transcriptChunks: z.array(TranscriptChunkSchema).optional(),
   transcriptedAt: z.number().int().optional(),
   errorMessage: z.string().optional(),
   createdAt: z.number().int(),

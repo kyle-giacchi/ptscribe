@@ -22,10 +22,7 @@ export function mergeClipTranscripts(clips: SessionClip[]): string {
  * segments so the PT can see which portion came from which clip.
  * Display-only — never stored.
  */
-export function mergeClipTranscriptsWithMarkers(
-  clips: SessionClip[],
-  allClips: SessionClip[],
-): string {
+export function mergeClipTranscriptsWithMarkers(clips: SessionClip[]): string {
   const transcribed = clips
     .filter((c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0)
     .sort((a, b) => a.createdAt - b.createdAt);
@@ -36,7 +33,7 @@ export function mergeClipTranscriptsWithMarkers(
 
   return transcribed
     .map((c) => {
-      const clipNumber = allClips.findIndex((x) => x.id === c.id) + 1;
+      const clipNumber = clips.findIndex((x) => x.id === c.id) + 1;
       return `--- [Clip ${clipNumber}] ---\n${c.transcript!.trim()}`;
     })
     .join('\n\n');
