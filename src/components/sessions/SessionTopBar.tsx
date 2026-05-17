@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { isDemoMode } from '@/lib/demoMode';
+import { ProfileButton } from '@/components/common/TopBar';
 import {
   ArrowLeft, CheckCircle2, Copy, FileText, List, LockOpen,
   Mic, Sparkles, Loader2,
@@ -116,6 +117,7 @@ export function SessionTopBar({
             <StatusBadge status={session.status} finalized={session.status === 'finalized'} />
           </div>
         </div>
+        <ProfileButton />
       </div>
 
       {/* ── Row 2: tabs + recording control ── */}

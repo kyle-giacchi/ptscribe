@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useMatch } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
+import { TopBar, ProfileButton } from './TopBar';
 import { Toaster } from '@/components/ui/Toaster';
 import { OfflineIndicator } from './OfflineIndicator';
 import { duration, ease } from '@/lib/motion';
@@ -166,16 +166,19 @@ function DemoTopBar() {
           </div>
         )}
       </div>
-      <span
-        className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-        style={{
-          background: 'color-mix(in oklab, var(--color-caution) 15%, transparent)',
-          color: 'var(--color-caution)',
-          border: '1px solid color-mix(in oklab, var(--color-caution) 30%, transparent)',
-        }}
-      >
-        Demo
-      </span>
+      <div className="flex items-center gap-2">
+        <span
+          className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+          style={{
+            background: 'color-mix(in oklab, var(--color-caution) 15%, transparent)',
+            color: 'var(--color-caution)',
+            border: '1px solid color-mix(in oklab, var(--color-caution) 30%, transparent)',
+          }}
+        >
+          Demo
+        </span>
+        <ProfileButton />
+      </div>
     </header>
   );
 }
