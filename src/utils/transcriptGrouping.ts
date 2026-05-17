@@ -1,3 +1,6 @@
+import type { SessionClip } from '@/types';
+
+
 export interface TranscriptSegment {
   text: string;
   speaker: string | null; // 'Dr' | 'Pt' | 'SPEAKER_0' etc., or null for plain text
@@ -58,6 +61,41 @@ export function parseTranscriptSegments(
       minuteLabel: `${mm}:${ss}`,
     };
   });
+}
+
+/**
+ * Build transcript segments from real 2-min chunk timestamps stored on clips.
+ * Returns null if no clip has chunk data (caller falls back to word estimation).
+ * Multi-clip sessions accumulate clip durations as offsets so timestamps are
+ * absolute from session start.
+ */
+export function parseChunkedTranscript(clips: SessionClip[]): TranscriptSegment[] | null {
+  const sorted = [...clips]
+    .filter((c) => c.transcriptChunks && c.transcriptChunks.length > 0)
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  if (sorted.length === 0) return null;
+
+  let clipOffset = 0;
+  const segments: TranscriptSegment[] = [];
+
+  for (const clip of sorted) {
+    for (const chunk of clip.transcriptChunks!) {
+      const absoluteSec = clipOffset + chunk.startSec;
+      const mm = String(Math.floor(absoluteSec / 60)).padStart(2, '0');
+      const ss = String(Math.floor(absoluteSec % 60)).padStart(2, '0');
+      segments.push({
+        text: chunk.text,
+        speaker: null,
+        estimatedSec: absoluteSec,
+        showMinuteDivider: true, // every real chunk always gets a timestamp header
+        minuteLabel: `${mm}:${ss}`,
+      });
+    }
+    clipOffset += clip.durationSec;
+  }
+
+  return segments.length > 0 ? segments : null;
 }
 
 function wordCount(s: string): number {

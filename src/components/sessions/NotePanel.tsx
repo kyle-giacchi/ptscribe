@@ -114,23 +114,12 @@ export function NotePanel({
                       <ClipboardList size={11} strokeWidth={2} />
                     </button>
                   )}
-                </div>
-
-                {/* Section body editor */}
-                <NoteSectionEditor
-                  value={s.body}
-                  readOnly={!!note?.finalized}
-                  onChange={(body) => onSectionChange(s.key, body)}
-                />
-
-                {/* Per-section copy button */}
-                {s.body.trim() && (
-                  <div className="mt-2 flex justify-end">
+                  {s.body.trim() && (
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 text-[11px]"
-                      style={{ color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      className="btn btn-ghost p-0.5"
                       title={`Copy ${s.label}`}
+                      style={{ color: 'var(--color-fg-subtle)' }}
                       onClick={() =>
                         navigator.clipboard.writeText(s.body).then(
                           () => toast.success(`${s.label} copied`),
@@ -139,10 +128,16 @@ export function NotePanel({
                       }
                     >
                       <Copy size={11} strokeWidth={2} />
-                      Copy
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* Section body editor */}
+                <NoteSectionEditor
+                  value={s.body}
+                  readOnly={!!note?.finalized}
+                  onChange={(body) => onSectionChange(s.key, body)}
+                />
               </div>
             );
           })}

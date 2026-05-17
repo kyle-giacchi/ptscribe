@@ -72,6 +72,11 @@ export type ClipStatus =
   | 'transcribed' // transcript text populated
   | 'failed'; // last transcription attempt failed
 
+export interface TranscriptChunk {
+  startSec: number; // seconds from clip start (real, not estimated)
+  text: string;
+}
+
 export interface SessionClip {
   id: ID;
   index: number;
@@ -79,7 +84,9 @@ export interface SessionClip {
   status: ClipStatus;
   transcript?: string;
   liveTranscript?: string;
+  /** @deprecated Written by the local-Whisper auto-pass; used only to detect whether cloud has upgraded the clip. Remove once transcriptSource moves to clip level. */
   localTranscript?: string;
+  transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
   transcriptedAt?: number;
   errorMessage?: string;
   createdAt: number;

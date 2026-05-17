@@ -14,6 +14,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    pool: 'forks',
+    forks: { singleFork: true },
     coverage: {
       reporter: ['text', 'html'],
       exclude: ['**/*.config.*', '**/test/**', '**/*.d.ts', 'src/main.tsx'],
