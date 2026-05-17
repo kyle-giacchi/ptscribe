@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 18;
+export const APP_DATA_VERSION = 19;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -335,6 +335,12 @@ export interface SessionWorkflowSettings {
    * tap. When false, the user advances each step manually. Default true.
    */
   autoFinish: boolean;
+  /**
+   * When true, the browser Web Speech API runs alongside Whisper during recording,
+   * writing t1Transcript from cloud captions. Off by default — Whisper VAD segments
+   * are the default T1 source.
+   */
+  webSpeechEnabled: boolean;
 }
 
 /**
