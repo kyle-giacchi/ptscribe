@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Mic, Cpu, Sparkles, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, Mic, Cpu, Sparkles, FileText, Pencil } from 'lucide-react';
 import { Eyebrow, SurfaceCard } from '@/components/design';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
@@ -7,12 +7,13 @@ import type { Patient, Session } from '@/types';
 
 // ─── Tier badge ─────────────────────────────────────────────────────────────
 
-type TierLevel = 1 | 2 | 3;
+type TierLevel = 1 | 2 | 3 | 4;
 
 const TIER_META: Record<TierLevel, { label: string; Icon: React.FC<{ size?: number; strokeWidth?: number }> ; color: string }> = {
-  1: { label: 'Web Speech', Icon: Mic, color: '#6366f1' },
-  2: { label: 'Local Whisper', Icon: Cpu, color: '#0ea5e9' },
-  3: { label: 'Nova AI', Icon: Sparkles, color: '#10b981' },
+  1: { label: 'T1 Live Browser', Icon: Mic, color: '#6366f1' },
+  2: { label: 'T2 Whisper Local', Icon: Cpu, color: '#0ea5e9' },
+  3: { label: 'T3 Nova AI', Icon: Sparkles, color: '#10b981' },
+  4: { label: 'Edited', Icon: Pencil, color: '#f59e0b' },
 };
 
 function TierBadge({ tier, active }: { tier: TierLevel; active: boolean }) {
@@ -66,9 +67,9 @@ function wordCount(text: string | undefined): number {
 function SessionRow({ session, patient }: { session: Session; patient: Patient | undefined }) {
   const [open, setOpen] = useState(false);
 
-  const hasT1 = Boolean(session.liveTranscript);
-  const hasT2 = Boolean(session.localTranscript);
-  const hasT3 = Boolean(session.aiTranscript);
+  const hasT1 = Boolean(session.t1Transcript);
+  const hasT2 = Boolean(session.t2Transcript);
+  const hasT3 = Boolean(session.t3Transcript);
   const hasAny = hasT1 || hasT2 || hasT3;
 
   const patientName = patient
@@ -81,13 +82,13 @@ function SessionRow({ session, patient }: { session: Session; patient: Patient |
     year: 'numeric',
   });
 
-  const activeSource = session.transcriptSource ?? (session.transcript ? 'whisper' : undefined);
+  const activeTier = session.activeTranscriptTier ?? (session.transcript ? 't2' : undefined);
   const activeTierLabel =
-    activeSource === 'nova' ? 'Nova AI' :
-    activeSource === 'whisper' ? 'Local Whisper' :
-    activeSource === 'webspeech' ? 'Web Speech' :
-    activeSource === 'manual' ? 'Manual' :
-    session.transcript ? 'whisper' : '—';
+    activeTier === 't3' ? 'T3 Nova AI' :
+    activeTier === 't2' ? 'T2 Whisper Local' :
+    activeTier === 't1' ? 'T1 Live Browser' :
+    activeTier === 'edited' ? 'Edited' :
+    session.transcript ? 'T2 Whisper Local' : '—';
 
   return (
     <div
@@ -144,9 +145,10 @@ function SessionRow({ session, patient }: { session: Session; patient: Patient |
               No transcription data for this session.
             </p>
           )}
-          {hasT1 && <TranscriptBlock tier={1} text={session.liveTranscript!} />}
-          {hasT2 && <TranscriptBlock tier={2} text={session.localTranscript!} />}
-          {hasT3 && <TranscriptBlock tier={3} text={session.aiTranscript!} />}
+          {hasT1 && <TranscriptBlock tier={1} text={session.t1Transcript!} />}
+          {hasT2 && <TranscriptBlock tier={2} text={session.t2Transcript!} />}
+          {hasT3 && <TranscriptBlock tier={3} text={session.t3Transcript!} />}
+          {session.editedTranscript && <TranscriptBlock tier={4} text={session.editedTranscript} />}
           {session.transcript && !hasT2 && !hasT3 && (
             <div className="flex items-start gap-2 rounded-md p-3" style={{ background: 'var(--color-pt-surface-mut)' }}>
               <FileText size={13} strokeWidth={1.75} style={{ color: 'var(--color-pt-text-3)', flexShrink: 0, marginTop: 2 }} />
@@ -182,25 +184,25 @@ function SessionRow({ session, patient }: { session: Session; patient: Patient |
                         {Math.round(clip.durationSec)}s · {clip.status}
                       </span>
                       <span className="ml-auto flex gap-1">
-                        {clip.liveTranscript && <TierBadge tier={1} active />}
-                        {clip.localTranscript && <TierBadge tier={2} active />}
-                        {clip.aiTranscript && <TierBadge tier={3} active />}
+                        {clip.t1Transcript && <TierBadge tier={1} active />}
+                        {clip.t2Transcript && <TierBadge tier={2} active />}
+                        {clip.t3Transcript && <TierBadge tier={3} active />}
                       </span>
                     </div>
                     <div className="flex flex-col gap-1">
-                      {clip.liveTranscript && (
+                      {clip.t1Transcript && (
                         <div style={{ color: '#6366f1' }}>
-                          <span style={{ fontWeight: 600 }}>T1:</span> {wordCount(clip.liveTranscript)}w
+                          <span style={{ fontWeight: 600 }}>T1:</span> {wordCount(clip.t1Transcript)}w
                         </div>
                       )}
-                      {clip.localTranscript && (
+                      {clip.t2Transcript && (
                         <div style={{ color: '#0ea5e9' }}>
-                          <span style={{ fontWeight: 600 }}>T2:</span> {wordCount(clip.localTranscript)}w
+                          <span style={{ fontWeight: 600 }}>T2:</span> {wordCount(clip.t2Transcript)}w
                         </div>
                       )}
-                      {clip.aiTranscript && (
+                      {clip.t3Transcript && (
                         <div style={{ color: '#10b981' }}>
-                          <span style={{ fontWeight: 600 }}>T3:</span> {wordCount(clip.aiTranscript)}w
+                          <span style={{ fontWeight: 600 }}>T3:</span> {wordCount(clip.t3Transcript)}w
                         </div>
                       )}
                     </div>
@@ -231,9 +233,9 @@ export function AdminPage() {
     [sessions],
   );
 
-  const withT1 = sessions.filter((s) => s.liveTranscript).length;
-  const withT2 = sessions.filter((s) => s.localTranscript).length;
-  const withT3 = sessions.filter((s) => s.aiTranscript).length;
+  const withT1 = sessions.filter((s) => s.t1Transcript).length;
+  const withT2 = sessions.filter((s) => s.t2Transcript).length;
+  const withT3 = sessions.filter((s) => s.t3Transcript).length;
 
   return (
     <div className="flex flex-col gap-5" style={{ padding: '20px 16px', maxWidth: 900, margin: '0 auto' }}>
@@ -245,9 +247,9 @@ export function AdminPage() {
           {(
             [
               { label: 'Total sessions', value: sessions.length, color: 'var(--color-pt-text)' },
-              { label: 'Web Speech (T1)', value: withT1, color: '#6366f1' },
-              { label: 'Local Whisper (T2)', value: withT2, color: '#0ea5e9' },
-              { label: 'Nova AI (T3)', value: withT3, color: '#10b981' },
+              { label: 'T1 Live Browser', value: withT1, color: '#6366f1' },
+              { label: 'T2 Whisper Local', value: withT2, color: '#0ea5e9' },
+              { label: 'T3 Nova AI', value: withT3, color: '#10b981' },
             ] as const
           ).map(({ label, value, color }) => (
             <div

@@ -6,7 +6,7 @@ import type {
   Patient,
   SessionType,
   ToneStyle,
-  TranscriptSource,
+  TranscriptTier,
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
 import { buildUserPrompt } from '@/lib/clinical/prompts';
@@ -29,7 +29,7 @@ export interface GenerateNoteArgs {
   priorNote?: Note;
   sessionType?: SessionType;
   toneStyle?: ToneStyle;
-  transcriptSource?: TranscriptSource;
+  activeTranscriptTier?: TranscriptTier;
   signal?: AbortSignal;
 }
 
@@ -49,10 +49,11 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       sessionType: args.sessionType,
     });
 
-    const system =
-      args.transcriptSource === 'whisper'
-        ? args.template.systemPrompt
-        : args.template.systemPrompt.trimEnd() + NO_DIARIZATION_NOTE;
+    const hasSpeakerContext =
+      args.activeTranscriptTier === 't2' || args.activeTranscriptTier === 't3';
+    const system = hasSpeakerContext
+      ? args.template.systemPrompt
+      : args.template.systemPrompt.trimEnd() + NO_DIARIZATION_NOTE;
 
     const result = await callAnthropic({
       model: args.model || 'claude-sonnet-4-6',

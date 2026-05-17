@@ -52,6 +52,12 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   are new optional fields. `SessionClip.aiTranscript` (Tier 3 per-clip Nova result) is
  *   also added. `TranscriptSource` gains `'nova'` as a valid value. All new fields default
  *   to absent — no structural transformation needed.
+ * - v17 → v18: Renames all transcript tier fields for clarity. Session and SessionClip:
+ *   `liveTranscript`→`t1Transcript`, `localTranscript`→`t2Transcript`,
+ *   `aiTranscript`→`t3Transcript`. Session: `transcriptSource`→`activeTranscriptTier`
+ *   (type `TranscriptTier`). Old `transcriptSource` values mapped: 'webspeech'→'t1',
+ *   'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'. New `Session.editedTranscript`
+ *   optional field added (no structural transform needed — defaults to absent).
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -115,6 +121,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 16) {
     working = migrateV16ToV17(working);
+  }
+  if ((working as { version?: number }).version === 17) {
+    working = migrateV17ToV18(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -422,6 +431,41 @@ function migrateV16ToV17(input: Record<string, unknown>): Record<string, unknown
   // (aiTranscript) all default to absent. TranscriptSource gains 'nova'. No structural
   // transformation needed — existing data passes the updated schema as-is.
   return { ...input, version: 17 };
+}
+
+function migrateV17ToV18(input: Record<string, unknown>): Record<string, unknown> {
+  // Rename transcript tier fields on sessions and clips.
+  // Session: liveTranscript→t1Transcript, localTranscript→t2Transcript, aiTranscript→t3Transcript
+  // SessionClip: same renames + liveTranscript→t1Transcript
+  // transcriptSource values: 'webspeech'→'t1', 'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'
+  const sourceMap: Record<string, string> = { webspeech: 't1', whisper: 't2', nova: 't3', manual: 'edited' };
+  const sessions = Array.isArray(input.sessions) ? (input.sessions as Record<string, unknown>[]) : [];
+  const migratedSessions = sessions.map((s) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(s)) {
+      if (k === 'liveTranscript') { out.t1Transcript = v; continue; }
+      if (k === 'localTranscript') { out.t2Transcript = v; continue; }
+      if (k === 'aiTranscript') { out.t3Transcript = v; continue; }
+      if (k === 'transcriptSource') {
+        out.activeTranscriptTier = typeof v === 'string' ? (sourceMap[v] ?? v) : v;
+        continue;
+      }
+      out[k] = v;
+    }
+    const clips = Array.isArray(s.clips) ? (s.clips as Record<string, unknown>[]) : [];
+    out.clips = clips.map((c) => {
+      const clip: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(c)) {
+        if (k === 'liveTranscript') { clip.t1Transcript = v; continue; }
+        if (k === 'localTranscript') { clip.t2Transcript = v; continue; }
+        if (k === 'aiTranscript') { clip.t3Transcript = v; continue; }
+        clip[k] = v;
+      }
+      return clip;
+    });
+    return out;
+  });
+  return { ...input, version: 18, sessions: migratedSessions };
 }
 
 function migrateV15ToV16(input: Record<string, unknown>): Record<string, unknown> {

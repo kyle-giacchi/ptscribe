@@ -257,7 +257,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
-  const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
+  const hasT2Transcript = sortedClips.some((c) => !!c.t2Transcript);
   // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
   const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
 
@@ -496,13 +496,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   transcribeUsed={transcribeUsed}
                   transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
                   hasUserEdits={hasUserEdits}
-                  hasLocalTranscript={hasLocalTranscript}
+                  hasT2Transcript={hasT2Transcript}
                   totalDurationSec={totalDurationSec}
                   onChange={setTranscript}
                   onCommit={() =>
                     patchSession({
                       transcript,
-                      transcriptSource: session.transcriptSource ?? 'manual',
+                      activeTranscriptTier: session.activeTranscriptTier ?? 'edited',
                     })
                   }
                   onCreateTranscript={handleCreateTranscript}
