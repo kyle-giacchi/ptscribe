@@ -287,6 +287,7 @@ export function useTranscriptionFlow(
           patchClip(clip.id, {
             status: 'transcribed',
             transcript: result.text,
+            ...(useNova ? { aiTranscript: result.text } : {}),
             transcriptChunks: useNova ? undefined : result.chunks,
             transcriptedAt: Date.now(),
             errorMessage: undefined,
@@ -387,7 +388,8 @@ export function useTranscriptionFlow(
 
       if (merged) {
         setTranscript(merged);
-        patchSession({ transcript: merged, transcriptSource: 'whisper', status: 'draft' });
+        // aiTranscript frozen here — localTranscript is preserved untouched
+        patchSession({ transcript: merged, transcriptSource: 'nova', aiTranscript: merged, status: 'draft' });
       } else {
         patchSession({ status: 'draft' });
       }
@@ -482,7 +484,8 @@ export function useTranscriptionFlow(
             const merged = mergeClipTranscripts(freshClips);
             if (merged) {
               setTranscript(merged);
-              patchSession({ transcript: merged, transcriptSource: 'whisper' });
+              // localTranscript frozen here — never overwritten by cloud pass
+              patchSession({ transcript: merged, transcriptSource: 'whisper', localTranscript: merged });
             }
           } else {
             patchClip(clip.id, { status: 'failed', errorMessage: result.error });
