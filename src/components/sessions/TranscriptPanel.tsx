@@ -60,7 +60,7 @@ export function TranscriptPanel({
   transcribeUsed,
   transcribeCap,
   hasUserEdits,
-  hasLocalTranscript,
+  hasT2Transcript,
   totalDurationSec,
   onChange,
   onCommit,
@@ -74,7 +74,7 @@ export function TranscriptPanel({
   transcribeUsed: number;
   transcribeCap: number;
   hasUserEdits: boolean;
-  hasLocalTranscript: boolean;
+  hasT2Transcript: boolean;
   totalDurationSec: number;
   onChange: (next: string) => void;
   onCommit: () => void;
@@ -139,7 +139,7 @@ export function TranscriptPanel({
     }
   }
 
-  const showActionRow = canTranscribe || hasLocalTranscript;
+  const showActionRow = canTranscribe || hasT2Transcript;
 
   return (
     <div className="space-y-3">
@@ -161,7 +161,7 @@ export function TranscriptPanel({
                 onClick={handleCreateClick}
               />
             )}
-            {hasLocalTranscript && (
+            {hasT2Transcript && (
               <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}
                 title="Restore the on-device draft transcript captured while you were recording.">
                 <RotateCcw size={14} strokeWidth={2} /> Revert to draft transcript

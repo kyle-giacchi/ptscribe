@@ -6,11 +6,11 @@ How audio becomes text in PTScribe: three tiers, one active transcript, independ
 
 Every session accumulates transcription data across up to three independently stored tiers. Higher tiers produce better text. The active transcript (`session.transcript`) always holds the highest tier that exists.
 
-| Tier | Source | When it fires | Quality | Network |
-|------|--------|---------------|---------|---------|
-| **T1 — Web Speech** | Browser Speech Recognition API | Streaming, **during** recording | ~65% — stumbles on medical terms and speaker changes | Browser's own cloud (Google/Apple) — not the PTScribe Worker |
-| **T2 — Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** each clip is saved (`status: 'ready'`) | ~87% — handles medical vocabulary, fully offline | None |
-| **T3 — Nova** | Deepgram Nova-3 via Cloudflare Worker | **Explicit user action** ("Transcribe with AI") only | Best — speaker diarization, accent-robust | PTScribe Worker → Deepgram |
+| Tier | Name | Source | When it fires | Quality | Network |
+|------|------|--------|---------------|---------|---------|
+| **T1** | **Live Browser Transcription** | Browser Speech Recognition API | Streaming, **during** recording | ~65% — stumbles on medical terms and speaker changes | Browser's own cloud (Google/Apple) — not the PTScribe Worker |
+| **T2** | **Whisper Local Transcription** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** each clip is saved (`status: 'ready'`) | ~87% — handles medical vocabulary, fully offline | None |
+| **T3** | **Nova AI Transcription** | Deepgram Nova-3 via Cloudflare Worker | **Explicit user action** ("Transcribe with AI") only | Best — speaker diarization, accent-robust | PTScribe Worker → Deepgram |
 
 **Priority rule applied at every write:**
 ```
@@ -94,11 +94,11 @@ clip → audioRepository.load(clip.id)
 
 ## Key invariants
 
-**T2 is never overwritten by T3.** `session.localTranscript` and `clip.localTranscript` are only ever written by the Whisper auto-pass. The Nova write path skips those fields entirely. This makes "revert to local" reliable even after multiple Nova runs.
+**T2 (Whisper Local) is never overwritten by T3 (Nova AI).** `session.localTranscript` and `clip.localTranscript` are only ever written by the Whisper auto-pass. The Nova write path skips those fields entirely. This makes "revert to Whisper Local" reliable even after multiple Nova runs.
 
-**T1 is never used as the active transcript source unless T2 and T3 are absent.** `session.liveTranscript` is always written, but `session.transcript` is only set to it via the priority rule when neither `localTranscript` nor `aiTranscript` exist.
+**T1 (Live Browser) is never used as the active transcript source unless T2 and T3 are absent.** `session.liveTranscript` is always written, but `session.transcript` is only set to it via the priority rule when neither `localTranscript` nor `aiTranscript` exist.
 
-**`transcriptSource: 'whisper'` = T2; `transcriptSource: 'nova'` = T3.** Nova correctly stamps `'nova'` (not `'whisper'`) so the source is always accurate.
+**`transcriptSource: 'whisper'` = T2 (Whisper Local); `transcriptSource: 'nova'` = T3 (Nova AI).** Nova correctly stamps `'nova'` (not `'whisper'`) so the source is always accurate.
 
 **The background auto-pass fires for every clip regardless of provider setting.** See [invariants.md — Local-first transcription](invariants.md#local-first-transcription). Do not gate it behind a provider check.
 
@@ -108,7 +108,7 @@ clip → audioRepository.load(clip.id)
 
 ## Revert to local
 
-`handleRevertToLocal` (in `useTranscriptionFlow`) reads `session.localTranscript` directly when available, falling back to re-merging from `clip.localTranscript` per clip. The operation resets `session.transcript` and `session.transcriptSource` to the T2 values without touching `session.aiTranscript` (which remains frozen and can be re-applied later).
+`handleRevertToLocal` (in `useTranscriptionFlow`) reads `session.localTranscript` directly when available, falling back to re-merging from `clip.localTranscript` per clip. The operation resets `session.transcript` and `session.transcriptSource` to the T2 (Whisper Local) values without touching `session.aiTranscript` (which remains frozen and can be re-applied later).
 
 ---
 

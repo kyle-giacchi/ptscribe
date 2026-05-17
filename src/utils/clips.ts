@@ -5,7 +5,7 @@ export function getTranscribableClips(clips: SessionClip[]): SessionClip[] {
     (c) =>
       c.status === 'ready' ||
       c.status === 'failed' ||
-      (c.status === 'transcribed' && !!c.localTranscript && c.transcript === c.localTranscript),
+      (c.status === 'transcribed' && !!c.t2Transcript && c.transcript === c.t2Transcript),
   );
 }
 

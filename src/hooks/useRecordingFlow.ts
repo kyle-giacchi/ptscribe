@@ -6,13 +6,14 @@ import { transcribeLocally, preloadLocalWhisper, LOCAL_WHISPER_DEFAULT_MODEL } f
 import { newId } from '@/utils/ids';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import type { UseRecorder } from '@/hooks/useRecorder';
-import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
+import type { UseWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import type { Session, SessionClip } from '@/types';
+
 
 export interface UseRecordingFlowParams {
   session: Session | undefined;
   recorder: UseRecorder;
-  live: UseLiveTranscript;
+  webSpeech: UseWebSpeechTranscript;
   sortedClips: SessionClip[];
   patchSession: (patch: Partial<Session>) => void;
   patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
@@ -39,7 +40,7 @@ export interface UseRecordingFlowResult {
   uploadStatus: UploadStatus;
   // Handlers
   handleStartRecording: () => Promise<void>;
-  handleStopRecording: () => Promise<void>;
+  handleFinishedRecording: () => Promise<void>;
   handlePauseResume: () => void;
   handleStopAndFinish: () => void;
   handleUploadAudio: (file: File) => Promise<string | null>;
@@ -56,7 +57,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   const {
     session,
     recorder,
-    live,
+    webSpeech,
     sortedClips,
     patchSession,
     patchClips,
@@ -98,6 +99,16 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
+
+  // Continuously persist Web Speech captions to t1Transcript as each segment finalizes.
+  // This ensures a browser crash only loses the current in-progress segment, not the full recording.
+  useEffect(() => {
+    const clipId = activeClipIdRef.current;
+    if (!clipId || !webSpeech.accumulatedText.trim()) return;
+    patchClip(clipId, { t1Transcript: webSpeech.accumulatedText.trim() });
+    // patchClip uses functional updates and activeClipIdRef is a stable ref — safe to omit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webSpeech.accumulatedText]);
 
   // ── Live Whisper chunk processing (leaky-bucket) ─────────────────────────
   // At most one Whisper job runs at a time; if a new chunk arrives while one
@@ -142,8 +153,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   const isSavingRef = useRef<Set<string>>(new Set());
 
   // Used by the auto-stop finalization effect below to always call the latest
-  // handleStopRecording without including it in the effect's dep array.
-  const handleStopRecordingRef = useRef<() => Promise<void>>(async () => {});
+  // handleFinishedRecording without including it in the effect's dep array.
+  const handleFinishedRecordingRef = useRef<() => Promise<void>>(async () => {});
   // Guards against calling finalization twice for the same auto-stop event.
   const autoStopFinalizedRef = useRef(false);
 
@@ -184,23 +195,23 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       return;
     }
 
-    if (live.supported) {
-      live.reset();
-      live.start(() => durationSecRef.current);
+    if (webSpeech.supported) {
+      webSpeech.reset();
+      webSpeech.start(() => durationSecRef.current);
     }
   }
 
   function handlePauseResume() {
     if (recorder.status === 'recording') {
       recorder.pause();
-      live.stop();
+      webSpeech.stop();
     } else if (recorder.status === 'paused') {
       recorder.resume();
-      if (live.supported) live.start(() => durationSecRef.current);
+      if (webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
 
-  async function handleStopRecording() {
+  async function handleFinishedRecording() {
     if (!session) return;
     const clipId = activeClipIdRef.current;
     activeClipIdRef.current = null;
@@ -210,7 +221,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
 
     const finalBlob = await recorder.stop();
     const durationSec = recorder.durationSec;
-    live.stop();
+    webSpeech.stop();
 
     if (clipId) {
       if (finalBlob) {
@@ -267,17 +278,17 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     }
 
-    if (clipId && live.finalText.trim()) {
-      patchClip(clipId, { liveTranscript: live.finalText.trim() });
+    if (clipId && webSpeech.accumulatedText.trim()) {
+      patchClip(clipId, { t1Transcript: webSpeech.accumulatedText.trim() });
     }
-    live.reset();
+    webSpeech.reset();
     patchSession({ status: 'draft' });
   }
 
   // C3: Stop & finish now only stops the recording and switches to Review.
   // Transcription and note generation are explicit user-triggered steps.
   function handleStopAndFinish() {
-    void handleStopRecording().then(() => setActiveTab('review'));
+    void handleFinishedRecording().then(() => setActiveTab('review'));
   }
 
   // ── Audio upload ─────────────────────────────────────────────────────────
@@ -386,25 +397,31 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     }
 
-    // Compile from best available per-clip transcript — uses local Whisper result where
-    // available, falls back to WebSpeech liveTranscript where not (e.g. Whisper failed).
+    // Always compile pure T1 text for preservation before any higher tier overwrites it.
+    const t1Texts = sortedClips
+      .map((c) => c.t1Transcript?.trim())
+      .filter((t): t is string => Boolean(t));
+
+    // Best-available per-clip for the active transcript display (T2 > T1).
     const compiledTexts = sortedClips
-      .map((c) => (c.transcript || c.localTranscript || c.liveTranscript)?.trim())
+      .map((c) => (c.transcript || c.t2Transcript || c.t1Transcript)?.trim())
       .filter((t): t is string => Boolean(t));
     if (compiledTexts.length > 0) {
       const merged = compiledTexts.join('\n\n');
       setTranscript(merged);
-      patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
+      const patch: Partial<Session> = { transcript: merged, activeTranscriptTier: 't1' };
+      if (t1Texts.length > 0) patch.t1Transcript = t1Texts.join('\n\n');
+      patchSession(patch);
     }
 
     setActiveTab('review');
   }
 
   // Keep ref current so the effect below always invokes the latest closure.
-  handleStopRecordingRef.current = handleStopRecording;
+  handleFinishedRecordingRef.current = handleFinishedRecording;
 
   // When the hard cap or idle auto-stop fires, the MediaRecorder stops itself
-  // internally — handleStopRecording is never called by user action, so the clip
+  // internally — handleFinishedRecording is never called by user action, so the clip
   // stays 'pending' and audio is never persisted to IDB in the same session.
   // This effect detects that condition and finalizes the clip immediately so the
   // user doesn't need to reload to trigger useAudioRecovery.
@@ -421,8 +438,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     if (autoStopFinalizedRef.current) return;
     if (recorder.status !== 'stopped') return;
     autoStopFinalizedRef.current = true;
-    void handleStopRecordingRef.current();
-    // handleStopRecordingRef is a stable ref — intentionally excluded from deps.
+    void handleFinishedRecordingRef.current();
+    // handleFinishedRecordingRef is a stable ref — intentionally excluded from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.hardCapStopped, recorder.idleAutoStopped, recorder.recorderInterrupted, recorder.micDisconnected, recorder.status]);
 
@@ -433,7 +450,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     whisperBubbles,
     uploadStatus,
     handleStartRecording,
-    handleStopRecording,
+    handleFinishedRecording,
     handlePauseResume,
     handleStopAndFinish,
     handleUploadAudio,

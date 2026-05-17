@@ -42,10 +42,10 @@ export interface TranscriptSegment {
   wallTime: number;
 }
 
-export interface UseLiveTranscript {
+export interface UseWebSpeechTranscript {
   supported: boolean;
   listening: boolean;
-  finalText: string;
+  accumulatedText: string;
   interimText: string;
   segments: TranscriptSegment[];
   error: string | null;
@@ -54,9 +54,9 @@ export interface UseLiveTranscript {
   reset: () => void;
 }
 
-export function useLiveTranscript(): UseLiveTranscript {
+export function useWebSpeechTranscript(): UseWebSpeechTranscript {
   const [listening, setListening] = useState(false);
-  const [finalText, setFinalText] = useState('');
+  const [accumulatedText, setAccumulatedText] = useState('');
   const [interimText, setInterimText] = useState('');
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +103,7 @@ export function useLiveTranscript(): UseLiveTranscript {
       if (appended) {
         const elapsedSec = getElapsedSecRef.current?.() ?? 0;
         const wallTime = Date.now();
-        setFinalText((prev) => (prev + ' ' + appended).trim());
+        setAccumulatedText((prev) => (prev + ' ' + appended).trim());
         setSegments((prev) => [...prev, { text: appended.trim(), elapsedSec, wallTime }]);
       }
       setInterimText(interim);
@@ -132,11 +132,11 @@ export function useLiveTranscript(): UseLiveTranscript {
   }, []);
 
   const reset = useCallback(() => {
-    setFinalText('');
+    setAccumulatedText('');
     setInterimText('');
     setSegments([]);
     setError(null);
   }, []);
 
-  return { supported, listening, finalText, interimText, segments, error, start, stop, reset };
+  return { supported, listening, accumulatedText, interimText, segments, error, start, stop, reset };
 }
