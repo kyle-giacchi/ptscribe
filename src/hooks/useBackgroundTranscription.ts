@@ -20,7 +20,7 @@ const LOCAL_CHUNK_SEC = 120; // 2-minute segments — each maps to a real audio 
  * Returns structured { startSec, text } chunks so the transcript view can
  * render timestamp headers at real audio positions.
  */
-async function transcribeLocalChunked(
+async function transcribeWithLocalWhisper(
   blob: Blob,
   onProgress?: (msg: string) => void,
   signal?: AbortSignal,
@@ -87,7 +87,7 @@ async function transcribeLocalChunked(
 }
 
 /** Best-available text per clip: Whisper result > local Whisper > live Web Speech. */
-function buildMergedTranscript(clips: SessionClip[]): string {
+function buildBestAvailableTranscript(clips: SessionClip[]): string {
   return [...clips]
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((c) => (c.transcript || c.t2Transcript || c.t1Transcript)?.trim())
@@ -140,7 +140,7 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
         .load(clip.id)
         .then((original) => {
           if (!original) throw new Error('No audio found for this clip.');
-          return transcribeLocalChunked(original, (msg) => toast.loading(msg, { id: tid }));
+          return transcribeWithLocalWhisper(original, (msg) => toast.loading(msg, { id: tid }));
         })
         .then((result) => {
           autoTranscribingRef.current.delete(clip.id);
@@ -163,7 +163,7 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
             );
             // Use fallback-aware merge so that failed clips' t1Transcripts
             // are not dropped when this clip's Whisper result comes in.
-            const merged = buildMergedTranscript(freshClips);
+            const merged = buildBestAvailableTranscript(freshClips);
             if (merged) {
               setTranscript(merged);
               // t2Transcript frozen here — never overwritten by cloud pass
@@ -173,7 +173,7 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
             patchClip(clip.id, { status: 'failed', errorMessage: result.error });
             toast.error(`Clip ${clip.index + 1}: ${result.error}`, { id: tid });
             // Fall back to t1Transcript so the session doesn't lose this clip's content.
-            const fallback = buildMergedTranscript(sessionRef.current?.clips ?? []);
+            const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
             if (fallback) {
               setTranscript(fallback);
             patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
@@ -185,7 +185,7 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
           patchClip(clip.id, { status: 'failed', errorMessage: e.message });
           toast.error(`Clip ${clip.index + 1}: ${e.message}`, { id: tid });
           // Fall back to t1Transcript so the session doesn't lose this clip's content.
-          const fallback = buildMergedTranscript(sessionRef.current?.clips ?? []);
+          const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
           if (fallback) {
             setTranscript(fallback);
             patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
