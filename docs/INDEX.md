@@ -103,10 +103,10 @@ State machines and step-by-step data flows for every major user journey. Read wh
 | Section | Gist |
 |---------|------|
 | State machines | Session status, SessionClip status, Patient status — valid transitions and owners |
-| Recording flow | `handleStartRecording` → WAL chunks → `handleStopRecording` → IDB save → T2 auto-pass |
+| Recording flow | `handleStartRecording` → WAL chunks → `handleFinishedRecording` → IDB save → T2 auto-pass |
 | Upload audio flow | File → IDB → `ready` → same auto-pass path as recorded clips |
 | Crash recovery | `useAudioRecovery`: pending clips on mount → WAL reassembly → `ready` or `failed` |
-| Auto-stop scenarios | Hard cap, idle auto-stop, mic disconnect, recorder interrupted — all funnel through `handleStopRecording` |
+| Auto-stop scenarios | Hard cap, idle auto-stop, mic disconnect, recorder interrupted — all funnel through `handleFinishedRecording` |
 | Note generation | Guard → `POST /api/generate` → `ensureNote` lazy creation → `status: 'ready'` |
 | Finalization | `handleFinalize` required-section guard → `finalizeNote` → `status: 'finalized'`; audit trail on re-edit |
 | Session deletion | Audio IDB cleanup + note removal; demo-mode exception resets instead of deletes |
@@ -123,9 +123,9 @@ Three-tier transcription system: Web Speech (T1), local Whisper auto-pass (T2), 
 | Three-tier model | Tier table: source, timing, quality, network requirement |
 | Data fields | Every `Session` and `SessionClip` field per tier with writer ownership |
 | Write paths | Exact code flow for T2 auto-pass and T3 Nova pass |
-| Key invariants | T2 never overwritten by T3; correct `transcriptSource` stamping; auto-pass always runs |
-| Revert to local | How `handleRevertToLocal` reads T2 without losing T3 |
-| Schema version | v17 migration; legacy session fallback |
+| Key invariants | T2 never overwritten by T3; correct `activeTranscriptTier` stamping; auto-pass always runs |
+| Revert to local | How revert reads `t2Transcript` without losing `t3Transcript` |
+| Schema version | v18 migration; legacy session fallback |
 | Admin page | `/admin` diagnostic: coverage stats + per-session tier viewer |
 
 ### [docs/clinical-model.md](clinical-model.md)
