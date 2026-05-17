@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 17;
+export const APP_DATA_VERSION = 18;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -58,7 +58,7 @@ export type SessionStatus =
   | 'generating'
   | 'ready'
   | 'finalized';
-export type TranscriptSource = 'whisper' | 'webspeech' | 'manual' | 'nova';
+export type TranscriptTier = 't1' | 't2' | 't3' | 'edited';
 
 /**
  * One discrete audio take inside a session. A session is a sequence of these.
@@ -82,10 +82,10 @@ export interface SessionClip {
   index: number;
   durationSec: number;
   status: ClipStatus;
-  transcript?: string;       // active transcript — always the highest tier available
-  liveTranscript?: string;   // Tier 1: Web Speech real-time capture during recording
-  localTranscript?: string;  // Tier 2: local Whisper auto-pass result (frozen, never overwritten by cloud)
-  aiTranscript?: string;     // Tier 3: Nova cloud result (written by explicit AI transcription action)
+  transcript?: string;       // active transcript — mirrors the active tier's text
+  t1Transcript?: string;     // Tier 1 (Live Browser): Web Speech real-time capture during recording
+  t2Transcript?: string;     // Tier 2 (Whisper Local): auto-pass result, frozen after first write
+  t3Transcript?: string;     // Tier 3 (Nova AI): cloud result, written by explicit transcription action
   transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
   transcriptedAt?: number;
   errorMessage?: string;
@@ -101,11 +101,12 @@ export interface Session {
   durationMin?: number;
   status: SessionStatus;
   clips: SessionClip[];
-  transcript?: string;        // active transcript — always the highest tier available
-  liveTranscript?: string;    // Tier 1: merged Web Speech live transcripts
-  localTranscript?: string;   // Tier 2: merged local Whisper result (frozen after auto-pass)
-  aiTranscript?: string;      // Tier 3: merged Nova cloud result (written on explicit AI transcription)
-  transcriptSource?: TranscriptSource;
+  transcript?: string;           // active transcript — mirrors the active tier's text
+  t1Transcript?: string;         // Tier 1 (Live Browser): merged per-clip Web Speech live transcripts
+  t2Transcript?: string;         // Tier 2 (Whisper Local): merged result, frozen after auto-pass
+  t3Transcript?: string;         // Tier 3 (Nova AI): merged cloud result, written on explicit transcription
+  editedTranscript?: string;     // Edited: user-modified transcript text
+  activeTranscriptTier?: TranscriptTier;
   noteId?: ID;
   templateId?: ID;
   createdAt: number;

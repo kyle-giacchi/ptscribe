@@ -9,6 +9,7 @@ import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseLiveTranscript } from '@/hooks/useLiveTranscript';
 import type { Session, SessionClip } from '@/types';
 
+
 export interface UseRecordingFlowParams {
   session: Session | undefined;
   recorder: UseRecorder;
@@ -268,7 +269,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     }
 
     if (clipId && live.finalText.trim()) {
-      patchClip(clipId, { liveTranscript: live.finalText.trim() });
+      patchClip(clipId, { t1Transcript: live.finalText.trim() });
     }
     live.reset();
     patchSession({ status: 'draft' });
@@ -386,15 +387,21 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     }
 
-    // Compile from best available per-clip transcript — uses local Whisper result where
-    // available, falls back to WebSpeech liveTranscript where not (e.g. Whisper failed).
+    // Always compile pure T1 text for preservation before any higher tier overwrites it.
+    const t1Texts = sortedClips
+      .map((c) => c.t1Transcript?.trim())
+      .filter((t): t is string => Boolean(t));
+
+    // Best-available per-clip for the active transcript display (T2 > T1).
     const compiledTexts = sortedClips
-      .map((c) => (c.transcript || c.localTranscript || c.liveTranscript)?.trim())
+      .map((c) => (c.transcript || c.t2Transcript || c.t1Transcript)?.trim())
       .filter((t): t is string => Boolean(t));
     if (compiledTexts.length > 0) {
       const merged = compiledTexts.join('\n\n');
       setTranscript(merged);
-      patchSession({ transcript: merged, liveTranscript: merged, transcriptSource: 'webspeech' });
+      const patch: Partial<Session> = { transcript: merged, activeTranscriptTier: 't1' };
+      if (t1Texts.length > 0) patch.t1Transcript = t1Texts.join('\n\n');
+      patchSession(patch);
     }
 
     setActiveTab('review');

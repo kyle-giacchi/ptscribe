@@ -181,7 +181,7 @@ export function useTranscriptionFlow(
           patchClip(clip.id, {
             status: 'transcribed',
             transcript: result.text,
-            aiTranscript: result.text,
+            t3Transcript: result.text,
             transcriptChunks: undefined,
             transcriptedAt: Date.now(),
             errorMessage: undefined,
@@ -224,7 +224,7 @@ export function useTranscriptionFlow(
       return;
     }
 
-    // Include locally-transcribed clips (localTranscript === transcript means nova hasn't run yet)
+    // Include locally-transcribed clips (t2Transcript === transcript means nova hasn't run yet)
     const pending = getTranscribableClips(session.clips).filter(
       (c) => clipId == null || c.id === clipId,
     );
@@ -240,7 +240,7 @@ export function useTranscriptionFlow(
     if (pending.length === 0) {
       const merged = mergeClipTranscripts(session.clips);
       setTranscript(merged);
-      patchSession({ transcript: merged, transcriptSource: 'whisper' });
+      patchSession({ transcript: merged, activeTranscriptTier: 't2' });
       toast.success('Transcript merged from existing clips.');
       return;
     }
@@ -282,8 +282,8 @@ export function useTranscriptionFlow(
 
       if (merged) {
         setTranscript(merged);
-        // aiTranscript frozen here — localTranscript is preserved untouched
-        patchSession({ transcript: merged, transcriptSource: 'nova', aiTranscript: merged, status: 'draft' });
+        // t3Transcript frozen here — t2Transcript is preserved untouched
+        patchSession({ transcript: merged, activeTranscriptTier: 't3', t3Transcript: merged, status: 'draft' });
       } else {
         patchSession({ status: 'draft' });
       }
@@ -317,15 +317,15 @@ export function useTranscriptionFlow(
   function handleRevertToLocal() {
     const clips = session?.clips ?? [];
     const reverted = clips.map((c) =>
-      c.localTranscript
-        ? { ...c, transcript: c.localTranscript, status: 'transcribed' as ClipStatus }
+      c.t2Transcript
+        ? { ...c, transcript: c.t2Transcript, status: 'transcribed' as ClipStatus }
         : c,
     );
     patchClips(() => reverted);
     const merged = mergeClipTranscripts(reverted);
     if (merged.trim()) {
       setTranscript(merged);
-      patchSession({ transcript: merged, transcriptSource: 'whisper' });
+      patchSession({ transcript: merged, activeTranscriptTier: 't2' });
     }
     toast.success('Reverted to local transcription.');
   }
