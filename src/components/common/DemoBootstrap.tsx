@@ -58,7 +58,8 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     }
 
     // Keep the demo user locked to the session — any navigation attempt bounces back.
-    if (pathname !== DEMO_SESSION_PATH) {
+    // Exception: allow /debug so the profile dropdown's Debug link works.
+    if (pathname !== DEMO_SESSION_PATH && pathname !== '/debug') {
       navigate(DEMO_SESSION_PATH, { replace: true });
     }
   }, [
