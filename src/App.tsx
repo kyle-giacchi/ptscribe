@@ -75,7 +75,7 @@ function AppProviders() {
                                     <Route path="/templates" element={<Templates />} />
                                     <Route path="/exercises" element={<Exercises />} />
                                     <Route path="/settings" element={<Settings />} />
-                                    <Route path="/admin" element={<AdminPage />} />
+                                    <Route path="/debug" element={<AdminPage />} />
                                   </Route>
                                   <Route
                                     path="*"
