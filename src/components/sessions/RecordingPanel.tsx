@@ -20,13 +20,13 @@ import { useSettings } from '@/contexts/SettingsProvider';
 import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
-import type { UseLiveTranscript, TranscriptSegment } from '@/hooks/useLiveTranscript';
+import type { UseWebSpeechTranscript, TranscriptSegment } from '@/hooks/useLiveTranscript';
 import type { UploadStatus } from '@/hooks/useRecordingFlow';
 import type { SessionClip } from '@/types';
 
 export interface RecordingPanelProps {
   recorder: UseRecorder;
-  live: UseLiveTranscript;
+  webSpeech: UseWebSpeechTranscript;
   clips: SessionClip[];
   whisperBubbles: string[];
   uploadStatus: UploadStatus;
@@ -408,7 +408,7 @@ function ActiveRecordingCard({
   durationSec,
   paused,
   chainActive,
-  live,
+  webSpeech,
   whisperBubbles,
   onPauseResume,
   onStopAndFinish,
@@ -416,7 +416,7 @@ function ActiveRecordingCard({
   durationSec: number;
   paused: boolean;
   chainActive: boolean;
-  live: UseLiveTranscript;
+  webSpeech: UseWebSpeechTranscript;
   whisperBubbles: string[];
   onPauseResume: () => void;
   onStopAndFinish: () => void;
@@ -432,7 +432,7 @@ function ActiveRecordingCard({
 
   // ── Two-column layout: transcript left, controls right ──────────────────────
   // Activate whenever live captions are on OR Whisper has produced any text.
-  if (live.listening || whisperBubbles.length > 0) {
+  if (webSpeech.listening || whisperBubbles.length > 0) {
     return (
       <div className="flex gap-0" style={{ minHeight: 480 }}>
         {/* Left: Transcript panel */}
@@ -448,8 +448,8 @@ function ActiveRecordingCard({
               <button
                 type="button"
                 onClick={() => {
-                  live.stop();
-                  window.setTimeout(() => live.start(() => durationSecRef.current), 150);
+                  webSpeech.stop();
+                  window.setTimeout(() => webSpeech.start(() => durationSecRef.current), 150);
                 }}
                 title="Restart live captions"
                 className="flex items-center justify-center rounded transition-opacity hover:opacity-70"
@@ -487,8 +487,8 @@ function ActiveRecordingCard({
 
           {transcriptVisible ? (
             <LiveTranscriptView
-              segments={live.segments}
-              interimText={live.interimText}
+              segments={webSpeech.segments}
+              interimText={webSpeech.interimText}
               whisperBubbles={whisperBubbles}
               expandToFill
             />
@@ -680,20 +680,20 @@ function ActiveRecordingCard({
           <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
             Live transcript
           </p>
-          <p className="text-xs" style={{ color: live.error ? 'var(--color-caution)' : !live.supported ? 'var(--color-pt-text-3)' : 'var(--color-pt-text-3)' }}>
-            {!live.supported
+          <p className="text-xs" style={{ color: webSpeech.error ? 'var(--color-caution)' : !webSpeech.supported ? 'var(--color-pt-text-3)' : 'var(--color-pt-text-3)' }}>
+            {!webSpeech.supported
               ? 'Not available in this browser (Chrome/Edge required)'
-              : live.error
-                ? `Captions paused: ${live.error}`
+              : webSpeech.error
+                ? `Captions paused: ${webSpeech.error}`
                 : 'Toggle to follow along in real-time'}
           </p>
         </div>
-        {live.supported && (
+        {webSpeech.supported && (
           <button
             type="button"
             role="switch"
-            aria-checked={live.listening}
-            onClick={() => (live.listening ? live.stop() : live.start())}
+            aria-checked={webSpeech.listening}
+            onClick={() => (webSpeech.listening ? webSpeech.stop() : webSpeech.start())}
             className="flex items-center gap-2"
             style={{ touchAction: 'manipulation', flexShrink: 0, minHeight: 44 }}
           >
@@ -722,7 +722,7 @@ function ActiveRecordingCard({
 // ── Main panel ─────────────────────────────────────────────────────────────────
 export function RecordingPanel({
   recorder,
-  live,
+  webSpeech,
   clips,
   whisperBubbles,
   uploadStatus,
@@ -815,7 +815,7 @@ export function RecordingPanel({
           durationSec={recorder.durationSec}
           paused={recorder.status === 'paused'}
           chainActive={false}
-          live={live}
+          webSpeech={webSpeech}
           whisperBubbles={whisperBubbles}
           onPauseResume={onPauseResume}
           onStopAndFinish={onStopAndFinish}
@@ -837,12 +837,12 @@ export function RecordingPanel({
       <RecordingNotices
         recorderError={recorder.error}
         webspeechProvider={webspeechProvider}
-        liveSupported={live.supported}
-        liveError={live.error}
+        liveSupported={webSpeech.supported}
+        liveError={webSpeech.error}
         hasFailedClip={clips.some((c) => c.status === 'failed')}
       />
 
-      {!recording && <LiveTranscriptPreview live={live} />}
+      {!recording && <LiveTranscriptPreview webSpeech={webSpeech} />}
     </div>
   );
 }
@@ -952,8 +952,8 @@ function liveErrorHint(err: string): string {
 }
 
 // ── Live transcript overlay ────────────────────────────────────────────────────
-function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
-  if (!(live.listening || live.interimText || live.finalText)) return null;
+function LiveTranscriptPreview({ webSpeech }: { webSpeech: UseWebSpeechTranscript }) {
+  if (!(webSpeech.listening || webSpeech.interimText || webSpeech.accumulatedText)) return null;
   return (
     <div
       className="rounded-lg px-3.5 py-2.5 text-xs"
@@ -966,11 +966,11 @@ function LiveTranscriptPreview({ live }: { live: UseLiveTranscript }) {
       <span className="font-semibold" style={{ color: 'var(--color-pt-accent-fg)' }}>
         Live:{' '}
       </span>
-      <span style={{ color: 'var(--color-pt-text)' }}>{live.finalText}</span>
-      {live.interimText && (
+      <span style={{ color: 'var(--color-pt-text)' }}>{webSpeech.accumulatedText}</span>
+      {webSpeech.interimText && (
         <span className="italic" style={{ color: 'var(--color-pt-text-3)' }}>
           {' '}
-          {live.interimText}
+          {webSpeech.interimText}
         </span>
       )}
     </div>

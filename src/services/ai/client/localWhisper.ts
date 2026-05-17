@@ -161,15 +161,18 @@ export async function transcribeFloat32Parallel(
   if (n <= 1) {
     // Sequential fallback — reuse the singleton worker via transcribeFloat32.
     const results: string[] = [];
+    const errors: string[] = [];
     for (let i = 0; i < chunks.length; i++) {
       try {
         const result = await transcribeFloat32(chunks[i], model);
         results.push(result.text);
-      } catch {
+      } catch (err) {
+        errors.push((err as Error).message ?? 'Unknown error');
         results.push('');
       }
       onProgress?.(i + 1, chunks.length);
     }
+    if (errors.length === chunks.length) throw new Error(errors[0]);
     return results;
   }
 
@@ -205,11 +208,14 @@ export async function transcribeFloat32Parallel(
 
   // Reconstruct results in original index order; failed chunks → ''.
   const results: string[] = new Array(chunks.length).fill('');
+  const errors: string[] = [];
   for (const outcome of settled) {
     if (outcome.status === 'fulfilled') {
       results[outcome.value.index] = outcome.value.text;
+    } else {
+      errors.push((outcome.reason as Error)?.message ?? 'Unknown error');
     }
-    // rejected → slot stays ''
   }
+  if (errors.length === chunks.length) throw new Error(errors[0]);
   return results;
 }

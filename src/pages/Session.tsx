@@ -10,7 +10,7 @@ import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
-import { useLiveTranscript } from '@/hooks/useLiveTranscript';
+import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import type { Session, SessionClip, NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
@@ -50,7 +50,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const template = getTemplate(session?.templateId ?? '') ?? templates[0];
 
   const recorder = useRecorder({ limits: settings.recordingLimits });
-  const live = useLiveTranscript();
+  const webSpeech = useWebSpeechTranscript();
 
   // ── URL params — read before first render so initial tab/mode are correct ──
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,7 +125,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const recording = useRecordingFlow({
     session,
     recorder,
-    live,
+    webSpeech,
     sortedClips,
     patchSession,
     patchClips,
@@ -142,7 +142,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     whisperBubbles,
     uploadStatus,
     handleStartRecording,
-    handleStopRecording,
+    handleFinishedRecording,
     handlePauseResume,
     handleStopAndFinish,
     handleUploadAudio,
@@ -153,7 +153,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   useAutoRotateClip(
     recorder.status,
     recorder.durationSec,
-    handleStopRecording,
+    handleFinishedRecording,
     handleStartRecording,
   );
 
@@ -257,7 +257,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
-  const hasLocalTranscript = sortedClips.some((c) => !!c.localTranscript);
+  const hasT2Transcript = sortedClips.some((c) => !!c.t2Transcript);
   // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
   const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
 
@@ -411,7 +411,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             ) : (
               <RecordingPanel
                 recorder={recorder}
-                live={live}
+                webSpeech={webSpeech}
                 clips={sortedClips}
                 whisperBubbles={whisperBubbles}
                 uploadStatus={uploadStatus}
@@ -496,13 +496,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   transcribeUsed={transcribeUsed}
                   transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
                   hasUserEdits={hasUserEdits}
-                  hasLocalTranscript={hasLocalTranscript}
+                  hasT2Transcript={hasT2Transcript}
                   totalDurationSec={totalDurationSec}
                   onChange={setTranscript}
                   onCommit={() =>
                     patchSession({
                       transcript,
-                      transcriptSource: session.transcriptSource ?? 'manual',
+                      activeTranscriptTier: session.activeTranscriptTier ?? 'edited',
                     })
                   }
                   onCreateTranscript={handleCreateTranscript}

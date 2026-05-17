@@ -27,7 +27,7 @@ const baseArgs: GenerateNoteArgs = {
   template: mockTemplate,
   transcript: 'Patient presents with knee pain.',
   patient: mockPatient,
-  transcriptSource: 'whisper',
+  activeTranscriptTier: 't2',
 };
 
 describe('extractJson', () => {
@@ -119,20 +119,20 @@ describe('generateNote', () => {
     );
   });
 
-  it('appends speaker-context section when transcriptSource is not whisper', async () => {
+  it('appends speaker-context section when activeTranscriptTier is t1', async () => {
     mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
 
-    await generateNote({ ...baseArgs, transcriptSource: 'webspeech' });
+    await generateNote({ ...baseArgs, activeTranscriptTier: 't1' });
 
     const call = mockCallAnthropic.mock.calls[0][0];
     expect(call.system).toContain(mockTemplate.systemPrompt);
     expect(call.system).toContain('without speaker diarization');
   });
 
-  it('does not append speaker-context section when transcriptSource is whisper', async () => {
+  it('does not append speaker-context section when activeTranscriptTier is t2 or t3', async () => {
     mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
 
-    await generateNote({ ...baseArgs, transcriptSource: 'whisper' });
+    await generateNote({ ...baseArgs, activeTranscriptTier: 't2' });
 
     expect(mockCallAnthropic).toHaveBeenCalledWith(
       expect.objectContaining({ system: mockTemplate.systemPrompt }),

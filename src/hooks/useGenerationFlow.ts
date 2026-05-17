@@ -137,7 +137,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
           patient: patient!,
           sessionType: session!.type,
           toneStyle: settings.orgPolicy.toneStyle,
-          transcriptSource: session!.transcriptSource,
+          activeTranscriptTier: session!.activeTranscriptTier,
           signal: controller.signal,
         });
         if (note) {
