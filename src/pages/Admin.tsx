@@ -11,8 +11,6 @@ import {
   Copy,
   Check,
   RefreshCw,
-  Search,
-  X,
   Clock,
   HardDrive,
   Monitor,
@@ -953,6 +951,68 @@ function TranscriptAccordion({ session }: { session: Session }) {
   );
 }
 
+// ─── Audio clips accordion ────────────────────────────────────────────────────
+
+function AudioClipsAccordion({ session }: { session: Session }) {
+  const [open, setOpen] = useState(false);
+  const { settings } = useSettings();
+  const sd = settings.audio.silenceDetection;
+  const su = settings.audio.speedUp;
+
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: '1px solid var(--color-pt-border)',
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+        style={{
+          padding: '8px 12px',
+          cursor: 'pointer',
+          background: open ? 'var(--color-pt-surface-mut)' : 'var(--color-pt-surface-alt)',
+        }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span style={{ color: 'var(--color-pt-text-3)', flexShrink: 0 }}>
+          {open ? (
+            <ChevronDown size={13} strokeWidth={2} />
+          ) : (
+            <ChevronRight size={13} strokeWidth={2} />
+          )}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)', flex: 1, textAlign: 'left' }}>
+          Audio Clips
+        </span>
+        <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}>
+          {session.clips.length} clip{session.clips.length !== 1 ? 's' : ''}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{ padding: '12px' }}>
+          <div className="mb-3 flex flex-wrap gap-2">
+            <SettingChip
+              label="Silence removal"
+              value={sd.enabled ? `ON · ${sd.sensitivity} · ${sd.padMs}ms pad` : 'OFF'}
+              ok={sd.enabled}
+            />
+            <SettingChip
+              label="Speed-up"
+              value={su.enabled ? `ON · ${su.speed}×` : 'OFF'}
+              ok={su.enabled}
+            />
+          </div>
+          <SessionAudioSection session={session} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Session debug row ────────────────────────────────────────────────────────
 
 function SessionDebugRow({
@@ -963,7 +1023,6 @@ function SessionDebugRow({
   patient: Patient | undefined;
 }) {
   const [open, setOpen] = useState(false);
-  const { settings } = useSettings();
   const { copied, copy } = useCopy();
 
   const hasT1 = Boolean(session.t1Transcript);
@@ -980,8 +1039,6 @@ function SessionDebugRow({
     year: 'numeric',
   });
 
-  const sd = settings.audio.silenceDetection;
-  const su = settings.audio.speedUp;
   const shortId = session.id.slice(0, 8);
 
   return (
@@ -1058,36 +1115,7 @@ function SessionDebugRow({
             </button>
           </div>
 
-          {/* Clip Management */}
-          <div>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--color-pt-text-3)',
-                marginBottom: 10,
-              }}
-            >
-              Clip Management
-            </div>
-            <div className="mb-3 flex flex-wrap gap-2">
-              <SettingChip
-                label="Silence removal"
-                value={sd.enabled ? `ON · ${sd.sensitivity} · ${sd.padMs}ms pad` : 'OFF'}
-                ok={sd.enabled}
-              />
-              <SettingChip
-                label="Speed-up"
-                value={su.enabled ? `ON · ${su.speed}×` : 'OFF'}
-                ok={su.enabled}
-              />
-            </div>
-            <SessionAudioSection session={session} />
-          </div>
-
-          {/* Transcriptions accordion */}
+          <AudioClipsAccordion session={session} />
           <TranscriptAccordion session={session} />
         </div>
       )}
@@ -1100,7 +1128,6 @@ function SessionDebugRow({
 export function AdminPage() {
   const { sessions } = useSessions();
   const { patients } = usePatients();
-  const [search, setSearch] = useState('');
   const { copied, copy } = useCopy();
 
   const patientMap = useMemo(
@@ -1112,16 +1139,6 @@ export function AdminPage() {
     () => [...sessions].sort((a, b) => b.date - a.date),
     [sessions],
   );
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter((s) => {
-      const p = patientMap.get(s.patientId);
-      const name = p ? `${p.firstName} ${p.lastName}`.toLowerCase() : '';
-      return name.includes(q) || s.type.includes(q) || s.status.includes(q);
-    });
-  }, [sorted, search, patientMap]);
 
   function buildReport(): string {
     const browser = detectBrowser();
@@ -1206,77 +1223,27 @@ export function AdminPage() {
             borderBottom: '1px solid var(--color-pt-border)',
           }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Eyebrow>Session Inspector</Eyebrow>
-              <p
-                style={{
-                  fontSize: 11.5,
-                  color: 'var(--color-pt-text-3)',
-                  marginTop: 4,
-                  marginBottom: 0,
-                }}
-              >
-                {sorted.length} session{sorted.length !== 1 ? 's' : ''} — expand to inspect
-                clips, audio pipeline, and transcripts
-              </p>
-            </div>
-            {/* Search */}
-            <div
-              className="flex items-center gap-1.5"
-              style={{
-                padding: '5px 10px',
-                borderRadius: 8,
-                border: '1px solid var(--color-pt-border)',
-                background: 'var(--color-pt-surface-alt)',
-                minWidth: 180,
-              }}
-            >
-              <Search
-                size={12}
-                strokeWidth={2}
-                style={{ color: 'var(--color-pt-text-3)', flexShrink: 0 }}
-              />
-              <input
-                type="text"
-                placeholder="Filter by patient, type, status…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  fontSize: 12,
-                  border: 'none',
-                  outline: 'none',
-                  background: 'transparent',
-                  color: 'var(--color-pt-text)',
-                  width: '100%',
-                }}
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch('')}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    color: 'var(--color-pt-text-3)',
-                  }}
-                >
-                  <X size={11} strokeWidth={2} />
-                </button>
-              )}
-            </div>
-          </div>
+          <Eyebrow>Session Inspector</Eyebrow>
+          <p
+            style={{
+              fontSize: 11.5,
+              color: 'var(--color-pt-text-3)',
+              marginTop: 4,
+              marginBottom: 0,
+            }}
+          >
+            {sorted.length} session{sorted.length !== 1 ? 's' : ''} — expand to inspect
+            clips, audio pipeline, and transcripts
+          </p>
         </div>
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <p
             style={{ padding: '12px 14px', fontSize: 13, color: 'var(--color-pt-text-3)' }}
           >
-            {search ? `No sessions match "${search}".` : 'No sessions yet.'}
+            No sessions yet.
           </p>
         ) : (
-          filtered.map((session) => (
+          sorted.map((session) => (
             <SessionDebugRow
               key={session.id}
               session={session}
