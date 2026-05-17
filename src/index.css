@@ -262,6 +262,18 @@ body {
   border-radius: 4px;
 }
 
+/* Calm pulse ring for idle CTA buttons (big mic) */
+@keyframes pts-pulse-calm {
+  0% {
+    transform: scale(1);
+    opacity: 0.28;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
 /* Pulse ring for live status dots */
 @keyframes pts-pulse {
   0% {
