@@ -48,7 +48,7 @@ Purely a label used for filtering in the patient picker. No business logic gates
 
 ## Recording flow
 
-**Owner:** `useRecordingFlow` + `useRecorder` + `useLiveTranscript`
+**Owner:** `useRecordingFlow` + `useRecorder` + `useWebSpeechTranscript`
 
 ### Normal record → stop
 
@@ -58,25 +58,26 @@ handleStartRecording()
   → patchClips: append { id: clipId, status: 'pending', ... }
   → patchSession: status = 'recording'
   → recorder.start(clipId)
-      → MediaRecorder.start(100ms timeslice)
+      → MediaRecorder.start(5s timeslice)
       → per-timeslice: audioRepository.appendChunk(clipId, index, blob)  ← WAL
       → per-timeslice: onChunk(blob) → Whisper live preview (leaky bucket)
-  → useLiveTranscript.start()  ← Web Speech streaming begins → clip.liveTranscript accumulates
+  → useWebSpeechTranscript.start()  ← Web Speech streaming begins
+      → per finalized segment: patchClip(clipId, { t1Transcript: accumulatedText })  ← T1 written continuously
 
-handleStopRecording()
+handleFinishedRecording()
   → recorder.stop() → finalBlob (consolidated from MediaRecorder)
-  → useLiveTranscript.stop() → live.finalText frozen
+  → useWebSpeechTranscript.stop() → webSpeech.accumulatedText frozen
   → audioRepository.save(clipId, finalBlob)           ← consolidated Blob to IDB
   → audioRepository.clearChunks(clipId)               ← WAL purged (best-effort)
   → patchClip(clipId, { status: 'ready', durationSec })
-  → patchClip(clipId, { liveTranscript: live.finalText })  ← T1 frozen
+  → patchClip(clipId, { t1Transcript: webSpeech.accumulatedText })  ← T1 final flush
   → patchSession: status = 'draft'
   → [background auto-pass fires] → T2 Whisper transcription begins (see transcription.md)
 ```
 
 ### Stop & finish
 
-`handleStopAndFinish()` calls `handleStopRecording()` then immediately switches to the Review tab. No additional state changes — transcription and generation remain explicit.
+`handleStopAndFinish()` calls `handleFinishedRecording()` then immediately switches to the Review tab. No additional state changes — transcription and generation remain explicit.
 
 ### Pause / resume
 
@@ -91,8 +92,8 @@ handleRecordingComplete()
   → load all ready/transcribed clip blobs from IDB
   → mergeAudioBlobs(blobs) → setMergedAudioBlob   ← used for playback only, not persisted
   → compile best-available transcript per clip:
-      transcript ?? localTranscript ?? liveTranscript
-  → patchSession: transcript = compiled, liveTranscript = compiled, transcriptSource = 'webspeech'
+      transcript ?? t2Transcript ?? t1Transcript
+  → patchSession: transcript = compiled, activeTranscriptTier = 't1'
   → setActiveTab('review')
 ```
 
@@ -158,7 +159,7 @@ Four conditions cause the MediaRecorder to stop without explicit user action:
 | Recorder interrupted | `recorder.recorderInterrupted` | MediaRecorder error or OS-level interruption |
 | Mic disconnected | `recorder.micDisconnected` | `MediaStreamTrack` ended event |
 
-When any of these flags is true and `recorder.status === 'stopped'`, an effect in `useRecordingFlow` fires `handleStopRecording()` automatically — the same path as a manual stop. The clip lands in `ready` and the Whisper auto-pass picks it up.
+When any of these flags is true and `recorder.status === 'stopped'`, an effect in `useRecordingFlow` fires `handleFinishedRecording()` automatically — the same path as a manual stop. The clip lands in `ready` and the Whisper auto-pass picks it up.
 
 A background visibility warning (`wasBackgrounded`) is a separate sticky flag set by `useRecorder` the first time the tab is hidden during a clip. It surfaces a "verify duration" banner in `Session.tsx` but does not stop recording.
 
@@ -166,9 +167,9 @@ A background visibility warning (`wasBackgrounded`) is a separate sticky flag se
 
 ## T2 background transcription
 
-**Owner:** `useTranscriptionFlow` (background `useEffect` on `session.clips`)
+**Owner:** `useBackgroundTranscription` (background `useEffect` on `session.clips`)
 
-Fires automatically for every clip that reaches `status: 'ready'` with no `localTranscript`, regardless of the configured provider. See [transcription.md — T2 background auto-pass](transcription.md#t2-background-auto-pass-usetranscriptionflow445) for the full write path.
+Fires automatically for every clip that reaches `status: 'ready'` with no `t2Transcript`, regardless of the configured provider. See [transcription.md — T2 Local Whisper auto-pass](transcription.md#t2--local-whisper-auto-pass-usebackgroundtranscription) for the full write path.
 
 ---
 
@@ -186,13 +187,13 @@ handleCreateTranscript(clipId?)
   → runTranscribeLoop(pending, transcribed, useNova=true)
       → per clip: optional trimSilence() + speedUpAudio()
       → POST /api/transcribe (Cloudflare Worker → Deepgram Nova-3)
-      → patchClip: status='transcribed', transcript=nova, aiTranscript=nova
-  → mergeClipTranscripts(updatedClips)
-  → patchSession: transcript=merged, transcriptSource='nova', aiTranscript=merged, status='draft'
+      → patchClip: status='transcribed', transcript=nova, t3Transcript=nova
+  → buildBestAvailableTranscript(updatedClips)
+  → patchSession: transcript=merged, activeTranscriptTier='t3', t3Transcript=merged, status='draft'
   → setBusy(null)
 ```
 
-`session.localTranscript` (T2) is **not touched** by this path.
+`session.t2Transcript` (T2) is **not touched** by this path.
 
 ---
 
@@ -307,4 +308,4 @@ A leaky-bucket pattern runs Whisper on audio chunks as they arrive from the Medi
 
 Results appear as `whisperBubbles: string[]` in the recording panel. Bubbles separated by more than 2 500 ms are appended as new items; results within the gap replace the last bubble (continuous refinement of the current utterance).
 
-This is display-only — the bubbles are never persisted. The authoritative T2 transcript comes from the post-clip `transcribeLocalChunked` pass, not from these live preview chunks.
+This is display-only — the bubbles are never persisted. The authoritative T2 transcript comes from the post-clip `transcribeWithLocalWhisper` pass in `useBackgroundTranscription`, not from these live preview chunks.
