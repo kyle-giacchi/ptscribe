@@ -196,14 +196,20 @@ async function handleModelFile(url: URL, env: Env): Promise<Response> {
   }
 
   const object = await env.MODELS.get(key);
-  if (!object) return new Response('Not found', { status: 404 });
+  if (object) {
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    return new Response(object.body, { headers });
+  }
 
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  // Model weights are content-addressed and never change — cache aggressively.
+  // R2 miss — proxy from HuggingFace so the app works before model files are uploaded.
+  const hfRes = await fetch(`https://huggingface.co/${key}`);
+  if (!hfRes.ok) return new Response('Not found', { status: 404 });
+
+  const headers = new Headers(hfRes.headers);
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-
-  return new Response(object.body, { headers });
+  return new Response(hfRes.body, { status: 200, headers });
 }
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
