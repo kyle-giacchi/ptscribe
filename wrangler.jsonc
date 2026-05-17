@@ -24,6 +24,12 @@
       "id": "f877f83936664e6ea409c492aa37c20d",
     },
   ],
+  "r2_buckets": [
+    {
+      "binding": "MODELS",
+      "bucket_name": "ptnotes-models",
+    },
+  ],
   "observability": {
     "enabled": true,
   },

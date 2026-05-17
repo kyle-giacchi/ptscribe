@@ -26,6 +26,7 @@ export interface Env {
   AUTH_BASE_URL?: string;
   DB: D1Database;
   RATE_LIMIT?: KVNamespace;
+  MODELS?: R2Bucket;
   /** Comma-separated list of allowed request Origins. Defaults to same-origin
    *  plus localhost dev ports when unset. */
   ALLOWED_ORIGINS?: string;
@@ -94,6 +95,8 @@ export default {
       }
     } else if (url.pathname.startsWith('/api/org/')) {
       res = await handleOrgRoute(request, env, ctx, url.pathname);
+    } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
+      res = await handleModelFile(url, env);
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
     } else {
@@ -135,7 +138,7 @@ function withSecurityHeaders(res: Response, url: URL): Response {
     "img-src 'self' data: blob:",
     "media-src 'self' blob:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self' https://huggingface.co https://*.huggingface.co https://cdn-lfs.huggingface.co",
+    "connect-src 'self'",
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -158,14 +161,16 @@ function withSecurityHeaders(res: Response, url: URL): Response {
 
   // Cross-origin isolation — keep it modest. COOP same-origin prevents window
   // handle leaks from popups; CORP same-origin prevents cross-origin embeds of
-  // our assets. Don't enable COEP — it would break the HuggingFace fetch.
+  // our assets. COEP is not enabled yet but is now unblocked (model files are
+  // same-origin via /api/model/*) — enabling it would give SharedArrayBuffer.
   headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   headers.set('Cross-Origin-Resource-Policy', 'same-origin');
 
   // Suppress no-cache header from being clobbered if upstream set caching.
-  // /api/* already sets `no-store` in `json()`. For static assets, leave the
-  // ASSETS-binding-supplied caching alone.
-  if (url.pathname.startsWith('/api/')) {
+  // /api/* already sets `no-store` in `json()`. Model files at /api/model/*
+  // set their own immutable cache header — don't override them. For static
+  // assets, leave the ASSETS-binding-supplied caching alone.
+  if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/model/')) {
     headers.set('Cache-Control', 'no-store');
   }
 
@@ -174,6 +179,31 @@ function withSecurityHeaders(res: Response, url: URL): Response {
     statusText: res.statusText,
     headers,
   });
+}
+
+async function handleModelFile(url: URL, env: Env): Promise<Response> {
+  if (!env.MODELS) {
+    return new Response(JSON.stringify({ error: 'Model storage not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Strip /api/model/ prefix → R2 key, e.g. "Xenova/whisper-tiny.en/resolve/main/config.json"
+  const key = url.pathname.slice('/api/model/'.length);
+  if (!key || key.includes('..') || key.startsWith('/')) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const object = await env.MODELS.get(key);
+  if (!object) return new Response('Not found', { status: 404 });
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  // Model weights are content-addressed and never change — cache aggressively.
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+  return new Response(object.body, { headers });
 }
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
