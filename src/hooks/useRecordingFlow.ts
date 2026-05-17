@@ -53,6 +53,8 @@ export interface UseRecordingFlowResult {
  * Wires the recorder/live hooks to clip + session mutations, and merges clips
  * for Review-tab playback when the user finishes recording.
  */
+
+
 export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFlowResult {
   const {
     session,
@@ -79,12 +81,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     const t = window.setTimeout(() => setUploadStatus({ phase: 'idle', message: '' }), 3000);
     return () => window.clearTimeout(t);
   }, [uploadStatus.phase]);
-  const lastWhisperResultAtRef = useRef<number>(0);
-  const BUBBLE_GAP_MS = 2500;
 
   // Warm up the Whisper worker + model as soon as the session mounts so the
   // first transcription result doesn't have to wait for a cold model download.
   useEffect(() => { preloadLocalWhisper(); }, []);
+
 
   // Always-current ref so the live-transcript callback reads the latest duration.
   const durationSecRef = useRef(0);
@@ -122,16 +123,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     whisperPendingRef.current = null;
     try {
       const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
-      if (result.text.trim()) {
-        const now = Date.now();
-        const gap = now - lastWhisperResultAtRef.current;
-        lastWhisperResultAtRef.current = now;
-        setWhisperBubbles((prev) =>
-          prev.length === 0 || gap > BUBBLE_GAP_MS
-            ? [...prev, result.text]
-            : [...prev.slice(0, -1), result.text],
-        );
-      }
+      const text = result.text.trim();
+      if (text) setWhisperBubbles((prev) => [...prev, text]);
     } catch (err) {
       console.error('[Whisper live preview]', err);
     }
@@ -180,7 +173,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     patchSession({ status: 'recording' });
 
     setWhisperBubbles([]);
-    lastWhisperResultAtRef.current = 0;
     whisperPendingRef.current = null;
     recorder.onChunk.current = handleChunk;
 
@@ -195,10 +187,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       return;
     }
 
-    if (webSpeech.supported) {
-      webSpeech.reset();
-      webSpeech.start(() => durationSecRef.current);
-    }
+    // TODO: re-enable Web Speech once Whisper live preview is validated
+    // if (webSpeech.supported) {
+    //   webSpeech.reset();
+    //   webSpeech.start(() => durationSecRef.current);
+    // }
   }
 
   function handlePauseResume() {
@@ -207,7 +200,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       webSpeech.stop();
     } else if (recorder.status === 'paused') {
       recorder.resume();
-      if (webSpeech.supported) webSpeech.start(() => durationSecRef.current);
+      // TODO: re-enable Web Speech once Whisper live preview is validated
+      // if (webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
 
