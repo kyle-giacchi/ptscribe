@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useLocation, useMatch, Link } from 'react-router-dom';
-import { Bell, Menu, ArrowLeft, Lock, Unlock } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useMatch, Link, NavLink } from 'react-router-dom';
+import { Bell, Menu, ArrowLeft, Lock, Unlock, Terminal } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -86,8 +86,8 @@ function usePageTitle(): { title: string; subtitle?: string } {
       return { title: 'Exercise library', subtitle: 'Built-in and custom exercises' };
     case '/settings':
       return { title: 'Settings', subtitle: 'Clinician profile, AI keys, data' };
-    case '/admin':
-      return { title: 'Admin', subtitle: 'Transcription tiers, raw session data' };
+    case '/debug':
+      return { title: 'Debug', subtitle: 'Transcription tiers, raw session data' };
     default:
       return { title: 'PTScribe' };
   }
@@ -115,6 +115,105 @@ function RecordingIndicator({ status }: { status: string }) {
         />
       </span>
       <span style={{ fontSize: 12, fontWeight: 500 }}>{isRecording ? 'Recording' : 'Idle'}</span>
+    </div>
+  );
+}
+
+export function ProfileButton() {
+  const { clinician } = useClinician();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [open]);
+
+  const initials = (clinician.name || 'PT')
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-label="User profile"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 8,
+          border: `1px solid ${open ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
+          background: open ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+          color: open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+          cursor: 'pointer',
+          fontSize: 11.5,
+          fontWeight: 600,
+        }}
+      >
+        {initials}
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-50"
+          style={{
+            top: '100%',
+            right: 0,
+            marginTop: 6,
+            minWidth: 160,
+            background: 'var(--color-pt-surface)',
+            border: '1px solid var(--color-pt-border)',
+            borderRadius: 10,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            padding: '4px 0',
+          }}
+        >
+          <div
+            style={{
+              padding: '8px 12px 6px',
+              borderBottom: '1px solid var(--color-pt-border)',
+            }}
+          >
+            <div
+              className="truncate"
+              style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)' }}
+            >
+              {clinician.name || 'Clinician'}
+            </div>
+            <div
+              className="truncate"
+              style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}
+            >
+              {clinician.credentials || clinician.practiceName || 'PTScribe'}
+            </div>
+          </div>
+          <NavLink
+            to="/debug"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+            style={{
+              padding: '7px 12px',
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: 'var(--color-pt-text-2)',
+              textDecoration: 'none',
+            }}
+          >
+            <Terminal size={13} strokeWidth={1.75} />
+            <span>Debug</span>
+          </NavLink>
+        </div>
+      )}
     </div>
   );
 }
@@ -171,6 +270,7 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
         <Bell size={15} strokeWidth={1.75} />
       </button>
       <CommandPalette />
+      <ProfileButton />
     </div>
   );
 
