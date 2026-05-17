@@ -5,7 +5,6 @@ import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL }
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
 import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
-import { mergeClipTranscripts } from '@/utils/clips';
 import type { Session, SessionClip, TranscriptChunk } from '@/types';
 
 const LOCAL_CHUNK_SEC = 120; // 2-minute segments — each maps to a real audio timestamp
@@ -48,9 +47,11 @@ async function transcribeLocalChunked(
     let speech: Float32Array;
     try {
       const ranges = await findSpeechRangesML(chunkAudio, SR, DEFAULT_VAD_OPTIONS);
-      speech = ranges.length > 0 ? extractRanges(chunkAudio, SR, ranges) : chunkAudio;
+      // extractRanges returns a new buffer; chunkAudio is a subarray of samples —
+      // must slice so each chunk owns its buffer before transferring to the worker.
+      speech = ranges.length > 0 ? extractRanges(chunkAudio, SR, ranges) : chunkAudio.slice();
     } catch {
-      speech = chunkAudio;
+      speech = chunkAudio.slice();
     }
 
     if (speech.length >= SR * 0.5) {
@@ -85,6 +86,15 @@ async function transcribeLocalChunked(
   return { ok: true, text: chunks.map((c) => c.text).join(' '), chunks };
 }
 
+/** Best-available text per clip: Whisper result > local Whisper > live Web Speech. */
+function buildMergedTranscript(clips: SessionClip[]): string {
+  return [...clips]
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((c) => (c.transcript || c.t2Transcript || c.t1Transcript)?.trim())
+    .filter((t): t is string => Boolean(t))
+    .join('\n\n');
+}
+
 interface Params {
   session: Session | undefined;
   patchClip: (clipId: string, patch: Partial<SessionClip>) => void;
@@ -97,7 +107,7 @@ interface Params {
  * regardless of the configured provider. Fires in the background after each
  * clip reaches 'ready' status — no user action required.
  *
- * Results are stored in localTranscript (frozen after this pass) and merged
+ * Results are stored in t2Transcript (frozen after this pass) and merged
  * into the session transcript at Tier 2. Cloud (Nova) transcription is a
  * separate explicit action handled by useTranscriptionFlow.
  *
@@ -116,7 +126,7 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
     const eligible = session.clips.filter(
       (c) =>
         c.status === 'ready' &&
-        !c.localTranscript &&
+        !c.t2Transcript &&
         !autoTranscribingRef.current.has(c.id),
     );
     if (eligible.length === 0) return;
@@ -138,7 +148,7 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
             patchClip(clip.id, {
               status: 'transcribed',
               transcript: result.text,
-              localTranscript: result.text,
+              t2Transcript: result.text,
               transcriptChunks: result.chunks,
               transcriptedAt: Date.now(),
               errorMessage: undefined,
@@ -151,21 +161,35 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
                 ? { ...c, status: 'transcribed' as const, transcript: result.text }
                 : c,
             );
-            const merged = mergeClipTranscripts(freshClips);
+            // Use fallback-aware merge so that failed clips' t1Transcripts
+            // are not dropped when this clip's Whisper result comes in.
+            const merged = buildMergedTranscript(freshClips);
             if (merged) {
               setTranscript(merged);
-              // localTranscript frozen here — never overwritten by cloud pass
-              patchSession({ transcript: merged, transcriptSource: 'whisper', localTranscript: merged });
+              // t2Transcript frozen here — never overwritten by cloud pass
+              patchSession({ transcript: merged, activeTranscriptTier: 't2', t2Transcript: merged });
             }
           } else {
             patchClip(clip.id, { status: 'failed', errorMessage: result.error });
             toast.error(`Clip ${clip.index + 1}: ${result.error}`, { id: tid });
+            // Fall back to t1Transcript so the session doesn't lose this clip's content.
+            const fallback = buildMergedTranscript(sessionRef.current?.clips ?? []);
+            if (fallback) {
+              setTranscript(fallback);
+            patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
+            }
           }
         })
         .catch((e: Error) => {
           autoTranscribingRef.current.delete(clip.id);
           patchClip(clip.id, { status: 'failed', errorMessage: e.message });
-          toast.error(`Clip ${clip.index + 1} transcription failed.`, { id: tid });
+          toast.error(`Clip ${clip.index + 1}: ${e.message}`, { id: tid });
+          // Fall back to t1Transcript so the session doesn't lose this clip's content.
+          const fallback = buildMergedTranscript(sessionRef.current?.clips ?? []);
+          if (fallback) {
+            setTranscript(fallback);
+            patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
+          }
         });
     }
     // patchClip / patchSession / setTranscript use functional updates — safe to omit.
