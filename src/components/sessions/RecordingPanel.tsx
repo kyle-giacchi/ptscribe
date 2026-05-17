@@ -11,7 +11,6 @@ import {
   Info,
   ArrowRight,
   X,
-  RotateCcw,
   Loader2,
 } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
@@ -452,22 +451,12 @@ function ActiveRecordingCard({
                 className="text-[10px] font-medium px-1.5 py-0.5 rounded"
                 style={{ background: 'var(--color-pt-accent-soft)', color: 'var(--color-pt-accent-fg)' }}
               >
-                {webSpeech.listening ? 'T1 · Browser' : 'T2 · Whisper'}
+                {/* TODO: restore dynamic tier once Web Speech is re-enabled */}
+                T2 · Whisper
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  webSpeech.stop();
-                  window.setTimeout(() => webSpeech.start(() => durationSecRef.current), 150);
-                }}
-                title="Restart live captions"
-                className="flex items-center justify-center rounded transition-opacity hover:opacity-70"
-                style={{ color: 'var(--color-pt-text-3)', minHeight: 44, minWidth: 32, touchAction: 'manipulation' }}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
+              {/* TODO: restore restart button once Web Speech is re-enabled */}
               <button
                 type="button"
                 role="switch"
@@ -679,27 +668,23 @@ function ActiveRecordingCard({
         </button>
       </div>
 
-      {/* Live transcript toggle */}
-      <div
-        className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-4"
-        style={{
-          background: 'var(--color-pt-surface)',
-          border: '1px solid var(--color-pt-border)',
-        }}
-      >
-        <div className="min-w-0">
-          <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-            Live transcript
-          </p>
-          <p className="text-xs" style={{ color: webSpeech.error ? 'var(--color-caution)' : !webSpeech.supported ? 'var(--color-pt-text-3)' : 'var(--color-pt-text-3)' }}>
-            {!webSpeech.supported
-              ? 'Not available in this browser (Chrome/Edge required)'
-              : webSpeech.error
-                ? `Captions paused: ${webSpeech.error}`
-                : 'Toggle to follow along in real-time'}
-          </p>
-        </div>
-        {webSpeech.supported && (
+      {/* Live transcript toggle — only shown when Web Speech is available */}
+      {webSpeech.supported && (
+        <div
+          className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-4"
+          style={{
+            background: 'var(--color-pt-surface)',
+            border: '1px solid var(--color-pt-border)',
+          }}
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+              Live transcript
+            </p>
+            <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+              {webSpeech.listening ? 'Browser captions active' : 'Enable for real-time captions alongside Whisper'}
+            </p>
+          </div>
           <button
             type="button"
             role="switch"
@@ -710,22 +695,22 @@ function ActiveRecordingCard({
           >
             <span
               className="text-[11px] font-bold uppercase tracking-wide"
-              style={{ color: 'var(--color-pt-text-3)' }}
+              style={{ color: webSpeech.listening ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)' }}
             >
-              OFF
+              {webSpeech.listening ? 'ON' : 'OFF'}
             </span>
             <span
-              className="relative inline-flex h-6 w-11 rounded-full"
-              style={{ background: 'var(--color-pt-border-strong)' }}
+              className="relative inline-flex h-6 w-11 rounded-full transition-colors"
+              style={{ background: webSpeech.listening ? 'var(--color-pt-accent)' : 'var(--color-pt-border-strong)' }}
             >
               <span
-                className="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow"
-                style={{ transform: 'translateX(0)' }}
+                className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                style={{ transform: webSpeech.listening ? 'translateX(20px)' : 'translateX(2px)' }}
               />
             </span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -956,7 +941,7 @@ function liveErrorHint(err: string): string {
     case 'audio-capture':
       return 'No microphone was found.';
     case 'network':
-      return 'Browser speech recognition needs an internet connection.';
+      return 'Browser speech recognition was blocked — this is common in private/incognito mode. Your recording is still being saved and can be transcribed after.';
     default:
       return 'Switch to Cloudflare in Settings to transcribe saved clips instead.';
   }
