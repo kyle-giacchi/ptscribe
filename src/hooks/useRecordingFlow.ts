@@ -14,6 +14,7 @@ export interface UseRecordingFlowParams {
   session: Session | undefined;
   recorder: UseRecorder;
   webSpeech: UseWebSpeechTranscript;
+  webSpeechEnabled: boolean;
   sortedClips: SessionClip[];
   patchSession: (patch: Partial<Session>) => void;
   patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
@@ -53,11 +54,14 @@ export interface UseRecordingFlowResult {
  * Wires the recorder/live hooks to clip + session mutations, and merges clips
  * for Review-tab playback when the user finishes recording.
  */
+
+
 export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFlowResult {
   const {
     session,
     recorder,
     webSpeech,
+    webSpeechEnabled,
     sortedClips,
     patchSession,
     patchClips,
@@ -72,6 +76,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
   const [whisperBubbles, setWhisperBubbles] = useState<string[]>([]);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ phase: 'idle', message: '' });
+  // Sync ref so processWhisperChunk can persist t1Transcript without waiting for state.
+  const whisperTextRef = useRef<string[]>([]);
 
   // Auto-clear terminal upload states after 3 s
   useEffect(() => {
@@ -79,12 +85,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     const t = window.setTimeout(() => setUploadStatus({ phase: 'idle', message: '' }), 3000);
     return () => window.clearTimeout(t);
   }, [uploadStatus.phase]);
-  const lastWhisperResultAtRef = useRef<number>(0);
-  const BUBBLE_GAP_MS = 2500;
 
   // Warm up the Whisper worker + model as soon as the session mounts so the
   // first transcription result doesn't have to wait for a cold model download.
   useEffect(() => { preloadLocalWhisper(); }, []);
+
 
   // Always-current ref so the live-transcript callback reads the latest duration.
   const durationSecRef = useRef(0);
@@ -100,15 +105,16 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
 
-  // Continuously persist Web Speech captions to t1Transcript as each segment finalizes.
-  // This ensures a browser crash only loses the current in-progress segment, not the full recording.
+  // When Web Speech is enabled in settings, persist live captions to t1Transcript continuously.
+  // This ensures a browser crash only loses the current in-progress segment.
   useEffect(() => {
+    if (!webSpeechEnabled) return;
     const clipId = activeClipIdRef.current;
     if (!clipId || !webSpeech.accumulatedText.trim()) return;
     patchClip(clipId, { t1Transcript: webSpeech.accumulatedText.trim() });
     // patchClip uses functional updates and activeClipIdRef is a stable ref — safe to omit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [webSpeech.accumulatedText]);
+  }, [webSpeech.accumulatedText, webSpeechEnabled]);
 
   // ── Live Whisper chunk processing (leaky-bucket) ─────────────────────────
   // At most one Whisper job runs at a time; if a new chunk arrives while one
@@ -122,15 +128,13 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     whisperPendingRef.current = null;
     try {
       const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
-      if (result.text.trim()) {
-        const now = Date.now();
-        const gap = now - lastWhisperResultAtRef.current;
-        lastWhisperResultAtRef.current = now;
-        setWhisperBubbles((prev) =>
-          prev.length === 0 || gap > BUBBLE_GAP_MS
-            ? [...prev, result.text]
-            : [...prev.slice(0, -1), result.text],
-        );
+      const text = result.text.trim();
+      if (text) {
+        whisperTextRef.current = [...whisperTextRef.current, text];
+        setWhisperBubbles(whisperTextRef.current);
+        // Persist accumulated Whisper segments as T1 — fallback when Web Speech is off.
+        const clipId = activeClipIdRef.current;
+        if (clipId) patchClip(clipId, { t1Transcript: whisperTextRef.current.join(' ') });
       }
     } catch (err) {
       console.error('[Whisper live preview]', err);
@@ -180,7 +184,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     patchSession({ status: 'recording' });
 
     setWhisperBubbles([]);
-    lastWhisperResultAtRef.current = 0;
+    whisperTextRef.current = [];
     whisperPendingRef.current = null;
     recorder.onChunk.current = handleChunk;
 
@@ -195,7 +199,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       return;
     }
 
-    if (webSpeech.supported) {
+    if (webSpeechEnabled && webSpeech.supported) {
       webSpeech.reset();
       webSpeech.start(() => durationSecRef.current);
     }
@@ -204,10 +208,10 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   function handlePauseResume() {
     if (recorder.status === 'recording') {
       recorder.pause();
-      webSpeech.stop();
+      if (webSpeechEnabled) webSpeech.stop();
     } else if (recorder.status === 'paused') {
       recorder.resume();
-      if (webSpeech.supported) webSpeech.start(() => durationSecRef.current);
+      if (webSpeechEnabled && webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
 
@@ -278,10 +282,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     }
 
-    if (clipId && webSpeech.accumulatedText.trim()) {
+    if (webSpeechEnabled && clipId && webSpeech.accumulatedText.trim()) {
       patchClip(clipId, { t1Transcript: webSpeech.accumulatedText.trim() });
     }
     webSpeech.reset();
+    whisperTextRef.current = [];
     patchSession({ status: 'draft' });
   }
 
