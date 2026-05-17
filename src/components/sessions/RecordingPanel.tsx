@@ -668,49 +668,6 @@ function ActiveRecordingCard({
         </button>
       </div>
 
-      {/* Live transcript toggle — only shown when Web Speech is available */}
-      {webSpeech.supported && (
-        <div
-          className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-4"
-          style={{
-            background: 'var(--color-pt-surface)',
-            border: '1px solid var(--color-pt-border)',
-          }}
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-              Live transcript
-            </p>
-            <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
-              {webSpeech.listening ? 'Browser captions active' : 'Enable for real-time captions alongside Whisper'}
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={webSpeech.listening}
-            onClick={() => (webSpeech.listening ? webSpeech.stop() : webSpeech.start())}
-            className="flex items-center gap-2"
-            style={{ touchAction: 'manipulation', flexShrink: 0, minHeight: 44 }}
-          >
-            <span
-              className="text-[11px] font-bold uppercase tracking-wide"
-              style={{ color: webSpeech.listening ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)' }}
-            >
-              {webSpeech.listening ? 'ON' : 'OFF'}
-            </span>
-            <span
-              className="relative inline-flex h-6 w-11 rounded-full transition-colors"
-              style={{ background: webSpeech.listening ? 'var(--color-pt-accent)' : 'var(--color-pt-border-strong)' }}
-            >
-              <span
-                className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-                style={{ transform: webSpeech.listening ? 'translateX(20px)' : 'translateX(2px)' }}
-              />
-            </span>
-          </button>
-        </div>
-      )}
     </div>
   );
 }

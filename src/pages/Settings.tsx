@@ -531,7 +531,7 @@ export function Settings() {
             <strong>Stop &amp; finish</strong> button that chains stop → transcribe → generate. Turn
             off if you prefer to advance each step yourself.
           </p>
-          <div style={{ maxWidth: 280 }}>
+          <div style={{ maxWidth: 280, display: 'grid', gap: 12 }}>
             <Field label="Auto-finish chain">
               <Select
                 value={settings.session.autoFinish ? 'on' : 'off'}
@@ -539,6 +539,15 @@ export function Settings() {
               >
                 <option value="on">On — show Stop &amp; finish</option>
                 <option value="off">Off — manual steps only</option>
+              </Select>
+            </Field>
+            <Field label="Live Web Speech captions">
+              <Select
+                value={settings.session.webSpeechEnabled ? 'on' : 'off'}
+                onChange={(e) => updateSession({ webSpeechEnabled: e.target.value === 'on' })}
+              >
+                <option value="off">Off — Whisper only (default, private)</option>
+                <option value="on">On — add browser captions alongside Whisper</option>
               </Select>
             </Field>
           </div>
