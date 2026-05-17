@@ -134,8 +134,11 @@ function IdleRecordingCard({
       <div className="flex flex-col items-center gap-5">
         <div className="relative">
           <span
-            className="absolute inset-0 animate-ping rounded-full"
-            style={{ background: 'var(--color-pt-accent)', opacity: 0.15 }}
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: 'var(--color-pt-accent)',
+              animation: 'pts-pulse-calm 2.8s ease-out infinite',
+            }}
           />
           <button
             type="button"
@@ -438,12 +441,20 @@ function ActiveRecordingCard({
         {/* Left: Transcript panel */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 pr-5">
           <div className="flex items-center justify-between">
-            <p
-              className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--color-pt-text-3)' }}
-            >
-              Transcript · Live
-            </p>
+            <div className="flex items-center gap-2">
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: 'var(--color-pt-text-3)' }}
+              >
+                Transcript · Live
+              </p>
+              <span
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                style={{ background: 'var(--color-pt-accent-soft)', color: 'var(--color-pt-accent-fg)' }}
+              >
+                {webSpeech.listening ? 'T1 · Browser' : 'T2 · Whisper'}
+              </span>
+            </div>
             <div className="flex items-center gap-1">
               <button
                 type="button"
