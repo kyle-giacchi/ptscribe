@@ -127,6 +127,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     session,
     recorder,
     webSpeech,
+    webSpeechEnabled: settings.session.webSpeechEnabled,
     sortedClips,
     patchSession,
     patchClips,

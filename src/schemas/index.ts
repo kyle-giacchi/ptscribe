@@ -226,6 +226,7 @@ const SettingsSchema = z.object({
   }),
   session: z.object({
     autoFinish: z.boolean(),
+    webSpeechEnabled: z.boolean(),
   }),
   recordingLimits: z.object({
     softWarnAtMinutes: z.number().int().min(15).max(240),
@@ -313,7 +314,7 @@ export function defaultAppData(): AppData {
         speedUp: { enabled: true, speed: 1.25 },
       },
       security: { idleLockMinutes: 10 },
-      session: { autoFinish: false },
+      session: { autoFinish: false, webSpeechEnabled: false },
       recordingLimits: {
         softWarnAtMinutes: 75,
         maxMinutes: 90,
