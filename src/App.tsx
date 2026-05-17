@@ -37,6 +37,7 @@ const Notes = lazy(() => import('@/pages/Notes').then((m) => ({ default: m.Notes
 const Templates = lazy(() => import('@/pages/Templates').then((m) => ({ default: m.Templates })));
 const Exercises = lazy(() => import('@/pages/Exercises').then((m) => ({ default: m.Exercises })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
+const AdminPage = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.AdminPage })));
 
 function PageLoader() {
   return (
@@ -74,6 +75,7 @@ function AppProviders() {
                                     <Route path="/templates" element={<Templates />} />
                                     <Route path="/exercises" element={<Exercises />} />
                                     <Route path="/settings" element={<Settings />} />
+                                    <Route path="/admin" element={<AdminPage />} />
                                   </Route>
                                   <Route
                                     path="*"

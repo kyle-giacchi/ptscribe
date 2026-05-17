@@ -117,11 +117,13 @@ function IdleRecordingCard({
   onUpload,
   onSkip,
   uploadStatus,
+  isAddingClip = false,
 }: {
   onStart: () => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
   uploadStatus: UploadStatus;
+  isAddingClip?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
@@ -138,7 +140,7 @@ function IdleRecordingCard({
           <button
             type="button"
             onClick={onStart}
-            aria-label="Start recording"
+            aria-label={isAddingClip ? 'Record another clip' : 'Start recording'}
             disabled={isUploading}
             className="relative flex items-center justify-center rounded-full transition-opacity"
             style={{
@@ -156,10 +158,10 @@ function IdleRecordingCard({
 
         <div className="flex flex-col items-center gap-1">
           <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
-            Start Recording
+            {isAddingClip ? 'Record Another Clip' : 'Start Recording'}
           </span>
           <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
-            Tap the mic to begin
+            {isAddingClip ? 'Tap the mic to add a clip to this session' : 'Tap the mic to begin'}
           </p>
         </div>
       </div>
@@ -193,20 +195,24 @@ function IdleRecordingCard({
             }
             {' '}Upload audio
           </button>
-          <span className="text-xs select-none">·</span>
-          <button
-            type="button"
-            disabled={isUploading}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-opacity"
-            onClick={onSkip}
-            style={{
-              touchAction: 'manipulation',
-              opacity: isUploading ? 0.45 : 1,
-              cursor: isUploading ? 'default' : 'pointer',
-            }}
-          >
-            Skip <ArrowRight size={11} strokeWidth={2} />
-          </button>
+          {!isAddingClip && (
+            <>
+              <span className="text-xs select-none">·</span>
+              <button
+                type="button"
+                disabled={isUploading}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-opacity"
+                onClick={onSkip}
+                style={{
+                  touchAction: 'manipulation',
+                  opacity: isUploading ? 0.45 : 1,
+                  cursor: isUploading ? 'default' : 'pointer',
+                }}
+              >
+                Skip <ArrowRight size={11} strokeWidth={2} />
+              </button>
+            </>
+          )}
         </div>
 
         {/* Inline upload status — replaces toast */}
@@ -765,7 +771,7 @@ export function RecordingPanel({
   }, [recorder.status]);
 
   if (idle && !wasAutoStopped) {
-    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} />;
+    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} />;
   }
 
   return (
@@ -815,7 +821,7 @@ export function RecordingPanel({
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
-        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} />
+        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} />
       )}
 
       {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}

@@ -86,6 +86,8 @@ function usePageTitle(): { title: string; subtitle?: string } {
       return { title: 'Exercise library', subtitle: 'Built-in and custom exercises' };
     case '/settings':
       return { title: 'Settings', subtitle: 'Clinician profile, AI keys, data' };
+    case '/admin':
+      return { title: 'Admin', subtitle: 'Transcription tiers, raw session data' };
     default:
       return { title: 'PTScribe' };
   }

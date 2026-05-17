@@ -20,6 +20,22 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Adding a domain field (4-step ripple)                                    | [invariants.md:111](invariants.md#type-changes-ripple)                     |
 | Local-first transcription (background auto-pass for all providers)        | [invariants.md:189](invariants.md#local-first-transcription)               |
 | Worker pool & device guards (pool size formula, ~40 MB per worker)       | [invariants.md:206](invariants.md#worker-pool-and-device-guards)           |
+| Session status state machine (draft/recording/transcribing/generating/ready/finalized) | [workflows.md](workflows.md#session-status) |
+| Clip status state machine (pending/ready/transcribing/transcribed/failed) | [workflows.md](workflows.md#sessionclip-status) |
+| Recording workflow (start → WAL chunks → stop → save → auto-pass)        | [workflows.md](workflows.md#recording-flow)                                |
+| Upload audio workflow (file → IDB → ready → auto-pass)                   | [workflows.md](workflows.md#upload-audio-flow)                             |
+| Crash recovery (pending clips → WAL reassembly on next mount)             | [workflows.md](workflows.md#crash-recovery)                                |
+| Auto-stop scenarios (hard cap, idle, mic disconnect, interrupted)         | [workflows.md](workflows.md#auto-stop-scenarios)                           |
+| Note generation (guard → POST /api/generate → lazy note creation)        | [workflows.md](workflows.md#note-generation)                               |
+| Finalization + post-finalization audit trail                              | [workflows.md](workflows.md#finalization)                                  |
+| Session deletion (audio cleanup + demo-mode exception)                   | [workflows.md](workflows.md#session-deletion)                              |
+| Demo mode completion (discharge + reset modal)                            | [workflows.md](workflows.md#demo-mode-completion)                          |
+| Action guards (rate limits on transcribe + generate per session)          | [workflows.md](workflows.md#action-guards)                                 |
+| Whisper live preview during recording (leaky bucket, display-only)        | [workflows.md](workflows.md#whisper-live-preview-during-recording)         |
+| Three-tier transcription (T1 Web Speech / T2 Local Whisper / T3 Nova)    | [transcription.md](transcription.md#three-tier-model)                      |
+| Transcription write paths (auto-pass vs explicit Nova, field ownership)   | [transcription.md](transcription.md#write-paths)                           |
+| Transcription tier invariants (T2 never overwritten, source stamping)     | [transcription.md](transcription.md#key-invariants)                        |
+| Admin page — tier coverage diagnostic (`/admin`, Terminal icon)           | [transcription.md](transcription.md#admin-page-admin)                      |
 | Session page panel components (`sessions/` sub-dir)                      | [architecture.md:6](architecture.md#layering)                              |
 | Inline confirmation pattern (no `window.confirm()`)                      | [invariants.md](invariants.md#destructive-actions-use-inline-confirmation) |
 | Boot sequence (load → migrate → safeParse → fallback)                    | [architecture.md:34](architecture.md#boot-sequence)                        |
@@ -79,6 +95,38 @@ UI/UX style guide: dark navy frame + white card surface, cyan-teal accent, Inter
 ### [docs/personas.md](personas.md)
 
 Two product personas — busy clinician (Dana) and PT business owner (Marcus) — with what they want, what kills their trust, and design implications. Read before proposing UX changes, defaults, or new settings.
+
+### [docs/workflows.md](workflows.md)
+
+State machines and step-by-step data flows for every major user journey. Read when adding a new flow, debugging unexpected session/clip status, or understanding what owns a particular side-effect.
+
+| Section | Gist |
+|---------|------|
+| State machines | Session status, SessionClip status, Patient status — valid transitions and owners |
+| Recording flow | `handleStartRecording` → WAL chunks → `handleStopRecording` → IDB save → T2 auto-pass |
+| Upload audio flow | File → IDB → `ready` → same auto-pass path as recorded clips |
+| Crash recovery | `useAudioRecovery`: pending clips on mount → WAL reassembly → `ready` or `failed` |
+| Auto-stop scenarios | Hard cap, idle auto-stop, mic disconnect, recorder interrupted — all funnel through `handleStopRecording` |
+| Note generation | Guard → `POST /api/generate` → `ensureNote` lazy creation → `status: 'ready'` |
+| Finalization | `handleFinalize` required-section guard → `finalizeNote` → `status: 'finalized'`; audit trail on re-edit |
+| Session deletion | Audio IDB cleanup + note removal; demo-mode exception resets instead of deletes |
+| Demo mode completion | Discharge patient → DemoCompleteModal → start fresh or keep |
+| Action guards | Rate limits on cloud transcription + generation per session |
+| Whisper live preview | Leaky-bucket display-only preview during recording; never persisted |
+
+### [docs/transcription.md](transcription.md)
+
+Three-tier transcription system: Web Speech (T1), local Whisper auto-pass (T2), Nova cloud (T3). Read when touching any transcription write path, the tier field definitions, revert-to-local logic, or the Admin page.
+
+| Section | Gist |
+|---------|------|
+| Three-tier model | Tier table: source, timing, quality, network requirement |
+| Data fields | Every `Session` and `SessionClip` field per tier with writer ownership |
+| Write paths | Exact code flow for T2 auto-pass and T3 Nova pass |
+| Key invariants | T2 never overwritten by T3; correct `transcriptSource` stamping; auto-pass always runs |
+| Revert to local | How `handleRevertToLocal` reads T2 without losing T3 |
+| Schema version | v17 migration; legacy session fallback |
+| Admin page | `/admin` diagnostic: coverage stats + per-session tier viewer |
 
 ### [docs/clinical-model.md](clinical-model.md)
 
