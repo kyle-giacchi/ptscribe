@@ -72,6 +72,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [sectionCache, setSectionCache] = useState<Map<string, NoteSection[]>>(new Map());
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
+  const processingStartedAtRef = useRef<number | null>(null);
 
   // ── Atomic session/clip patches via functional slice update ──────────────
   function patchSession(patch: Partial<Session>) {
@@ -278,7 +279,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ── Upload audio + auto-transcribe ────────────────────────────────────────
   async function handleUpload(file: File) {
     const clipId = await handleUploadAudio(file);
-    if (clipId) setProcessingUploadClipId(clipId);
+    if (clipId) {
+      processingStartedAtRef.current = Date.now();
+      setProcessingUploadClipId(clipId);
+    }
   }
 
   useEffect(() => {
@@ -287,8 +291,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (!clip) return;
 
     if (clip.status === 'transcribed' || clip.status === 'failed') {
-      setProcessingUploadClipId(null);
-      setActiveTab('review');
+      const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
+      const delay = Math.max(0, 3000 - elapsed);
+      const t = setTimeout(() => {
+        setProcessingUploadClipId(null);
+        setActiveTab('review');
+      }, delay);
+      return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.clips, processingUploadClipId]);
@@ -407,7 +416,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               </div>
             )}
             {processingUploadClipId ? (
-              <UploadProcessingView />
+              <UploadProcessingView
+                durationSec={sortedClips.find((c) => c.id === processingUploadClipId)?.durationSec}
+              />
             ) : (
               <RecordingPanel
                 recorder={recorder}
@@ -598,17 +609,60 @@ function NotFound() {
   );
 }
 
-function UploadProcessingView() {
+const PROCESSING_STEPS = [
+  { label: 'Reading audio file',               threshold: 0.00 },
+  { label: 'Sending to transcription service', threshold: 0.10 },
+  { label: 'Transcribing audio',               threshold: 0.25 },
+  { label: 'Finalizing transcript',            threshold: 0.88 },
+] as const;
+
+function UploadProcessingView({ durationSec }: { durationSec?: number }) {
+  // ~150ms per second of audio; realtime transcription is typically 5–10× faster than playback
+  const estimatedMs = Math.max(3000, (durationSec ?? 30) * 150);
+  const [progress, setProgress] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const cap = 0.95;
+
+    function tick() {
+      const t = Math.min(1, (Date.now() - start) / estimatedMs);
+      const eased = Math.min(cap, 1 - Math.pow(1 - t, 3)); // ease-out cubic
+      setProgress(eased);
+      if (eased < cap) rafRef.current = requestAnimationFrame(tick);
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [estimatedMs]);
+
+  const stepLabel =
+    [...PROCESSING_STEPS].reverse().find((s) => progress >= s.threshold)?.label ??
+    PROCESSING_STEPS[0].label;
+
   return (
-    <div className="flex flex-col items-center gap-5 py-16">
-      <Loader2 size={48} className="animate-spin" style={{ color: 'var(--color-pt-accent)' }} />
-      <div className="flex flex-col items-center gap-1.5 text-center">
-        <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
-          Processing audio
+    <div className="flex flex-col items-center gap-6 py-16 px-8">
+      <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        Processing audio
+      </span>
+      <div className="flex w-full flex-col items-center gap-2" style={{ maxWidth: 320 }}>
+        <div
+          className="w-full overflow-hidden rounded-full"
+          style={{ height: 6, background: 'var(--color-pt-border)' }}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.round(progress * 100)}%`,
+              background: 'var(--color-pt-accent)',
+              transition: 'width 120ms linear',
+            }}
+          />
+        </div>
+        <span className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+          {stepLabel}
         </span>
-        <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
-          Transcribing with Whisper — this may take a moment
-        </p>
       </div>
     </div>
   );
