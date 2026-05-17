@@ -170,20 +170,31 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
               patchSession({ transcript: merged, activeTranscriptTier: 't2', t2Transcript: merged });
             }
           } else {
-            patchClip(clip.id, { status: 'failed', errorMessage: result.error });
-            toast.error(`Clip ${clip.index + 1}: ${result.error}`, { id: tid });
+            // Revert to 'ready' so cloud transcription remains available.
+            patchClip(clip.id, { status: 'ready', errorMessage: undefined });
+            toast.error(`Clip ${clip.index + 1}: Local transcription failed (${result.error}). Use the Transcribe button for cloud transcription.`, { id: tid });
             // Fall back to t1Transcript so the session doesn't lose this clip's content.
             const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
             if (fallback) {
               setTranscript(fallback);
-            patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
+              patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
             }
           }
         })
         .catch((e: Error) => {
           autoTranscribingRef.current.delete(clip.id);
-          patchClip(clip.id, { status: 'failed', errorMessage: e.message });
-          toast.error(`Clip ${clip.index + 1}: ${e.message}`, { id: tid });
+          // Revert to 'ready' — audio saved fine, only local transcription failed.
+          // This keeps the clip available for manual cloud transcription.
+          const isFetchError = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
+          patchClip(clip.id, {
+            status: 'ready',
+            errorMessage: undefined,
+          });
+          if (isFetchError) {
+            toast.error(`Clip ${clip.index + 1}: Local transcription unavailable (model download failed). Use the Transcribe button to use cloud transcription.`, { id: tid });
+          } else {
+            toast.error(`Clip ${clip.index + 1}: Local transcription failed — use Transcribe to retry with cloud. (${e.message})`, { id: tid });
+          }
           // Fall back to t1Transcript so the session doesn't lose this clip's content.
           const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
           if (fallback) {
