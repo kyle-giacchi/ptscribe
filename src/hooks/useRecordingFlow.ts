@@ -24,14 +24,19 @@ export interface UseRecordingFlowParams {
   setIsMerging: (v: boolean) => void;
 }
 
+export type UploadPhase = 'idle' | 'reading' | 'saving' | 'done' | 'error';
+export interface UploadStatus { phase: UploadPhase; message: string; }
+
 export interface UseRecordingFlowResult {
   // Recording state for UI
   backgroundWarningDismissed: boolean;
   setBackgroundWarningDismissed: (v: boolean) => void;
   // Active clip ref (exposed so the auto-record deep link hook can read it if needed)
   activeClipIdRef: MutableRefObject<string | null>;
-  // Growing Whisper transcript captured from audio chunks during recording
-  whisperLiveText: string;
+  // Whisper live preview: one string per natural speech segment
+  whisperBubbles: string[];
+  // Inline upload status (replaces toast for the upload flow)
+  uploadStatus: UploadStatus;
   // Handlers
   handleStartRecording: () => Promise<void>;
   handleStopRecording: () => Promise<void>;
@@ -64,7 +69,17 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   } = params;
 
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
-  const [whisperLiveText, setWhisperLiveText] = useState('');
+  const [whisperBubbles, setWhisperBubbles] = useState<string[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ phase: 'idle', message: '' });
+
+  // Auto-clear terminal upload states after 3 s
+  useEffect(() => {
+    if (uploadStatus.phase !== 'done' && uploadStatus.phase !== 'error') return;
+    const t = window.setTimeout(() => setUploadStatus({ phase: 'idle', message: '' }), 3000);
+    return () => window.clearTimeout(t);
+  }, [uploadStatus.phase]);
+  const lastWhisperResultAtRef = useRef<number>(0);
+  const BUBBLE_GAP_MS = 2500;
 
   // Warm up the Whisper worker + model as soon as the session mounts so the
   // first transcription result doesn't have to wait for a cold model download.
@@ -96,7 +111,16 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     whisperPendingRef.current = null;
     try {
       const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
-      if (result.text.trim()) setWhisperLiveText(result.text);
+      if (result.text.trim()) {
+        const now = Date.now();
+        const gap = now - lastWhisperResultAtRef.current;
+        lastWhisperResultAtRef.current = now;
+        setWhisperBubbles((prev) =>
+          prev.length === 0 || gap > BUBBLE_GAP_MS
+            ? [...prev, result.text]
+            : [...prev.slice(0, -1), result.text],
+        );
+      }
     } catch (err) {
       console.error('[Whisper live preview]', err);
     }
@@ -144,7 +168,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     ]);
     patchSession({ status: 'recording' });
 
-    setWhisperLiveText('');
+    setWhisperBubbles([]);
+    lastWhisperResultAtRef.current = 0;
     whisperPendingRef.current = null;
     recorder.onChunk.current = handleChunk;
 
@@ -195,8 +220,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
             const est = await navigator.storage.estimate();
             const available = (est.quota ?? 0) - (est.usage ?? 0);
             if (available > 0 && finalBlob.size > available * 0.9) {
-              // Hard stop — saving would consume more than 90% of remaining space.
-              toast.error('Not enough device storage to save this recording.');
               patchClip(clipId, {
                 status: 'failed',
                 errorMessage: 'Not enough device storage to save this recording.',
@@ -230,7 +253,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         // Chunk cleanup is best-effort — failure doesn't affect the saved clip.
         audioRepository.clearChunks(clipId).catch((e) => {
           console.warn('[useRecordingFlow] clearChunks failed:', e);
-          toast.warning('Storage cleanup failed — some space may not be recovered.');
         });
         patchClip(clipId, { status: 'ready', durationSec });
       } else {
@@ -261,11 +283,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   // ── Audio upload ─────────────────────────────────────────────────────────
   async function handleUploadAudio(file: File): Promise<string | null> {
     if (file.size > MAX_AUDIO_BYTES) {
-      toast.error('File too large — Whisper accepts up to 25 MB.');
+      setUploadStatus({ phase: 'error', message: 'File too large — max 25 MB.' });
       return null;
     }
     if (file.type && !/^(audio|video)\//.test(file.type)) {
-      toast.error('Please upload an audio file (MP3, M4A, WAV, OGG, WebM, etc.).');
+      setUploadStatus({ phase: 'error', message: 'Please upload an audio or video file.' });
       return null;
     }
 
@@ -283,7 +305,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       },
     ]);
 
-    const tid = toast.loading('Uploading file…', { duration: Infinity });
+    setUploadStatus({ phase: 'reading', message: 'Reading file…' });
     try {
       const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'audio/mpeg' });
 
@@ -307,6 +329,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         /* duration stays 0 */
       }
 
+      setUploadStatus({ phase: 'saving', message: 'Saving audio…' });
       if (isSavingRef.current.has(clipId)) {
         console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
         return null;
@@ -319,13 +342,13 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
       patchClip(clipId, { status: 'ready', durationSec });
 
-      toast.success(`Added "${file.name}"`, { id: tid });
+      setUploadStatus({ phase: 'done', message: 'Audio added' });
       return clipId;
     } catch (e) {
       patchClips((clips) =>
         clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
       );
-      toast.error(`Upload failed: ${(e as Error).message}`, { id: tid });
+      setUploadStatus({ phase: 'error', message: `Upload failed: ${(e as Error).message}` });
       return null;
     }
   }
@@ -407,7 +430,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
     activeClipIdRef,
-    whisperLiveText,
+    whisperBubbles,
+    uploadStatus,
     handleStartRecording,
     handleStopRecording,
     handlePauseResume,

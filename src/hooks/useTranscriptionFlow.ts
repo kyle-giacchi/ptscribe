@@ -10,7 +10,7 @@ import { trimSilence } from '@/lib/audio/silenceTrim';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
 import { useActionGuard, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useActionGuard';
-import type { ClipStatus, Session, SessionClip, Settings } from '@/types';
+import type { ClipStatus, Session, SessionClip, Settings, TranscriptChunk } from '@/types';
 
 export interface DebugStats {
   droppedSec: number;
@@ -44,20 +44,22 @@ export interface UseTranscriptionFlowResult {
   // Handlers
   handleCreateTranscript: (clipId?: string) => Promise<void>;
   handleRevertToLocal: () => void;
-  handleRemergeFromClips: () => void;
 }
 
-const LOCAL_CHUNK_SEC = 180; // 3-minute segments fed to the Whisper worker
+const LOCAL_CHUNK_SEC = 120; // 2-minute segments — each maps to a real audio timestamp
 
 /**
  * Local-first transcription pipeline used by the background auto-pass.
  *
- * Pipeline: decode → VAD speech extraction → 3-min chunking → Whisper per chunk.
- * Decodes the blob once to 16 kHz Float32, strips silence with the ML VAD
- * (Silero), then splits speech-only audio into fixed-length chunks and sends
- * each Float32Array directly to the Whisper worker. This avoids re-encoding
- * between steps and prevents a single long file from blocking the worker
- * indefinitely.
+ * Pipeline: chunk original audio at 2-min boundaries → VAD per chunk →
+ * Whisper per chunk (parallel). Chunking the original audio first preserves
+ * real timestamps: chunk i always starts at i * LOCAL_CHUNK_SEC seconds in
+ * the recording. VAD runs per-chunk so silence within each bucket is still
+ * stripped before Whisper sees it.
+ *
+ * Returns structured { startSec, text } chunks so the transcript view can
+ * render timestamp headers at real audio positions instead of word-count
+ * estimates.
  *
  * See docs/invariants.md — "Local-first transcription".
  */
@@ -65,48 +67,66 @@ async function transcribeLocalChunked(
   blob: Blob,
   onProgress?: (msg: string) => void,
   signal?: AbortSignal,
-): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; text: string; chunks: TranscriptChunk[] } | { ok: false; error: string }> {
   const SR = 16000;
 
   onProgress?.('Decoding audio…');
   const samples = await blobToFloat32(blob);
 
-  // VAD: strip silence — non-fatal; falls back to full audio on error.
-  onProgress?.('Detecting speech…');
-  let speechSamples: Float32Array;
-  try {
-    const ranges = await findSpeechRangesML(samples, SR, DEFAULT_VAD_OPTIONS);
-    speechSamples = ranges.length > 0 ? extractRanges(samples, SR, ranges) : samples;
-  } catch {
-    speechSamples = samples;
+  if (samples.length < SR * 0.5) {
+    return { ok: false, error: 'Audio too short.' };
   }
 
-  if (speechSamples.length < SR * 0.5) {
-    return { ok: false, error: 'No speech detected in audio.' };
-  }
-
-  // Split into fixed-size chunks so each worker call stays bounded in time.
+  // Split original audio into 2-min windows; VAD each window independently.
+  // Chunking first ensures chunk i starts at exactly i * LOCAL_CHUNK_SEC seconds.
   const chunkLen = SR * LOCAL_CHUNK_SEC;
-  const chunks: Float32Array[] = [];
-  for (let offset = 0; offset < speechSamples.length; offset += chunkLen) {
-    chunks.push(speechSamples.slice(offset, offset + chunkLen));
+  const numChunks = Math.ceil(samples.length / chunkLen);
+
+  onProgress?.('Detecting speech…');
+  const speechChunks: { startSec: number; audio: Float32Array }[] = [];
+  for (let i = 0; i < numChunks; i++) {
+    const startSample = i * chunkLen;
+    const chunkAudio = samples.subarray(startSample, Math.min(startSample + chunkLen, samples.length));
+    const startSec = i * LOCAL_CHUNK_SEC;
+
+    let speech: Float32Array;
+    try {
+      const ranges = await findSpeechRangesML(chunkAudio, SR, DEFAULT_VAD_OPTIONS);
+      speech = ranges.length > 0 ? extractRanges(chunkAudio, SR, ranges) : chunkAudio;
+    } catch {
+      speech = chunkAudio;
+    }
+
+    if (speech.length >= SR * 0.5) {
+      speechChunks.push({ startSec, audio: speech });
+    }
+  }
+
+  if (speechChunks.length === 0) {
+    return { ok: false, error: 'No speech detected in audio.' };
   }
 
   const label = (n: number, total: number) =>
     total > 1 ? `Transcribing ${n}/${total} chunks…` : 'Transcribing…';
-  onProgress?.(label(0, chunks.length));
+  onProgress?.(label(0, speechChunks.length));
+
   const texts = await transcribeFloat32Parallel(
-    chunks,
+    speechChunks.map((c) => c.audio),
     LOCAL_WHISPER_DEFAULT_MODEL,
     (done, total) => { onProgress?.(label(done, total)); },
   );
-  if (signal?.aborted) return { ok: false, error: 'Aborted.' };
-  const parts = texts.filter((t) => t.trim()).map((t) => t.trim());
 
-  if (parts.length === 0) {
+  if (signal?.aborted) return { ok: false, error: 'Aborted.' };
+
+  const chunks: TranscriptChunk[] = speechChunks
+    .map((c, i) => ({ startSec: c.startSec, text: (texts[i] ?? '').trim() }))
+    .filter((c) => c.text);
+
+  if (chunks.length === 0) {
     return { ok: false, error: 'Whisper returned no text.' };
   }
-  return { ok: true, text: parts.join(' ') };
+
+  return { ok: true, text: chunks.map((c) => c.text).join(' '), chunks };
 }
 
 /**
@@ -155,6 +175,7 @@ export function useTranscriptionFlow(
     | {
         ok: true;
         text: string;
+        chunks?: TranscriptChunk[];
         trimReport?: { droppedSec: number; originalSec: number };
         speedReport?: { savedSec: number; originalSec: number };
       }
@@ -266,6 +287,8 @@ export function useTranscriptionFlow(
           patchClip(clip.id, {
             status: 'transcribed',
             transcript: result.text,
+            ...(useNova ? { aiTranscript: result.text } : {}),
+            transcriptChunks: useNova ? undefined : result.chunks,
             transcriptedAt: Date.now(),
             errorMessage: undefined,
           });
@@ -356,15 +379,17 @@ export function useTranscriptionFlow(
         totalSpeedOriginalSec,
       } = await runTranscribeLoop(pending, transcribed, true, controller.signal);
 
-      const merged = [...session.clips]
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((c) => textByClip.get(c.id))
-        .filter((t): t is string => Boolean(t && t.trim()))
-        .join('\n\n');
+      const merged = mergeClipTranscripts(
+        session.clips.map((c) => {
+          const t = textByClip.get(c.id);
+          return t ? { ...c, status: 'transcribed' as const, transcript: t } : c;
+        }),
+      );
 
       if (merged) {
         setTranscript(merged);
-        patchSession({ transcript: merged, transcriptSource: 'whisper', status: 'draft' });
+        // aiTranscript frozen here — localTranscript is preserved untouched
+        patchSession({ transcript: merged, transcriptSource: 'nova', aiTranscript: merged, status: 'draft' });
       } else {
         patchSession({ status: 'draft' });
       }
@@ -411,18 +436,6 @@ export function useTranscriptionFlow(
     toast.success('Reverted to local transcription.');
   }
 
-  function handleRemergeFromClips() {
-    if (!session) return;
-    const merged = mergeClipTranscripts(session.clips);
-    if (!merged) {
-      toast.error('No transcribed clips to merge.');
-      return;
-    }
-    setTranscript(merged);
-    patchSession({ transcript: merged, transcriptSource: 'whisper' });
-    toast.success('Transcript re-merged from clips.');
-  }
-
   transcribeClipBlobRef.current = transcribeClipBlob;
 
   // Background local-Whisper pass: automatically transcribes every newly-saved clip
@@ -456,27 +469,23 @@ export function useTranscriptionFlow(
               status: 'transcribed',
               transcript: result.text,
               localTranscript: result.text,
+              transcriptChunks: result.chunks,
               transcriptedAt: Date.now(),
               errorMessage: undefined,
             });
             toast.success(`Clip ${clip.index + 1} transcribed.`, { id: tid });
 
-            // Merge fresh result with other clips.  sessionRef has the latest
-            // clip list; override this clip's text directly to avoid a race
-            // with the React state update that follows patchClip above.
-            const freshClips = sessionRef.current?.clips ?? [];
-            const merged = [...freshClips]
-              .sort((a, b) => a.createdAt - b.createdAt)
-              .map((c) =>
-                c.id === clip.id
-                  ? result.text
-                  : (c.transcript || c.localTranscript || c.liveTranscript)?.trim(),
-              )
-              .filter((t): t is string => Boolean(t))
-              .join('\n\n');
+            // Merge fresh result with other clips. sessionRef has the latest clip list;
+            // override this clip's text directly to avoid a race with the React state
+            // update that follows patchClip above.
+            const freshClips = (sessionRef.current?.clips ?? []).map((c) =>
+              c.id === clip.id ? { ...c, status: 'transcribed' as const, transcript: result.text } : c,
+            );
+            const merged = mergeClipTranscripts(freshClips);
             if (merged) {
               setTranscript(merged);
-              patchSession({ transcript: merged, transcriptSource: 'whisper' });
+              // localTranscript frozen here — never overwritten by cloud pass
+              patchSession({ transcript: merged, transcriptSource: 'whisper', localTranscript: merged });
             }
           } else {
             patchClip(clip.id, { status: 'failed', errorMessage: result.error });
@@ -506,7 +515,6 @@ export function useTranscriptionFlow(
     recordAction,
     handleCreateTranscript,
     handleRevertToLocal,
-    handleRemergeFromClips,
   };
 }
 

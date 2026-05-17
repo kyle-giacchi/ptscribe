@@ -9,6 +9,7 @@ import {
   ClipboardList,
   LogOut,
   Settings as SettingsIcon,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -140,6 +141,20 @@ export function Sidebar({ onClose, className }: SidebarProps) {
               'PTScribe'}
           </div>
         </div>
+        <NavLink
+          to="/admin"
+          aria-label="Admin"
+          onClick={onClose}
+          className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            color: 'var(--color-pt-text-3)',
+          }}
+        >
+          <Terminal size={15} strokeWidth={1.75} />
+        </NavLink>
         <NavLink
           to="/settings"
           aria-label="Settings"
