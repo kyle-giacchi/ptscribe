@@ -246,10 +246,20 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   async function handleFinishedRecording() {
     if (!session) return;
     const clipId = activeClipIdRef.current;
-    activeClipIdRef.current = null;
 
+    // Stop accepting new chunks immediately, then drain any in-flight Whisper
+    // work so the last spoken segment's transcription lands before we clear clipId.
     recorder.onChunk.current = null;
+    if (whisperRunningRef.current) {
+      await whisperChainPromiseRef.current;
+    }
+    if (whisperPendingRef.current && !whisperRunningRef.current) {
+      whisperRunningRef.current = true;
+      await (whisperChainPromiseRef.current = processWhisperChunk());
+    }
     whisperPendingRef.current = null;
+
+    activeClipIdRef.current = null;
 
     const finalBlob = await recorder.stop();
     const durationSec = recorder.durationSec;
@@ -370,17 +380,19 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       let durationSec = 0;
       try {
         const url = URL.createObjectURL(blob);
-        let metaHandled = false;
         durationSec = await new Promise<number>((resolve) => {
           const audio = new Audio();
-          audio.onloadedmetadata = () => {
+          let settled = false;
+          const settle = (v: number) => {
+            if (settled) return;
+            settled = true;
             URL.revokeObjectURL(url);
-            if (!metaHandled) { metaHandled = true; resolve(isFinite(audio.duration) ? audio.duration : 0); }
+            resolve(v);
           };
-          audio.onerror = () => {
-            URL.revokeObjectURL(url);
-            if (!metaHandled) { metaHandled = true; resolve(0); }
-          };
+          // Guard against malformed files where neither event fires.
+          const t = window.setTimeout(() => settle(0), 3000);
+          audio.onloadedmetadata = () => { clearTimeout(t); settle(isFinite(audio.duration) ? audio.duration : 0); };
+          audio.onerror = () => { clearTimeout(t); settle(0); };
           audio.src = url;
         });
       } catch {
@@ -388,6 +400,20 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
 
       setUploadStatus({ phase: 'saving', message: 'Saving audio…' });
+      if (navigator?.storage?.estimate) {
+        try {
+          const est = await navigator.storage.estimate();
+          const available = (est.quota ?? 0) - (est.usage ?? 0);
+          if (available > 0 && blob.size > available * 0.9) {
+            patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
+            setUploadStatus({ phase: 'error', message: 'Not enough device storage to save this file.' });
+            return null;
+          }
+          if (available > 0 && blob.size > available * 0.8) {
+            addNotification('warning', 'Device storage is low — this file may not save completely.');
+          }
+        } catch { /* estimate unavailable — proceed */ }
+      }
       if (isSavingRef.current.has(clipId)) {
         console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
         return null;

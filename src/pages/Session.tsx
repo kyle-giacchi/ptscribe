@@ -392,7 +392,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
         {/* ① Record tab */}
         {activeTab === 'record' && (
-          <div style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div role="tabpanel" id="panel-record" aria-labelledby="tab-record" style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {showRecordWarning && (
               <div
                 style={{
@@ -479,6 +479,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         {activeTab === 'review' &&
           (isTranscriptLocked ? (
             <div
+              role="tabpanel"
+              id="panel-review"
+              aria-labelledby="tab-review"
               style={{
                 padding: '44px 24px',
                 textAlign: 'center',
@@ -498,6 +501,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             </div>
           ) : (
             <div
+              role="tabpanel"
+              id="panel-review"
+              aria-labelledby="tab-review"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
@@ -562,7 +568,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
         {/* ③ Clips tab */}
         {activeTab === 'clips' && (
-          <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div role="tabpanel" id="panel-clips" aria-labelledby="tab-clips" style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"

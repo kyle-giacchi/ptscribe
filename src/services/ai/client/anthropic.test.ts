@@ -115,16 +115,11 @@ describe('callAnthropic — retry logic', () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('retries on 429 and returns the successful second response', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(textResponse(429, 'Rate Limited'))
-      .mockResolvedValueOnce(jsonResponse(200, { text: 'recovered' }));
+  it('throws immediately on 429 without retrying', async () => {
+    mockApiFetch.mockResolvedValueOnce(textResponse(429, 'Rate Limited'));
 
-    const promise = callAnthropic(baseArgs);
-    await vi.runAllTimersAsync();
-
-    expect(await promise).toEqual({ text: 'recovered' });
-    expect(mockApiFetch).toHaveBeenCalledTimes(2);
+    await expect(callAnthropic(baseArgs)).rejects.toThrow('Generate proxy failed (429)');
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
   });
 
   it('throws after all retries are exhausted', async () => {
