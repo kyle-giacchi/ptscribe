@@ -127,9 +127,11 @@ export function SessionTopBar({
           className="inline-flex items-center gap-0.5 p-1"
           style={{ background: 'var(--color-pt-surface-alt)', borderRadius: 10 }}
         >
-          <TabPill label="Record" icon={<Mic size={12} strokeWidth={2} />} active={activeTab === 'record'} onClick={() => onSetTab('record')} />
+          <TabPill id="tab-record" controls="panel-record" label="Record" icon={<Mic size={12} strokeWidth={2} />} active={activeTab === 'record'} onClick={() => onSetTab('record')} />
           {clipsCount > 0 && (
             <TabPill
+              id="tab-clips"
+              controls="panel-clips"
               label="Clips"
               icon={<List size={12} strokeWidth={2} />}
               active={activeTab === 'clips'}
@@ -138,6 +140,8 @@ export function SessionTopBar({
             />
           )}
           <TabPill
+            id="tab-review"
+            controls="panel-review"
             label="Review"
             icon={<FileText size={12} strokeWidth={2} />}
             active={activeTab === 'review'}
@@ -231,7 +235,7 @@ export function SessionTopBar({
 // ── Sub-components ──────────────────────────────────────────────
 
 function TabPill({
-  label, icon, active, onClick, badge, badgeHighlight,
+  label, icon, active, onClick, badge, badgeHighlight, id, controls,
 }: {
   label: string;
   icon: ReactNode;
@@ -239,11 +243,15 @@ function TabPill({
   onClick: () => void;
   badge?: string;
   badgeHighlight?: boolean;
+  id?: string;
+  controls?: string;
 }) {
   return (
     <button
       type="button"
       role="tab"
+      id={id}
+      aria-controls={controls}
       aria-selected={active}
       onClick={onClick}
       className="inline-flex items-center gap-1.5 transition-colors"

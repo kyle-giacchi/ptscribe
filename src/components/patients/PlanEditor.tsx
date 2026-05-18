@@ -69,6 +69,7 @@ export function PlanEditor({
             <li key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <input
                 type="checkbox"
+                aria-label={g.text}
                 checked={g.met}
                 onChange={() => toggleGoal(g.id)}
                 style={{ marginTop: 4 }}

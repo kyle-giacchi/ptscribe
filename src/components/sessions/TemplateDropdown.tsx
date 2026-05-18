@@ -100,7 +100,7 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
           </div>
 
           {/* Template list */}
-          <div role="listbox" style={{ maxHeight: 320, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 320, overflowY: 'auto' }}>
             {templates.length === 0 && (
               <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
                 No templates available.
@@ -109,58 +109,53 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
             {templates.map((t) => {
               const isActive = t.id === template?.id;
               const sectionSummary = t.sections.map((s) => s.label).join(', ');
-              return (
-                <div
-                  key={t.id}
-                  role="option"
-                  aria-selected={isActive}
-                  className="flex items-start gap-3 px-4 py-3"
-                  style={{
-                    borderBottom: '1px solid var(--color-pt-border)',
-                    background: isActive
-                      ? 'color-mix(in oklab, var(--color-pt-accent) 6%, var(--color-pt-surface))'
-                      : undefined,
-                    cursor: isActive ? 'default' : 'pointer',
-                  }}
-                  onClick={!isActive ? () => { onChange(t.id); setOpen(false); } : undefined}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-                        {t.name}
+              const content = (
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+                      {t.name}
+                    </span>
+                    {isActive && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          background: 'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)',
+                          color: 'var(--color-pt-accent-fg)',
+                        }}
+                      >
+                        <Check size={9} strokeWidth={3} />
+                        active
                       </span>
-                      {isActive && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                          style={{
-                            background: 'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)',
-                            color: 'var(--color-pt-accent-fg)',
-                          }}
-                        >
-                          <Check size={9} strokeWidth={3} />
-                          active
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--color-pt-text-2)' }}>
-                      {sectionSummary}
-                    </p>
+                    )}
                   </div>
-                  {!isActive && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost shrink-0 text-xs"
-                      style={{ height: 28, padding: '0 10px' }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onChange(t.id);
-                        setOpen(false);
-                      }}
-                    >
-                      Use
-                    </button>
-                  )}
+                  <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--color-pt-text-2)' }}>
+                    {sectionSummary}
+                  </p>
                 </div>
+              );
+              const sharedStyle = {
+                borderBottom: '1px solid var(--color-pt-border)',
+                background: isActive
+                  ? 'color-mix(in oklab, var(--color-pt-accent) 6%, var(--color-pt-surface))'
+                  : undefined,
+              };
+              if (isActive) {
+                return (
+                  <div key={t.id} className="flex items-start gap-3 px-4 py-3" style={sharedStyle}>
+                    {content}
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="flex w-full items-start gap-3 px-4 py-3"
+                  style={{ ...sharedStyle, cursor: 'pointer', border: 'none', background: sharedStyle.background }}
+                  onClick={() => { onChange(t.id); setOpen(false); }}
+                >
+                  {content}
+                </button>
               );
             })}
           </div>

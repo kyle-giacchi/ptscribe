@@ -21,6 +21,7 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
 
   return (
     <div
+      aria-hidden="true"
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       style={{ background: 'oklch(0.28 0.03 250 / 0.4)' }}
       onClick={onClose}

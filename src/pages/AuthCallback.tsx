@@ -2,6 +2,17 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authClient } from '@/lib/auth/client';
 
+function safePath(raw: string | null): string {
+  if (!raw) return '/';
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (url.origin !== window.location.origin) return '/';
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return '/';
+  }
+}
+
 export function AuthCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -19,8 +30,7 @@ export function AuthCallback() {
         if (error) {
           navigate('/login?error=invalid-link', { replace: true });
         } else {
-          const from = searchParams.get('from') ?? '/';
-          navigate(from, { replace: true });
+          navigate(safePath(searchParams.get('from')), { replace: true });
         }
       })
       .catch(() => {

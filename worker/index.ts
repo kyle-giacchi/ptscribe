@@ -87,16 +87,36 @@ export default {
 
     let res: Response;
     if (url.pathname.startsWith('/api/auth/')) {
+      const origin = request.headers.get('Origin');
+      if (origin && !isOriginAllowed(origin, request.url, env)) {
+        res = apiError('FORBIDDEN', 'Origin not allowed', 403);
+      } else {
+        const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+        if (!(await checkPreGateLimit(env, ip)).allowed) {
+          res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+        } else {
+          res = await createAuth(env, ctx).handler(request);
+        }
+      }
+    } else if (url.pathname.startsWith('/api/org/')) {
+      const origin = request.headers.get('Origin');
+      if (origin && !isOriginAllowed(origin, request.url, env)) {
+        res = apiError('FORBIDDEN', 'Origin not allowed', 403);
+      } else {
+        const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+        if (!(await checkPreGateLimit(env, ip)).allowed) {
+          res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+        } else {
+          res = await handleOrgRoute(request, env, ctx, url.pathname);
+        }
+      }
+    } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
       const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
       if (!(await checkPreGateLimit(env, ip)).allowed) {
         res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
       } else {
-        res = await createAuth(env, ctx).handler(request);
+        res = await handleModelFile(url, env);
       }
-    } else if (url.pathname.startsWith('/api/org/')) {
-      res = await handleOrgRoute(request, env, ctx, url.pathname);
-    } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
-      res = await handleModelFile(url, env);
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
     } else {
@@ -118,9 +138,9 @@ export default {
  *     tightened with a nonce later.
  *   - `worker-src 'self' blob:`: `MediaRecorder`, `timeStretch.worker.ts`, and
  *     transformers.js load from blob URLs.
- *   - `connect-src 'self' https://*.huggingface.co https://huggingface.co
- *     https://cdn-lfs.huggingface.co`: same-origin XHR/fetch for `/api/*`,
- *     plus HuggingFace model downloads when local Whisper is enabled.
+ *   - `connect-src 'self'`: same-origin XHR/fetch for `/api/*`. Model files
+ *     are served via `/api/model/*` (same-origin R2 proxy), so no HuggingFace
+ *     origin is needed here.
  *   - `media-src 'self' blob:`: <audio> sources blob URLs from IndexedDB.
  *   - `frame-ancestors 'none'`: blocks framing entirely (better than X-Frame).
  *   - `object-src 'none'`: no plugins; `base-uri 'self'`: no <base> hijack.
@@ -207,9 +227,21 @@ async function handleModelFile(url: URL, env: Env): Promise<Response> {
   const hfRes = await fetch(`https://huggingface.co/${key}`);
   if (!hfRes.ok) return new Response('Not found', { status: 404 });
 
+  const hfContentLength = Number(hfRes.headers.get('Content-Length') ?? 0);
+  const HF_SIZE_LIMIT = 200 * 1024 * 1024; // 200 MB
+  if (hfContentLength > HF_SIZE_LIMIT) return new Response('Not found', { status: 404 });
+
   const headers = new Headers(hfRes.headers);
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   return new Response(hfRes.body, { status: 200, headers });
+}
+
+function isOriginAllowed(origin: string, requestUrl: string, env: Env): boolean {
+  const workerOrigin = new URL(requestUrl).origin;
+  const allowed = env.ALLOWED_ORIGINS
+    ? new Set(env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean))
+    : new Set([workerOrigin, 'http://localhost:8080', 'http://localhost:8787']);
+  return allowed.has(origin);
 }
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
@@ -218,18 +250,8 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   }
 
   const origin = request.headers.get('Origin');
-  if (origin) {
-    const workerOrigin = new URL(request.url).origin;
-    const allowed = env.ALLOWED_ORIGINS
-      ? new Set(
-          env.ALLOWED_ORIGINS.split(',')
-            .map((o) => o.trim())
-            .filter(Boolean),
-        )
-      : new Set([workerOrigin, 'http://localhost:8080', 'http://localhost:8787']);
-    if (!allowed.has(origin)) {
-      return apiError('FORBIDDEN', 'Origin not allowed', 403);
-    }
+  if (origin && !isOriginAllowed(origin, request.url, env)) {
+    return apiError('FORBIDDEN', 'Origin not allowed', 403);
   }
 
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
@@ -460,6 +482,9 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   }
   if (!ALLOWED_GENERATE_MODELS.has(body.model)) {
     return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
+  }
+  if (body.user.length > 50_000) {
+    return apiError('MISSING_FIELDS', 'user prompt too large', 400);
   }
 
   // Compose the final system prompt server-side so the cached string is built

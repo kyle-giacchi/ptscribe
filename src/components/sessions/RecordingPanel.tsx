@@ -544,12 +544,10 @@ function ActiveRecordingCard({
                 className="text-[10px] font-medium px-1.5 py-0.5 rounded"
                 style={{ background: 'var(--color-pt-accent-soft)', color: 'var(--color-pt-accent-fg)' }}
               >
-                {/* TODO: restore dynamic tier once Web Speech is re-enabled */}
                 T2 · Whisper
               </span>
             </div>
             <div className="flex items-center gap-1">
-              {/* TODO: restore restart button once Web Speech is re-enabled */}
               <button
                 type="button"
                 role="switch"
