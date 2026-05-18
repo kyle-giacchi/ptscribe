@@ -1,24 +1,18 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // ── Model source routing ─────────────────────────────────────────────────────
-// In dev (Vite, port 8080) there is no Worker running, so we fall back to
-// HuggingFace directly and let the browser HTTP cache handle persistence.
-// In production the Worker serves model files at /api/model/* from R2, which
-// is same-origin — no tracking-protection blocks, no HuggingFace CDN dependency.
+// Mirrors whisper.worker.ts: dev hits HuggingFace directly; prod routes through
+// R2 at /api/model/* with a HuggingFace fallback baked into the fetch interceptor.
 const IS_DEV = (import.meta as unknown as { env: { DEV: boolean } }).env.DEV;
 
 const HF_HOST = 'https://huggingface.co';
 const R2_HOST = `${self.location.origin}/api/model`;
 
 env.remoteHost = HF_HOST;
-// In production our IDB fetch interceptor below is the single cache layer.
-// In dev, keep the browser HTTP cache so HuggingFace downloads persist.
 env.useBrowserCache = IS_DEV;
 env.allowLocalModels = false;
 
 // ── IDB model cache (production only) ───────────────────────────────────────
-// Caches downloaded model files across page loads and browser-cache evictions.
-// Errors are always swallowed — a cache failure must never block model loading.
 
 const IDB_NAME = 'ptscribe-model-cache';
 const IDB_STORE = 'files';
@@ -67,9 +61,6 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
 }
 
 // ── Fetch interceptor (production only) ─────────────────────────────────────
-// Sits in front of all fetches made by transformers.js inside this worker.
-// Requests to MODEL_HOST are served from IDB when available; on a miss the
-// response is fetched from R2 and written to IDB fire-and-forget.
 
 if (!IS_DEV) {
   const _originalFetch = globalThis.fetch.bind(globalThis);
@@ -122,15 +113,50 @@ if (!IS_DEV) {
 // ── Worker message types ─────────────────────────────────────────────────────
 
 type InMsg =
-  | { id: number; type: 'transcribe'; audio: Float32Array; model: string }
-  | { id: number; type: 'preload'; model: string };
+  | { id: number; type: 'preload'; model: string }
+  | { id: number; type: 'scrub'; text: string; model: string };
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
-  | { id: number; type: 'result'; text: string }
+  | { id: number; type: 'result'; scrubbed: string; entityCount: number }
   | { id: number; type: 'error'; error: string };
 
 const post = (msg: OutMsg) => (self as unknown as Worker).postMessage(msg);
+
+type Entity = {
+  entity_group: string;
+  score: number;
+  word: string;
+  start: number;
+  end: number;
+};
+
+function buildScrubbed(
+  text: string,
+  entities: Entity[],
+): { scrubbed: string; entityCount: number } {
+  // Sort by position, then drop overlapping spans (keep whichever starts first).
+  const sorted = [...entities].sort((a, b) => a.start - b.start);
+  const deduped: Entity[] = [];
+  let lastEnd = 0;
+  for (const entity of sorted) {
+    if (entity.start >= lastEnd) {
+      deduped.push(entity);
+      lastEnd = entity.end;
+    }
+  }
+
+  let result = '';
+  let cursor = 0;
+  for (const entity of deduped) {
+    result += text.slice(cursor, entity.start);
+    result += `[${entity.entity_group}]`;
+    cursor = entity.end;
+  }
+  result += text.slice(cursor);
+
+  return { scrubbed: result, entityCount: deduped.length };
+}
 
 let currentPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
 let currentModel = '';
@@ -143,10 +169,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     if (!currentPipeline || currentModel !== model) {
       currentPipeline = null;
       currentModel = '';
-      currentPipeline = await pipeline('automatic-speech-recognition', model, {
-        // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
-        // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
-        // and crashes because the required scale tensor is absent. 'basic' skips it.
+      currentPipeline = await pipeline('token-classification', model, {
         session_options: { graphOptimizationLevel: 'basic' },
         progress_callback: (p: {
           status: string;
@@ -161,22 +184,16 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     }
 
     if (msg.type === 'preload') {
-      post({ id, type: 'result', text: '' });
+      post({ id, type: 'result', scrubbed: '', entityCount: 0 });
       return;
     }
 
-    const audio = msg.audio;
-    type ASROutput = { text: string } | Array<{ text: string }>;
     const raw = await (
-      currentPipeline as unknown as (audio: Float32Array, opts: object) => Promise<ASROutput>
-    )(audio, {
-      sampling_rate: 16000,
-      chunk_length_s: 30,
-      stride_length_s: 5,
-    });
+      currentPipeline as unknown as (text: string, opts: object) => Promise<Entity[]>
+    )(msg.text, { aggregation_strategy: 'simple' });
 
-    const text = Array.isArray(raw) ? raw.map((r) => r.text).join(' ') : raw.text;
-    post({ id, type: 'result', text: text.trim() });
+    const { scrubbed, entityCount } = buildScrubbed(msg.text, raw);
+    post({ id, type: 'result', scrubbed, entityCount });
   } catch (err) {
     post({ id, type: 'error', error: (err as Error).message ?? 'Unknown worker error' });
   }

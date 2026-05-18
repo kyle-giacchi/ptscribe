@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useMatch, Link, NavLink } from 'react-router-dom';
-import { Bell, Menu, ArrowLeft, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal } from 'lucide-react';
+import { Bell, Menu, ArrowLeft, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal, HardDrive } from 'lucide-react';
+import { useStorageEstimate } from '@/hooks/useStorageEstimate';
 import { CommandPalette } from './CommandPalette';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -72,6 +73,7 @@ function formatRelativeTime(ts: number): string {
 
 function AlertsButton() {
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications();
+  const { localModelsUnavailable, available, loading: storageLoading } = useStorageEstimate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -85,28 +87,33 @@ function AlertsButton() {
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [open, markAllRead]);
 
-  const hasItems = notifications.length > 0;
+  const hasNotifications = notifications.length > 0;
   const hasUnread = unreadCount > 0;
+  const storageWarning = !storageLoading && localModelsUnavailable;
+  const hasItems = hasNotifications || storageWarning;
+  // Red for unread notifications; amber when only a storage warning is present.
+  const badgeColor = hasUnread ? '#dc2626' : '#d97706';
+  const showBadge = hasUnread || storageWarning;
 
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        aria-label={`Warnings and errors${hasUnread ? ` — ${unreadCount} unread` : ''}`}
+        aria-label={`Warnings and errors${hasUnread ? ` — ${unreadCount} unread` : storageWarning ? ' — storage low' : ''}`}
         onClick={() => setOpen((o) => !o)}
         className="relative flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
         style={{
           width: 44,
           height: 44,
           borderRadius: 8,
-          border: `1px solid ${open || hasUnread ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
+          border: `1px solid ${open || showBadge ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
           background: open ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
-          color: hasUnread ? '#dc2626' : open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+          color: hasUnread ? '#dc2626' : storageWarning ? '#d97706' : open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
           cursor: 'pointer',
         }}
       >
         <Bell size={15} strokeWidth={1.75} />
-        {hasUnread && (
+        {showBadge && (
           <span
             aria-hidden
             className="absolute flex items-center justify-center"
@@ -117,14 +124,14 @@ function AlertsButton() {
               height: 14,
               padding: '0 2px',
               borderRadius: 7,
-              background: '#dc2626',
+              background: badgeColor,
               color: '#fff',
               fontSize: 9,
               fontWeight: 700,
               lineHeight: '14px',
             }}
           >
-            {unreadCount > 9 ? '9+' : unreadCount}
+            {hasUnread ? (unreadCount > 9 ? '9+' : unreadCount) : '!'}
           </span>
         )}
       </button>
@@ -153,7 +160,7 @@ function AlertsButton() {
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-pt-text)' }}>
               Warnings &amp; Errors
             </span>
-            {hasItems && (
+            {hasNotifications && (
               <button
                 type="button"
                 onClick={clearAll}
@@ -184,6 +191,32 @@ function AlertsButton() {
             </div>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', maxHeight: 320, overflowY: 'auto' }}>
+              {storageWarning && (
+                <li
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    padding: '9px 14px',
+                    borderBottom: hasNotifications ? '1px solid var(--color-pt-border)' : 'none',
+                    alignItems: 'flex-start',
+                    background: 'rgba(217, 119, 6, 0.05)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0, marginTop: 1, color: '#d97706' }}>
+                    <HardDrive size={13} strokeWidth={2} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)', lineHeight: 1.45 }}>
+                      Local models unavailable
+                    </p>
+                    <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--color-pt-text-2)', lineHeight: 1.4 }}>
+                      {available !== null
+                        ? `${(available / (1024 * 1024)).toFixed(0)} MB free — on-device transcription and PII scrubbing need ~150 MB.`
+                        : 'Storage is too low for on-device transcription and PII scrubbing (~150 MB required).'}
+                    </p>
+                  </div>
+                </li>
+              )}
               {notifications.map((n, i) => (
                 <li
                   key={n.id}
