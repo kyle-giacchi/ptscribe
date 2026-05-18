@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   Sparkles, Loader2, Info, RotateCcw, ChevronDown,
   Search, ChevronLeft, ChevronRight, Edit3, Wand2,
-  Copy, List, Mic,
+  Copy, List, Mic, EyeOff,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
@@ -71,6 +71,10 @@ export function TranscriptPanel({
   onViewRecordings,
   clipsCount,
   onCopyTranscript,
+  onScrubPII,
+  onApplyScrub,
+  piiScrubbing,
+  piiProgress,
 }: {
   transcript: string;
   clips: SessionClip[];
@@ -89,6 +93,10 @@ export function TranscriptPanel({
   onViewRecordings?: () => void;
   clipsCount?: number;
   onCopyTranscript?: () => void;
+  onScrubPII?: (text: string) => Promise<{ scrubbed: string; entityCount: number }>;
+  onApplyScrub?: (scrubbed: string) => void;
+  piiScrubbing?: boolean;
+  piiProgress?: string | null;
 }) {
   const [pendingOverwrite, setPendingOverwrite] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -96,6 +104,7 @@ export function TranscriptPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
   const [improveBusy, setImproveBusy] = useState(false);
+  const [scrubResult, setScrubResult] = useState<{ scrubbed: string; entityCount: number } | null>(null);
 
   // Find & Replace (edit mode only)
   const [replaceStr, setReplaceStr] = useState('');
@@ -148,10 +157,39 @@ export function TranscriptPanel({
     }
   }
 
+  async function handleScrubPII() {
+    if (!onScrubPII) return;
+    setScrubResult(null);
+    try {
+      const result = await onScrubPII(transcript);
+      if (result.entityCount === 0) {
+        toast.info('No PII detected in transcript');
+      } else {
+        setScrubResult(result);
+      }
+    } catch {
+      toast.error('PII scan failed — try again');
+    }
+  }
+
   const showActionRow = canTranscribe || hasT2Transcript;
 
   return (
     <div className="space-y-3">
+      {/* ── Scrub PII confirm banner ── */}
+      {scrubResult !== null && (
+        <ConfirmBanner
+          message={`Found ${scrubResult.entityCount} PII item${scrubResult.entityCount !== 1 ? 's' : ''} — replace with redacted placeholders?`}
+          confirmLabel="Apply redaction"
+          onCancel={() => setScrubResult(null)}
+          onConfirm={() => {
+            onApplyScrub?.(scrubResult.scrubbed);
+            setScrubResult(null);
+            toast.success('PII redacted from transcript');
+          }}
+        />
+      )}
+
       {/* ── Confirm banners ── */}
       {pendingOverwrite ? (
         <ConfirmBanner
@@ -294,10 +332,10 @@ export function TranscriptPanel({
         {/* Panel body */}
         <div style={{ display: 'grid', gridTemplateRows: panelOpen ? '1fr' : '0fr', transition: 'grid-template-rows 200ms ease-out' }}>
           <div style={{ overflow: 'hidden' }}>
-            {/* Improve with AI — above the text editor */}
+            {/* Improve with AI + Scrub PII — above the text editor */}
             {transcript.trim() && (
               <div
-                className="flex items-center px-3 py-2"
+                className="flex items-center gap-1 px-3 py-2"
                 style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
               >
                 <button
@@ -312,6 +350,20 @@ export function TranscriptPanel({
                     : <Wand2 size={13} strokeWidth={2} />}
                   Improve with AI
                 </button>
+                {onScrubPII && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12 }}
+                    disabled={piiScrubbing}
+                    onClick={handleScrubPII}
+                    title="Scan transcript for names, dates, phone numbers, and other PII — replaces them with labeled placeholders."
+                  >
+                    {piiScrubbing
+                      ? <><Loader2 size={13} className="animate-spin" /> {piiProgress ?? 'Scanning…'}</>
+                      : <><EyeOff size={13} strokeWidth={2} /> Scrub PII</>}
+                  </button>
+                )}
               </div>
             )}
 
