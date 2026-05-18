@@ -612,6 +612,7 @@ function ActiveRecordingCard({
   analyser,
   webSpeech,
   whisperBubbles,
+  wasmSupported,
   onPauseResume,
   onStopAndFinish,
 }: {
@@ -621,6 +622,7 @@ function ActiveRecordingCard({
   analyser: AnalyserNode | null;
   webSpeech: UseWebSpeechTranscript;
   whisperBubbles: string[];
+  wasmSupported?: boolean;
   onPauseResume: () => void;
   onStopAndFinish: () => void;
 }) {
@@ -644,14 +646,23 @@ function ActiveRecordingCard({
                 className="text-[11px] font-semibold uppercase tracking-[0.18em]"
                 style={{ color: 'var(--color-pt-text-3)' }}
               >
-                Transcript · Live
+                Transcript
               </p>
-              <span
-                className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-                style={{ background: 'var(--color-pt-accent-soft)', color: 'var(--color-pt-accent-fg)' }}
-              >
-                T2 · Whisper
-              </span>
+              {wasmSupported !== false ? (
+                <span
+                  className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--color-pt-accent-soft)', color: 'var(--color-pt-accent-fg)' }}
+                >
+                  Live Transcription
+                </span>
+              ) : (
+                <span
+                  className="text-[10px] italic"
+                  style={{ color: 'var(--color-pt-text-3)' }}
+                >
+                  Live unavailable · processed after recording
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -912,6 +923,7 @@ export function RecordingPanel({
           analyser={recorder.analyser}
           webSpeech={webSpeech}
           whisperBubbles={whisperBubbles}
+          wasmSupported={capabilities?.wasmSupported}
           onPauseResume={onPauseResume}
           onStopAndFinish={onStopAndFinish}
         />

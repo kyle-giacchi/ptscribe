@@ -115,7 +115,7 @@ export default {
       if (!(await checkPreGateLimit(env, ip)).allowed) {
         res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
       } else {
-        res = await handleModelFile(url, env);
+        res = await handleModelFile(url, env, ctx);
       }
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
@@ -138,9 +138,9 @@ export default {
  *     tightened with a nonce later.
  *   - `worker-src 'self' blob:`: `MediaRecorder`, `timeStretch.worker.ts`, and
  *     transformers.js load from blob URLs.
- *   - `connect-src 'self'`: same-origin XHR/fetch for `/api/*`. Model files
- *     are served via `/api/model/*` (same-origin R2 proxy), so no HuggingFace
- *     origin is needed here.
+ *   - `connect-src 'self' https://huggingface.co`: same-origin XHR/fetch for`/api/*`.
+ *     Model files are served via `/api/model/*` (R2 proxy). HuggingFace is
+ *     a client-side fallback in whisper.worker.ts when the bucket is unseeded.
  *   - `media-src 'self' blob:`: <audio> sources blob URLs from IndexedDB.
  *   - `frame-ancestors 'none'`: blocks framing entirely (better than X-Frame).
  *   - `object-src 'none'`: no plugins; `base-uri 'self'`: no <base> hijack.
@@ -158,7 +158,7 @@ function withSecurityHeaders(res: Response, url: URL): Response {
     "img-src 'self' data: blob:",
     "media-src 'self' blob:",
     "font-src 'self' data: https://fonts.gstatic.com",
-    "connect-src 'self'",
+    "connect-src 'self' https://huggingface.co",
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -201,7 +201,7 @@ function withSecurityHeaders(res: Response, url: URL): Response {
   });
 }
 
-async function handleModelFile(url: URL, env: Env): Promise<Response> {
+async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
   if (!env.MODELS) {
     return new Response(JSON.stringify({ error: 'Model storage not configured' }), {
       status: 503,
@@ -231,9 +231,21 @@ async function handleModelFile(url: URL, env: Env): Promise<Response> {
   const HF_SIZE_LIMIT = 200 * 1024 * 1024; // 200 MB
   if (hfContentLength > HF_SIZE_LIMIT) return new Response('Not found', { status: 404 });
 
-  const headers = new Headers(hfRes.headers);
+  // Buffer the body so we can both return it and write it to R2.
+  const buffer = await hfRes.arrayBuffer();
+  const contentType = hfRes.headers.get('Content-Type') ?? 'application/octet-stream';
+
+  // Write to R2 fire-and-forget so future requests are served from cache.
+  ctx.waitUntil(
+    env.MODELS.put(key, buffer, {
+      httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+    }),
+  );
+
+  const headers = new Headers();
+  headers.set('Content-Type', contentType);
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-  return new Response(hfRes.body, { status: 200, headers });
+  return new Response(buffer, { status: 200, headers });
 }
 
 function isOriginAllowed(origin: string, requestUrl: string, env: Env): boolean {

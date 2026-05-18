@@ -260,6 +260,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── Derived display values ────────────────────────────────────────────────
+  const canGenerate =
+    transcript.trim().length > 0 &&
+    settings.ai.generation.provider === 'anthropic' &&
+    generateUsed < MAX_GENERATES_PER_SESSION;
+
   const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
@@ -354,25 +359,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         patient={patient}
         session={session}
         note={note}
-        template={template}
-        templates={templates}
-        activeTab={activeTab}
-        clipsCount={sortedClips.length}
-        hasNote={!!note}
-        noteFinalized={note?.finalized}
-        busy={busy}
-        transcript={transcript}
         totalDurationSec={totalDurationSec}
-        generateUsed={generateUsed}
-        generateCap={MAX_GENERATES_PER_SESSION}
-        generationReady={settings.ai.generation.provider === 'anthropic'}
         missingRequiredLabels={missingRequiredLabels}
         pendingDeleteSession={pendingDeleteSession}
-        onSetTab={setActiveTab}
-        onTemplateChange={handleTemplateChange}
-        onManageTemplates={() => setManageTemplatesOpen(true)}
-        onGenerate={handleGenerate}
-        onCopyTranscript={handleCopyTranscript}
         onCopyNote={handleCopyNote}
         onFinalize={handleFinalizeWrapped}
         onUnfinalize={handleUnfinalize}
@@ -533,10 +522,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   patient={patient}
                   note={note}
                   template={template}
+                  templates={templates}
                   transcript={transcript}
                   totalDurationSec={totalDurationSec}
                   busy={busy}
+                  canGenerate={canGenerate}
                   onSectionChange={handleSectionChange}
+                  onTemplateChange={handleTemplateChange}
+                  onManageTemplates={() => setManageTemplatesOpen(true)}
+                  onGenerate={handleGenerate}
                 />
               </div>
 
@@ -561,6 +555,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   }
                   onCreateTranscript={handleCreateTranscript}
                   onRevertToLocal={handleRevertToLocal}
+                  onAddRecording={() => setActiveTab('record')}
+                  onViewRecordings={() => setActiveTab('clips')}
+                  clipsCount={sortedClips.length}
+                  onCopyTranscript={handleCopyTranscript}
                 />
               </div>
             </div>
@@ -590,6 +588,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
                 />
               </label>
+              <div style={{ flex: 1 }} />
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setActiveTab('review')}
+                style={{ minHeight: 44, touchAction: 'manipulation' }}
+              >
+                <ArrowLeft size={14} strokeWidth={2} /> Return to Notes
+              </button>
             </div>
             <ClipsList clips={sortedClips} recordingDisabled={isRecording} onDeleteClip={handleDeleteClip} />
             {sortedClips.length > 0 && (

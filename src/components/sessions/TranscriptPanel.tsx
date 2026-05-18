@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import {
   Sparkles, Loader2, Info, RotateCcw, ChevronDown,
   Search, ChevronLeft, ChevronRight, Edit3, Wand2,
+  Copy, List, Mic,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
@@ -66,6 +67,10 @@ export function TranscriptPanel({
   onCommit,
   onCreateTranscript,
   onRevertToLocal,
+  onAddRecording,
+  onViewRecordings,
+  clipsCount,
+  onCopyTranscript,
 }: {
   transcript: string;
   clips: SessionClip[];
@@ -80,6 +85,10 @@ export function TranscriptPanel({
   onCommit: () => void;
   onCreateTranscript: (clipId?: string) => void;
   onRevertToLocal: () => void;
+  onAddRecording?: () => void;
+  onViewRecordings?: () => void;
+  clipsCount?: number;
+  onCopyTranscript?: () => void;
 }) {
   const [pendingOverwrite, setPendingOverwrite] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -201,6 +210,34 @@ export function TranscriptPanel({
 
           <div style={{ flex: 1 }} />
 
+          {/* Contextual nav actions */}
+          {onCopyTranscript && transcript.trim() && (
+            <button type="button" className="btn btn-ghost p-1.5" onClick={onCopyTranscript} title="Copy transcript" aria-label="Copy transcript">
+              <Copy size={13} strokeWidth={2} />
+            </button>
+          )}
+          {onViewRecordings && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ height: 28, padding: '0 8px', fontSize: 11.5 }}
+              onClick={onViewRecordings}
+            >
+              <List size={12} strokeWidth={2} />
+              {clipsCount != null && clipsCount > 0 ? `${clipsCount} Clip${clipsCount !== 1 ? 's' : ''}` : 'Clips'}
+            </button>
+          )}
+          {onAddRecording && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ height: 28, padding: '0 8px', fontSize: 11.5 }}
+              onClick={onAddRecording}
+            >
+              <Mic size={12} strokeWidth={2} /> Add Recording
+            </button>
+          )}
+
           {/* Search input (formatted view only) */}
           {panelOpen && !editMode && (
             <div className="relative flex items-center">
@@ -234,15 +271,6 @@ export function TranscriptPanel({
             </div>
           )}
 
-          {/* Improve with AI */}
-          {panelOpen && transcript.trim() && (
-            <button type="button" className="btn btn-ghost p-1.5" title="Improve transcript with AI"
-              disabled={improveBusy} onClick={handleImproveWithAI}
-              style={{ color: 'var(--color-fg-subtle)' }}>
-              {improveBusy ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} strokeWidth={2} />}
-            </button>
-          )}
-
           {/* Edit mode toggle */}
           {panelOpen && transcript.trim() && (
             <button type="button" className="btn btn-ghost p-1.5"
@@ -266,6 +294,27 @@ export function TranscriptPanel({
         {/* Panel body */}
         <div style={{ display: 'grid', gridTemplateRows: panelOpen ? '1fr' : '0fr', transition: 'grid-template-rows 200ms ease-out' }}>
           <div style={{ overflow: 'hidden' }}>
+            {/* Improve with AI — above the text editor */}
+            {transcript.trim() && (
+              <div
+                className="flex items-center px-3 py-2"
+                style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
+              >
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12 }}
+                  disabled={improveBusy}
+                  onClick={handleImproveWithAI}
+                >
+                  {improveBusy
+                    ? <Loader2 size={13} className="animate-spin" />
+                    : <Wand2 size={13} strokeWidth={2} />}
+                  Improve with AI
+                </button>
+              </div>
+            )}
+
             {editMode ? (
               /* Edit mode: find & replace + textarea */
               <>

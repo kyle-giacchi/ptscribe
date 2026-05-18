@@ -17,13 +17,13 @@ import {
   Zap,
 } from 'lucide-react';
 import { SurfaceCard, Eyebrow } from '@/components/design';
-import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
 import { BlobWaveform } from '@/components/audio/BlobWaveform';
+import { ClipsList } from '@/components/sessions/ClipsList';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { useAudioProcessing } from '@/hooks/useAudioProcessing';
 import { audioRepository } from '@/services/AudioRepository';
-import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { vault } from '@/lib/vault/vault';
 import type { Patient, Session } from '@/types';
@@ -536,13 +536,86 @@ function FeaturesCard() {
   );
 }
 
+// ─── Per-clip audio player ────────────────────────────────────────────────────
+
+function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob }) {
+  const { settings } = useSettings();
+  const { activeSilenced, activeSpedup, compilingSilence, compilingSpeed } =
+    useAudioProcessing(blob);
+  const su = settings.audio.speedUp;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: 'var(--color-pt-text-3)',
+        }}
+      >
+        Clip {clipIndex + 1}
+      </div>
+
+      {/* Full */}
+      <div>
+        <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)', marginBottom: 4 }}>
+          Full Audio Clip
+        </div>
+        <BlobWaveform blob={blob} />
+      </div>
+
+      {/* Silenced */}
+      <div>
+        <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+            Silenced Audio Clip
+          </span>
+          {activeSilenced && (
+            <span style={{ fontSize: 9.5, fontWeight: 600, color: '#10b981' }}>
+              −{activeSilenced.savedSec.toFixed(1)}s saved
+            </span>
+          )}
+        </div>
+        {compilingSilence ? (
+          <div className="flex items-center gap-1.5" style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+            <Loader2 size={11} className="animate-spin" /> Computing…
+          </div>
+        ) : activeSilenced ? (
+          <BlobWaveform blob={activeSilenced.blob} />
+        ) : null}
+      </div>
+
+      {/* Speed Up */}
+      <div>
+        <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+            Speed Up Audio Clip ({su.speed}×)
+          </span>
+          {activeSpedup && (
+            <span style={{ fontSize: 9.5, fontWeight: 600, color: '#10b981' }}>
+              −{activeSpedup.savedSec.toFixed(1)}s saved
+            </span>
+          )}
+        </div>
+        {compilingSpeed ? (
+          <div className="flex items-center gap-1.5" style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+            <Loader2 size={11} className="animate-spin" /> Computing…
+          </div>
+        ) : activeSpedup ? (
+          <BlobWaveform blob={activeSpedup.blob} />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ─── Session audio section (lazy-mounted on expand) ───────────────────────────
 
 function SessionAudioSection({ session }: { session: Session }) {
-  const [clipBlobs, setClipBlobs] = useState<(Blob | null)[]>([]);
-  const [mergedBlob, setMergedBlob] = useState<Blob | null>(null);
+  const [clipBlobs, setClipBlobs] = useState<Map<string, Blob>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [mergeError, setMergeError] = useState<string | null>(null);
   const vaultUnlocked = vault.isUnlocked();
 
   useEffect(() => {
@@ -551,21 +624,19 @@ function SessionAudioSection({ session }: { session: Session }) {
       return;
     }
     setLoading(true);
-    setMergeError(null);
     async function load() {
-      try {
-        const blobs = await Promise.all(session.clips.map((c) => audioRepository.load(c.id)));
-        setClipBlobs(blobs);
-        const valid = blobs.filter((b): b is Blob => b !== null);
-        if (valid.length > 0) {
-          const merged = await mergeAudioBlobs(valid);
-          setMergedBlob(merged);
-        }
-      } catch (e) {
-        setMergeError((e as Error).message);
-      } finally {
-        setLoading(false);
+      const entries = await Promise.all(
+        session.clips.map(async (c) => {
+          const blob = await audioRepository.load(c.id);
+          return [c.id, blob] as [string, Blob | null];
+        }),
+      );
+      const map = new Map<string, Blob>();
+      for (const [id, blob] of entries) {
+        if (blob) map.set(id, blob);
       }
+      setClipBlobs(map);
+      setLoading(false);
     }
     void load();
   }, [session.id, vaultUnlocked]);
@@ -586,108 +657,22 @@ function SessionAudioSection({ session }: { session: Session }) {
 
   if (loading) {
     return (
-      <div
-        className="flex items-center gap-2"
-        style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}
-      >
+      <div className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
         <Loader2 size={12} className="animate-spin" /> Loading audio from IndexedDB…
       </div>
     );
   }
 
-  const hasAny = clipBlobs.some((b) => b !== null);
-  if (!hasAny && !mergeError) {
-    return (
-      <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
-        No audio stored for this session.
-      </span>
-    );
-  }
+  const sortedClips = [...session.clips].sort((a, b) => a.index - b.index);
+  const clipsWithBlobs = sortedClips.filter((c) => clipBlobs.has(c.id));
+
+  if (clipsWithBlobs.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-4">
-      {session.clips.length > 0 && (
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--color-pt-text-3)',
-              marginBottom: 8,
-            }}
-          >
-            Raw Clips ({session.clips.length})
-          </div>
-          <div className="flex flex-col gap-2">
-            {session.clips.map((clip, i) => {
-              const blob = clipBlobs[i];
-              return (
-                <div
-                  key={clip.id}
-                  className="rounded-lg p-3"
-                  style={{
-                    border: '1px solid var(--color-pt-border)',
-                    background: 'var(--color-pt-surface-alt)',
-                  }}
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <span
-                      style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-pt-text)' }}
-                    >
-                      Clip {clip.index + 1}
-                    </span>
-                    <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}>
-                      {Math.round(clip.durationSec)}s · {clip.status}
-                    </span>
-                    <span className="ml-auto flex items-center gap-1">
-                      {clip.t1Transcript && <TierBadge tier={1} active />}
-                      {clip.t2Transcript && <TierBadge tier={2} active />}
-                      {clip.t3Transcript && <TierBadge tier={3} active />}
-                    </span>
-                  </div>
-                  {blob ? (
-                    <BlobWaveform blob={blob} />
-                  ) : (
-                    <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
-                      Audio file not found in storage
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {mergedBlob && (
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--color-pt-text-3)',
-              marginBottom: 8,
-            }}
-          >
-            Combined Audio + Processing
-          </div>
-          <AudioPreviewSection mergedAudioBlob={mergedBlob} />
-        </div>
-      )}
-
-      {mergeError && (
-        <div
-          className="flex items-center gap-2 rounded-lg p-3"
-          style={{ background: 'color-mix(in oklab, #ef4444 8%, transparent)' }}
-        >
-          <AlertCircle size={13} style={{ color: '#ef4444', flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: '#ef4444' }}>Merge error: {mergeError}</span>
-        </div>
-      )}
+    <div className="flex flex-col gap-6">
+      {clipsWithBlobs.map((clip) => (
+        <ClipAudioPlayer key={clip.id} clipIndex={clip.index} blob={clipBlobs.get(clip.id)!} />
+      ))}
     </div>
   );
 }
@@ -966,6 +951,10 @@ function AudioClipsAccordion({ session }: { session: Session }) {
   const { settings } = useSettings();
   const sd = settings.audio.silenceDetection;
   const su = settings.audio.speedUp;
+  const sortedClips = useMemo(
+    () => [...session.clips].sort((a, b) => a.index - b.index),
+    [session.clips],
+  );
 
   return (
     <div
@@ -1014,7 +1003,12 @@ function AudioClipsAccordion({ session }: { session: Session }) {
               ok={su.enabled}
             />
           </div>
-          <SessionAudioSection session={session} />
+          <ClipsList clips={sortedClips} />
+          {session.clips.length > 0 && (
+            <div className="mt-4">
+              <SessionAudioSection session={session} />
+            </div>
+          )}
         </div>
       )}
     </div>
