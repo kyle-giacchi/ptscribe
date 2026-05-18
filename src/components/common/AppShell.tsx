@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation, useMatch } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sidebar } from './Sidebar';
@@ -16,9 +16,11 @@ export function AppShell() {
   const sessionMatch = useMatch('/sessions/:id');
   const isSessionPage = !!sessionMatch;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     setSidebarOpen(false);
+    mainRef.current?.scrollTo(0, 0);
   }, [location.pathname]);
 
   const shellBox = {
@@ -71,7 +73,7 @@ export function AppShell() {
               patient information.
             </div>
           )}
-          <main className="overflow-auto" style={mainStyle}>
+          <main ref={mainRef} className="overflow-auto" style={mainStyle}>
             {pageTransition}
           </main>
         </div>
@@ -90,7 +92,7 @@ export function AppShell() {
         <Sidebar className="hidden md:grid" />
         <div className="grid min-w-0 overflow-hidden" style={{ gridTemplateRows: 'auto 1fr' }}>
           <TopBar onMenuOpen={() => setSidebarOpen(true)} />
-          <main className="overflow-auto" style={mainStyle}>
+          <main ref={mainRef} className="overflow-auto" style={mainStyle}>
             {pageTransition}
           </main>
         </div>

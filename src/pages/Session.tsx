@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Mic, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Mic, RotateCcw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
+import { SessionActionsContext } from '@/contexts/SessionActionsContext';
+import { audioRepository } from '@/services/AudioRepository';
+import { Modal } from '@/components/ui/Modal';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
@@ -39,7 +42,7 @@ export function SessionPage() {
 function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getSession } = useSessions();
   const { getPatient, updatePatient } = usePatients();
-  const { forSession } = useNotes();
+  const { forSession, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
   const { settings } = useSettings();
   const { updateSessionsSlice } = useAppData();
@@ -62,6 +65,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [recordingSkipped, setRecordingSkipped] = useState(quickMode);
   const [pendingDeleteSession, setPendingDeleteSession] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'record' | 'review' | 'clips'>(quickMode ? 'review' : 'record');
   // Once dismissed per session, the re-record warning does not resurface.
@@ -277,6 +281,37 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setActiveTab('review');
   }
 
+  // ── Reset session — wipe all recordings, transcripts, and the generated note ──
+  async function handleResetSession() {
+    setResetModalOpen(false);
+    if (!session) return;
+    if (recorder.status !== 'idle') {
+      toast.error('Stop recording before resetting the session.');
+      return;
+    }
+    await Promise.allSettled(session.clips.map((c) => audioRepository.remove(c.id)));
+    if (session.noteId) removeNote(session.noteId);
+    patchSession({
+      status: 'draft',
+      clips: [],
+      transcript: undefined,
+      t1Transcript: undefined,
+      t2Transcript: undefined,
+      t3Transcript: undefined,
+      editedTranscript: undefined,
+      activeTranscriptTier: undefined,
+      noteId: undefined,
+      durationMin: undefined,
+    });
+    setTranscript('');
+    setActiveTab('record');
+    setMergedAudioBlob(null);
+    setIsMerging(false);
+    setError(null);
+    setBusy(null);
+    setRecordingSkipped(false);
+  }
+
   // ── Upload audio + auto-transcribe ────────────────────────────────────────
   async function handleUpload(file: File) {
     const clipId = await handleUploadAudio(file);
@@ -304,6 +339,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }, [session?.clips, processingUploadClipId]);
 
   return (
+    <SessionActionsContext.Provider value={{ onResetSession: () => setResetModalOpen(true) }}>
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
 
       {/* ── Error banner ──────────────────────────────────── */}
@@ -593,7 +629,34 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           speedFactor={settings.audio.speedUp.speed}
         />
       )}
+
+      {/* ── Reset session confirmation ────────────────────── */}
+      <Modal
+        open={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        title="Reset Session"
+        size="sm"
+      >
+        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+          This will permanently delete all recordings and transcriptions for this session,
+          including any generated note. The session will return to a fresh state.
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button className="btn btn-ghost" onClick={() => setResetModalOpen(false)}>
+            Cancel
+          </button>
+          <button
+            className="btn"
+            style={{ background: 'var(--color-pt-danger, #dc2626)', color: '#fff', border: 'none' }}
+            onClick={() => void handleResetSession()}
+          >
+            <RotateCcw size={13} strokeWidth={2} />
+            Reset Session
+          </button>
+        </div>
+      </Modal>
     </div>
+    </SessionActionsContext.Provider>
   );
 }
 

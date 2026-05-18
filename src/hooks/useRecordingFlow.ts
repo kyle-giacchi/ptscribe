@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
+import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { transcribeLocally, preloadLocalWhisper, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
@@ -73,6 +74,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     setIsMerging,
   } = params;
 
+  const { addNotification } = useNotifications();
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
   const [whisperBubbles, setWhisperBubbles] = useState<string[]>([]);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>({ phase: 'idle', message: '' });
@@ -121,8 +123,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   // is in flight, it replaces the pending blob so we always process fresh audio.
   const whisperRunningRef = useRef(false);
   const whisperPendingRef = useRef<Blob | null>(null);
+  const whisperChainPromiseRef = useRef<Promise<void>>(Promise.resolve());
 
-  async function processWhisperChunk() {
+  async function processWhisperChunk(): Promise<void> {
     const blob = whisperPendingRef.current;
     if (!blob) { whisperRunningRef.current = false; return; }
     whisperPendingRef.current = null;
@@ -140,7 +143,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       console.error('[Whisper live preview]', err);
     }
     if (whisperPendingRef.current) {
-      void processWhisperChunk();
+      return processWhisperChunk();
     } else {
       whisperRunningRef.current = false;
     }
@@ -150,7 +153,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     whisperPendingRef.current = blob;
     if (whisperRunningRef.current) return;
     whisperRunningRef.current = true;
-    void processWhisperChunk();
+    whisperChainPromiseRef.current = processWhisperChunk();
   }
 
   // Prevents concurrent saves for the same clipId from corrupting each other mid-encryption.
@@ -205,14 +208,39 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     }
   }
 
-  function handlePauseResume() {
+  async function handlePauseResumeAsync() {
     if (recorder.status === 'recording') {
       recorder.pause();
       if (webSpeechEnabled) webSpeech.stop();
+      // Drain any in-flight Whisper work so the result appears as a bubble before pausing.
+      await whisperChainPromiseRef.current;
+      // Pick up any final chunk the recorder emitted during the pause transition.
+      if (whisperPendingRef.current && !whisperRunningRef.current) {
+        whisperRunningRef.current = true;
+        await (whisperChainPromiseRef.current = processWhisperChunk());
+      }
+      // Checkpoint: persist clip-level T1 and compile session-level T1 as a data safeguard.
+      const clipId = activeClipIdRef.current;
+      if (clipId && whisperTextRef.current.length > 0) {
+        patchClip(clipId, { t1Transcript: whisperTextRef.current.join(' ') });
+      }
+      const prevT1Texts = sortedClips
+        .filter((c) => c.id !== clipId)
+        .map((c) => c.t1Transcript?.trim())
+        .filter((t): t is string => Boolean(t));
+      const currentT1 = whisperTextRef.current.join(' ').trim();
+      const allT1Texts = [...prevT1Texts, ...(currentT1 ? [currentT1] : [])];
+      if (allT1Texts.length > 0) {
+        patchSession({ t1Transcript: allT1Texts.join('\n\n') });
+      }
     } else if (recorder.status === 'paused') {
       recorder.resume();
       if (webSpeechEnabled && webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
+  }
+
+  function handlePauseResume() {
+    void handlePauseResumeAsync();
   }
 
   async function handleFinishedRecording() {
@@ -242,7 +270,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
               return;
             }
             if (available > 0 && finalBlob.size > available * 0.8) {
-              toast.warning('Device storage is low — this recording may not save completely.');
+              addNotification('warning', 'Device storage is low — this recording may not save completely.');
             }
           } catch {
             // Estimate unavailable — proceed with save.
@@ -282,12 +310,26 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     }
 
-    if (webSpeechEnabled && clipId && webSpeech.accumulatedText.trim()) {
-      patchClip(clipId, { t1Transcript: webSpeech.accumulatedText.trim() });
+    const webSpeechT1 = webSpeechEnabled && clipId ? webSpeech.accumulatedText.trim() : '';
+    const whisperT1 = whisperTextRef.current.join(' ').trim();
+    const currentClipT1 = webSpeechT1 || whisperT1;
+
+    if (webSpeechEnabled && clipId && webSpeechT1) {
+      patchClip(clipId, { t1Transcript: webSpeechT1 });
     }
     webSpeech.reset();
     whisperTextRef.current = [];
-    patchSession({ status: 'draft' });
+
+    // Compile session-level T1 immediately so the debug page shows it before "Generate Notes".
+    const prevT1Texts = sortedClips
+      .filter((c) => c.id !== clipId)
+      .map((c) => c.t1Transcript?.trim())
+      .filter((t): t is string => Boolean(t));
+    const allT1Texts = [...prevT1Texts, ...(currentClipT1 ? [currentClipT1] : [])];
+    patchSession({
+      status: 'draft',
+      ...(allT1Texts.length > 0 ? { t1Transcript: allT1Texts.join('\n\n') } : {}),
+    });
   }
 
   // C3: Stop & finish now only stops the recording and switches to Review.
@@ -392,11 +434,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         const blobs = loaded.filter((b): b is Blob => b !== null);
         const dropped = readyClips.length - blobs.length;
         if (dropped > 0) {
-          toast.info(`${dropped} clip${dropped === 1 ? '' : 's'} could not be loaded for playback.`);
+          addNotification('warning', `${dropped} clip${dropped === 1 ? '' : 's'} could not be loaded for playback.`);
         }
         if (blobs.length > 0) setMergedAudioBlob(await mergeAudioBlobs(blobs));
       } catch (e) {
-        toast.error(`Could not combine clips: ${(e as Error).message}`);
+        addNotification('error', `Could not combine clips for playback: ${(e as Error).message}`);
       } finally {
         setIsMerging(false);
       }
