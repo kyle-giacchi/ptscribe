@@ -31,8 +31,8 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Session deletion (audio cleanup + demo-mode exception)                   | [workflows.md](workflows.md#session-deletion)                              |
 | Demo mode completion (discharge + reset modal)                            | [workflows.md](workflows.md#demo-mode-completion)                          |
 | Action guards (rate limits on transcribe + generate per session)          | [workflows.md](workflows.md#action-guards)                                 |
-| Whisper live preview during recording (leaky bucket, display-only)        | [workflows.md](workflows.md#whisper-live-preview-during-recording)         |
-| Three-tier transcription (T1 Web Speech / T2 Local Whisper / T3 Nova)    | [transcription.md](transcription.md#three-tier-model)                      |
+| Whisper live preview during recording (VAD segment recorder, T1 + display) | [workflows.md](workflows.md#whisper-live-preview-during-recording)        |
+| Four-tier transcription (T1 Whisper VAD segments / T2 Local Whisper / T3 Nova / Edited) | [transcription.md](transcription.md#three-tier-model)            |
 | Transcription write paths (auto-pass vs explicit Nova, field ownership)   | [transcription.md](transcription.md#write-paths)                           |
 | Transcription tier invariants (T2 never overwritten, source stamping)     | [transcription.md](transcription.md#key-invariants)                        |
 | Admin page — tier coverage diagnostic (`/admin`, Terminal icon)           | [transcription.md](transcription.md#admin-page-admin)                      |
@@ -112,7 +112,7 @@ State machines and step-by-step data flows for every major user journey. Read wh
 | Session deletion | Audio IDB cleanup + note removal; demo-mode exception resets instead of deletes |
 | Demo mode completion | Discharge patient → DemoCompleteModal → start fresh or keep |
 | Action guards | Rate limits on cloud transcription + generation per session |
-| Whisper live preview | Leaky-bucket display-only preview during recording; never persisted |
+| Whisper live preview | VAD segment recorder writes T1 transcript + drives display bubbles during recording |
 
 ### [docs/transcription.md](transcription.md)
 
@@ -120,12 +120,12 @@ Three-tier transcription system: Web Speech (T1), local Whisper auto-pass (T2), 
 
 | Section | Gist |
 |---------|------|
-| Three-tier model | Tier table: source, timing, quality, network requirement |
+| Four-tier model | Tier table: source, timing, quality, network requirement; Web Speech as opt-in T1 alternative |
 | Data fields | Every `Session` and `SessionClip` field per tier with writer ownership |
 | Write paths | Exact code flow for T2 auto-pass and T3 Nova pass |
 | Key invariants | T2 never overwritten by T3; correct `activeTranscriptTier` stamping; auto-pass always runs |
 | Revert to local | How revert reads `t2Transcript` without losing `t3Transcript` |
-| Schema version | v18 migration; legacy session fallback |
+| Schema version | v18 (four-tier fields), v19 (webSpeechEnabled gate); legacy session fallback |
 | Admin page | `/admin` diagnostic: coverage stats + per-session tier viewer |
 
 ### [docs/clinical-model.md](clinical-model.md)

@@ -247,6 +247,7 @@ const SettingsSchema = z.object({
     sidebarCollapsed: z.boolean(),
     densityMode: z.enum(['cozy', 'compact']),
     theme: z.enum(['system', 'light', 'dark']),
+    timezone: z.string().optional(),
   }),
   retention: z.object({
     autoDeleteAudioAfterDays: z.number().int().positive().optional(),

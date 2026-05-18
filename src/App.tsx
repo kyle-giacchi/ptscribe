@@ -10,6 +10,7 @@ import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { IdleLockProvider } from '@/contexts/IdleLockProvider';
+import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
@@ -38,6 +39,9 @@ const Templates = lazy(() => import('@/pages/Templates').then((m) => ({ default:
 const Exercises = lazy(() => import('@/pages/Exercises').then((m) => ({ default: m.Exercises })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
 const AdminPage = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.AdminPage })));
+const UserSettings = lazy(() =>
+  import('@/pages/UserSettings').then((m) => ({ default: m.UserSettings })),
+);
 
 function PageLoader() {
   return (
@@ -49,6 +53,7 @@ function PageLoader() {
 
 function AppProviders() {
   return (
+    <NotificationsProvider>
     <VaultGate>
       <AppDataProvider>
         <ClinicianProvider>
@@ -75,6 +80,7 @@ function AppProviders() {
                                     <Route path="/templates" element={<Templates />} />
                                     <Route path="/exercises" element={<Exercises />} />
                                     <Route path="/settings" element={<Settings />} />
+                                    <Route path="/account" element={<UserSettings />} />
                                     <Route path="/debug" element={<AdminPage />} />
                                   </Route>
                                   <Route
@@ -118,6 +124,7 @@ function AppProviders() {
         </ClinicianProvider>
       </AppDataProvider>
     </VaultGate>
+    </NotificationsProvider>
   );
 }
 
