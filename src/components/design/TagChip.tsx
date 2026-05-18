@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 export type TagKind = 'pain' | 'rom' | 'strength' | 'home' | 'note';
 
 export const TAG_TONES: Record<
@@ -22,7 +24,7 @@ export interface TagChipProps {
   text?: string;
 }
 
-export function TagChip({ kind, text }: TagChipProps) {
+export const TagChip = memo(function TagChip({ kind, text }: TagChipProps) {
   const t = TAG_TONES[kind];
   return (
     <span
@@ -61,7 +63,7 @@ export function TagChip({ kind, text }: TagChipProps) {
       {text && <span className="truncate">{text}</span>}
     </span>
   );
-}
+});
 
 export interface QuickTagButtonProps {
   kind: TagKind;
@@ -69,7 +71,11 @@ export interface QuickTagButtonProps {
   label?: string;
 }
 
-export function QuickTagButton({ kind, onClick, label }: QuickTagButtonProps) {
+export const QuickTagButton = memo(function QuickTagButton({
+  kind,
+  onClick,
+  label,
+}: QuickTagButtonProps) {
   const t = TAG_TONES[kind];
   return (
     <button
@@ -100,4 +106,4 @@ export function QuickTagButton({ kind, onClick, label }: QuickTagButtonProps) {
       <span>{label ?? t.label}</span>
     </button>
   );
-}
+});

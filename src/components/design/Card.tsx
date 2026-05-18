@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 
 export interface SurfaceCardProps extends HTMLAttributes<HTMLDivElement> {
@@ -8,7 +9,7 @@ export interface SurfaceCardProps extends HTMLAttributes<HTMLDivElement> {
   bordered?: boolean;
 }
 
-export function SurfaceCard({
+export const SurfaceCard = memo(function SurfaceCard({
   children,
   padding = 0,
   radius = 14,
@@ -31,14 +32,14 @@ export function SurfaceCard({
       {children}
     </div>
   );
-}
+});
 
 export interface EyebrowProps {
   children: ReactNode;
   className?: string;
 }
 
-export function Eyebrow({ children, className }: EyebrowProps) {
+export const Eyebrow = memo(function Eyebrow({ children, className }: EyebrowProps) {
   return (
     <div
       className={className}
@@ -53,4 +54,4 @@ export function Eyebrow({ children, className }: EyebrowProps) {
       {children}
     </div>
   );
-}
+});

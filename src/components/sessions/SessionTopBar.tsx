@@ -1,40 +1,18 @@
 // src/components/sessions/SessionTopBar.tsx
-import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { isDemoMode } from '@/lib/demoMode';
 import { ProfileButton } from '@/components/common/TopBar';
 import {
-  ArrowLeft, CheckCircle2, Copy, FileText, List, LockOpen,
-  Mic, Sparkles, Loader2,
+  CheckCircle2, Copy, LockOpen,
 } from 'lucide-react';
-import { TemplateDropdown } from './TemplateDropdown';
-import type { Patient, Session, Note, NoteTemplate } from '@/types';
-
-type Busy = null | 'transcribing' | 'generating';
+import type { Patient, Session, Note } from '@/types';
 
 export interface SessionTopBarProps {
   patient: Patient;
   session: Session;
   note: Note | undefined;
-  template: NoteTemplate | undefined;
-  templates: NoteTemplate[];
-  activeTab: 'record' | 'review' | 'clips';
-  clipsCount: number;
-  hasNote: boolean;
-  noteFinalized: boolean | undefined;
-  busy: Busy;
-  transcript: string;
   totalDurationSec: number;
-  generateUsed: number;
-  generateCap: number;
-  generationReady: boolean;
   missingRequiredLabels: string[];
   pendingDeleteSession: boolean;
-  onSetTab: (tab: 'record' | 'review' | 'clips') => void;
-  onTemplateChange: (id: string) => void;
-  onManageTemplates: () => void;
-  onGenerate: () => void;
-  onCopyTranscript: () => void;
   onCopyNote: () => void;
   onFinalize: () => void;
   onUnfinalize: () => void;
@@ -48,14 +26,10 @@ const SESSION_TYPE_LABEL: Record<string, string> = {
 };
 
 export function SessionTopBar({
-  patient, session, note, template, templates,
-  activeTab, clipsCount, hasNote, noteFinalized,
-  busy, transcript, totalDurationSec,
-  generateUsed, generateCap, generationReady,
+  patient, session, note,
+  totalDurationSec,
   missingRequiredLabels, pendingDeleteSession,
-  onSetTab,
-  onTemplateChange, onManageTemplates,
-  onGenerate, onCopyTranscript, onCopyNote, onFinalize, onUnfinalize,
+  onCopyNote, onFinalize, onUnfinalize,
 }: SessionTopBarProps) {
   const sessionDate = new Date(session.date);
   const dayLabel = sessionDate.toLocaleDateString(undefined, { weekday: 'short' });
@@ -65,10 +39,6 @@ export function SessionTopBar({
   const diagnosis = patient.primaryDiagnosis ?? '';
   const sessionTypeLabel = SESSION_TYPE_LABEL[session.type] ?? session.type;
   const subtitle = [sessionTypeLabel, diagnosis].filter(Boolean).join(' · ');
-
-  const canGenerate = transcript.trim().length > 0 && generationReady && generateUsed < generateCap;
-  const isGenerating = busy === 'generating';
-  const hasDraftContent = !!note?.sections.some((s) => s.body.trim().length > 0);
 
   return (
     <div style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface)' }}>
@@ -92,14 +62,6 @@ export function SessionTopBar({
 
       {/* ── Row 1: patient breadcrumb ── */}
       <div className="flex items-start gap-3 px-5 pt-3">
-        <Link
-          to={`/patients/${patient.id}`}
-          className="inline-flex items-center gap-1 shrink-0 text-xs font-medium mt-0.5"
-          style={{ color: 'var(--color-pt-text-2)', textDecoration: 'none' }}
-        >
-          <ArrowLeft size={13} strokeWidth={2} />
-          Back
-        </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-pt-text)' }}>
             {patient.firstName} {patient.lastName}
@@ -120,81 +82,12 @@ export function SessionTopBar({
         <ProfileButton />
       </div>
 
-      {/* ── Row 2: tabs + recording control ── */}
-      <div className="flex items-center gap-3 px-5 pt-2.5 pb-1.5">
-        <div
-          role="tablist"
-          className="inline-flex items-center gap-0.5 p-1"
-          style={{ background: 'var(--color-pt-surface-alt)', borderRadius: 10 }}
-        >
-          <TabPill id="tab-record" controls="panel-record" label="Record" icon={<Mic size={12} strokeWidth={2} />} active={activeTab === 'record'} onClick={() => onSetTab('record')} />
-          {clipsCount > 0 && (
-            <TabPill
-              id="tab-clips"
-              controls="panel-clips"
-              label="Clips"
-              icon={<List size={12} strokeWidth={2} />}
-              active={activeTab === 'clips'}
-              onClick={() => onSetTab('clips')}
-              badge={String(clipsCount)}
-            />
-          )}
-          <TabPill
-            id="tab-review"
-            controls="panel-review"
-            label="Review"
-            icon={<FileText size={12} strokeWidth={2} />}
-            active={activeTab === 'review'}
-            onClick={() => onSetTab('review')}
-            badge={hasNote ? (noteFinalized ? 'Final' : 'Draft') : undefined}
-            badgeHighlight={!!noteFinalized}
-          />
-        </div>
-      </div>
-
-      {/* ── Row 3: Review-only action cluster ── */}
-      {activeTab === 'review' && !pendingDeleteSession && (
+      {/* ── Row 2: action cluster ── */}
+      {!pendingDeleteSession && (
         <div
           className="flex flex-wrap items-center gap-2 px-5 pt-2 pb-2.5"
           style={{ borderTop: '1px solid var(--color-pt-border)' }}
         >
-          <TemplateDropdown
-            template={template}
-            templates={templates}
-            onChange={onTemplateChange}
-            onManage={onManageTemplates}
-          />
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ height: 32, padding: '0 12px', fontSize: 12.5, boxSizing: 'border-box' }}
-            disabled={!canGenerate || isGenerating}
-            onClick={onGenerate}
-            title={
-              !generationReady
-                ? 'Enable Anthropic generation in Settings'
-                : generateUsed >= generateCap
-                ? `Per-session limit reached (${generateUsed}/${generateCap})`
-                : `${hasDraftContent ? 'Regenerate' : 'Generate'} note from transcript (${generateUsed}/${generateCap} used)`
-            }
-          >
-            {isGenerating ? (
-              <><Loader2 size={13} className="animate-spin" /> Generating…</>
-            ) : (
-              <><Sparkles size={13} strokeWidth={2} /> {hasDraftContent ? 'Regenerate' : 'Generate'}</>
-            )}
-          </button>
-          <div style={{ flex: 1 }} />
-          {transcript.trim() && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ height: 32, padding: '0 10px', fontSize: 12, boxSizing: 'border-box' }}
-              onClick={onCopyTranscript}
-            >
-              <Copy size={13} strokeWidth={2} /> Copy Transcription
-            </button>
-          )}
           {note && (
             <button
               type="button"
@@ -205,6 +98,7 @@ export function SessionTopBar({
               <Copy size={13} strokeWidth={2} /> Copy Notes
             </button>
           )}
+          <div style={{ flex: 1 }} />
           {note?.finalized ? (
             <button
               type="button"
@@ -233,55 +127,6 @@ export function SessionTopBar({
 }
 
 // ── Sub-components ──────────────────────────────────────────────
-
-function TabPill({
-  label, icon, active, onClick, badge, badgeHighlight, id, controls,
-}: {
-  label: string;
-  icon: ReactNode;
-  active: boolean;
-  onClick: () => void;
-  badge?: string;
-  badgeHighlight?: boolean;
-  id?: string;
-  controls?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      id={id}
-      aria-controls={controls}
-      aria-selected={active}
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 transition-colors"
-      style={{
-        padding: '5px 11px',
-        borderRadius: 8,
-        fontSize: 12.5,
-        fontWeight: 600,
-        color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
-        background: active ? 'var(--color-pt-surface)' : 'transparent',
-        boxShadow: active ? '0 1px 2px rgba(26,32,48,0.06)' : 'none',
-        border: 'none',
-        cursor: 'pointer',
-      }}
-    >
-      {icon}
-      {label}
-      {badge && (
-        <span style={{
-          fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 999,
-          background: badgeHighlight ? 'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)' : 'rgba(26,32,48,0.08)',
-          color: badgeHighlight ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
-        }}>
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
-
 
 function StatusBadge({ status, finalized }: { status: string; finalized: boolean }) {
   const label = finalized ? 'final' : status === 'ready' ? 'ready' : 'draft';
