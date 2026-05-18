@@ -67,14 +67,14 @@ async function seedModel(modelId: string): Promise<void> {
     const buf = Buffer.from(await res.arrayBuffer());
 
     // wrangler r2 object put reads from stdin when --pipe is set.
-    // Use execFileSync so we avoid shell quoting issues on Windows.
+    // shell: true is required on Windows to execute .cmd wrapper scripts.
     const wrangler = process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler';
     const wranglerBin = path.join('node_modules', '.bin', wrangler);
 
     execFileSync(
       wranglerBin,
       ['r2', 'object', 'put', `${BUCKET}/${r2Key}`, '--pipe', '--content-type', ct],
-      { input: buf, stdio: ['pipe', 'pipe', 'inherit'] },
+      { input: buf, stdio: ['pipe', 'pipe', 'inherit'], shell: true },
     );
 
     console.log(`✓  (${(buf.byteLength / 1024).toFixed(0)} KB)`);
