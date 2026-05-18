@@ -95,6 +95,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const startedAtRef = useRef<number>(0);
   const accumulatedRef = useRef<number>(0);
   const stopResolveRef = useRef<((b: Blob | null) => void) | null>(null);
+  const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** True while we expect the recorder to be active; guards unexpected-stop detection. */
   const shouldBeRecordingRef = useRef(false);
   /** Mime type of the current recording, saved for blob reconstruction in interruption paths. */
@@ -154,6 +155,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       const sentinel = wakeLockRef.current;
       wakeLockRef.current = null;
       void releaseWakeLock(sentinel);
+    }
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
     }
     // Resolve any in-flight stop() Promise so callers don't hang on reset/error/unmount.
     if (stopResolveRef.current) {
@@ -370,6 +375,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           // which produces clean standalone blobs per utterance. Main recorder is IDB only.
         };
         recorder.onstop = () => {
+          if (stopTimeoutRef.current) {
+            clearTimeout(stopTimeoutRef.current);
+            stopTimeoutRef.current = null;
+          }
           const finalBlob = new Blob(chunksRef.current, {
             type: mimeType || 'audio/webm',
           });
@@ -474,6 +483,17 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       stopResolveRef.current = resolve;
       tickPause();
       r.stop();
+      // Safety net: if onstop never fires (browser bug, unusual state), resolve
+      // from whatever in-memory chunks exist so the caller never hangs forever.
+      stopTimeoutRef.current = setTimeout(() => {
+        const cb = stopResolveRef.current;
+        if (!cb) return;
+        stopResolveRef.current = null;
+        const fallback = chunksRef.current.length > 0
+          ? new Blob(chunksRef.current, { type: currentMimeRef.current })
+          : null;
+        cb(fallback);
+      }, 8000);
     });
   }, [blob, tickPause]);
 

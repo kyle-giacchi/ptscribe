@@ -207,6 +207,7 @@ export function TranscriptPanel({
               <Search size={12} strokeWidth={2} style={{ position: 'absolute', left: 7, color: 'var(--color-fg-subtle)', pointerEvents: 'none' }} />
               <input
                 type="text"
+                aria-label="Search transcript"
                 placeholder="Search…"
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setMatchIndex(0); }}
@@ -272,10 +273,10 @@ export function TranscriptPanel({
                   className="flex flex-wrap items-center gap-2 px-3 py-2"
                   style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
                 >
-                  <input type="text" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
+                  <input type="text" aria-label="Find" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
                     placeholder="Find" value={searchQuery}
                     onChange={(e) => { setSearchQuery(e.target.value); setReplaceCount(null); }} />
-                  <input type="text" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
+                  <input type="text" aria-label="Replace with" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
                     placeholder="Replace with" value={replaceStr}
                     onChange={(e) => setReplaceStr(e.target.value)} />
                   <button type="button" className="btn btn-secondary"

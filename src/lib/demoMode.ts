@@ -30,14 +30,5 @@ export function getDemoPassphrase(): string {
   return DEMO_VAULT_PASSPHRASE;
 }
 
-// Matches the AppGate hash shipped in src/lib/gate.ts. The hash is already in
-// source — this just reflects the same shipped value so demo users skip the
-// 6-digit code prompt. The Worker still enforces PTSCRIBE_GATE server-side.
-const DEMO_GATE_CODE = '112233';
-
-export function getDemoGateCode(): string {
-  return DEMO_GATE_CODE;
-}
-
 export const DEMO_PATIENT_ID = 'demo-patient';
 export const DEMO_SESSION_ID = 'demo-session';
