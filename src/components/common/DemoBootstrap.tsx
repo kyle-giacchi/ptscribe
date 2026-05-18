@@ -5,6 +5,7 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { isDemoMode, DEMO_PATIENT_ID, DEMO_SESSION_ID } from '@/lib/demoMode';
+import { preloadPrivacyFilter } from '@/services/ai/client/privacyFilter';
 import type { Patient, Session } from '@/types';
 
 const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;
@@ -12,6 +13,14 @@ const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;
 export function DemoBootstrap({ children }: { children: ReactNode }) {
   const demoMode = isDemoMode();
   const { clinician, setClinician } = useClinician();
+
+  // Runs once after vault unlock for both demo and real users (DemoBootstrap is
+  // inside VaultGate). Request persistent storage so the browser won't evict
+  // IDB model caches under pressure, then start the PII model download.
+  useEffect(() => {
+    void navigator.storage?.persist?.();
+    preloadPrivacyFilter();
+  }, []);
   const { patients, addPatient } = usePatients();
   const { sessions, addSession } = useSessions();
   const { templates } = useTemplates();
