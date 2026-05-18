@@ -38,6 +38,8 @@ export interface UseRecorder {
   recorderInterrupted: boolean;
   /** Set when the microphone track ended mid-recording (device disconnected, permission revoked). Audio from in-memory chunks is saved automatically. */
   micDisconnected: boolean;
+  /** True while the mic has been continuously silent for ≥ 30 s during active recording — possible muted or disconnected mic. Clears automatically when voice is detected again. */
+  silenceWarning: boolean;
   /** Live AnalyserNode from the voice detector — non-null while recording, null otherwise. */
   analyser: AnalyserNode | null;
   /**
@@ -59,6 +61,9 @@ const CHUNK_TIMESLICE_MS = 5000;
 // How often the heartbeat checks that MediaRecorder is still alive while we
 // expect it to be recording. Catches silent death when onstop never fires.
 const HEARTBEAT_INTERVAL_MS = 3000;
+
+// Continuous silence duration (seconds) before the muted-mic warning fires.
+const SILENCE_WARN_SEC = 30;
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;
@@ -85,6 +90,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const [idleAutoStopped, setIdleAutoStopped] = useState(false);
   const [recorderInterrupted, setRecorderInterrupted] = useState(false);
   const [micDisconnected, setMicDisconnected] = useState(false);
+  const [silenceWarning, setSilenceWarning] = useState(false);
+  const silenceWarnActiveRef = useRef(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -224,6 +231,17 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
             } catch { /* best-effort */ }
           }
         }
+      }
+
+      // ── Extended silence / muted-mic warning ───────────────────────────────
+      if (silenceMs >= SILENCE_WARN_SEC * 1000) {
+        if (!silenceWarnActiveRef.current) {
+          silenceWarnActiveRef.current = true;
+          setSilenceWarning(true);
+        }
+      } else if (silenceMs < 500 && silenceWarnActiveRef.current) {
+        silenceWarnActiveRef.current = false;
+        setSilenceWarning(false);
       }
 
       if (!limits) return;
@@ -411,6 +429,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         setIdleAutoStopped(false);
         setRecorderInterrupted(false);
         setMicDisconnected(false);
+        setSilenceWarning(false);
+        silenceWarnActiveRef.current = false;
         recorder.start(CHUNK_TIMESLICE_MS);
         shouldBeRecordingRef.current = true;
         audioRepository
@@ -511,6 +531,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     setIdleAutoStopped(false);
     setRecorderInterrupted(false);
     setMicDisconnected(false);
+    setSilenceWarning(false);
+    silenceWarnActiveRef.current = false;
   }, [teardown]);
 
   return {
@@ -529,6 +551,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     idleAutoStopped,
     recorderInterrupted,
     micDisconnected,
+    silenceWarning,
     analyser: voiceDetectorRef.current.analyser,
     onChunk: onChunkRef,
   };

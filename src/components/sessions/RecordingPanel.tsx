@@ -17,11 +17,13 @@ import {
 import { formatDuration } from '@/utils/format';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities';
 import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseWebSpeechTranscript, TranscriptSegment } from '@/hooks/useLiveTranscript';
 import type { UploadStatus } from '@/hooks/useRecordingFlow';
+import type { DeviceCapabilities } from '@/hooks/useDeviceCapabilities';
 import type { SessionClip } from '@/types';
 
 export interface RecordingPanelProps {
@@ -37,6 +39,38 @@ export interface RecordingPanelProps {
   onSkip: () => void;
   wasBackgrounded: boolean;
   onDismissBackgroundWarning: () => void;
+}
+
+// ── Muted-mic alert chime (Web Audio API) ─────────────────────────────────────
+// Two-tone ascending fifth (C5 → G5) at low gain — audible but unobtrusive.
+function playAlertChime(): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ??
+      (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    for (const [freq, start, dur] of [
+      [523.25, 0, 0.12],    // C5
+      [783.99, 0.15, 0.18], // G5
+    ] as [number, number, number][]) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0, now + start);
+      gain.gain.linearRampToValueAtTime(0.06, now + start + 0.02);
+      gain.gain.linearRampToValueAtTime(0, now + start + dur);
+      osc.start(now + start);
+      osc.stop(now + start + dur + 0.05);
+    }
+    setTimeout(() => void ctx.close(), 600);
+  } catch {
+    // AudioContext unavailable — skip chime
+  }
 }
 
 // ── Shared banner for all status/warning/info notices ─────────────────────────
@@ -118,41 +152,100 @@ function IdleRecordingCard({
   onSkip,
   uploadStatus,
   isAddingClip = false,
+  capabilities,
 }: {
   onStart: () => void;
   onUpload: (file: File) => void;
   onSkip: () => void;
   uploadStatus: UploadStatus;
   isAddingClip?: boolean;
+  capabilities?: DeviceCapabilities;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
   const hasStatusMessage = uploadStatus.phase !== 'idle';
 
+  const micBlocked = capabilities?.micPermission === 'denied';
+  const noRecorder = capabilities?.mediaRecorderSupported === false;
+  const recordBlocked = micBlocked || noRecorder;
+  const buttonDisabled = isUploading || recordBlocked;
+
+  const capBanners = !capabilities || capabilities.checking ? null : (
+    <>
+      {noRecorder && (
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+          Audio recording is not supported in this browser. Try Chrome, Edge, or Firefox.
+        </StatusBanner>
+      )}
+      {!noRecorder && micBlocked && (
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+          Microphone access is blocked — open your browser settings to allow it for this site.
+        </StatusBanner>
+      )}
+      {capabilities.storageCritical && (
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+          Device storage is critically low — recordings may fail to save. Free up space before recording.
+        </StatusBanner>
+      )}
+      {!capabilities.storageCritical && capabilities.storageLow && (
+        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
+          Device storage is low — long recordings may not save completely.
+        </StatusBanner>
+      )}
+      {!capabilities.wasmSupported && (
+        <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
+          Live transcription (Whisper) isn&apos;t available here — WebAssembly is blocked. Cloud transcription still works after recording.
+        </StatusBanner>
+      )}
+      {capabilities.isLowMemoryDevice && capabilities.wasmSupported && (
+        <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
+          Low-memory device detected — live transcription may be slow or skip segments.
+        </StatusBanner>
+      )}
+    </>
+  );
+
+  const hasBanners =
+    capabilities &&
+    !capabilities.checking &&
+    (micBlocked ||
+      noRecorder ||
+      capabilities.storageLow ||
+      capabilities.storageCritical ||
+      !capabilities.wasmSupported ||
+      capabilities.isLowMemoryDevice);
+
   return (
     <div className="flex flex-col items-center gap-8 py-12">
       <div className="flex flex-col items-center gap-5">
         <div className="relative">
-          <span
-            className="absolute inset-0 rounded-full"
-            style={{
-              background: 'var(--color-pt-accent)',
-              animation: 'pts-pulse-calm 2.8s ease-out infinite',
-            }}
-          />
+          {!recordBlocked && (
+            <span
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: 'var(--color-pt-accent)',
+                animation: 'pts-pulse-calm 2.8s ease-out infinite',
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={onStart}
             aria-label={isAddingClip ? 'Record another clip' : 'Start recording'}
-            disabled={isUploading}
+            disabled={buttonDisabled}
             className="relative flex items-center justify-center rounded-full transition-opacity"
             style={{
               width: 144,
               height: 144,
-              background: 'var(--color-pt-accent)',
+              background: recordBlocked
+                ? 'var(--color-pt-border-strong)'
+                : 'var(--color-pt-accent)',
               touchAction: 'manipulation',
-              boxShadow: '0 8px 32px color-mix(in srgb, var(--color-pt-accent) 35%, transparent)',
+              boxShadow: recordBlocked
+                ? 'none'
+                : '0 8px 32px color-mix(in srgb, var(--color-pt-accent) 35%, transparent)',
               opacity: isUploading ? 0.45 : 1,
+              cursor: recordBlocked ? 'not-allowed' : 'pointer',
             }}
           >
             <Mic size={52} strokeWidth={1.5} style={{ color: 'white' }} />
@@ -164,10 +257,23 @@ function IdleRecordingCard({
             {isAddingClip ? 'Record Another Clip' : 'Start Recording'}
           </span>
           <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
-            {isAddingClip ? 'Tap the mic to add a clip to this session' : 'Tap the mic to begin'}
+            {micBlocked
+              ? 'Microphone permission required'
+              : noRecorder
+                ? 'Recording not available in this browser'
+                : isAddingClip
+                  ? 'Tap the mic to add a clip to this session'
+                  : 'Tap the mic to begin'}
           </p>
         </div>
       </div>
+
+      {/* Device capability warnings */}
+      {hasBanners && (
+        <div className="w-full flex flex-col gap-2">
+          {capBanners}
+        </div>
+      )}
 
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-1" style={{ color: 'var(--color-pt-text-3)' }}>
@@ -697,7 +803,23 @@ export function RecordingPanel({
   onDismissBackgroundWarning,
 }: RecordingPanelProps) {
   const { settings } = useSettings();
+  const capabilities = useDeviceCapabilities();
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
+  const activelyRecording = recorder.status === 'recording';
+
+  const [silenceWarnDismissed, setSilenceWarnDismissed] = useState(false);
+
+  // Play chime once each time the silence warning fires.
+  useEffect(() => {
+    if (recorder.silenceWarning && activelyRecording) playAlertChime();
+    // activelyRecording excluded from deps — we only want to react to silenceWarning transitions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.silenceWarning]);
+
+  // Auto-clear the dismiss flag when voice resumes so the next silence period warns again.
+  useEffect(() => {
+    if (!recorder.silenceWarning) setSilenceWarnDismissed(false);
+  }, [recorder.silenceWarning]);
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
@@ -733,7 +855,7 @@ export function RecordingPanel({
   }, [recorder.status]);
 
   if (idle && !wasAutoStopped) {
-    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} />;
+    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} capabilities={capabilities} />;
   }
 
   return (
@@ -745,6 +867,16 @@ export function RecordingPanel({
           onDismiss={onDismissBackgroundWarning}
         >
           Tab was in the background — recording continued. Verify the clip duration after stopping.
+        </StatusBanner>
+      )}
+
+      {activelyRecording && recorder.silenceWarning && !silenceWarnDismissed && (
+        <StatusBanner
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+          color="negative"
+          onDismiss={() => setSilenceWarnDismissed(true)}
+        >
+          No audio detected for 30 seconds — microphone may be muted or disconnected. Check your mic and try speaking.
         </StatusBanner>
       )}
 
@@ -784,7 +916,7 @@ export function RecordingPanel({
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
-        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} />
+        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} capabilities={capabilities} />
       )}
 
       {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}
