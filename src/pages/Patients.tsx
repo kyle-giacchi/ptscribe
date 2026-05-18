@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Upload } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import {
@@ -18,6 +19,7 @@ import { newId } from '@/utils/ids';
 import { parseIsoDate, fmtIsoDateOptional, relativeFromNow } from '@/utils/dates';
 import { ageFromDob } from '@/utils/patients';
 import { useToggle } from '@/hooks/useToggle';
+import { useDebounce } from '@/hooks/useDebounce';
 import type { Patient, Sex } from '@/types';
 
 type StatusFilter = 'all' | 'on_track' | 'plateau' | 'flagged' | 'new';
@@ -29,6 +31,8 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'flagged', label: 'Flagged' },
   { value: 'new', label: 'New' },
 ];
+
+const PATIENT_ROW_HEIGHT = 64;
 
 interface PatientRowData {
   patient: Patient;
@@ -72,6 +76,7 @@ export function Patients() {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [open, openModal, closeModal] = useToggle();
   const [now] = useState(() => Date.now());
+  const debouncedQuery = useDebounce(query, 250);
 
   const sessionStats = useMemo(() => {
     const map = new Map<string, { count: number; last?: number; next?: number }>();
@@ -110,8 +115,8 @@ export function Patients() {
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (filter !== 'all' && r.displayStatus !== filter) return false;
-      if (!query) return true;
-      const q = query.toLowerCase();
+      if (!debouncedQuery) return true;
+      const q = debouncedQuery.toLowerCase();
       const p = r.patient;
       return (
         `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
@@ -121,7 +126,20 @@ export function Patients() {
         (p.icd10 ?? '').toLowerCase().includes(q)
       );
     });
-  }, [rows, filter, query]);
+  }, [rows, filter, debouncedQuery]);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => PATIENT_ROW_HEIGHT,
+    overscan: 8,
+  });
+
+  const handleSelect = useCallback(
+    (patientId: string) => navigate(`/patients/${patientId}`),
+    [navigate],
+  );
 
   return (
     <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
@@ -150,14 +168,31 @@ export function Patients() {
               No patients match this filter.
             </div>
           ) : (
-            filtered.map((row, i) => (
-              <PatientRow
-                key={row.patient.id}
-                data={row}
-                isLast={i === filtered.length - 1}
-                onSelect={() => navigate(`/patients/${row.patient.id}`)}
-              />
-            ))
+            <div
+              ref={listRef}
+              style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', overflowX: 'hidden' }}
+            >
+              <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+                  <div
+                    key={filtered[virtualRow.index].patient.id}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    <PatientRow
+                      data={filtered[virtualRow.index]}
+                      isLast={virtualRow.index === filtered.length - 1}
+                      onSelect={handleSelect}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </SurfaceCard>
       )}
@@ -231,7 +266,7 @@ function Toolbar({
 
 const COLS = '36px 1.6fr 1fr 1fr 1fr 1fr 120px';
 
-function TableHeader() {
+const TableHeader = memo(function TableHeader() {
   return (
     <div
       style={{
@@ -252,29 +287,31 @@ function TableHeader() {
       <Eyebrow>Status</Eyebrow>
     </div>
   );
-}
+});
 
-function PatientRow({
+const PatientRow = memo(function PatientRow({
   data,
   isLast,
   onSelect,
 }: {
   data: PatientRowData;
   isLast: boolean;
-  onSelect: () => void;
+  onSelect: (patientId: string) => void;
 }) {
   const { patient: p, sessionCount, lastVisit, nextVisit, tone, badgeLabel } = data;
   const age = ageFromDob(p.dob);
   const fullName = `${p.firstName} ${p.lastName}`.trim();
+  const handleClick = useCallback(() => onSelect(p.id), [onSelect, p.id]);
+
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onSelect();
+          handleClick();
         }
       }}
       className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
@@ -337,9 +374,9 @@ function PatientRow({
       <StatusBadge tone={tone} label={badgeLabel} />
     </div>
   );
-}
+});
 
-function ProgressCell({ count }: { count: number }) {
+const ProgressCell = memo(function ProgressCell({ count }: { count: number }) {
   if (count === 0) {
     return (
       <span
@@ -389,7 +426,7 @@ function ProgressCell({ count }: { count: number }) {
       </div>
     </div>
   );
-}
+});
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (

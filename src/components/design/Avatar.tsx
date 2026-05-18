@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 
 const VARIANTS = [
   { bg: '#e6f7f6', fg: '#0a6d70' }, // cyan
@@ -20,7 +20,7 @@ export interface AvatarProps {
   className?: string;
 }
 
-export function Avatar({ name, size = 32, className }: AvatarProps) {
+export const Avatar = memo(function Avatar({ name, size = 32, className }: AvatarProps) {
   const initials = useMemo(
     () =>
       (name || '?')
@@ -49,4 +49,4 @@ export function Avatar({ name, size = 32, className }: AvatarProps) {
       {initials}
     </div>
   );
-}
+});
