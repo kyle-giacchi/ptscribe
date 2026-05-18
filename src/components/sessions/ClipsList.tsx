@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { CheckCircle2, Clock, Loader2, Trash2, XCircle } from 'lucide-react';
 import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { formatDuration, wordCount } from '@/utils/format';
@@ -29,23 +29,23 @@ export function ClipsList({
           clip={clip}
           ordinal={i + 1}
           recordingDisabled={recordingDisabled}
-          onDelete={() => onDeleteClip(clip.id)}
+          onDeleteClip={onDeleteClip}
         />
       ))}
     </div>
   );
 }
 
-function ClipRow({
+const ClipRow = memo(function ClipRow({
   clip,
   ordinal,
   recordingDisabled,
-  onDelete,
+  onDeleteClip,
 }: {
   clip: SessionClip;
   ordinal: number;
   recordingDisabled: boolean;
-  onDelete: () => void;
+  onDeleteClip: (clipId: string) => void;
 }) {
   const [pendingDelete, setPendingDelete] = useState(false);
   const blocked = recordingDisabled || clip.status === 'transcribing';
@@ -127,7 +127,7 @@ function ClipRow({
               style={{ color: 'var(--color-negative)', touchAction: 'manipulation' }}
               onClick={() => {
                 setPendingDelete(false);
-                onDelete();
+                onDeleteClip(clip.id);
               }}
             >
               Delete
@@ -180,9 +180,9 @@ function ClipRow({
       )}
     </div>
   );
-}
+});
 
-export function ClipStatusBadge({ status }: { status: ClipStatus }) {
+export const ClipStatusBadge = memo(function ClipStatusBadge({ status }: { status: ClipStatus }) {
   const meta = clipBadgeMeta(status);
   return (
     <span
@@ -199,7 +199,7 @@ export function ClipStatusBadge({ status }: { status: ClipStatus }) {
       {meta.label}
     </span>
   );
-}
+});
 
 export function clipBadgeMeta(status: ClipStatus): {
   label: string;

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { memo, useRef, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Avatar,
   Eyebrow,
@@ -14,6 +15,8 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { relativeFromNow } from '@/utils/dates';
 import { shortLabelForType } from '@/utils/labels';
+import { useDebounce } from '@/hooks/useDebounce';
+import type { Note, Patient, Session } from '@/types';
 
 type StatusFilter = 'all' | 'draft' | 'finalized';
 
@@ -23,17 +26,27 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'finalized', label: 'Signed' },
 ];
 
+const NOTE_ROW_HEIGHT = 58;
+
+interface NoteRowData {
+  note: Note;
+  patient: Patient | undefined;
+  session: Session | undefined;
+}
+
 export function Notes() {
   const { notes } = useNotes();
   const { patients } = usePatients();
   const { sessions } = useSessions();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const debouncedQuery = useDebounce(query, 250);
 
-  const rows = useMemo(() => {
-    const patById = new Map(patients.map((p) => [p.id, p]));
-    const sessById = new Map(sessions.map((s) => [s.id, s]));
-    const q = query.trim().toLowerCase();
+  const patById = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients]);
+  const sessById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
+
+  const rows = useMemo<NoteRowData[]>(() => {
+    const q = debouncedQuery.trim().toLowerCase();
     return notes
       .map((note) => ({
         note,
@@ -50,7 +63,15 @@ export function Notes() {
         return note.sections.some((s) => s.body.toLowerCase().includes(q));
       })
       .sort((a, b) => b.note.updatedAt - a.note.updatedAt);
-  }, [notes, patients, sessions, query, statusFilter]);
+  }, [notes, patById, sessById, debouncedQuery, statusFilter]);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => NOTE_ROW_HEIGHT,
+    overscan: 8,
+  });
 
   return (
     <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
@@ -105,84 +126,37 @@ export function Notes() {
             No notes match.
           </div>
         ) : (
-          rows.map(({ note, patient, session }, i) => {
-            const tone = noteTone(note, session?.date);
-            const label = note.finalized
-              ? 'Signed'
-              : tone === 'flagged'
-                ? 'Overdue'
-                : 'Awaiting sign';
-            const fullName = patient
-              ? `${patient.firstName} ${patient.lastName}`
-              : 'Unknown patient';
-            return (
-              <Link
-                key={note.id}
-                to={`/sessions/${note.sessionId}`}
-                style={{ textDecoration: 'none' }}
-              >
+          <div
+            ref={listRef}
+            style={{ maxHeight: 'calc(100vh - 250px)', overflowY: 'auto', overflowX: 'hidden' }}
+          >
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => (
                 <div
-                  className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+                  key={rows[virtualRow.index].note.id}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '36px 1.6fr 1fr 1fr 130px',
-                    gap: 14,
-                    padding: '12px 18px',
-                    alignItems: 'center',
-                    borderBottom:
-                      i === rows.length - 1 ? 'none' : '1px solid var(--color-pt-border)',
-                    cursor: 'pointer',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  <Avatar name={fullName} size={32} />
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 13.5,
-                        fontWeight: 600,
-                        color: 'var(--color-pt-text)',
-                      }}
-                    >
-                      {fullName}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11.5,
-                        color: 'var(--color-pt-text-3)',
-                        fontFamily: 'var(--font-mono)',
-                        marginTop: 1,
-                      }}
-                    >
-                      {note.format.toUpperCase()}
-                      {session ? ` · ${shortLabelForType(session.type)}` : ''}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12.5,
-                      color: 'var(--color-pt-text-2)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {snippet(note.sections.find((s) => s.body)?.body) || '—'}
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
-                    {relativeFromNow(note.updatedAt)}
-                  </div>
-                  <StatusBadge tone={tone} label={label} />
+                  <NoteRow
+                    data={rows[virtualRow.index]}
+                    isLast={virtualRow.index === rows.length - 1}
+                  />
                 </div>
-              </Link>
-            );
-          })
+              ))}
+            </div>
+          </div>
         )}
       </SurfaceCard>
     </div>
   );
 }
 
-function TableHeader() {
+const TableHeader = memo(function TableHeader() {
   return (
     <div
       style={{
@@ -201,7 +175,70 @@ function TableHeader() {
       <Eyebrow>Status</Eyebrow>
     </div>
   );
-}
+});
+
+const NoteRow = memo(function NoteRow({
+  data,
+  isLast,
+}: {
+  data: NoteRowData;
+  isLast: boolean;
+}) {
+  const { note, patient, session } = data;
+  const tone = noteTone(note, session?.date);
+  const label = note.finalized ? 'Signed' : tone === 'flagged' ? 'Overdue' : 'Awaiting sign';
+  const fullName = patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown patient';
+
+  return (
+    <Link to={`/sessions/${note.sessionId}`} style={{ textDecoration: 'none' }}>
+      <div
+        className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '36px 1.6fr 1fr 1fr 130px',
+          gap: 14,
+          padding: '12px 18px',
+          alignItems: 'center',
+          borderBottom: isLast ? 'none' : '1px solid var(--color-pt-border)',
+          cursor: 'pointer',
+        }}
+      >
+        <Avatar name={fullName} size={32} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+            {fullName}
+          </div>
+          <div
+            style={{
+              fontSize: 11.5,
+              color: 'var(--color-pt-text-3)',
+              fontFamily: 'var(--font-mono)',
+              marginTop: 1,
+            }}
+          >
+            {note.format.toUpperCase()}
+            {session ? ` · ${shortLabelForType(session.type)}` : ''}
+          </div>
+        </div>
+        <div
+          style={{
+            fontSize: 12.5,
+            color: 'var(--color-pt-text-2)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {snippet(note.sections.find((s) => s.body)?.body) || '—'}
+        </div>
+        <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+          {relativeFromNow(note.updatedAt)}
+        </div>
+        <StatusBadge tone={tone} label={label} />
+      </div>
+    </Link>
+  );
+});
 
 function noteTone(note: { finalized: boolean; updatedAt: number }, visitDate?: number): StatusTone {
   if (note.finalized) return 'done';
