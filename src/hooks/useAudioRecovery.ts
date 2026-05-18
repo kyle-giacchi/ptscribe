@@ -31,7 +31,9 @@ export function useAudioRecovery(
           await audioRepository.clearChunks(clip.id);
           outcomes.push({ clipId: clip.id, ok: true });
         } catch (err) {
-          console.error(`Audio recovery failed for clip ${clip.id}:`, err);
+          if (import.meta.env.DEV) {
+            console.error(`[useAudioRecovery] Chunk recovery failed for clip ${clip.id}:`, err);
+          }
           outcomes.push({ clipId: clip.id, ok: false });
         }
       }

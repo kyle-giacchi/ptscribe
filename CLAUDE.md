@@ -1,6 +1,6 @@
 # CLAUDE.md — PTScribe
 
-**PTScribe** is a note-taking + transcription app for physical therapists, modeled on Heidi-style "record the visit, get a structured note." All clinical data stays on-device (`localStorage` + IndexedDB). Tracks patients, sessions (audio + transcript + generated note), customizable templates, an exercise library, and per-patient plans of care. Headline workflow: open a session → record (or dictate) → transcribe (Cloudflare Workers AI / Deepgram Nova-3) → generate a structured note (Anthropic) → finalize. A Cloudflare Worker serves as the AI proxy (`/api/*`) and auth backend (`/api/auth`); it never stores clinical data.
+**PTScribe** is a note-taking + transcription app for physical therapists, modeled on Heidi-style "record the visit, get a structured note." All clinical data stays on-device (`localStorage` + IndexedDB). Tracks patients, sessions (audio + transcript + generated note), customizable templates, an exercise library, and per-patient plans of care. Headline workflow: open a session → record (or dictate) → transcribe → generate a structured note (Anthropic) → finalize. Transcription has two paths: **cloud** (`@cf/deepgram/nova-3` via Cloudflare Workers AI, with speaker diarization) and **local** (on-device `Xenova/whisper-tiny.en` via `@huggingface/transformers` in a Web Worker). A Cloudflare Worker serves as the AI proxy (`/api/*`) and auth backend (`/api/auth`); it never stores clinical data.
 
 ## Before editing
 
@@ -20,10 +20,13 @@
 | Where does load-time validation happen?  | `DataRepository.load()` calls `safeParse()` on `AppDataSchema` once ([invariants.md:48](docs/invariants.md#schema-validation-at-boundaries))                                                                                                                        |
 | Which hook for which slice?              | Provider/mutator table at [architecture.md:58](docs/architecture.md#provider-responsibilities)                                                                                                                                                                      |
 | Built-in templates / exercises?          | Provider-level guards make `update`/`remove` no-ops when `builtin: true`. UI shows Clone, not Edit. ([invariants.md:73](docs/invariants.md#built-in-entities))                                                                                                      |
-| Default models?                          | Transcription = `@cf/deepgram/nova-3` (Cloudflare Workers AI, with speaker diarization); generation = `claude-sonnet-4-6` (Anthropic). Both reached through our Worker proxy at `/api/transcribe` and `/api/generate`; the browser never sees provider credentials. |
+| Default cloud transcription model?       | `@cf/deepgram/nova-3` (Cloudflare Workers AI, speaker diarization) via `/api/transcribe`. Allowlisted Whisper variants available in Settings.                                                                                                                       |
+| Default local transcription model?       | `Xenova/whisper-tiny.en` — see `src/services/ai/client/localWhisper.ts`. Model files served from R2 at `/api/model/*`; falls back to HuggingFace if R2 is empty. Pre-populate with `npx tsx scripts/seed-r2-models.ts`.                                            |
+| Default note generation model?           | `claude-sonnet-4-6` (Anthropic) via `/api/generate`; the browser never sees provider credentials.                                                                                                                                                                  |
 | ID generation?                           | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                                                                                                                                   |
 | Where is data encrypted?                 | Inside `DataRepository` (AppData) and `AudioRepository` (audio Blobs + chunks). AES-GCM via `src/lib/vault/`. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))                                                                            |
 | Who owns the wake lock during recording? | `useRecorder` — released on stop/reset/error/unmount. ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))                                                                                                           |
+| Demo mode build flag?                    | `VITE_DEMO_MODE=false` to disable. Default is **ON** — auto-unlocks vault with a hardcoded passphrase, skips first-run wizard, seeds a demo patient. Must be `false` for production builds.                                                                         |
 
 ## Commands
 
@@ -41,13 +44,17 @@ npm run test:coverage    Vitest with v8 coverage
 npm run test:e2e         Playwright E2E
 npm run test:e2e:ui      Playwright interactive UI mode
 npm run test:e2e:update  Update Playwright snapshots
+
+npx tsx scripts/seed-r2-models.ts   Pre-populate R2 with Whisper model files (run once before first deploy)
 ```
 
 ## Stack
 
 See [README.md](README.md) for the full stack overview. Key agent-relevant details:
 - AI calls go through our Cloudflare Worker proxy (`/api/transcribe`, `/api/generate`) — provider credentials are server-side secrets; the browser never sees them.
-- Auth (BetterAuth with passkey + magic link) is also served by the Worker at `/api/auth`.
+- Local Whisper transcription runs entirely in the browser via a Web Worker (`src/lib/audio/whisper.worker.ts`). Model files are served from R2 at `/api/model/*`, with a HuggingFace fallback. The fetch interceptor in the worker caches files in IDB after first download.
+- Auth (BetterAuth with passkey + magic link) is served by the Worker at `/api/auth`. **Magic-link email (`worker/email.ts`) is currently a `console.log` stub** — wire a real email provider before enabling auth in production.
+- Org management (create org, validate invite token) is handled at `/api/org/**`.
 
 ## Documentation
 
@@ -56,6 +63,8 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 - [docs/invariants.md](docs/invariants.md) — non-obvious rules; read before any cross-cutting edit
 - [docs/architecture.md](docs/architecture.md) — provider tree, data flow, storage, AI services, units
 - [docs/clinical-model.md](docs/clinical-model.md) — domain entities, session state machine, AI prompt shape
+- [docs/transcription.md](docs/transcription.md) — transcription pipeline: cloud vs local paths, VAD, chunking, T1/T2 sources
+- [docs/workflows.md](docs/workflows.md) — end-to-end user workflows
 - [docs/style-guide.md](docs/style-guide.md) — UI conventions
 - [docs/superpowers/specs/](docs/superpowers/specs/) — design specs
 
@@ -69,9 +78,10 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 ## Hard rules
 
 - **All clinical data is client-side.** `AppData` lives in `localStorage`; audio lives in IndexedDB. Do not add a server-side database, telemetry, or analytics that exfiltrates session content. The Cloudflare Worker is a proxy only — it never stores or logs clinical data.
-- **AI calls go through our Worker proxy.** Whisper and Anthropic are reached via `POST /api/transcribe` and `POST /api/generate` on our Cloudflare Worker; provider credentials are server-side secrets the browser never sees. Requests carry the `AppGate` 6-digit code in `x-ptscribe-key` (obscurity, not auth — abuse caps live server-side). Settings still surfaces a HIPAA disclaimer because data still leaves the device.
+- **AI calls go through our Worker proxy.** Whisper and Anthropic are reached via `POST /api/transcribe` and `POST /api/generate` on our Cloudflare Worker; provider credentials are server-side secrets the browser never sees. Requests carry `sha256(PTSCRIBE_GATE)` in `x-ptscribe-key` (obscurity gate — abuse caps live server-side). Settings still surfaces a HIPAA disclaimer because data still leaves the device.
 - **Single write path.** Components/hooks never touch `localStorage` or IndexedDB directly — go through a slice provider mutator → `updateXSlice` → `DataRepository.save()`, or through `AudioRepository` for audio Blobs.
 - **Validate only at I/O boundaries.** `AppDataSchema.safeParse()` runs on load and on JSON import. Skip it for in-memory state.
 - **Built-ins are read-only.** Templates and exercises with `builtin: true` cannot be edited or deleted at the provider level — UI offers Clone instead.
 - **Encryption is enforced inside the Repository layer.** When the vault is unlocked, `DataRepository` and `AudioRepository` round-trip every byte through AES-GCM. Do not add a second persistence path that bypasses them. Tab close evicts the in-memory key; there is no passphrase recovery. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))
 - **Recorder owns wake lock + visibility.** `useRecorder` holds a `'screen'` wake lock and a `visibilitychange` listener for the lifetime of each clip; both must be released on every exit path (stop, reset, error, unmount). ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))
+- **Console calls are DEV-only.** All `console.error/warn` calls are wrapped in `if (import.meta.env.DEV)` — Vite tree-shakes them out of production builds. Never add bare console calls.

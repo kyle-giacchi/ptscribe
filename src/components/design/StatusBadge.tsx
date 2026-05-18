@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 export type StatusTone =
   | 'on-track'
   | 'plateau'
@@ -76,7 +78,7 @@ export interface StatusBadgeProps {
   label?: string;
 }
 
-export function StatusBadge({ tone, label }: StatusBadgeProps) {
+export const StatusBadge = memo(function StatusBadge({ tone, label }: StatusBadgeProps) {
   const t = TONES[tone];
   return (
     <span
@@ -96,9 +98,9 @@ export function StatusBadge({ tone, label }: StatusBadgeProps) {
       <span>{label ?? t.defaultLabel}</span>
     </span>
   );
-}
+});
 
-export function StatusDot({
+export const StatusDot = memo(function StatusDot({
   color,
   pulse,
   heartbeat,
@@ -133,4 +135,4 @@ export function StatusDot({
       )}
     </span>
   );
-}
+});

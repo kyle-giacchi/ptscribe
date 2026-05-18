@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { CheckCircle2, Clock, Loader2, Trash2, XCircle } from 'lucide-react';
 import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { formatDuration, wordCount } from '@/utils/format';
@@ -6,12 +6,12 @@ import type { ClipStatus, SessionClip } from '@/types';
 
 export function ClipsList({
   clips,
-  recordingDisabled,
+  recordingDisabled = false,
   onDeleteClip,
 }: {
   clips: SessionClip[];
-  recordingDisabled: boolean;
-  onDeleteClip: (clipId: string) => void;
+  recordingDisabled?: boolean;
+  onDeleteClip?: (clipId: string) => void;
 }) {
   if (clips.length === 0) {
     return (
@@ -29,23 +29,23 @@ export function ClipsList({
           clip={clip}
           ordinal={i + 1}
           recordingDisabled={recordingDisabled}
-          onDelete={() => onDeleteClip(clip.id)}
+          onDeleteClip={onDeleteClip}
         />
       ))}
     </div>
   );
 }
 
-function ClipRow({
+const ClipRow = memo(function ClipRow({
   clip,
   ordinal,
   recordingDisabled,
-  onDelete,
+  onDeleteClip,
 }: {
   clip: SessionClip;
   ordinal: number;
   recordingDisabled: boolean;
-  onDelete: () => void;
+  onDeleteClip?: (clipId: string) => void;
 }) {
   const [pendingDelete, setPendingDelete] = useState(false);
   const blocked = recordingDisabled || clip.status === 'transcribing';
@@ -110,8 +110,8 @@ function ClipRow({
           )}
         </div>
 
-        {/* Delete control */}
-        {pendingDelete ? (
+        {/* Delete control — only rendered when onDeleteClip is provided */}
+        {onDeleteClip && (pendingDelete ? (
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
@@ -127,7 +127,7 @@ function ClipRow({
               style={{ color: 'var(--color-negative)', touchAction: 'manipulation' }}
               onClick={() => {
                 setPendingDelete(false);
-                onDelete();
+                onDeleteClip(clip.id);
               }}
             >
               Delete
@@ -148,12 +148,34 @@ function ClipRow({
           >
             <Trash2 size={14} strokeWidth={2} />
           </button>
-        )}
+        ))}
       </div>
 
       {showWaveform && (
         <div className="px-3.5 pb-3">
           <PlaybackWaveform audioKey={clip.id} />
+        </div>
+      )}
+
+      {clip.t1Transcript && clip.status !== 'transcribed' && (
+        <div
+          className="border-t px-3.5 pb-3 pt-2.5"
+          style={{ borderColor: 'var(--color-pt-border)' }}
+        >
+          <details>
+            <summary
+              className="cursor-pointer select-none text-[12px] font-medium"
+              style={{ color: 'var(--color-pt-text-2)' }}
+            >
+              Live transcript ({wordCount(clip.t1Transcript)} words)
+            </summary>
+            <p
+              className="mt-2 whitespace-pre-wrap text-xs leading-relaxed"
+              style={{ color: 'var(--color-pt-text)' }}
+            >
+              {clip.t1Transcript}
+            </p>
+          </details>
         </div>
       )}
 
@@ -180,9 +202,9 @@ function ClipRow({
       )}
     </div>
   );
-}
+});
 
-export function ClipStatusBadge({ status }: { status: ClipStatus }) {
+export const ClipStatusBadge = memo(function ClipStatusBadge({ status }: { status: ClipStatus }) {
   const meta = clipBadgeMeta(status);
   return (
     <span
@@ -199,7 +221,7 @@ export function ClipStatusBadge({ status }: { status: ClipStatus }) {
       {meta.label}
     </span>
   );
-}
+});
 
 export function clipBadgeMeta(status: ClipStatus): {
   label: string;
