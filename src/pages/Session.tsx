@@ -22,6 +22,7 @@ import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
 import { useRecordingFlow } from '@/hooks/useRecordingFlow';
 import { useTranscriptionFlow, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useTranscriptionFlow';
 import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
+import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsList } from '@/components/sessions/ClipsList';
 import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
@@ -190,6 +191,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     missingRequiredLabels,
   } = generation;
 
+  const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
+
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
 
   function handleFinalizeWrapped() {
@@ -238,6 +241,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       () => toast.success('Transcript copied'),
       () => toast.error('Copy failed'),
     );
+  }
+
+  function handleApplyScrub(scrubbed: string) {
+    setTranscript(scrubbed);
+    patchSession({
+      transcript: scrubbed,
+      activeTranscriptTier: session?.activeTranscriptTier ?? 'edited',
+    });
   }
 
   function handleTemplateChange(newTemplateId: string) {
@@ -559,6 +570,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   onViewRecordings={() => setActiveTab('clips')}
                   clipsCount={sortedClips.length}
                   onCopyTranscript={handleCopyTranscript}
+                  onScrubPII={scrubPIIFn}
+                  onApplyScrub={handleApplyScrub}
+                  piiScrubbing={piiScrubbing}
+                  piiProgress={scrubProgress}
                 />
               </div>
             </div>
