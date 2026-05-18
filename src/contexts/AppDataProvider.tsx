@@ -75,20 +75,26 @@ export async function purgeOrphanChunks(
   try {
     chunkIds = await repo.listChunkSessionIds();
   } catch (err) {
-    console.error('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
+    if (import.meta.env.DEV) {
+      console.error('[AppDataProvider] Failed to list chunk session IDs for orphan purge:', err);
+    }
     return;
   }
   for (const id of chunkIds) {
     if (!activeClipIds.has(id)) {
       void repo.clearChunks(id).catch((err: unknown) => {
-        console.warn(`[AppDataProvider] Failed to clear orphaned chunks for clip ${id}:`, err);
+        if (import.meta.env.DEV) {
+          console.warn(`[AppDataProvider] Failed to clear orphaned chunks for clip ${id}:`, err);
+        }
       });
     }
   }
 }
 
 function handleSaveError(err: unknown): void {
-  console.error('AppData save failed', err);
+  if (import.meta.env.DEV) {
+    console.error('[AppDataProvider] AppData save failed', err);
+  }
   const msg = err instanceof Error ? err.message : '';
   if (msg.includes('QuotaExceeded') || msg.includes('quota') || msg.includes('storage')) {
     toast.error(

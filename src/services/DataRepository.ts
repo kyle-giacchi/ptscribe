@@ -47,13 +47,17 @@ export const dataRepository = {
       const migrated = migrate(parsed);
       const result = AppDataSchema.safeParse(migrated);
       if (!result.success) {
-        console.error('AppData failed schema validation', result.error);
+        if (import.meta.env.DEV) {
+          console.error('[DataRepository] AppData failed schema validation — quarantining corrupt data', result.error);
+        }
         quarantineCorrupt(raw);
         return null;
       }
       return result.data;
     } catch (e) {
-      console.error('Failed to load AppData', e);
+      if (import.meta.env.DEV) {
+        console.error('[DataRepository] Failed to load AppData — quarantining corrupt data', e);
+      }
       quarantineCorrupt(raw);
       return null;
     }

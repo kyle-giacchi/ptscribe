@@ -6,12 +6,12 @@ import type { ClipStatus, SessionClip } from '@/types';
 
 export function ClipsList({
   clips,
-  recordingDisabled,
+  recordingDisabled = false,
   onDeleteClip,
 }: {
   clips: SessionClip[];
-  recordingDisabled: boolean;
-  onDeleteClip: (clipId: string) => void;
+  recordingDisabled?: boolean;
+  onDeleteClip?: (clipId: string) => void;
 }) {
   if (clips.length === 0) {
     return (
@@ -45,7 +45,7 @@ const ClipRow = memo(function ClipRow({
   clip: SessionClip;
   ordinal: number;
   recordingDisabled: boolean;
-  onDeleteClip: (clipId: string) => void;
+  onDeleteClip?: (clipId: string) => void;
 }) {
   const [pendingDelete, setPendingDelete] = useState(false);
   const blocked = recordingDisabled || clip.status === 'transcribing';
@@ -110,8 +110,8 @@ const ClipRow = memo(function ClipRow({
           )}
         </div>
 
-        {/* Delete control */}
-        {pendingDelete ? (
+        {/* Delete control — only rendered when onDeleteClip is provided */}
+        {onDeleteClip && (pendingDelete ? (
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
@@ -148,12 +148,34 @@ const ClipRow = memo(function ClipRow({
           >
             <Trash2 size={14} strokeWidth={2} />
           </button>
-        )}
+        ))}
       </div>
 
       {showWaveform && (
         <div className="px-3.5 pb-3">
           <PlaybackWaveform audioKey={clip.id} />
+        </div>
+      )}
+
+      {clip.t1Transcript && clip.status !== 'transcribed' && (
+        <div
+          className="border-t px-3.5 pb-3 pt-2.5"
+          style={{ borderColor: 'var(--color-pt-border)' }}
+        >
+          <details>
+            <summary
+              className="cursor-pointer select-none text-[12px] font-medium"
+              style={{ color: 'var(--color-pt-text-2)' }}
+            >
+              Live transcript ({wordCount(clip.t1Transcript)} words)
+            </summary>
+            <p
+              className="mt-2 whitespace-pre-wrap text-xs leading-relaxed"
+              style={{ color: 'var(--color-pt-text)' }}
+            >
+              {clip.t1Transcript}
+            </p>
+          </details>
         </div>
       )}
 

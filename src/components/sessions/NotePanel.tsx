@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ClipboardList, Copy, Download, FileText, Loader2, Share2 } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Copy, Download, FileText, Loader2, Share2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
+import { Modal } from '@/components/ui/Modal';
+import { TemplateDropdown } from './TemplateDropdown';
 import type { Note, NoteSection, NoteTemplate, Patient } from '@/types';
 
 type Busy = null | 'transcribing' | 'generating';
@@ -15,34 +17,102 @@ export interface NotePanelProps {
   patient: Patient;
   note: Note | undefined;
   template: NoteTemplate | undefined;
+  templates: NoteTemplate[];
   transcript: string;
   /** Sum of all clip durations in seconds. */
   totalDurationSec: number;
   busy: Busy;
+  canGenerate: boolean;
   onSectionChange: (key: string, body: string) => void;
+  onTemplateChange: (id: string) => void;
+  onManageTemplates: () => void;
+  onGenerate: () => void;
 }
 
 export function NotePanel({
   patient,
   note,
   template,
+  templates,
   transcript: _transcript,
   totalDurationSec: _totalDurationSec,
   busy,
+  canGenerate,
   onSectionChange,
+  onTemplateChange,
+  onManageTemplates,
+  onGenerate,
 }: NotePanelProps) {
   const navigate = useNavigate();
+  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
   const sections: NoteSection[] =
     note?.sections ??
     template?.sections.map((s) => ({ key: s.key, label: s.label, body: '' })) ??
     [];
 
+  const isGenerating = busy === 'generating';
+  const hasDraftContent = note?.sections.some((s) => s.body.trim().length > 0) ?? false;
+
+  function handleGenerateClick() {
+    if (hasDraftContent) {
+      setOverwriteConfirmOpen(true);
+    } else {
+      onGenerate();
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {/* Document heading */}
-      <h2 className="text-xl font-semibold" style={{ color: 'var(--color-pt-text)' }}>
-        Clinical note
-      </h2>
+      {/* Heading + generate controls */}
+      <div>
+        <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-pt-text)' }}>
+          Clinical note
+        </h2>
+        <div className="flex items-center gap-2">
+          <TemplateDropdown
+            template={template}
+            templates={templates}
+            onChange={onTemplateChange}
+            onManage={onManageTemplates}
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ height: 32, padding: '0 12px', fontSize: 12.5, boxSizing: 'border-box' }}
+            disabled={!canGenerate || isGenerating}
+            onClick={handleGenerateClick}
+          >
+            {isGenerating ? (
+              <><Loader2 size={13} className="animate-spin" /> Generating…</>
+            ) : (
+              <><Sparkles size={13} strokeWidth={2} /> {hasDraftContent ? 'Regenerate' : 'Generate'}</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Overwrite confirmation modal */}
+      <Modal
+        open={overwriteConfirmOpen}
+        onClose={() => setOverwriteConfirmOpen(false)}
+        title="Replace existing note?"
+        size="sm"
+      >
+        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+          Regenerating will erase your current clinical note. This cannot be undone.
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button className="btn btn-ghost" onClick={() => setOverwriteConfirmOpen(false)}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => { setOverwriteConfirmOpen(false); onGenerate(); }}
+          >
+            <Sparkles size={13} strokeWidth={2} /> Regenerate
+          </button>
+        </div>
+      </Modal>
 
       {/* Finalized banner */}
       {note?.finalized && (
@@ -117,9 +187,8 @@ export function NotePanel({
                   {s.body.trim() && (
                     <button
                       type="button"
-                      className="btn btn-ghost p-0.5"
-                      title={`Copy ${s.label}`}
-                      style={{ color: 'var(--color-fg-subtle)' }}
+                      className="btn btn-ghost"
+                      style={{ color: 'var(--color-fg-subtle)', fontSize: 11, padding: '2px 6px', gap: 3 }}
                       onClick={() =>
                         navigator.clipboard.writeText(s.body).then(
                           () => toast.success(`${s.label} copied`),
@@ -127,7 +196,7 @@ export function NotePanel({
                         )
                       }
                     >
-                      <Copy size={11} strokeWidth={2} />
+                      <Copy size={10} strokeWidth={2} /> Copy
                     </button>
                   )}
                 </div>
