@@ -10,6 +10,10 @@
  * a genuine chain break from a known rolling-window trim.
  */
 
+// Entries are written in plaintext even when the vault is enabled. This is
+// intentional: the audit log must be readable before the vault is unlocked so
+// tampering is detectable at startup. Only action codes and timestamps are
+// stored here — no clinical content or PII.
 const STORAGE_KEY = 'ptnotes.auditLog';
 const MAX_ENTRIES = 500;
 export const GENESIS_HASH = '0'.repeat(64);

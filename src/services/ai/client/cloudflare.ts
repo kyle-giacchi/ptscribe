@@ -26,7 +26,7 @@ export interface CloudflareWhisperResult {
 }
 
 const RETRY_DELAYS_MS = [500, 1500, 4000];
-const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const RETRYABLE_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
 
 export async function transcribeWithCloudflare(
   args: CloudflareWhisperArgs,

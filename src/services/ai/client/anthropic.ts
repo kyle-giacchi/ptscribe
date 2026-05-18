@@ -30,7 +30,7 @@ export interface AnthropicResult {
 }
 
 const RETRY_DELAYS_MS = [1_000, 3_000];
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
 
 export async function callAnthropic(args: AnthropicMessageArgs): Promise<AnthropicResult> {
   let lastError: unknown;
