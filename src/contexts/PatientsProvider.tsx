@@ -29,7 +29,9 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
       const removePromises = patientSessions.flatMap((session) =>
         session.clips.map((clip) =>
           audioRepository.remove(clip.id).catch((err: unknown) => {
-            console.warn(`[PatientsProvider] Failed to delete audio for clip ${clip.id}:`, err);
+            if (import.meta.env.DEV) {
+              console.warn(`[PatientsProvider] Failed to delete audio for clip ${clip.id}:`, err);
+            }
           }),
         ),
       );

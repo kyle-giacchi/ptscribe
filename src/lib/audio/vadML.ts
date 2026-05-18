@@ -82,7 +82,9 @@ export async function findSpeechRangesML(
 
     return merged;
   } catch (err) {
-    console.warn('[vadML] ML VAD failed, falling back to energy VAD:', err);
+    if (import.meta.env.DEV) {
+      console.warn('[vadML] ML VAD failed, falling back to energy VAD:', err);
+    }
     return findSpeechRanges(samples, sampleRate, opts);
   }
 }

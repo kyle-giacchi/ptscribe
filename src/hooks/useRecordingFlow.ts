@@ -140,7 +140,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         if (clipId) patchClip(clipId, { t1Transcript: whisperTextRef.current.join(' ') });
       }
     } catch (err) {
-      console.error('[Whisper live preview]', err);
+      if (import.meta.env.DEV) {
+        console.error('[useRecordingFlow] Whisper live-preview chunk failed:', err);
+      }
     }
     if (whisperPendingRef.current) {
       return processWhisperChunk();
@@ -235,6 +237,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       }
     } else if (recorder.status === 'paused') {
       recorder.resume();
+      // Re-wire with the freshest handleChunk closure so post-resume Whisper
+      // segments capture the latest patchClip and whisperTextRef state.
+      recorder.onChunk.current = handleChunk;
       if (webSpeechEnabled && webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
@@ -287,7 +292,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
           }
         }
         if (isSavingRef.current.has(clipId)) {
-          console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
+          if (import.meta.env.DEV) {
+            console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
+          }
           return;
         }
         isSavingRef.current.add(clipId);
@@ -305,7 +312,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         }
         // Chunk cleanup is best-effort — failure doesn't affect the saved clip.
         audioRepository.clearChunks(clipId).catch((e) => {
-          console.warn('[useRecordingFlow] clearChunks failed:', e);
+          if (import.meta.env.DEV) {
+            console.warn('[useRecordingFlow] clearChunks failed:', e);
+          }
         });
         patchClip(clipId, { status: 'ready', durationSec });
       } else {
@@ -415,7 +424,9 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         } catch { /* estimate unavailable — proceed */ }
       }
       if (isSavingRef.current.has(clipId)) {
-        console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
+        if (import.meta.env.DEV) {
+          console.warn(`[useRecordingFlow] Skipping duplicate save for clip ${clipId}`);
+        }
         return null;
       }
       isSavingRef.current.add(clipId);

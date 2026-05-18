@@ -98,12 +98,20 @@ if (!IS_DEV) {
       });
     }
 
-    const response = await _originalFetch(input, init);
+    let response = await _originalFetch(input, init);
+
+    // If the Worker route fails, fall back to HuggingFace directly.
+    // MODEL_HOST = "${origin}/api/model", HuggingFace path = everything after it.
+    if (!response.ok) {
+      const hfPath = url.slice(MODEL_HOST.length + 1); // "Xenova/.../config.json"
+      response = await _originalFetch(`https://huggingface.co/${hfPath}`, init);
+    }
+
     if (response.ok) {
       const contentType =
         response.headers.get('Content-Type') ?? 'application/octet-stream';
       const buffer = await response.arrayBuffer();
-      // Fire-and-forget — never let a cache write delay the caller.
+      // Cache against the original /api/model/* URL so next time R2 is warm.
       cachePut(url, { buffer, contentType });
       return new Response(buffer, {
         status: 200,

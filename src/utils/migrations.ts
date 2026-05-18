@@ -65,10 +65,11 @@ export function migrate(data: unknown): AppData {
     throw new Error('migrate: data has no numeric version field');
   }
   if (version > CURRENT_VERSION) {
-    console.warn(
-      `[migrations] Data version ${version} is newer than this app's CURRENT_VERSION ${CURRENT_VERSION}. ` +
-        'Loading as-is — some fields may be unrecognised. Upgrade the app to avoid data loss.',
-    );
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[migrations] Data version ${version} is newer than CURRENT_VERSION ${CURRENT_VERSION} — loading as-is, some fields may be unrecognised.`,
+      );
+    }
     return data as AppData;
   }
 
