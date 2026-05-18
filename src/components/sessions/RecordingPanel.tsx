@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
   Mic,
@@ -12,6 +12,7 @@ import {
   ArrowRight,
   X,
   Loader2,
+  ChevronDown,
 } from 'lucide-react';
 import { formatDuration } from '@/utils/format';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
@@ -252,17 +253,69 @@ function fmtWallTime(ms: number): string {
   return `${h}:${String(min).padStart(2, '0')}${ampm}`;
 }
 
-function ChatBubble({ children, muted = false }: { children: React.ReactNode; muted?: boolean }) {
+function ChatBubble({
+  children,
+  timestamp,
+  isInterim = false,
+}: {
+  children: React.ReactNode;
+  timestamp?: string;
+  isInterim?: boolean;
+}) {
   return (
-    <div
-      className="self-start max-w-[88%] rounded-2xl rounded-tl-sm px-3.5 py-2"
-      style={{
-        background: 'var(--color-pt-surface-alt)',
-        border: '1px solid var(--color-pt-border)',
-        opacity: muted ? 0.6 : 1,
-      }}
-    >
-      {children}
+    <div className="flex items-end gap-2">
+      {/* Avatar */}
+      <div
+        className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+        style={{
+          background: isInterim ? 'var(--color-pt-surface-alt)' : 'var(--color-pt-accent)',
+          border: '1px solid var(--color-pt-border)',
+          opacity: isInterim ? 0.5 : 1,
+        }}
+      >
+        <Mic size={11} style={{ color: isInterim ? 'var(--color-pt-text-3)' : 'white' }} />
+      </div>
+      {/* Bubble — rounded-bl-sm creates the tail toward the avatar */}
+      <div
+        className="max-w-[82%] rounded-2xl rounded-bl-sm px-3.5 py-2.5"
+        style={{
+          background: 'var(--color-pt-surface-alt)',
+          border: '1px solid var(--color-pt-border)',
+          opacity: isInterim ? 0.65 : 1,
+        }}
+      >
+        {children}
+        {timestamp && (
+          <span
+            className="block text-right text-[10px] tabular-nums mt-1"
+            style={{ color: 'var(--color-pt-text-3)' }}
+          >
+            {timestamp}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div style={{ animation: 'transcript-slide-in 280ms ease-out both' }}>
+      <ChatBubble isInterim>
+        <div className="flex items-center gap-1 py-0.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-2 h-2 rounded-full animate-bounce"
+              style={{
+                background: 'var(--color-pt-text-3)',
+                animationDelay: `${i * 160}ms`,
+                animationDuration: '900ms',
+              }}
+            />
+          ))}
+        </div>
+      </ChatBubble>
     </div>
   );
 }
@@ -272,13 +325,16 @@ function LiveTranscriptView({
   interimText,
   whisperBubbles = [],
   expandToFill = false,
+  isActive = false,
 }: {
   segments: TranscriptSegment[];
   interimText: string;
   whisperBubbles?: string[];
   expandToFill?: boolean;
+  isActive?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const hasWebSpeech = segments.length > 0 || !!interimText;
   const hasContent = hasWebSpeech || whisperBubbles.length > 0;
   const [showNoSpeechHint, setShowNoSpeechHint] = useState(false);
@@ -292,97 +348,87 @@ function LiveTranscriptView({
     return () => window.clearTimeout(t);
   }, [hasContent]);
 
+  // Auto-scroll only when user is already at the bottom
   useEffect(() => {
     const el = containerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [segments.length, interimText, whisperBubbles.length]);
+    if (el && isAtBottom) el.scrollTop = el.scrollHeight;
+  }, [segments.length, interimText, whisperBubbles.length, isAtBottom]);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setIsAtBottom(distFromBottom < 48);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = containerRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      setIsAtBottom(true);
+    }
+  }, []);
 
   return (
     <div
-      ref={containerRef}
-      className={`w-full rounded-xl overflow-y-auto flex flex-col${expandToFill ? ' flex-1 min-h-0' : ''}`}
-      style={{
-        ...(expandToFill ? {} : { maxHeight: 300 }),
-        background: 'var(--color-pt-surface)',
-        border: '1px solid var(--color-pt-border)',
-      }}
+      className={`relative w-full${expandToFill ? ' flex-1 min-h-0' : ''}`}
+      style={expandToFill ? {} : { maxHeight: 300 }}
     >
-      {!hasContent ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 px-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex gap-1">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-1.5 w-1.5 rounded-full animate-bounce"
-                  style={{ background: 'var(--color-pt-text-3)', animationDelay: `${i * 160}ms` }}
-                />
-              ))}
-            </div>
-            <p className="text-xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
-              Transcribing&hellip;
-            </p>
-          </div>
-          {showNoSpeechHint && (
-            <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
-              Transcription starts after the first audio chunk (~5 s). First run downloads the model (~150 MB).
-            </p>
-          )}
-        </div>
-      ) : (
-        <>
-          {/* Spacer pushes bubbles to the bottom when content is short */}
-          <div className="flex-1 min-h-3" />
-          <div className="px-3 py-3 flex flex-col gap-2">
-            {hasWebSpeech ? (
-              <>
-                {segments.map((seg) => (
-                  <div
-                    key={seg.wallTime}
-                    className="flex flex-col items-start gap-0.5"
-                    style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
-                  >
-                    <ChatBubble>
-                      <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text)' }}>
-                        {seg.text.trim()}
-                      </p>
-                    </ChatBubble>
-                    <span
-                      className="ml-1 text-[10px] tabular-nums"
-                      style={{ color: 'var(--color-pt-text-3)' }}
-                    >
-                      {fmtWallTime(seg.wallTime)}
-                    </span>
-                  </div>
-                ))}
-                {interimText && (
-                  <ChatBubble muted>
-                    <p className="text-sm leading-relaxed italic" style={{ color: 'var(--color-pt-text-3)' }}>
-                      {interimText}
-                      <span
-                        className="inline-block ml-0.5 w-px align-middle"
-                        style={{
-                          height: '1em',
-                          background: 'var(--color-pt-accent)',
-                          animation: 'transcript-cursor-blink 900ms step-end infinite',
-                        }}
-                      />
-                    </p>
-                  </ChatBubble>
-                )}
-              </>
-            ) : (
-              whisperBubbles.map((text, i) => {
-                const isLast = i === whisperBubbles.length - 1;
-                return (
-                  <div
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className={`w-full rounded-xl overflow-y-auto flex flex-col${expandToFill ? ' h-full' : ' max-h-full'}`}
+        style={{
+          background: 'var(--color-pt-surface)',
+          border: '1px solid var(--color-pt-border)',
+        }}
+      >
+        {!hasContent ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 px-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <span
                     key={i}
-                    style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
-                  >
-                    <ChatBubble>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
-                        {text}
-                        {isLast && (
+                    className="h-1.5 w-1.5 rounded-full animate-bounce"
+                    style={{ background: 'var(--color-pt-text-3)', animationDelay: `${i * 160}ms` }}
+                  />
+                ))}
+              </div>
+              <p className="text-xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
+                Transcribing&hellip;
+              </p>
+            </div>
+            {showNoSpeechHint && (
+              <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
+                Transcription starts after the first audio chunk (~5 s). First run downloads the model (~150 MB).
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Spacer pushes bubbles to the bottom when content is short */}
+            <div className="flex-1 min-h-3" />
+            <div className="px-3 py-3 flex flex-col gap-3">
+              {hasWebSpeech ? (
+                <>
+                  {segments.map((seg) => (
+                    <div
+                      key={seg.wallTime}
+                      style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
+                    >
+                      <ChatBubble timestamp={fmtWallTime(seg.wallTime)}>
+                        <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text)' }}>
+                          {seg.text.trim()}
+                        </p>
+                      </ChatBubble>
+                    </div>
+                  ))}
+                  {interimText && (
+                    <div style={{ animation: 'transcript-slide-in 280ms ease-out both' }}>
+                      <ChatBubble isInterim>
+                        <p className="text-sm leading-relaxed italic" style={{ color: 'var(--color-pt-text-3)' }}>
+                          {interimText}
                           <span
                             className="inline-block ml-0.5 w-px align-middle"
                             style={{
@@ -391,15 +437,62 @@ function LiveTranscriptView({
                               animation: 'transcript-cursor-blink 900ms step-end infinite',
                             }}
                           />
-                        )}
-                      </p>
-                    </ChatBubble>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </>
+                        </p>
+                      </ChatBubble>
+                    </div>
+                  )}
+                </>
+              ) : (
+                whisperBubbles.map((text, i) => {
+                  const isLast = i === whisperBubbles.length - 1;
+                  return (
+                    <div
+                      key={i}
+                      style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
+                    >
+                      <ChatBubble>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
+                          {text}
+                          {isLast && (
+                            <span
+                              className="inline-block ml-0.5 w-px align-middle"
+                              style={{
+                                height: '1em',
+                                background: 'var(--color-pt-accent)',
+                                animation: 'transcript-cursor-blink 900ms step-end infinite',
+                              }}
+                            />
+                          )}
+                        </p>
+                      </ChatBubble>
+                    </div>
+                  );
+                })
+              )}
+              {isActive && !interimText && <TypingIndicator />}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Scroll-to-bottom button — visible when user has scrolled up */}
+      {!isAtBottom && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label="Scroll to bottom"
+          className="absolute bottom-3 right-3 flex items-center justify-center rounded-full shadow-lg transition-opacity hover:opacity-90"
+          style={{
+            width: 32,
+            height: 32,
+            background: 'var(--color-pt-accent)',
+            color: 'white',
+            animation: 'transcript-slide-in 180ms ease-out both',
+            zIndex: 1,
+          }}
+        >
+          <ChevronDown size={16} strokeWidth={2.5} />
+        </button>
       )}
     </div>
   );
@@ -410,6 +503,7 @@ function ActiveRecordingCard({
   durationSec,
   paused,
   chainActive,
+  analyser,
   webSpeech,
   whisperBubbles,
   onPauseResume,
@@ -418,6 +512,7 @@ function ActiveRecordingCard({
   durationSec: number;
   paused: boolean;
   chainActive: boolean;
+  analyser: AnalyserNode | null;
   webSpeech: UseWebSpeechTranscript;
   whisperBubbles: string[];
   onPauseResume: () => void;
@@ -433,10 +528,8 @@ function ActiveRecordingCard({
   const accentFg = paused ? 'var(--color-pt-amber-fg)' : 'var(--color-pt-red-fg)';
 
   // ── Two-column layout: transcript left, controls right ──────────────────────
-  // Activate whenever live captions are on OR Whisper has produced any text.
-  if (webSpeech.listening || whisperBubbles.length > 0) {
-    return (
-      <div className="flex gap-0" style={{ minHeight: 480 }}>
+  return (
+      <div className="flex gap-0" style={{ height: 480 }}>
         {/* Left: Transcript panel */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 pr-5">
           <div className="flex items-center justify-between">
@@ -491,6 +584,7 @@ function ActiveRecordingCard({
               interimText={webSpeech.interimText}
               whisperBubbles={whisperBubbles}
               expandToFill
+              isActive={!paused}
             />
           ) : (
             <div
@@ -553,7 +647,7 @@ function ActiveRecordingCard({
           </div>
 
           {/* Waveform */}
-          <Waveform micState={micState} height={40} />
+          <Waveform micState={micState} height={40} analyser={analyser} />
 
           {/* Pause / Resume */}
           <button
@@ -587,89 +681,6 @@ function ActiveRecordingCard({
         </div>
       </div>
     );
-  }
-
-  // ── Single-column layout (live transcript off) ──────────────────────────────
-  return (
-    <div className="flex flex-col items-center gap-6 py-4">
-      {/* Status label */}
-      <p
-        className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-        style={{ color: 'var(--color-pt-text-3)' }}
-      >
-        In-Visit · {paused ? 'Paused' : 'Recording'}
-      </p>
-
-      {/* Timer */}
-      <div className="flex items-center gap-3">
-        <span className="relative flex h-3 w-3 shrink-0">
-          {!paused && (
-            <span
-              className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-65"
-              style={{ background: accentColor }}
-            />
-          )}
-          <span
-            className="relative inline-flex h-3 w-3 rounded-full"
-            style={{ background: accentColor }}
-          />
-        </span>
-        <span
-          className="font-mono font-semibold tabular-nums"
-          style={{
-            color: 'var(--color-pt-text)',
-            fontSize: 56,
-            letterSpacing: '-0.03em',
-            lineHeight: 1,
-          }}
-        >
-          {formatDuration(durationSec)}
-        </span>
-        <span
-          className="self-end pb-1 text-[11px] font-bold uppercase tracking-widest"
-          style={{ color: accentFg }}
-        >
-          {paused ? 'Paused' : 'Recording'}
-        </span>
-      </div>
-
-      {/* Waveform */}
-      <div className="w-full">
-        <Waveform micState={micState} height={56} />
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onPauseResume}
-          disabled={chainActive}
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
-        >
-          {paused ? (
-            <>
-              <Play size={15} strokeWidth={2} /> Resume
-            </>
-          ) : (
-            <>
-              <Pause size={15} strokeWidth={2} /> Pause
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onStopAndFinish}
-          disabled={chainActive}
-          style={{ minHeight: 44, touchAction: 'manipulation' }}
-        >
-          <Square size={15} strokeWidth={2} /> Finish Recording
-        </button>
-      </div>
-
-    </div>
-  );
 }
 
 // ── Main panel ─────────────────────────────────────────────────────────────────
@@ -768,6 +779,7 @@ export function RecordingPanel({
           durationSec={recorder.durationSec}
           paused={recorder.status === 'paused'}
           chainActive={false}
+          analyser={recorder.analyser}
           webSpeech={webSpeech}
           whisperBubbles={whisperBubbles}
           onPauseResume={onPauseResume}

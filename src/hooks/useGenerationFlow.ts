@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { generateNote } from '@/services/ai/generate';
 import { newId } from '@/utils/ids';
@@ -73,6 +74,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
     recordAction,
   } = params;
 
+  const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const { addNote, updateNote, finalizeNote, unfinalizeNote, removeNote } = useNotes();
   const { removeSession } = useSessions();
@@ -215,7 +217,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
         (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id)),
       );
       if (demoResults.some((r) => r.status === 'rejected')) {
-        toast.warning('Some audio could not be removed from storage.');
+        addNotification('warning', 'Some audio could not be removed from storage.');
       }
       if (note) removeNote(note.id);
       patchSession({ clips: [], status: 'draft', transcript: undefined, noteId: undefined });
@@ -229,7 +231,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
       (session?.clips ?? []).map((clip) => audioRepository.remove(clip.id)),
     );
     if (results.some((r) => r.status === 'rejected')) {
-      toast.warning('Some audio could not be removed from storage.');
+      addNotification('warning', 'Some audio could not be removed from storage.');
     }
     removeSession(session!.id);
     navigate('/today', { replace: true });

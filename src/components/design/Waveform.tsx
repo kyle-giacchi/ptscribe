@@ -12,15 +12,23 @@ const COLORS: Record<MicState, string> = {
 export interface WaveformProps {
   micState: MicState;
   height?: number;
+  analyser?: AnalyserNode | null;
 }
 
-export function Waveform({ micState, height = 48 }: WaveformProps) {
+export function Waveform({ micState, height = 48, analyser }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef<MicState>(micState);
+  const analyserRef = useRef<AnalyserNode | null>(analyser ?? null);
+  const tdDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
   useEffect(() => {
     stateRef.current = micState;
   }, [micState]);
+
+  useEffect(() => {
+    analyserRef.current = analyser ?? null;
+    tdDataRef.current = analyser ? new Uint8Array(analyser.fftSize) as Uint8Array<ArrayBuffer> : null;
+  }, [analyser]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,27 +66,49 @@ export function Waveform({ micState, height = 48 }: WaveformProps) {
 
       ctx.fillStyle = COLORS[s];
 
-      for (let i = 0; i < barCount; i++) {
-        const x = i * 4;
-        let amp;
-        if (s === 'connected') {
-          amp =
-            (Math.sin(t * 0.06 + i * 0.35) * 0.5 + 0.55) *
-            (Math.sin(t * 0.013 + i * 0.07) * 0.4 + 0.7) *
-            (cy - 6);
-          amp = Math.max(2, amp);
-        } else if (s === 'paused') {
-          amp = 1.5;
-        } else if (s === 'weak') {
-          const gate = Math.sin(t * 0.04 + i * 0.5) > 0.2 ? 1 : 0.1;
-          amp = (Math.sin(t * 0.05 + i * 0.4) * 0.4 + 0.5) * (cy - 8) * gate;
-          amp = Math.max(1.5, amp);
-        } else if (s === 'disconnected') {
-          amp = 1.5 + Math.sin(t * 0.1) * 0.5;
-        } else {
-          amp = 1;
+      const a = analyserRef.current;
+      const d = tdDataRef.current;
+
+      if (s === 'connected' && a && d) {
+        // Real audio: sample peak amplitude per bar from time-domain data
+        a.getByteTimeDomainData(d);
+        const sliceWidth = d.length / barCount;
+        for (let i = 0; i < barCount; i++) {
+          const x = i * 4;
+          const start = Math.floor(i * sliceWidth);
+          const end = Math.min(Math.floor((i + 1) * sliceWidth), d.length);
+          let peak = 0;
+          for (let j = start; j < end; j++) {
+            const v = Math.abs(d[j] - 128);
+            if (v > peak) peak = v;
+          }
+          const amp = Math.max(2, (peak / 128) * (cy - 4));
+          ctx.fillRect(x, cy - amp, 2, amp * 2);
         }
-        ctx.fillRect(x, cy - amp, 2, amp * 2);
+      } else {
+        // Synthetic fallback (no analyser, paused, weak, disconnected, idle)
+        for (let i = 0; i < barCount; i++) {
+          const x = i * 4;
+          let amp;
+          if (s === 'connected') {
+            amp =
+              (Math.sin(t * 0.06 + i * 0.35) * 0.5 + 0.55) *
+              (Math.sin(t * 0.013 + i * 0.07) * 0.4 + 0.7) *
+              (cy - 6);
+            amp = Math.max(2, amp);
+          } else if (s === 'paused') {
+            amp = 1.5;
+          } else if (s === 'weak') {
+            const gate = Math.sin(t * 0.04 + i * 0.5) > 0.2 ? 1 : 0.1;
+            amp = (Math.sin(t * 0.05 + i * 0.4) * 0.4 + 0.5) * (cy - 8) * gate;
+            amp = Math.max(1.5, amp);
+          } else if (s === 'disconnected') {
+            amp = 1.5 + Math.sin(t * 0.1) * 0.5;
+          } else {
+            amp = 1;
+          }
+          ctx.fillRect(x, cy - amp, 2, amp * 2);
+        }
       }
 
       if (s === 'disconnected') {

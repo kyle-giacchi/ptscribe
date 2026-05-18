@@ -38,6 +38,8 @@ export interface UseRecorder {
   recorderInterrupted: boolean;
   /** Set when the microphone track ended mid-recording (device disconnected, permission revoked). Audio from in-memory chunks is saved automatically. */
   micDisconnected: boolean;
+  /** Live AnalyserNode from the voice detector — non-null while recording, null otherwise. */
+  analyser: AnalyserNode | null;
   /**
    * Set this ref's `.current` to receive the accumulated audio blob on every
    * MediaRecorder chunk tick (~5 s intervals). The blob spans all chunks from
@@ -507,6 +509,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     idleAutoStopped,
     recorderInterrupted,
     micDisconnected,
+    analyser: voiceDetectorRef.current.analyser,
     onChunk: onChunkRef,
   };
 }

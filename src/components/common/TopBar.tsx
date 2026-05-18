@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useMatch, Link, NavLink } from 'react-router-dom';
-import { Bell, Menu, ArrowLeft, Lock, Unlock, Terminal } from 'lucide-react';
+import { Bell, Menu, ArrowLeft, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { vault } from '@/lib/vault/vault';
 import { labelForType } from '@/utils/labels';
+import { useNotifications } from '@/contexts/NotificationsProvider';
+import { useSessionActions } from '@/contexts/SessionActionsContext';
 
 function useVaultState(): { initialized: boolean; unlocked: boolean } {
   const [state, setState] = useState(() => ({
@@ -61,6 +63,169 @@ function VaultPill() {
   );
 }
 
+function formatRelativeTime(ts: number): string {
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  return `${Math.floor(min / 60)}h ago`;
+}
+
+function AlertsButton() {
+  const { notifications, unreadCount, markAllRead, clearAll } = useNotifications();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    markAllRead();
+    function onMouseDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open, markAllRead]);
+
+  const hasItems = notifications.length > 0;
+  const hasUnread = unreadCount > 0;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-label={`Warnings and errors${hasUnread ? ` — ${unreadCount} unread` : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        className="relative flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 8,
+          border: `1px solid ${open || hasUnread ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
+          background: open ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+          color: hasUnread ? '#dc2626' : open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+          cursor: 'pointer',
+        }}
+      >
+        <Bell size={15} strokeWidth={1.75} />
+        {hasUnread && (
+          <span
+            aria-hidden
+            className="absolute flex items-center justify-center"
+            style={{
+              top: 6,
+              right: 6,
+              minWidth: 14,
+              height: 14,
+              padding: '0 2px',
+              borderRadius: 7,
+              background: '#dc2626',
+              color: '#fff',
+              fontSize: 9,
+              fontWeight: 700,
+              lineHeight: '14px',
+            }}
+          >
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-50"
+          style={{
+            top: '100%',
+            right: 0,
+            marginTop: 6,
+            width: 320,
+            background: 'var(--color-pt-surface)',
+            border: '1px solid var(--color-pt-border)',
+            borderRadius: 10,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+          }}
+        >
+          <div
+            className="flex items-center justify-between"
+            style={{
+              padding: '10px 14px 8px',
+              borderBottom: hasItems ? '1px solid var(--color-pt-border)' : 'none',
+            }}
+          >
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+              Warnings &amp; Errors
+            </span>
+            {hasItems && (
+              <button
+                type="button"
+                onClick={clearAll}
+                style={{
+                  fontSize: 11.5,
+                  color: 'var(--color-pt-text-3)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {!hasItems ? (
+            <div
+              style={{
+                padding: '20px 14px',
+                textAlign: 'center',
+                fontSize: 12.5,
+                color: 'var(--color-pt-text-3)',
+              }}
+            >
+              No warnings or errors
+            </div>
+          ) : (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', maxHeight: 320, overflowY: 'auto' }}>
+              {notifications.map((n, i) => (
+                <li
+                  key={n.id}
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    padding: '9px 14px',
+                    borderBottom: i < notifications.length - 1 ? '1px solid var(--color-pt-border)' : 'none',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      marginTop: 1,
+                      color: n.level === 'error' ? '#dc2626' : '#d97706',
+                    }}
+                  >
+                    {n.level === 'error' ? (
+                      <AlertCircle size={13} strokeWidth={2} />
+                    ) : (
+                      <AlertTriangle size={13} strokeWidth={2} />
+                    )}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--color-pt-text)', lineHeight: 1.45 }}>
+                      {n.message}
+                    </p>
+                    <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)', marginTop: 2, display: 'block' }}>
+                      {formatRelativeTime(n.timestamp)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface TopBarProps {
   onMenuOpen?: () => void;
 }
@@ -86,6 +251,8 @@ function usePageTitle(): { title: string; subtitle?: string } {
       return { title: 'Exercise library', subtitle: 'Built-in and custom exercises' };
     case '/settings':
       return { title: 'Settings', subtitle: 'Clinician profile, AI keys, data' };
+    case '/account':
+      return { title: 'User Settings', subtitle: 'Plan, time zone, transcription' };
     case '/debug':
       return { title: 'Debug', subtitle: 'Transcription tiers, raw session data' };
     default:
@@ -121,6 +288,7 @@ function RecordingIndicator({ status }: { status: string }) {
 
 export function ProfileButton() {
   const { clinician } = useClinician();
+  const { onResetSession } = useSessionActions();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -197,6 +365,45 @@ export function ProfileButton() {
               {clinician.credentials || clinician.practiceName || 'PTScribe'}
             </div>
           </div>
+          <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
+          <NavLink
+            to="/account"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+            style={{
+              padding: '7px 12px',
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: 'var(--color-pt-text-2)',
+              textDecoration: 'none',
+            }}
+          >
+            <SlidersHorizontal size={13} strokeWidth={1.75} />
+            <span>User Settings</span>
+          </NavLink>
+          {onResetSession && (
+            <>
+              <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onResetSession(); }}
+                className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+                style={{
+                  padding: '7px 12px',
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: 'var(--color-pt-danger, #dc2626)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <RotateCcw size={13} strokeWidth={1.75} />
+                <span>Reset Session</span>
+              </button>
+            </>
+          )}
           <NavLink
             to="/debug"
             onClick={() => setOpen(false)}
@@ -254,21 +461,7 @@ export function TopBar({ onMenuOpen }: TopBarProps) {
   const rightActions = (
     <div className="flex items-center gap-2.5">
       <VaultPill />
-      <button
-        type="button"
-        aria-label="Notifications"
-        className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 8,
-          border: '1px solid var(--color-pt-border)',
-          background: 'var(--color-pt-surface)',
-          color: 'var(--color-pt-text-2)',
-        }}
-      >
-        <Bell size={15} strokeWidth={1.75} />
-      </button>
+      <AlertsButton />
       <CommandPalette />
       <ProfileButton />
     </div>

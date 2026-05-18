@@ -48,7 +48,7 @@ Purely a label used for filtering in the patient picker. No business logic gates
 
 ## Recording flow
 
-**Owner:** `useRecordingFlow` + `useRecorder` + `useWebSpeechTranscript`
+**Owner:** `useRecordingFlow` + `useRecorder`
 
 ### Normal record → stop
 
@@ -60,17 +60,20 @@ handleStartRecording()
   → recorder.start(clipId)
       → MediaRecorder.start(5s timeslice)
       → per-timeslice: audioRepository.appendChunk(clipId, index, blob)  ← WAL
-      → per-timeslice: onChunk(blob) → Whisper live preview (leaky bucket)
-  → useWebSpeechTranscript.start()  ← Web Speech streaming begins
-      → per finalized segment: patchClip(clipId, { t1Transcript: accumulatedText })  ← T1 written continuously
+      → VAD segment recorder fires on each speech segment (≤15 s):
+          → POST /api/transcribe → whisperTextRef.current += text
+          → patchClip(clipId, { t1Transcript: whisperTextRef.current })  ← T1 written continuously
+          → whisperBubbles updated (transient display state — not persisted)
+  [if webSpeechEnabled: true]
+  → useWebSpeechTranscript.start()  ← Web Speech streaming begins instead
+      → per finalized segment: patchClip(clipId, { t1Transcript: accumulatedText })
 
 handleFinishedRecording()
   → recorder.stop() → finalBlob (consolidated from MediaRecorder)
-  → useWebSpeechTranscript.stop() → webSpeech.accumulatedText frozen
+  → segment recorder flushed → patchClip(clipId, { t1Transcript: whisperTextRef.current })  ← T1 final flush
   → audioRepository.save(clipId, finalBlob)           ← consolidated Blob to IDB
   → audioRepository.clearChunks(clipId)               ← WAL purged (best-effort)
   → patchClip(clipId, { status: 'ready', durationSec })
-  → patchClip(clipId, { t1Transcript: webSpeech.accumulatedText })  ← T1 final flush
   → patchSession: status = 'draft'
   → [background auto-pass fires] → T2 Whisper transcription begins (see transcription.md)
 ```
@@ -302,10 +305,11 @@ The background T2 Whisper pass bypasses the guard — it calls `transcribeClipBl
 
 ## Whisper live preview (during recording)
 
-**Owner:** `useRecordingFlow` leaky-bucket processor
+**Owner:** `useRecordingFlow` VAD segment recorder
 
-A leaky-bucket pattern runs Whisper on audio chunks as they arrive from the MediaRecorder. At most one Whisper job is in flight at a time; if a new chunk arrives while one is running, the new chunk replaces the pending blob so the preview always shows fresh content.
+A VAD-gated segment recorder fires on each detected speech segment (Silero VAD, up to 15 s). Each segment blob is sent to `POST /api/transcribe` (Cloudflare Worker → Whisper). The transcribed text serves two purposes simultaneously:
 
-Results appear as `whisperBubbles: string[]` in the recording panel. Bubbles separated by more than 2 500 ms are appended as new items; results within the gap replace the last bubble (continuous refinement of the current utterance).
+1. **T1 persistence** — appended to `whisperTextRef` and written to `clip.t1Transcript` on every segment. This is the default T1 transcript source.
+2. **Live display** — results also update `whisperBubbles: string[]` in the recording panel. Bubbles separated by more than 2 500 ms are appended as new items; results within the gap replace the last bubble (continuous refinement of the current utterance). `whisperBubbles` is transient state — it resets each session and is never written to storage.
 
-This is display-only — the bubbles are never persisted. The authoritative T2 transcript comes from the post-clip `transcribeWithLocalWhisper` pass in `useBackgroundTranscription`, not from these live preview chunks.
+The authoritative T2 transcript is produced by the post-clip `transcribeWithLocalWhisper` pass in `useBackgroundTranscription` (local ONNX, no network), not by these live segment chunks.
