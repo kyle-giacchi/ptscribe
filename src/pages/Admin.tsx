@@ -33,11 +33,14 @@ import type { Patient, Session } from '@/types';
 function useCopy(): { copied: string | null; copy: (text: string, key?: string) => void } {
   const [copied, setCopied] = useState<string | null>(null);
   const copy = useCallback((text: string, key?: string) => {
-    void navigator.clipboard.writeText(text).then(() => {
-      const k = key ?? text;
-      setCopied(k);
-      setTimeout(() => setCopied(null), 1800);
-    });
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        const k = key ?? text;
+        setCopied(k);
+        setTimeout(() => setCopied(null), 1800);
+      })
+      .catch(() => {});
   }, []);
   return { copied, copy };
 }
@@ -338,23 +341,28 @@ function StorageCard() {
   useEffect(() => {
     setRefreshing(true);
     async function load() {
-      const lsItems = Object.values(STORAGE_KEYS).map((key) => ({
-        key,
-        bytes: lsBytes(key),
-      }));
-      const [idbKeys, chunkIds] = await Promise.all([
-        audioRepository.listKeys(),
-        audioRepository.listChunkSessionIds(),
-      ]);
-      let quota: StorageInfo['quota'];
-      if (navigator.storage?.estimate) {
-        const est = await navigator.storage.estimate();
-        if (est.usage != null && est.quota != null) {
-          quota = { usage: est.usage, quota: est.quota };
+      try {
+        const lsItems = Object.values(STORAGE_KEYS).map((key) => ({
+          key,
+          bytes: lsBytes(key),
+        }));
+        const [idbKeys, chunkIds] = await Promise.all([
+          audioRepository.listKeys(),
+          audioRepository.listChunkSessionIds(),
+        ]);
+        let quota: StorageInfo['quota'];
+        if (navigator.storage?.estimate) {
+          const est = await navigator.storage.estimate();
+          if (est.usage != null && est.quota != null) {
+            quota = { usage: est.usage, quota: est.quota };
+          }
         }
+        setInfo({ lsItems, idbClipCount: idbKeys.length, idbChunkSessions: chunkIds.length, quota });
+      } catch {
+        /* diagnostic card — show stale data on error */
+      } finally {
+        setRefreshing(false);
       }
-      setInfo({ lsItems, idbClipCount: idbKeys.length, idbChunkSessions: chunkIds.length, quota });
-      setRefreshing(false);
     }
     void load();
   }, [refreshKey]);

@@ -131,6 +131,12 @@ export function Settings() {
   }
 
   async function handleExport() {
+    if (!vault.isUnlocked()) {
+      const ok = window.confirm(
+        'The vault is not enabled. This backup will contain unencrypted clinical data. Continue?',
+      );
+      if (!ok) return;
+    }
     try {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const text = await exportBackup(appData);
