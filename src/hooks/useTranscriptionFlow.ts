@@ -296,18 +296,6 @@ export function useTranscriptionFlow(
         speedOriginalSec: totalSpeedOriginalSec,
       });
       reportTranscribeOutcome(successes, failures);
-      if (totalDroppedSec > 1) {
-        const pct = Math.round((totalDroppedSec / Math.max(totalOriginalSec, 1)) * 100);
-        toast.info(
-          `Silence trimming saved ${Math.round(totalDroppedSec)}s (~${pct}%) before transcription.`,
-        );
-      }
-      if (totalSpeedSavedSec > 1) {
-        const pct = Math.round((totalSpeedSavedSec / Math.max(totalSpeedOriginalSec, 1)) * 100);
-        toast.info(
-          `Audio speed-up saved ${Math.round(totalSpeedSavedSec)}s (~${pct}%) before transcription.`,
-        );
-      }
     } finally {
       clearTimeout(abortTimer);
       setBusy(null);
