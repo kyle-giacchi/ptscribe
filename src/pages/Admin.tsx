@@ -50,8 +50,8 @@ const TIER_META: Record<
   TierLevel,
   { label: string; color: string; Icon: React.FC<{ size?: number; strokeWidth?: number }> }
 > = {
-  1: { label: 'T1 Live', color: '#6366f1', Icon: Mic },
-  2: { label: 'T2 Whisper', color: '#0ea5e9', Icon: Cpu },
+  1: { label: 'T1 Live Whisper', color: '#6366f1', Icon: Mic },
+  2: { label: 'T2 Post Whisper', color: '#0ea5e9', Icon: Cpu },
   3: { label: 'T3 Nova', color: '#10b981', Icon: Sparkles },
   4: { label: 'Edited', color: '#f59e0b', Icon: Pencil },
 };
@@ -687,8 +687,8 @@ function SessionAudioSection({ session }: { session: Session }) {
 // ─── Transcript tabs ──────────────────────────────────────────────────────────
 
 const TRANSCRIPT_TABS = [
-  { key: 't1' as const, label: 'T1 Live Browser', color: '#6366f1', Icon: Mic },
-  { key: 't2' as const, label: 'T2 Whisper Local', color: '#0ea5e9', Icon: Cpu },
+  { key: 't1' as const, label: 'T1 Live Whisper', color: '#6366f1', Icon: Mic },
+  { key: 't2' as const, label: 'T2 Post Whisper', color: '#0ea5e9', Icon: Cpu },
   { key: 't3' as const, label: 'T3 Nova AI', color: '#10b981', Icon: Sparkles },
   { key: 'edited' as const, label: 'Edited', color: '#f59e0b', Icon: Pencil },
 ];

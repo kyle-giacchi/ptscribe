@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
@@ -114,6 +114,7 @@ interface Params {
  * See docs/invariants.md — "Local-first transcription".
  */
 export function useBackgroundTranscription({ session, patchClip, patchSession, setTranscript }: Params): void {
+  const { addNotification } = useNotifications();
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
@@ -134,13 +135,12 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
     for (const clip of eligible) {
       autoTranscribingRef.current.add(clip.id);
       patchClip(clip.id, { status: 'transcribing', errorMessage: undefined });
-      const tid = toast.loading(`Transcribing clip ${clip.index + 1}…`, { duration: Infinity });
 
       audioRepository
         .load(clip.id)
         .then((original) => {
           if (!original) throw new Error('No audio found for this clip.');
-          return transcribeWithLocalWhisper(original, (msg) => toast.loading(msg, { id: tid }));
+          return transcribeWithLocalWhisper(original);
         })
         .then((result) => {
           autoTranscribingRef.current.delete(clip.id);
@@ -153,7 +153,6 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
               transcriptedAt: Date.now(),
               errorMessage: undefined,
             });
-            toast.success(`Clip ${clip.index + 1} transcribed.`, { id: tid });
             // sessionRef has the latest clip list; override this clip's text directly
             // to avoid a race with the React state update that follows patchClip above.
             const freshClips = (sessionRef.current?.clips ?? []).map((c) =>
@@ -169,10 +168,10 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
               // t2Transcript frozen here — never overwritten by cloud pass
               patchSession({ transcript: merged, activeTranscriptTier: 't2', t2Transcript: merged });
             }
-          } else {
+          } else if (result.error !== 'Aborted.') {
             // Revert to 'ready' so cloud transcription remains available.
             patchClip(clip.id, { status: 'ready', errorMessage: undefined });
-            toast.error(`Clip ${clip.index + 1}: Local transcription failed (${result.error}). Use the Transcribe button for cloud transcription.`, { id: tid });
+            addNotification('warning', `Clip ${clip.index + 1}: automatic transcription found no usable audio. Use Transcribe to retry with cloud.`);
             // Fall back to t1Transcript so the session doesn't lose this clip's content.
             const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
             if (fallback) {
@@ -186,14 +185,11 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
           // Revert to 'ready' — audio saved fine, only local transcription failed.
           // This keeps the clip available for manual cloud transcription.
           const isFetchError = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
-          patchClip(clip.id, {
-            status: 'ready',
-            errorMessage: undefined,
-          });
+          patchClip(clip.id, { status: 'ready', errorMessage: undefined });
           if (isFetchError) {
-            toast.error(`Clip ${clip.index + 1}: Local transcription unavailable (model download failed). Use the Transcribe button to use cloud transcription.`, { id: tid });
+            addNotification('error', 'Whisper model unavailable — use the Transcribe button for cloud transcription.');
           } else {
-            toast.error(`Clip ${clip.index + 1}: Local transcription failed — use Transcribe to retry with cloud. (${e.message})`, { id: tid });
+            addNotification('error', `Clip ${clip.index + 1}: automatic transcription failed. Use Transcribe to retry.`);
           }
           // Fall back to t1Transcript so the session doesn't lose this clip's content.
           const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
@@ -203,7 +199,8 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
           }
         });
     }
-    // patchClip / patchSession / setTranscript use functional updates — safe to omit.
+    // addNotification is stable (useCallback); patchClip / patchSession / setTranscript
+    // use functional updates — safe to omit from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.clips]);
 }

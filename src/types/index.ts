@@ -400,6 +400,8 @@ export interface Settings {
     sidebarCollapsed: boolean;
     densityMode: DensityMode;
     theme: ThemeMode;
+    /** IANA timezone string (e.g. 'America/New_York'). Undefined = browser default. */
+    timezone?: string;
   };
   retention: {
     autoDeleteAudioAfterDays?: number;

@@ -8,10 +8,12 @@ Every session accumulates transcription data across up to four tiers. Higher tie
 
 | Tier | Name | Source | When it fires | Quality | Network |
 |------|------|--------|---------------|---------|---------|
-| **T1** | **Web Speech Captions** | Browser Web Speech API | Streaming **during** recording — written continuously to clip | ~65% — stumbles on medical terms and speaker changes | Browser's own cloud (Google/Apple) — not the PTScribe Worker |
+| **T1** | **Whisper VAD Segments** | VAD-gated segment recorder → POST /api/transcribe (Cloudflare Whisper) | Each VAD-detected speech segment **during** recording; flushed on pause and stop | ~85% — same Whisper model as T2; handles medical vocabulary | PTScribe Worker → Cloudflare Workers AI |
 | **T2** | **Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** each clip reaches `status: 'ready'` | ~87% — handles medical vocabulary, fully offline | None |
 | **T3** | **Nova AI** | Deepgram Nova-3 via Cloudflare Worker | **Explicit user action** ("Transcribe with AI") only | Best — speaker diarization, accent-robust | PTScribe Worker → Deepgram |
 | **Edited** | **Manual Edit** | Clinician keyboard input | On user save in the Transcript tab | N/A — human-authored | None |
+
+**Web Speech API (opt-in alternative for T1):** When the user enables "Web Speech" in Settings → Recording (`webSpeechEnabled: true`), the browser Web Speech API replaces Whisper VAD segments as the T1 source. Quality is lower (~65%) but fires with zero network cost. Disabled by default.
 
 **Active tier set automatically at each write:**
 
@@ -30,7 +32,7 @@ t1Transcript present     → activeTranscriptTier: 't1'
 
 | Field | Tier | Written by | Notes |
 |-------|------|-----------|-------|
-| `t1Transcript?` | T1 | `useRecordingFlow` continuous effect + stop flush | Persisted on every Web Speech segment during recording |
+| `t1Transcript?` | T1 | `useRecordingFlow` continuous effect + pause/stop flush | Persisted on every Whisper VAD segment during recording (or every Web Speech segment when `webSpeechEnabled`) |
 | `t2Transcript?` | T2 | `useBackgroundTranscription` auto-pass | Frozen after Whisper finishes; **never overwritten by T3** |
 | `t3Transcript?` | T3 | `useTranscriptionFlow.handleCreateTranscript` | Written by explicit Nova pass |
 | `editedTranscript?` | Edited | `useTranscriptionFlow.handleCommitEdit` | Manual edit committed from Transcript tab |
@@ -41,7 +43,7 @@ t1Transcript present     → activeTranscriptTier: 't1'
 
 | Field | Tier | Written by | Notes |
 |-------|------|-----------|-------|
-| `t1Transcript?` | T1 | `useRecordingFlow` — continuous effect + stop flush | Written live; final flush on `handleFinishedRecording` |
+| `t1Transcript?` | T1 | `useRecordingFlow` — continuous effect + pause/stop flush | Written on each Whisper VAD segment during recording; final flush on pause or stop |
 | `t2Transcript?` | T2 | `useBackgroundTranscription` auto-pass | Frozen after Whisper run; never overwritten |
 | `t3Transcript?` | T3 | `useTranscriptionFlow.runTranscribeLoop` | Written alongside `transcript`; does not overwrite `t2Transcript` |
 | `transcript?` | active | All write paths | Active per-clip transcript; merged to produce `session.transcript` |
@@ -51,20 +53,24 @@ t1Transcript present     → activeTranscriptTier: 't1'
 
 ## Write paths
 
-### T1 — Web Speech (continuous during recording)
+### T1 — Whisper VAD segments (default, continuous during recording)
 
-`useWebSpeechTranscript` runs the browser Web Speech API throughout recording. A `useEffect` in `useRecordingFlow` writes `accumulatedText` to `clip.t1Transcript` on every finalized speech segment — a browser crash only loses the current in-progress segment. A final flush runs on `handleFinishedRecording`.
+A VAD-gated segment recorder runs alongside the main MediaRecorder. Each time Silero VAD detects a speech segment (up to 15 s), the audio blob is sent to `POST /api/transcribe`. The returned text is appended to `whisperTextRef` and immediately persisted to `clip.t1Transcript`. On pause or stop the final accumulated text is flushed.
 
 ```
-per Web Speech segment (during recording):
-  webSpeech.accumulatedText changes
-    → patchClip(clipId, { t1Transcript: accumulatedText })   ← T1 persisted continuously
+per VAD-gated segment (during recording):
+  segment recorder emits audio blob
+    → POST /api/transcribe (Cloudflare Worker → Whisper)
+    → whisperTextRef.current += result.text
+    → patchClip(clipId, { t1Transcript: whisperTextRef.current })   ← T1 persisted continuously
 
-handleFinishedRecording():
-  → patchClip(clipId, { t1Transcript: accumulatedText })     ← final flush
+on pause or handleFinishedRecording():
+  → patchClip(clipId, { t1Transcript: whisperTextRef.current })     ← final flush
 ```
 
-Note: The Whisper live preview (`whisperBubbles`) also runs during recording — it is display-only and never persisted. See [Whisper live preview](workflows.md#whisper-live-preview-during-recording).
+The `whisperBubbles` state displayed in the recording panel is sourced from the same segment-recorder chunks but is transient UI state — it resets on each render cycle and is never written to storage. See [Whisper live preview](workflows.md#whisper-live-preview-during-recording).
+
+**Web Speech API alternative (opt-in):** When `webSpeechEnabled: true` (Settings → Recording), `useWebSpeechTranscript` runs instead. On each finalized speech segment its `accumulatedText` is written to `clip.t1Transcript`; a final flush runs on `handleFinishedRecording`. Web Speech quality is lower (~65%) but requires no PTScribe network beyond the browser's own cloud.
 
 ### T2 — Local Whisper auto-pass (`useBackgroundTranscription`)
 
@@ -122,7 +128,7 @@ clip → audioRepository.load(clip.id)
 
 ## Key invariants
 
-**T1 is written continuously, not just on stop.** `clip.t1Transcript` is updated on every finalized Web Speech segment during recording. A crash only loses the current in-progress segment. The Whisper live preview bubbles shown in the UI are separate — display-only, never persisted to any tier.
+**T1 is written continuously, not just on stop.** `clip.t1Transcript` is updated on every completed Whisper VAD segment during recording. A crash only loses the current in-flight segment. The `whisperBubbles` display in the recording panel draws from the same chunks but is transient UI state — never written to storage. When Web Speech is enabled (`webSpeechEnabled: true`), it writes T1 instead, with the same continuous-update guarantee.
 
 **T2 (Local Whisper) is never overwritten by T3 (Nova).** `session.t2Transcript` and `clip.t2Transcript` are written exclusively by `useBackgroundTranscription`. The T3 write path skips those fields entirely, making "revert to Local Whisper" reliable even after multiple Nova runs.
 
@@ -143,6 +149,8 @@ The revert button in the Transcript tab is visible when `session.t2Transcript` e
 ## Schema version
 
 The four-tier field model was introduced in **AppData v18** (migration `migrateV17ToV18`). All four tier fields (`t1Transcript`, `t2Transcript`, `t3Transcript`, `editedTranscript`) are optional and default to absent. `TranscriptTier` (`'t1'` / `'t2'` / `'t3'` / `'edited'`) replaced the old `TranscriptSource` type. `activeTranscriptTier` replaced `transcriptSource`.
+
+**AppData v19** (migration `migrateV18ToV19`) added `webSpeechEnabled: false` to `SessionWorkflowSettings`. This is the gate that demotes Web Speech API from the default T1 source to an opt-in. Existing users land on `false` (Whisper VAD segments as T1 default).
 
 ---
 

@@ -13,6 +13,8 @@ export interface VoiceDetector {
   teardown(): void;
   /** Timestamp (ms) of the last detected voice activity. Used for idle auto-stop checks. */
   readonly lastVoiceAtMs: number;
+  /** Live AnalyserNode — non-null while recording, null otherwise. For waveform visualization. */
+  readonly analyser: AnalyserNode | null;
 }
 
 /**
@@ -83,6 +85,10 @@ export function createVoiceDetector(): VoiceDetector {
 
     get lastVoiceAtMs(): number {
       return _lastVoiceAtMs;
+    },
+
+    get analyser(): AnalyserNode | null {
+      return analyser;
     },
   };
 }
