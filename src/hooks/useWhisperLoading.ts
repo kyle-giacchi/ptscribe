@@ -8,7 +8,9 @@ export function useWhisperLoading(): boolean {
   useEffect(() => {
     if (isWhisperPreloadComplete()) { setLoading(false); return; }
     let active = true;
-    getWhisperPreloadPromise().then(() => { if (active) setLoading(false); });
+    getWhisperPreloadPromise()
+      .then(() => { if (active) setLoading(false); })
+      .catch(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

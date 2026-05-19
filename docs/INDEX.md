@@ -33,8 +33,9 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Action guards (rate limits on transcribe + generate per session)          | [workflows.md](workflows.md#action-guards)                                 |
 | Whisper live preview during recording (VAD segment recorder, T1 + display) | [workflows.md](workflows.md#whisper-live-preview-during-recording)        |
 | Four-tier transcription (T1 Whisper VAD segments / T2 Local Whisper / T3 Nova / Edited) | [transcription.md](transcription.md#three-tier-model)            |
-| Transcription write paths (auto-pass vs explicit Nova, field ownership)   | [transcription.md](transcription.md#write-paths)                           |
-| Transcription tier invariants (T2 never overwritten, source stamping)     | [transcription.md](transcription.md#key-invariants)                        |
+| Transcription write paths (T2 auto-pass, T3 Nova, Edited tier)            | [transcription.md](transcription.md#write-paths)                           |
+| Transcription tier invariants (T2 never overwritten, T2/T3 clear editedTranscript) | [transcription.md](transcription.md#key-invariants)               |
+| Revert actions (Revert to Draft vs Revert edits)                          | [transcription.md](transcription.md#revert-actions)                        |
 | Admin page — tier coverage diagnostic (`/admin`, Terminal icon)           | [transcription.md](transcription.md#admin-page-admin)                      |
 | Session page panel components (`sessions/` sub-dir)                      | [architecture.md:6](architecture.md#layering)                              |
 | Inline confirmation pattern (no `window.confirm()`)                      | [invariants.md](invariants.md#destructive-actions-use-inline-confirmation) |
@@ -117,15 +118,15 @@ State machines and step-by-step data flows for every major user journey. Read wh
 
 ### [docs/transcription.md](transcription.md)
 
-Three-tier transcription system: Web Speech (T1), local Whisper auto-pass (T2), Nova cloud (T3). Read when touching any transcription write path, the tier field definitions, revert-to-local logic, or the Admin page.
+Four-tier transcription system: Web Speech / Whisper VAD (T1), local Whisper auto-pass (T2), Nova cloud (T3), Edited (manual edit or PII scrub). Read when touching any transcription write path, the tier field definitions, revert actions, or the Admin page.
 
 | Section | Gist |
 |---------|------|
 | Four-tier model | Tier table: source, timing, quality, network requirement; Web Speech as opt-in T1 alternative |
 | Data fields | Every `Session` and `SessionClip` field per tier with writer ownership |
-| Write paths | Exact code flow for T2 auto-pass and T3 Nova pass |
-| Key invariants | T2 never overwritten by T3; correct `activeTranscriptTier` stamping; auto-pass always runs |
-| Revert to local | How revert reads `t2Transcript` without losing `t3Transcript` |
+| Write paths | Exact code flow for T2 auto-pass, T3 Nova pass, and Edited tier (manual edit + PII scrub) |
+| Key invariants | T2 never overwritten by T3; T2/T3 writes clear `editedTranscript`; auto-pass always runs |
+| Revert actions | Two revert buttons: "Revert to Draft" (T2) and "Revert edits" (clear `editedTranscript`) |
 | Schema version | v18 (four-tier fields), v19 (webSpeechEnabled gate); legacy session fallback |
 | Admin page | `/admin` diagnostic: coverage stats + per-session tier viewer |
 
