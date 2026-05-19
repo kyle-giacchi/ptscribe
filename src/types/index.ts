@@ -341,6 +341,12 @@ export interface SessionWorkflowSettings {
    * are the default T1 source.
    */
   webSpeechEnabled: boolean;
+  /**
+   * On-device model used for PII scrubbing. 'openai/privacy-filter' requires ONNX
+   * files pre-seeded to R2 (see scripts/convert-privacy-filter.py). 'Xenova/bert-base-NER'
+   * has ONNX exports on HuggingFace and works without R2 setup. Default: openai/privacy-filter.
+   */
+  piiModel?: 'openai/privacy-filter' | 'Xenova/bert-base-NER';
 }
 
 /**

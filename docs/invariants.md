@@ -190,7 +190,7 @@ The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is
 
 **Every audio clip — recorded or uploaded — is always sent through local Whisper first, regardless of the user's configured transcription provider.**
 
-The background auto-transcription effect in `useTranscriptionFlow` fires for every clip that reaches `status: 'ready'` with no `localTranscript`. It always calls `transcribeClipBlob` with `forceLocal: true` (whisper-tiny.en in-browser via `src/lib/audio/whisper.worker.ts`). The result is stored in both `localTranscript` and `transcript` so the Review tab populates without any manual action.
+The background auto-transcription effect in `useBackgroundTranscription` fires for every clip that reaches `status: 'ready'` with no `t2Transcript`. It calls `transcribeWithLocalWhisper` (whisper-tiny.en ONNX in-browser via `src/lib/audio/whisper.worker.ts`). The result is stored in both `t2Transcript` and `transcript` so the Review tab populates without any manual action.
 
 Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit user action** that upgrades the local result. It does not replace the background pass — it runs on top of it.
 
@@ -201,7 +201,7 @@ Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit
 Consequences of violating this rule:
 - Uploaded audio silently skips local transcription and the "Processing audio" screen hangs with no escape for the user.
 - Users on the 'local' provider get no automatic transcript.
-- `localTranscript` is never populated, breaking the "Revert to local" flow in `TranscriptPanel`.
+- `t2Transcript` is never populated, breaking the "Revert to Draft" flow in `TranscriptPanel`.
 
 ### Worker pool and device guards
 

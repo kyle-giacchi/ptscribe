@@ -227,6 +227,7 @@ const SettingsSchema = z.object({
   session: z.object({
     autoFinish: z.boolean(),
     webSpeechEnabled: z.boolean(),
+    piiModel: z.enum(['openai/privacy-filter', 'Xenova/bert-base-NER']).optional(),
   }),
   recordingLimits: z.object({
     softWarnAtMinutes: z.number().int().min(15).max(240),

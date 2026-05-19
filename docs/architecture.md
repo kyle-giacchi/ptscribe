@@ -127,7 +127,7 @@ Pipeline (from `src/hooks/useTranscriptionFlow.ts`):
 4. Fixed 3-minute chunking of the speech-only audio
 5. `transcribeFloat32Parallel(chunks, model, onProgress)` — dispatch chunks across a device-capability-sized worker pool
 
-This fires as a background auto-transcription effect (`useTranscriptionFlow` effect) for every clip that reaches `status: 'ready'` with no `localTranscript`. Result is stored in both `localTranscript` and `transcript` so the Review tab populates without user action.
+This fires as a background auto-transcription effect (`useBackgroundTranscription`) for every clip that reaches `status: 'ready'` with no `t2Transcript`. Result is stored in both `t2Transcript` and `transcript` so the Review tab populates without user action.
 
 Cloud transcription (Deepgram Nova-3 via Cloudflare Worker) is a **separate, explicit user action** accessed from TranscriptPanel that upgrades the local result. See [invariants.md#local-first-transcription](invariants.md#local-first-transcription) and [invariants.md#worker-pool-and-device-guards](invariants.md#worker-pool-and-device-guards).
 

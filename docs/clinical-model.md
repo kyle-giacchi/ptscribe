@@ -55,7 +55,7 @@ Each clip (recorded or uploaded) progresses through:
 pending  -- audio saved -->  ready  -- auto-transcribe -->  transcribing  -->  transcribed (or failed)
 ```
 
-The background auto-transcription effect fires for every clip reaching `status: 'ready'` with no `localTranscript`. The effect calls `transcribeLocalChunked` via the worker pool, then patches the clip with the result. The session-level `transcript` is merged from all transcribed clips.
+The background auto-transcription effect (`useBackgroundTranscription`) fires for every clip reaching `status: 'ready'` with no `t2Transcript`. It calls `transcribeWithLocalWhisper` via the worker pool, then patches the clip with the result storing output in `t2Transcript`. The session-level `transcript` is merged from all transcribed clips.
 
 ### Note
 
