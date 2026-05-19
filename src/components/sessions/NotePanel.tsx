@@ -203,6 +203,7 @@ export function NotePanel({
 
                 {/* Section body editor */}
                 <NoteSectionEditor
+                  key={`${note?.id ?? 'template'}-${s.key}`}
                   value={s.body}
                   readOnly={!!note?.finalized}
                   onChange={(body) => onSectionChange(s.key, body)}
