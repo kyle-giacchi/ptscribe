@@ -209,6 +209,25 @@ export function Sidebar({ onClose, className }: SidebarProps) {
                   <Terminal size={13} strokeWidth={1.75} />
                   <span>Debug</span>
                 </NavLink>
+                <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
+                <button
+                  type="button"
+                  onClick={() => { setProfileOpen(false); onClose?.(); logout(); }}
+                  className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+                  style={{
+                    padding: '7px 12px',
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: 'var(--color-pt-danger, #dc2626)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <LogOut size={13} strokeWidth={1.75} />
+                  <span>Log out</span>
+                </button>
               </div>
             )}
           </div>
