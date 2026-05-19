@@ -299,7 +299,7 @@ Rate-limits expensive AI operations per session to prevent runaway costs:
 | `transcribe` | `MAX_TRANSCRIBES_PER_SESSION` (cloud Nova passes only) |
 | `generate` | `MAX_GENERATES_PER_SESSION` |
 
-The background T2 Whisper pass bypasses the guard — it calls `transcribeClipBlob` directly with `forceLocal: true` and never touches `checkActionGuard`.
+The background T2 Whisper pass bypasses the guard — `useBackgroundTranscription` calls `transcribeWithLocalWhisper` directly and never touches `checkActionGuard`.
 
 ---
 

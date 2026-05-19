@@ -1,20 +1,14 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // ── Model source routing ─────────────────────────────────────────────────────
-// Unlike whisper.worker.ts, the fetch interceptor runs in BOTH dev and prod.
-// openai/privacy-filter has no ONNX exports on HuggingFace — the converted files
-// live only in R2. In dev, wrangler dev server proxies R2 at /api/model/* from
-// localhost, so the R2 fallback works there too. See scripts/convert-privacy-filter.py.
+// Mirrors whisper.worker.ts: R2 (via /api/model/*) is primary; HuggingFace is
+// the fallback when R2 is unseeded or unreachable (e.g. local dev without wrangler).
+// Xenova/bert-base-NER has ONNX exports on HuggingFace, so dev always works.
 
 const HF_HOST = 'https://huggingface.co';
-const R2_HOST = `${self.location.origin}/api/model`;
+const MODEL_HOST = `${self.location.origin}/api/model`;
 
-// Our ONNX conversion lives under models/privacy-filter/ in R2, not at the
-// mirrored HuggingFace path. See scripts/convert-privacy-filter.py.
-const HF_MODEL_PREFIX = `${HF_HOST}/openai/privacy-filter/resolve/main/`;
-const R2_MODEL_FOLDER = `${R2_HOST}/models/privacy-filter/`;
-
-env.remoteHost = HF_HOST;
+env.remoteHost = MODEL_HOST;
 env.useBrowserCache = false; // IDB interceptor owns all caching
 env.allowLocalModels = false;
 
@@ -68,54 +62,53 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
 
 // ── Fetch interceptor (dev + production) ────────────────────────────────────
 
-const _originalFetch = globalThis.fetch.bind(globalThis);
+{
+  const _originalFetch = globalThis.fetch.bind(globalThis);
 
-(globalThis as typeof globalThis).fetch = async (
-  input: RequestInfo | URL,
-  init?: RequestInit,
-): Promise<Response> => {
-  const url =
-    typeof input === 'string'
-      ? input
-      : input instanceof URL
-        ? input.href
-        : (input as Request).url;
+  (globalThis as typeof globalThis).fetch = async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response> => {
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : (input as Request).url;
 
-  if (!url.startsWith(HF_HOST)) {
-    return _originalFetch(input, init);
-  }
+    if (!url.startsWith(MODEL_HOST)) {
+      return _originalFetch(input, init);
+    }
 
-  const cached = await cacheGet(url);
-  if (cached) {
-    return new Response(cached.buffer, {
-      status: 200,
-      headers: { 'Content-Type': cached.contentType },
-    });
-  }
+    const cached = await cacheGet(url);
+    if (cached) {
+      return new Response(cached.buffer, {
+        status: 200,
+        headers: { 'Content-Type': cached.contentType },
+      });
+    }
 
-  let response = await _originalFetch(input, init);
+    let response = await _originalFetch(input, init);
 
-  // HuggingFace is the primary source; fall back to R2 if unreachable.
-  // Our ONNX files are under models/privacy-filter/ in R2, not the HF path.
-  if (!response.ok) {
-    const r2Url = url.startsWith(HF_MODEL_PREFIX)
-      ? `${R2_MODEL_FOLDER}${url.slice(HF_MODEL_PREFIX.length)}`
-      : `${R2_HOST}/${url.slice(HF_HOST.length + 1)}`;
-    response = await _originalFetch(r2Url, init);
-  }
+    // If R2 fails (unseeded or wrangler not running), fall back to HuggingFace.
+    if (!response.ok) {
+      const hfPath = url.slice(MODEL_HOST.length + 1);
+      response = await _originalFetch(`${HF_HOST}/${hfPath}`, init);
+    }
 
-  if (response.ok) {
-    const contentType =
-      response.headers.get('Content-Type') ?? 'application/octet-stream';
-    const buffer = await response.arrayBuffer();
-    cachePut(url, { buffer, contentType });
-    return new Response(buffer, {
-      status: 200,
-      headers: { 'Content-Type': contentType },
-    });
-  }
-  return response;
-};
+    if (response.ok) {
+      const contentType =
+        response.headers.get('Content-Type') ?? 'application/octet-stream';
+      const buffer = await response.arrayBuffer();
+      cachePut(url, { buffer, contentType });
+      return new Response(buffer, {
+        status: 200,
+        headers: { 'Content-Type': contentType },
+      });
+    }
+    return response;
+  };
+}
 
 // ── Worker message types ─────────────────────────────────────────────────────
 
