@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock } from 'lucide-react';
+import { preloadLocalWhisper } from '@/services/ai/client/localWhisper';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -175,6 +176,7 @@ export function Landing({ onSignIn }: LandingProps) {
   }, []);
 
   function handleDemo() {
+    preloadLocalWhisper();
     if (!onSignIn) {
       navigate('/today', { state: { showCode: true } });
       return;
@@ -183,6 +185,11 @@ export function Landing({ onSignIn }: LandingProps) {
     setCode('');
     setCodeError(null);
     setTimeout(() => inputRef.current?.focus(), 60);
+  }
+
+  function handleLogin() {
+    preloadLocalWhisper();
+    navigate('/login');
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -307,7 +314,7 @@ export function Landing({ onSignIn }: LandingProps) {
               </button>
               <button
                 id="ldg-setup"
-                onClick={() => navigate('/login')}
+                onClick={handleLogin}
                 style={{
                   padding: '15px 40px', border: '1.5px solid #d6dce5', borderRadius: 12,
                   background: 'transparent', color: '#1a2030', fontSize: 15.5, fontWeight: 600,
@@ -733,7 +740,7 @@ export function Landing({ onSignIn }: LandingProps) {
           <span>
             Already have an account?{' '}
             <button
-              onClick={() => navigate('/login')}
+              onClick={handleLogin}
               style={{ all: 'unset', color: '#0ea5a8', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
             >
               Sign in

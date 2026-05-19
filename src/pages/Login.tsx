@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { preloadLocalWhisper } from '@/services/ai/client/localWhisper';
 import { MailCheck } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
 import { activateTestUserSession } from '@/contexts/AuthContext';
@@ -23,6 +24,8 @@ export function Login() {
   const [loading, setLoading] = useState(false);
 
   const from = (location.state as { from?: Location })?.from?.pathname ?? '/';
+
+  useEffect(() => { preloadLocalWhisper(); }, []);
 
   async function handlePasskey() {
     setError(null);

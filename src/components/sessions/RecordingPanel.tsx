@@ -18,6 +18,7 @@ import { formatDuration } from '@/utils/format';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities';
+import { useWhisperLoading } from '@/hooks/useWhisperLoading';
 import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
@@ -162,13 +163,15 @@ function IdleRecordingCard({
   capabilities?: DeviceCapabilities;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const whisperLoading = useWhisperLoading();
   const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
   const hasStatusMessage = uploadStatus.phase !== 'idle';
 
   const micBlocked = capabilities?.micPermission === 'denied';
   const noRecorder = capabilities?.mediaRecorderSupported === false;
   const recordBlocked = micBlocked || noRecorder;
-  const buttonDisabled = isUploading || recordBlocked;
+  const whisperGate = !!(capabilities?.wasmSupported && whisperLoading);
+  const buttonDisabled = isUploading || recordBlocked || whisperGate;
 
   const capBanners = !capabilities || capabilities.checking ? null : (
     <>
@@ -202,6 +205,11 @@ function IdleRecordingCard({
           Low-memory device detected — live transcription may be slow or skip segments.
         </StatusBanner>
       )}
+      {capabilities.wasmSupported && whisperLoading && (
+        <StatusBanner icon={<Loader2 className="h-3.5 w-3.5 animate-spin" />} color="info">
+          Preparing transcription model — first run downloads ~150 MB. Recording will be enabled when ready.
+        </StatusBanner>
+      )}
     </>
   );
 
@@ -213,13 +221,14 @@ function IdleRecordingCard({
       capabilities.storageLow ||
       capabilities.storageCritical ||
       !capabilities.wasmSupported ||
-      capabilities.isLowMemoryDevice);
+      capabilities.isLowMemoryDevice ||
+      (capabilities.wasmSupported && whisperLoading));
 
   return (
     <div className="flex flex-col items-center gap-8 py-12">
       <div className="flex flex-col items-center gap-5">
         <div className="relative">
-          {!recordBlocked && (
+          {!recordBlocked && !whisperGate && (
             <span
               className="absolute inset-0 rounded-full"
               style={{
@@ -239,16 +248,22 @@ function IdleRecordingCard({
               height: 144,
               background: recordBlocked
                 ? 'var(--color-pt-border-strong)'
-                : 'var(--color-pt-accent)',
+                : whisperGate
+                  ? 'color-mix(in oklab, var(--color-pt-accent) 55%, var(--color-pt-surface))'
+                  : 'var(--color-pt-accent)',
               touchAction: 'manipulation',
-              boxShadow: recordBlocked
+              boxShadow: recordBlocked || whisperGate
                 ? 'none'
                 : '0 8px 32px color-mix(in srgb, var(--color-pt-accent) 35%, transparent)',
               opacity: isUploading ? 0.45 : 1,
-              cursor: recordBlocked ? 'not-allowed' : 'pointer',
+              cursor: recordBlocked || whisperGate ? 'not-allowed' : 'pointer',
             }}
           >
-            <Mic size={52} strokeWidth={1.5} style={{ color: 'white' }} />
+            {whisperGate ? (
+              <Loader2 size={48} strokeWidth={1.5} style={{ color: 'white' }} className="animate-spin" />
+            ) : (
+              <Mic size={52} strokeWidth={1.5} style={{ color: 'white' }} />
+            )}
           </button>
         </div>
 
@@ -261,9 +276,11 @@ function IdleRecordingCard({
               ? 'Microphone permission required'
               : noRecorder
                 ? 'Recording not available in this browser'
-                : isAddingClip
-                  ? 'Tap the mic to add a clip to this session'
-                  : 'Tap the mic to begin'}
+                : whisperGate
+                  ? 'Preparing transcription model…'
+                  : isAddingClip
+                    ? 'Tap the mic to add a clip to this session'
+                    : 'Tap the mic to begin'}
           </p>
         </div>
       </div>
