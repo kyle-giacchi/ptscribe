@@ -8,9 +8,9 @@ import { pipeline, env } from '@huggingface/transformers';
 const IS_DEV = (import.meta as unknown as { env: { DEV: boolean } }).env.DEV;
 
 const HF_HOST = 'https://huggingface.co';
-const R2_HOST = `${self.location.origin}/api/model`;
+const MODEL_HOST = IS_DEV ? HF_HOST : `${self.location.origin}/api/model`;
 
-env.remoteHost = HF_HOST;
+env.remoteHost = MODEL_HOST;
 // In production our IDB fetch interceptor below is the single cache layer.
 // In dev, keep the browser HTTP cache so HuggingFace downloads persist.
 env.useBrowserCache = IS_DEV;
@@ -85,7 +85,7 @@ if (!IS_DEV) {
           ? input.href
           : (input as Request).url;
 
-    if (!url.startsWith(HF_HOST)) {
+    if (!url.startsWith(MODEL_HOST)) {
       return _originalFetch(input, init);
     }
 
@@ -99,10 +99,10 @@ if (!IS_DEV) {
 
     let response = await _originalFetch(input, init);
 
-    // HuggingFace is the primary source; fall back to R2 if unreachable.
+    // If the R2 route fails (bucket unseeded), fall back to HuggingFace directly.
     if (!response.ok) {
-      const modelPath = url.slice(HF_HOST.length + 1);
-      response = await _originalFetch(`${R2_HOST}/${modelPath}`, init);
+      const hfPath = url.slice(MODEL_HOST.length + 1);
+      response = await _originalFetch(`${HF_HOST}/${hfPath}`, init);
     }
 
     if (response.ok) {
