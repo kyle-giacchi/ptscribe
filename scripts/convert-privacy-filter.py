@@ -76,7 +76,7 @@ def main() -> None:
 
     for path in files:
         rel_posix = path.relative_to(out_dir).as_posix()
-        r2_key = f'models/privacy-filter/{rel_posix}'
+        r2_key = f'openai/privacy-filter/resolve/main/{rel_posix}'
         ct = CONTENT_TYPES.get(path.suffix.lstrip('.'), 'application/octet-stream')
 
         size_kb = path.stat().st_size // 1024
@@ -92,7 +92,7 @@ def main() -> None:
         print('✓')
 
     print(f'\nDone. Verify with:')
-    print(f'  wrangler r2 object list {BUCKET} --prefix "models/privacy-filter"')
+    print(f'  wrangler r2 object list {BUCKET} --prefix "openai/privacy-filter"')
 
 
 if __name__ == '__main__':
