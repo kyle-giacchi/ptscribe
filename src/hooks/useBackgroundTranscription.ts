@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, getWhisperPreloadPromise } from '@/services/ai/client/localWhisper';
@@ -8,6 +8,13 @@ import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
 import type { Session, SessionClip, TranscriptChunk } from '@/types';
 
 const LOCAL_CHUNK_SEC = 120; // 2-minute segments — each maps to a real audio timestamp
+
+// After a transient failure (network error, worker crash), wait this long before
+// retrying. Keeps the badge stable while the Whisper model finishes downloading.
+const RETRY_DELAY_MS = 3_000;
+// Stop auto-retrying after this many transient failures per clip per session.
+// 8 attempts × 3 s = 24 s — enough to cover a typical HuggingFace model download.
+const MAX_AUTO_RETRIES = 8;
 
 /**
  * Local-first transcription pipeline for the background auto-pass.
@@ -118,8 +125,16 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
-  // Tracks which clips are currently being auto-transcribed to prevent duplicate runs.
+  // Tracks clips currently being auto-transcribed (or waiting in backoff) to
+  // prevent the effect from re-triggering an immediate retry when patchClip
+  // changes session.clips. Released on success, or after RETRY_DELAY_MS on
+  // transient failure (up to MAX_AUTO_RETRIES times).
   const autoTranscribingRef = useRef(new Set<string>());
+  // Tracks how many transient retries each clip has consumed this session.
+  const retryCountRef = useRef(new Map<string, number>());
+  // Bumped by retry timers so the effect re-runs after each backoff period
+  // without requiring an external session.clips change to trigger it.
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (!session) return;
@@ -146,8 +161,9 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
           return transcribeWithLocalWhisper(original);
         })
         .then((result) => {
-          autoTranscribingRef.current.delete(clip.id);
           if (result.ok) {
+            autoTranscribingRef.current.delete(clip.id);
+            retryCountRef.current.delete(clip.id);
             patchClip(clip.id, {
               status: 'transcribed',
               transcript: result.text,
@@ -172,7 +188,9 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
               patchSession({ transcript: merged, activeTranscriptTier: 't2', t2Transcript: merged });
             }
           } else if (result.error !== 'Aborted.') {
-            // Revert to 'ready' so cloud transcription remains available.
+            // Permanent content failure (no speech, audio too short, Whisper returned
+            // nothing). clip.id intentionally stays in autoTranscribingRef so the next
+            // patchClip re-render doesn't trigger a retry — retrying won't help here.
             patchClip(clip.id, { status: 'ready', errorMessage: undefined });
             addNotification('warning', `Clip ${clip.index + 1}: automatic transcription found no usable audio. Use Transcribe to retry with cloud.`);
             // Fall back to t1Transcript so the session doesn't lose this clip's content.
@@ -184,26 +202,43 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
           }
         })
         .catch((e: Error) => {
-          autoTranscribingRef.current.delete(clip.id);
-          // Revert to 'ready' — audio saved fine, only local transcription failed.
-          // This keeps the clip available for manual cloud transcription.
-          const isFetchError = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
+          // Transient failure — network error, worker crash, or model still downloading.
+          // Revert the clip to 'ready' but keep clip.id in autoTranscribingRef during
+          // the backoff window so the immediate patchClip re-render doesn't re-trigger
+          // the effect and produce a rapid ready↔transcribing flicker. After the delay,
+          // release the guard and bump retryTick to schedule one more attempt.
           patchClip(clip.id, { status: 'ready', errorMessage: undefined });
-          if (isFetchError) {
-            addNotification('error', 'Whisper model unavailable — use the Transcribe button for cloud transcription.');
-          } else {
-            addNotification('error', `Clip ${clip.index + 1}: automatic transcription failed. Use Transcribe to retry.`);
-          }
           // Fall back to t1Transcript so the session doesn't lose this clip's content.
           const fallback = buildBestAvailableTranscript(sessionRef.current?.clips ?? []);
           if (fallback) {
             setTranscript(fallback);
             patchSession({ transcript: fallback, activeTranscriptTier: 't1' });
           }
+
+          const retries = (retryCountRef.current.get(clip.id) ?? 0) + 1;
+          if (retries <= MAX_AUTO_RETRIES) {
+            retryCountRef.current.set(clip.id, retries);
+            // Release the guard after the backoff, then wake the effect for a retry.
+            // Notifications are suppressed during retries — only shown when giving up.
+            setTimeout(() => {
+              autoTranscribingRef.current.delete(clip.id);
+              setRetryTick((t) => t + 1);
+            }, RETRY_DELAY_MS);
+          } else {
+            // Max retries exhausted — clip.id stays in ref so no more auto-attempts.
+            // Notify once so the user knows to use cloud transcription.
+            const isFetchError = e.message.toLowerCase().includes('fetch') || e.message.toLowerCase().includes('network');
+            if (isFetchError) {
+              addNotification('error', 'Whisper model unavailable — use the Transcribe button for cloud transcription.');
+            } else {
+              addNotification('error', `Clip ${clip.index + 1}: automatic transcription failed. Use Transcribe to retry.`);
+            }
+          }
         });
     }
     // addNotification is stable (useCallback); patchClip / patchSession / setTranscript
-    // use functional updates — safe to omit from deps.
+    // use functional updates — safe to omit from deps. retryTick is included so retry
+    // timers can re-run the effect without needing an external session.clips change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.clips]);
+  }, [session?.clips, retryTick]);
 }

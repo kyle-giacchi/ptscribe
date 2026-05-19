@@ -18,9 +18,8 @@ import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import type { Session, SessionClip, NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
-import { mergeClipTranscripts, getTranscribableClips } from '@/utils/clips';
 import { useRecordingFlow } from '@/hooks/useRecordingFlow';
-import { useTranscriptionFlow, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useTranscriptionFlow';
+import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
 import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
@@ -62,6 +61,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   // Initial transcript captured ONCE per session (component is keyed on sessionId).
   const [transcript, setTranscript] = useState(session?.transcript ?? '');
+  const [editedTranscript, setEditedTranscript] = useState(session?.editedTranscript ?? '');
+  const effectiveTranscript = editedTranscript.trim() ? editedTranscript : transcript;
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [recordingSkipped, setRecordingSkipped] = useState(quickMode);
@@ -108,6 +109,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     session,
     settings,
     setTranscript,
+    setEditedTranscript,
     patchSession,
     patchClips,
     patchClip,
@@ -119,7 +121,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     isMerging,
     setIsMerging,
     debugStats,
-    transcribeUsed,
     generateUsed,
     checkActionGuard,
     recordAction,
@@ -171,7 +172,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     note,
     template,
     settings,
-    transcript,
+    transcript: effectiveTranscript,
     patchSession,
     setError,
     setBusy,
@@ -238,18 +239,20 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   function handleCopyTranscript() {
-    navigator.clipboard.writeText(transcript).then(
+    navigator.clipboard.writeText(effectiveTranscript).then(
       () => toast.success('Transcript copied'),
       () => toast.error('Copy failed'),
     );
   }
 
   function handleApplyScrub(scrubbed: string) {
-    setTranscript(scrubbed);
-    patchSession({
-      transcript: scrubbed,
-      activeTranscriptTier: session?.activeTranscriptTier ?? 'edited',
-    });
+    setEditedTranscript(scrubbed);
+    patchSession({ editedTranscript: scrubbed, activeTranscriptTier: 'edited' });
+  }
+
+  function handleRevertEdits() {
+    setEditedTranscript('');
+    patchSession({ editedTranscript: undefined });
   }
 
   function handleTemplateChange(newTemplateId: string) {
@@ -273,19 +276,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   // ── Derived display values ────────────────────────────────────────────────
   const canGenerate =
-    transcript.trim().length > 0 &&
+    effectiveTranscript.trim().length > 0 &&
     settings.ai.generation.provider === 'anthropic' &&
     generateUsed < MAX_GENERATES_PER_SESSION;
 
-  const isTranscriptLocked = sortedClips.length === 0 && !transcript.trim() && !recordingSkipped;
+  const isTranscriptLocked = sortedClips.length === 0 && !effectiveTranscript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
   const hasT2Transcript = sortedClips.some((c) => !!c.t2Transcript);
-  // Nova-eligible: clips not yet AI-transcribed (local result still in transcript, or not yet transcribed)
-  const novaEligible = !isRecording && getTranscribableClips(sortedClips).length > 0;
 
-  const currentClipMerge = mergeClipTranscripts(session.clips).trim();
-  const hasUserEdits = transcript.trim().length > 0 && transcript.trim() !== currentClipMerge;
+  const hasUserEdits = editedTranscript.trim().length > 0;
 
   // Show a strong warning when the user navigates back to Record after a note has been generated.
   const showRecordWarning = activeTab === 'record' && !recordWarnDismissed && !!note;
@@ -302,7 +302,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   async function handleResetSession() {
     setResetModalOpen(false);
     if (!session) return;
-    if (recorder.status !== 'idle') {
+    if (isRecording) {
       toast.error('Stop recording before resetting the session.');
       return;
     }
@@ -394,6 +394,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         {/* ① Record tab */}
         {activeTab === 'record' && (
           <div role="tabpanel" id="panel-record" aria-labelledby="tab-record" style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {(sortedClips.length > 0 || effectiveTranscript.trim().length > 0) && (
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-ghost py-1 text-xs"
+                  onClick={() => setActiveTab('review')}
+                >
+                  <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
+                </button>
+              </div>
+            )}
             {showRecordWarning && (
               <div
                 style={{
@@ -549,22 +560,20 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               {/* ── Right: Transcript ── */}
               <div>
                 <TranscriptPanel
-                  transcript={transcript}
+                  transcript={effectiveTranscript}
                   clips={sortedClips}
-                  canTranscribe={novaEligible}
                   transcribing={busy === 'transcribing'}
-                  transcribeUsed={transcribeUsed}
-                  transcribeCap={MAX_TRANSCRIBES_PER_SESSION}
                   hasUserEdits={hasUserEdits}
                   hasT2Transcript={hasT2Transcript}
                   totalDurationSec={totalDurationSec}
-                  onChange={setTranscript}
-                  onCommit={() =>
-                    patchSession({
-                      transcript,
-                      activeTranscriptTier: session.activeTranscriptTier ?? 'edited',
-                    })
-                  }
+                  onChange={setEditedTranscript}
+                  onCommit={() => {
+                    if (editedTranscript.trim()) {
+                      patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
+                    } else if (session.editedTranscript) {
+                      patchSession({ editedTranscript: undefined });
+                    }
+                  }}
                   onCreateTranscript={handleCreateTranscript}
                   onRevertToLocal={handleRevertToLocal}
                   onAddRecording={() => setActiveTab('record')}
@@ -575,6 +584,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   onApplyScrub={handleApplyScrub}
                   piiScrubbing={piiScrubbing}
                   piiProgress={scrubProgress}
+                  hasEditedTranscript={hasUserEdits}
+                  onRevertEdits={handleRevertEdits}
                 />
               </div>
             </div>

@@ -22,15 +22,29 @@ let _idCounter = 0;
 const _pending = new Map<number, PendingEntry>();
 
 // ── Preload state ─────────────────────────────────────────────────────────────
-// Eagerly-created promise so getWhisperPreloadPromise() is safe to call any time.
 let _preloadComplete = false;
 let _preloadStarted = false;
 let _preloadDoneResolve: (() => void) | null = null;
-const _preloadDonePromise = new Promise<void>((res) => { _preloadDoneResolve = res; });
+let _preloadDoneReject: ((e: Error) => void) | null = null;
 
-/** Returns a Promise that resolves once the Whisper pipeline is loaded and ready. */
+function newPreloadPromise(): Promise<void> {
+  return new Promise<void>((res, rej) => {
+    _preloadDoneResolve = res;
+    _preloadDoneReject = rej;
+  });
+}
+
+let _preloadDonePromise: Promise<void> = newPreloadPromise();
+
+/**
+ * Returns a Promise that resolves once the Whisper pipeline is ready, or
+ * rejects if the last load attempt failed. Automatically starts a preload if
+ * none is in progress — retries are self-healing without external coordination.
+ */
 export function getWhisperPreloadPromise(): Promise<void> {
-  return _preloadComplete ? Promise.resolve() : _preloadDonePromise;
+  if (_preloadComplete) return Promise.resolve();
+  if (!_preloadStarted) preloadLocalWhisper();
+  return _preloadDonePromise;
 }
 
 export function isWhisperPreloadComplete(): boolean {
@@ -135,9 +149,14 @@ export function preloadLocalWhisper(model = LOCAL_WHISPER_DEFAULT_MODEL): void {
       _preloadComplete = true;
       _preloadDoneResolve?.();
     },
-    reject: () => {
-      // Non-fatal: resolve the gate so callers are never permanently blocked.
-      _preloadDoneResolve?.();
+    reject: (err: Error) => {
+      // Reset so the next getWhisperPreloadPromise() call can start a fresh attempt.
+      _preloadStarted = false;
+      const rejectCurrent = _preloadDoneReject;
+      // Swap in a fresh promise before rejecting so new callers get a pending promise,
+      // not an already-rejected one.
+      _preloadDonePromise = newPreloadPromise();
+      rejectCurrent?.(err);
     },
   });
   worker.postMessage({ id, type: 'preload', model });
