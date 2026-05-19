@@ -189,6 +189,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleUnfinalize,
     handleCopyNoteMarkdown,
     missingRequiredLabels,
+    lastRawPayload,
   } = generation;
 
   const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
@@ -655,6 +656,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           setSpeedDebugOn={setSpeedDebugOn}
           debugStats={debugStats}
           speedFactor={settings.audio.speedUp.speed}
+          lastRawPayload={lastRawPayload}
         />
       )}
 

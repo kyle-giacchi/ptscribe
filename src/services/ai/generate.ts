@@ -35,6 +35,7 @@ export interface GenerateNoteArgs {
 
 export interface GenerateNoteResult {
   sections: NoteSection[];
+  rawText: string;
 }
 
 type GenerateBackend = (args: GenerateNoteArgs) => Promise<GenerateNoteResult>;
@@ -72,7 +73,7 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       label: s.label,
       body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
     }));
-    return { sections };
+    return { sections, rawText: result.text };
   },
   none: () => {
     throw new Error('AI generation is disabled. Pick a provider in Settings.');
