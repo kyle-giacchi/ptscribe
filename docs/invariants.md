@@ -238,14 +238,14 @@ Skipping the migration means existing persisted data will fail `AppDataSchema.sa
 
 `openai/privacy-filter` has no pre-converted ONNX exports on HuggingFace. `@huggingface/transformers` falls back to `model.safetensors` (the raw PyTorch weights, 400 MB+) when ONNX files are absent, which fails in the browser.
 
-**The ONNX files must be generated once and hosted in R2:**
+**The ONNX files must be downloaded once and hosted in R2:**
 
 ```bash
-pip install "optimum[exporters]"
 python scripts/convert-privacy-filter.py
 ```
 
-This converts the model to INT8 ONNX, writes files to `./models/privacy-filter/` (gitignored), and uploads them to R2 under the key prefix `models/privacy-filter/`. The fetch interceptor maps `https://huggingface.co/openai/privacy-filter/resolve/main/<file>` → `R2/models/privacy-filter/<file>` on fallback. Do not change this R2 prefix without updating `HF_MODEL_PREFIX` / `R2_MODEL_FOLDER` in `privacyFilter.worker.ts`.
+No conversion required — the repo ships `onnx/model_quantized.onnx` (INT8) directly.
+The script downloads that file plus tokenizer/config files, writes them to `./models/privacy-filter/` (gitignored), and uploads them to R2 under the key prefix `models/privacy-filter/`. No pip installs needed. The fetch interceptor maps `https://huggingface.co/openai/privacy-filter/resolve/main/<file>` → `R2/models/privacy-filter/<file>` on fallback. Do not change this R2 prefix without updating `HF_MODEL_PREFIX` / `R2_MODEL_FOLDER` in `privacyFilter.worker.ts`.
 
 **The model loads lazily** — it downloads only when the user clicks "Scrub PII" for the first time, not at app startup. Do not re-add a preload call in `DemoBootstrap` or any other boot component.
 
