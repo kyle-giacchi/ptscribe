@@ -38,6 +38,7 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Admin page — tier coverage diagnostic (`/admin`, Terminal icon)           | [transcription.md](transcription.md#admin-page-admin)                      |
 | Session page panel components (`sessions/` sub-dir)                      | [architecture.md:6](architecture.md#layering)                              |
 | Inline confirmation pattern (no `window.confirm()`)                      | [invariants.md](invariants.md#destructive-actions-use-inline-confirmation) |
+| PII scrubbing model — R2-only ONNX, interceptor always active (dev + prod) | [invariants.md](invariants.md#pii-scrubbing-model--r2-only-onnx-interceptor-always-active) |
 | Boot sequence (load → migrate → safeParse → fallback)                    | [architecture.md:34](architecture.md#boot-sequence)                        |
 | Units (ms timestamps, minutes, UUIDs, Markdown)                          | [architecture.md:48](architecture.md#units-and-coordinate-systems)         |
 | Provider/mutator table (every hook + setters)                            | [architecture.md:58](architecture.md#provider-responsibilities)            |

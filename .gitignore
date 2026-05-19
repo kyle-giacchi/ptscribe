@@ -48,3 +48,6 @@ coverage/
 
 # Wrangler
 .wrangler/
+
+# Local ONNX model conversions (uploaded to R2 via scripts/convert-privacy-filter.py)
+models/
