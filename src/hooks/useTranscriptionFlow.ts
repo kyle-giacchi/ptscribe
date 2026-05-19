@@ -20,6 +20,7 @@ export interface UseTranscriptionFlowParams {
   session: Session | undefined;
   settings: Settings;
   setTranscript: (next: string) => void;
+  setEditedTranscript?: (next: string) => void;
   patchSession: (patch: Partial<Session>) => void;
   patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
   patchClip: (clipId: string, patch: Partial<SessionClip>) => void;
@@ -57,6 +58,7 @@ export function useTranscriptionFlow(
     session,
     settings,
     setTranscript,
+    setEditedTranscript,
     patchSession,
     patchClips,
     patchClip,
@@ -240,7 +242,8 @@ export function useTranscriptionFlow(
     if (pending.length === 0) {
       const merged = mergeClipTranscripts(session.clips);
       setTranscript(merged);
-      patchSession({ transcript: merged, activeTranscriptTier: 't2' });
+      setEditedTranscript?.('');
+      patchSession({ transcript: merged, activeTranscriptTier: 't2', editedTranscript: undefined });
       toast.success('Transcript merged from existing clips.');
       return;
     }
@@ -282,8 +285,9 @@ export function useTranscriptionFlow(
 
       if (merged) {
         setTranscript(merged);
+        setEditedTranscript?.('');
         // t3Transcript frozen here — t2Transcript is preserved untouched
-        patchSession({ transcript: merged, activeTranscriptTier: 't3', t3Transcript: merged, status: 'draft' });
+        patchSession({ transcript: merged, activeTranscriptTier: 't3', t3Transcript: merged, status: 'draft', editedTranscript: undefined });
       } else {
         patchSession({ status: 'draft' });
       }
@@ -313,7 +317,8 @@ export function useTranscriptionFlow(
     const merged = mergeClipTranscripts(reverted);
     if (merged.trim()) {
       setTranscript(merged);
-      patchSession({ transcript: merged, activeTranscriptTier: 't2' });
+      setEditedTranscript?.('');
+      patchSession({ transcript: merged, activeTranscriptTier: 't2', editedTranscript: undefined });
     }
     toast.success('Reverted to local transcription.');
   }

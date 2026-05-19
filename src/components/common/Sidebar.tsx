@@ -11,6 +11,7 @@ import {
   LogOut,
   Settings as SettingsIcon,
   Terminal,
+  UserCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -172,6 +173,24 @@ export function Sidebar({ onClose, className }: SidebarProps) {
                     {clinician.credentials || clinician.practiceName || 'PTScribe'}
                   </div>
                 </div>
+                <NavLink
+                  to="/account"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onClose?.();
+                  }}
+                  className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+                  style={{
+                    padding: '7px 12px',
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: 'var(--color-pt-text-2)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <UserCircle size={13} strokeWidth={1.75} />
+                  <span>User settings</span>
+                </NavLink>
                 <NavLink
                   to="/debug"
                   onClick={() => {

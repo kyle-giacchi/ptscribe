@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Sun, Mic, ChevronRight, Inbox, Headphones, ClipboardCheck } from 'lucide-react';
 import { usePatients } from '@/contexts/PatientsProvider';
@@ -33,6 +33,20 @@ export function Dashboard() {
   const { notes } = useNotes();
   const { clinician } = useClinician();
   const navigate = useNavigate();
+
+  const [resumeModal, setResumeModal] = useState<Session | null>(null);
+  const hasShownResume = useRef(false);
+
+  useEffect(() => {
+    if (hasShownResume.current || sessions.length === 0) return;
+    const candidate = sessions
+      .filter((s) => s.status !== 'finalized' && s.clips.length > 0)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (candidate) {
+      hasShownResume.current = true;
+      setResumeModal(candidate);
+    }
+  }, [sessions]);
 
   // Quick Record: create a draft session attached to the built-in Unassigned
   // patient and jump straight into recording. The user can reassign on the
@@ -199,6 +213,54 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {resumeModal && (() => {
+        const resumePatient = patients.find((p) => p.id === resumeModal.patientId);
+        const resumePatientName = resumePatient
+          ? `${resumePatient.firstName} ${resumePatient.lastName}`.trim()
+          : 'Unknown patient';
+        return (
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              margin: '-22px -22px 0',
+              padding: '10px 22px',
+              background: 'var(--color-pt-accent-soft)',
+              borderBottom: '1px solid var(--color-pt-accent-border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: 'var(--color-pt-accent-fg)', lineHeight: 1.4 }}>
+              <strong>Session in progress</strong> — unfinished session for{' '}
+              <strong>{resumePatientName}</strong> from {relativeTime(resumeModal.updatedAt)}.
+            </div>
+            <div className="flex gap-2">
+              <PtButton
+                variant="primary"
+                style={{ fontSize: 12, padding: '5px 12px' }}
+                onClick={() => {
+                  setResumeModal(null);
+                  navigate(`/sessions/${resumeModal.id}?mode=quick`);
+                }}
+              >
+                Continue session
+              </PtButton>
+              <PtButton
+                variant="ghost"
+                style={{ fontSize: 12, padding: '5px 12px' }}
+                onClick={() => setResumeModal(null)}
+              >
+                Dismiss
+              </PtButton>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

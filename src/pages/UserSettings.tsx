@@ -221,6 +221,7 @@ export function UserSettings() {
   const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const tierStyle = TIER_STYLE[tier];
   const webSpeechEnabled = settings.session.webSpeechEnabled;
+  const piiModel = settings.session.piiModel ?? 'openai/privacy-filter';
 
   return (
     <div
@@ -306,6 +307,30 @@ export function UserSettings() {
             onClick={() => updateSession({ webSpeechEnabled: true })}
             title="Google Web Speech"
             description="Uses your browser's built-in speech recognition for word-by-word captions. Requires an internet connection; accuracy varies by browser."
+          />
+        </div>
+      </div>
+
+      {/* AI PII Scrubbing System */}
+      <div>
+        <SectionHeading>AI PII Scrubbing System</SectionHeading>
+        <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>On-device PII detection model</p>
+          <p style={DESC_STYLE}>
+            Model used when you tap "Scrub PII" on a transcript. Runs entirely in your browser —
+            no transcript text is sent to any server. Takes effect on the next scrub.
+          </p>
+          <RadioCard
+            selected={piiModel === 'openai/privacy-filter'}
+            onClick={() => updateSession({ piiModel: 'openai/privacy-filter' })}
+            title="OpenAI Privacy Filter (recommended)"
+            description="Specialized PII model — detects names, phone numbers, SSNs, dates of birth, addresses, and more. Requires ONNX files to be pre-seeded to R2."
+          />
+          <RadioCard
+            selected={piiModel === 'Xenova/bert-base-NER'}
+            onClick={() => updateSession({ piiModel: 'Xenova/bert-base-NER' })}
+            title="BERT Base NER"
+            description="General-purpose named-entity model — detects person names, organizations, and locations. Downloads automatically from HuggingFace; works without R2 setup."
           />
         </div>
       </div>

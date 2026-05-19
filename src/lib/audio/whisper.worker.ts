@@ -1,22 +1,21 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 // ── Model source routing ─────────────────────────────────────────────────────
-// In dev (Vite, port 8080) there is no Worker running, so we fall back to
-// HuggingFace directly and let the browser HTTP cache handle persistence.
-// In production the Worker serves model files at /api/model/* from R2, which
-// is same-origin — no tracking-protection blocks, no HuggingFace CDN dependency.
-const IS_DEV = (import.meta as unknown as { env: { DEV: boolean } }).env.DEV;
+// In both dev (wrangler dev proxies R2 at /api/model/*) and production the
+// Worker serves model files at /api/model/*. The IDB fetch interceptor below
+// caches files after first download so the model survives browser-cache evictions
+// and never needs a re-download across sessions. If R2 is unseeded (local dev
+// without seed-r2-models), the interceptor falls back to HuggingFace directly.
 
 const HF_HOST = 'https://huggingface.co';
-const MODEL_HOST = IS_DEV ? HF_HOST : `${self.location.origin}/api/model`;
+const MODEL_HOST = `${self.location.origin}/api/model`;
 
 env.remoteHost = MODEL_HOST;
-// In production our IDB fetch interceptor below is the single cache layer.
-// In dev, keep the browser HTTP cache so HuggingFace downloads persist.
-env.useBrowserCache = IS_DEV;
+// IDB interceptor is the sole cache layer in both dev and production.
+env.useBrowserCache = false;
 env.allowLocalModels = false;
 
-// ── IDB model cache (production only) ───────────────────────────────────────
+// ── IDB model cache ──────────────────────────────────────────────────────────
 // Caches downloaded model files across page loads and browser-cache evictions.
 // Errors are always swallowed — a cache failure must never block model loading.
 
@@ -66,12 +65,12 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
   }
 }
 
-// ── Fetch interceptor (production only) ─────────────────────────────────────
+// ── Fetch interceptor (dev + production) ────────────────────────────────────
 // Sits in front of all fetches made by transformers.js inside this worker.
 // Requests to MODEL_HOST are served from IDB when available; on a miss the
-// response is fetched from R2 and written to IDB fire-and-forget.
+// response is fetched from R2 (or HuggingFace fallback) and written to IDB.
 
-if (!IS_DEV) {
+{
   const _originalFetch = globalThis.fetch.bind(globalThis);
 
   (globalThis as typeof globalThis).fetch = async (
@@ -134,31 +133,49 @@ const post = (msg: OutMsg) => (self as unknown as Worker).postMessage(msg);
 
 let currentPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
 let currentModel = '';
+// Serialises concurrent pipeline() calls — onmessage is async so two messages
+// arriving before the first await resolves would both enter the load block and
+// download the model twice. All callers await this promise before proceeding.
+let pipelineLoadPromise: Promise<Awaited<ReturnType<typeof pipeline>>> | null = null;
+
+async function getPipeline(
+  model: string,
+  progressId: number,
+): Promise<Awaited<ReturnType<typeof pipeline>>> {
+  if (currentPipeline && currentModel === model) return currentPipeline;
+  // If a load is already in progress for the same model, wait for it.
+  if (pipelineLoadPromise) return pipelineLoadPromise;
+  pipelineLoadPromise = pipeline('automatic-speech-recognition', model, {
+    // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
+    // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
+    // and crashes because the required scale tensor is absent. 'basic' skips it.
+    session_options: { graphOptimizationLevel: 'basic' },
+    progress_callback: (p: {
+      status: string;
+      name?: string;
+      loaded?: number;
+      total?: number;
+    }) => {
+      post({ id: progressId, type: 'progress', ...p });
+    },
+  }).then((p) => {
+    currentPipeline = p;
+    currentModel = model;
+    pipelineLoadPromise = null;
+    return p;
+  }).catch((err) => {
+    pipelineLoadPromise = null;
+    throw err;
+  });
+  return pipelineLoadPromise;
+}
 
 self.onmessage = async (e: MessageEvent<InMsg>) => {
   const msg = e.data;
   const { id, model } = msg;
 
   try {
-    if (!currentPipeline || currentModel !== model) {
-      currentPipeline = null;
-      currentModel = '';
-      currentPipeline = await pipeline('automatic-speech-recognition', model, {
-        // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
-        // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
-        // and crashes because the required scale tensor is absent. 'basic' skips it.
-        session_options: { graphOptimizationLevel: 'basic' },
-        progress_callback: (p: {
-          status: string;
-          name?: string;
-          loaded?: number;
-          total?: number;
-        }) => {
-          post({ id, type: 'progress', ...p });
-        },
-      });
-      currentModel = model;
-    }
+    const pipe = await getPipeline(model, id);
 
     if (msg.type === 'preload') {
       post({ id, type: 'result', text: '' });
@@ -168,7 +185,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     const audio = msg.audio;
     type ASROutput = { text: string } | Array<{ text: string }>;
     const raw = await (
-      currentPipeline as unknown as (audio: Float32Array, opts: object) => Promise<ASROutput>
+      pipe as unknown as (audio: Float32Array, opts: object) => Promise<ASROutput>
     )(audio, {
       sampling_rate: 16000,
       chunk_length_s: 30,

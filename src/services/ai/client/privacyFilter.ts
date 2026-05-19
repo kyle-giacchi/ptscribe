@@ -14,6 +14,9 @@ type PendingEntry = {
 let _worker: Worker | null = null;
 let _idCounter = 0;
 const _pending = new Map<number, PendingEntry>();
+let _modelLoaded = false;
+
+export function isPIIModelLoaded(): boolean { return _modelLoaded; }
 
 function wireWorker(w: Worker): Worker {
   w.onmessage = (e: MessageEvent<OutMsg>) => {
@@ -29,6 +32,7 @@ function wireWorker(w: Worker): Worker {
       }
     } else if (msg.type === 'result') {
       _pending.delete(msg.id);
+      _modelLoaded = true;
       entry.resolve({ scrubbed: msg.scrubbed, entityCount: msg.entityCount });
     } else if (msg.type === 'error') {
       _pending.delete(msg.id);

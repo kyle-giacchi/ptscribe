@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Sparkles, Loader2, Info, RotateCcw, ChevronDown,
+  Loader2, RotateCcw, ChevronDown,
   Search, ChevronLeft, ChevronRight, Edit3, Wand2,
   Copy, List, Mic, EyeOff,
 } from 'lucide-react';
@@ -13,53 +13,12 @@ import {
 import { parseTranscriptSegments, parseChunkedTranscript } from '@/utils/transcriptGrouping';
 import { ConfirmBanner } from './ConfirmBanner';
 
-// ── AI Transcription button ───────────────────────────────────────────────────
-
-function CreateTranscriptButton({
-  busy, disabled, used, cap, onClick,
-}: {
-  busy: boolean; disabled: boolean; used: number; cap: number; onClick: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <button
-        type="button"
-        className="btn btn-secondary"
-        disabled={busy || disabled}
-        onClick={onClick}
-        title={disabled ? `Per-session limit reached (${used}/${cap}). Reload to reset.` : `Transcribe with AI (${used}/${cap} used).`}
-      >
-        {busy ? (
-          <><Loader2 size={14} className="animate-spin" /> Transcribing…</>
-        ) : (
-          <><Sparkles size={14} strokeWidth={2} /> Improve Transcription</>
-        )}
-      </button>
-      <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-fg-subtle)' }}>
-        {used}/{cap}
-      </span>
-      <button
-        type="button"
-        className="btn btn-ghost p-0.5"
-        aria-label="About AI transcription"
-        title="Uses cloud AI speech recognition with speaker identification — knows who's speaking (patient vs. clinician) for cleaner, more structured transcripts and better note generation."
-        style={{ color: 'var(--color-fg-subtle)', lineHeight: 0 }}
-      >
-        <Info size={13} strokeWidth={2} />
-      </button>
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function TranscriptPanel({
   transcript,
   clips,
-  canTranscribe,
   transcribing,
-  transcribeUsed,
-  transcribeCap,
   hasUserEdits,
   hasT2Transcript,
   totalDurationSec,
@@ -75,13 +34,12 @@ export function TranscriptPanel({
   onApplyScrub,
   piiScrubbing,
   piiProgress,
+  hasEditedTranscript,
+  onRevertEdits,
 }: {
   transcript: string;
   clips: SessionClip[];
-  canTranscribe: boolean;
   transcribing: boolean;
-  transcribeUsed: number;
-  transcribeCap: number;
   hasUserEdits: boolean;
   hasT2Transcript: boolean;
   totalDurationSec: number;
@@ -97,20 +55,19 @@ export function TranscriptPanel({
   onApplyScrub?: (scrubbed: string) => void;
   piiScrubbing?: boolean;
   piiProgress?: string | null;
+  hasEditedTranscript?: boolean;
+  onRevertEdits?: () => void;
 }) {
   const [pendingOverwrite, setPendingOverwrite] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
-  const [improveBusy, setImproveBusy] = useState(false);
   const [scrubResult, setScrubResult] = useState<{ scrubbed: string; entityCount: number } | null>(null);
 
   // Find & Replace (edit mode only)
   const [replaceStr, setReplaceStr] = useState('');
   const [replaceCount, setReplaceCount] = useState<number | null>(null);
-
-  const budgetSpent = transcribeUsed >= transcribeCap;
 
   const transcribedClips = clips.filter(
     (c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0,
@@ -146,16 +103,6 @@ export function TranscriptPanel({
     setReplaceCount(count);
   }
 
-  async function handleImproveWithAI() {
-    setImproveBusy(true);
-    try {
-      // Stub — full implementation requires a Worker endpoint POST /api/improve-transcript
-      await new Promise((r) => setTimeout(r, 800));
-      toast.info('Improve with AI — coming soon');
-    } finally {
-      setImproveBusy(false);
-    }
-  }
 
   async function handleScrubPII() {
     if (!onScrubPII) return;
@@ -171,8 +118,6 @@ export function TranscriptPanel({
       toast.error('PII scan failed — try again');
     }
   }
-
-  const showActionRow = canTranscribe || hasT2Transcript;
 
   return (
     <div className="space-y-3">
@@ -198,15 +143,14 @@ export function TranscriptPanel({
           onCancel={() => setPendingOverwrite(false)}
           onConfirm={() => { setPendingOverwrite(false); onCreateTranscript(); }}
         />
-      ) : showActionRow ? (
-        <div className="space-y-1.5">
+      ) : (
+        (hasEditedTranscript || hasT2Transcript) && (
           <div className="flex flex-wrap items-center gap-2">
-            {canTranscribe && (
-              <CreateTranscriptButton
-                busy={transcribing} disabled={budgetSpent}
-                used={transcribeUsed} cap={transcribeCap}
-                onClick={handleCreateClick}
-              />
+            {hasEditedTranscript && onRevertEdits && (
+              <button type="button" className="btn btn-ghost" onClick={onRevertEdits}
+                title="Clear your edits and show the original transcript.">
+                <RotateCcw size={14} strokeWidth={2} /> Revert edits
+              </button>
             )}
             {hasT2Transcript && (
               <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}
@@ -215,13 +159,8 @@ export function TranscriptPanel({
               </button>
             )}
           </div>
-          {canTranscribe && budgetSpent && (
-            <p className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
-              Session limit reached — reload the page to reset.
-            </p>
-          )}
-        </div>
-      ) : null}
+        )
+      )}
 
       {/* ── Panel ── */}
       <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--color-pt-border)' }}>
@@ -342,13 +281,13 @@ export function TranscriptPanel({
                   type="button"
                   className="btn btn-ghost"
                   style={{ fontSize: 12 }}
-                  disabled={improveBusy}
-                  onClick={handleImproveWithAI}
+                  disabled={transcribing}
+                  onClick={handleCreateClick}
+                  title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result."
                 >
-                  {improveBusy
-                    ? <Loader2 size={13} className="animate-spin" />
-                    : <Wand2 size={13} strokeWidth={2} />}
-                  Improve with AI
+                  {transcribing
+                    ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
+                    : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
                 </button>
                 {onScrubPII && (
                   <button
