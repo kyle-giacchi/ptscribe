@@ -233,3 +233,24 @@ Adding a new field to a domain type requires all four of:
 4. Migration entry in `src/utils/migrations.ts` — bump `APP_DATA_VERSION` and add a `v{N} -> v{N+1}` step
 
 Skipping the migration means existing persisted data will fail `AppDataSchema.safeParse` and be silently reset to defaults on next load.
+
+## PII scrubbing model — R2-only ONNX, interceptor always active
+
+`openai/privacy-filter` has no pre-converted ONNX exports on HuggingFace. `@huggingface/transformers` falls back to `model.safetensors` (the raw PyTorch weights, 400 MB+) when ONNX files are absent, which fails in the browser.
+
+**The ONNX files must be generated once and hosted in R2:**
+
+```bash
+pip install "optimum[exporters]"
+python scripts/convert-privacy-filter.py
+```
+
+This converts the model to INT8 ONNX, writes files to `./models/privacy-filter/` (gitignored), and uploads them to R2 under the key prefix `models/privacy-filter/`. The fetch interceptor maps `https://huggingface.co/openai/privacy-filter/resolve/main/<file>` → `R2/models/privacy-filter/<file>` on fallback. Do not change this R2 prefix without updating `HF_MODEL_PREFIX` / `R2_MODEL_FOLDER` in `privacyFilter.worker.ts`.
+
+**The model loads lazily** — it downloads only when the user clicks "Scrub PII" for the first time, not at app startup. Do not re-add a preload call in `DemoBootstrap` or any other boot component.
+
+**The fetch interceptor in `privacyFilter.worker.ts` runs in both dev and prod** — unlike `whisper.worker.ts`, which only installs the interceptor in production. The reason: in dev, wrangler's dev server proxies R2 at `/api/model/*` from `localhost`, so the R2 fallback works there too. Removing or gating the interceptor behind `IS_DEV` breaks the feature in dev.
+
+`env.useBrowserCache` is always `false` — the IDB interceptor owns all caching; the browser Cache API is not involved.
+
+Do not add an `if (!IS_DEV)` guard around the interceptor. Do not switch to a different model (e.g. `Xenova/bert-base-NER`) to avoid the conversion step — `openai/privacy-filter` covers dates, phone numbers, emails, and MRNs in addition to named entities, which the general NER model misses.
