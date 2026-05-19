@@ -11,7 +11,11 @@ type PendingEntry = {
   resolve: (text: string) => void;
   reject: (err: Error) => void;
   onProgress?: (msg: string) => void;
+  timer?: ReturnType<typeof setTimeout>;
 };
+
+// Generous limit: covers cold model download (~40 MB) + inference on slow devices.
+const TRANSCRIBE_TIMEOUT_MS = 300_000;
 
 let _worker: Worker | null = null;
 let _idCounter = 0;
@@ -45,9 +49,11 @@ function wireWorker(w: Worker): Worker {
         entry.onProgress?.('Loading model…');
       }
     } else if (msg.type === 'result') {
+      clearTimeout(entry.timer);
       _pending.delete(msg.id);
       entry.resolve(msg.text);
     } else if (msg.type === 'error') {
+      clearTimeout(entry.timer);
       _pending.delete(msg.id);
       entry.reject(new Error(msg.error));
     }
@@ -121,7 +127,11 @@ export async function transcribeFloat32(
   const worker = getWorker();
   const id = ++_idCounter;
   const text = await new Promise<string>((resolve, reject) => {
-    _pending.set(id, { resolve, reject, onProgress });
+    const timer = setTimeout(() => {
+      _pending.delete(id);
+      reject(new Error('Transcription timed out — model may still be downloading'));
+    }, TRANSCRIBE_TIMEOUT_MS);
+    _pending.set(id, { resolve, reject, onProgress, timer });
     worker.postMessage({ id, type: 'transcribe', audio, model }, [audio.buffer]);
   });
   return { text, source: 'whisper' };
@@ -137,7 +147,11 @@ export async function transcribeLocally(
   const id = ++_idCounter;
 
   const text = await new Promise<string>((resolve, reject) => {
-    _pending.set(id, { resolve, reject, onProgress });
+    const timer = setTimeout(() => {
+      _pending.delete(id);
+      reject(new Error('Transcription timed out — model may still be downloading'));
+    }, TRANSCRIBE_TIMEOUT_MS);
+    _pending.set(id, { resolve, reject, onProgress, timer });
     worker.postMessage({ id, type: 'transcribe', audio, model }, [audio.buffer]);
   });
 
