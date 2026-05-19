@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
-import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
+import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, getWhisperPreloadPromise } from '@/services/ai/client/localWhisper';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
 import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
@@ -134,12 +134,15 @@ export function useBackgroundTranscription({ session, patchClip, patchSession, s
 
     for (const clip of eligible) {
       autoTranscribingRef.current.add(clip.id);
-      patchClip(clip.id, { status: 'transcribing', errorMessage: undefined });
+      // Don't set 'transcribing' yet — wait for the Whisper model to be ready
+      // so the clip doesn't appear stuck while the model is still downloading.
 
       audioRepository
         .load(clip.id)
-        .then((original) => {
+        .then(async (original) => {
           if (!original) throw new Error('No audio found for this clip.');
+          await getWhisperPreloadPromise();
+          patchClip(clip.id, { status: 'transcribing', errorMessage: undefined });
           return transcribeWithLocalWhisper(original);
         })
         .then((result) => {
