@@ -45,6 +45,7 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Provider/mutator table (every hook + setters)                            | [architecture.md:58](architecture.md#provider-responsibilities)            |
 | Storage keys (`ptnotes.appData` + IndexedDB `ptnotes-audio`)             | [architecture.md:84](architecture.md#storage-key-namespace)                |
 | AI services (Cloudflare Whisper + Anthropic) and default models          | [architecture.md:93](architecture.md#ai-services)                          |
+| AI model catalog, caching strategy, R2 seeding runbook                   | [models.md](models.md)                                                      |
 | Session status state machine                                             | [clinical-model.md:30](clinical-model.md#session-status-state-machine)     |
 | Built-in templates and section structure                                 | [clinical-model.md:60](clinical-model.md#notetemplate)                     |
 | AI prompt shape (`generateNote` user prompt)                             | [clinical-model.md:99](clinical-model.md#ai-prompt-shape)                  |
@@ -129,6 +130,18 @@ Four-tier transcription system: Web Speech / Whisper VAD (T1), local Whisper aut
 | Revert actions | Two revert buttons: "Revert to Draft" (T2) and "Revert edits" (clear `editedTranscript`) |
 | Schema version | v18 (four-tier fields), v19 (webSpeechEnabled gate); legacy session fallback |
 | Admin page | `/admin` diagnostic: coverage stats + per-session tier viewer |
+
+### [docs/models.md](models.md)
+
+All AI models used in PTScribe: catalog, per-model details, R2/IDB caching architecture, key implementation files, and the R2 seeding runbook. Read when touching model loading, adding a new model, or debugging download/cache failures.
+
+| Section | Gist |
+|---|---|
+| Model catalog | Four models: Deepgram Nova-3 (cloud), Whisper (local), privacy-filter (PII), Claude Sonnet (note gen) |
+| `openai/privacy-filter` | Must load with `dtype: 'q8'`; pre-built ONNX INT8 exists on HuggingFace; seeded via `convert-privacy-filter.py` |
+| Caching architecture | IDB (per-browser) → R2 (global CDN) → HuggingFace (origin + R2 write-back) |
+| R2 key convention | Keys mirror the HuggingFace URL path (`{org}/{model}/resolve/main/{file}`) |
+| Seeding runbook | `seed-r2-models.ts` for Whisper; `convert-privacy-filter.py` for privacy filter |
 
 ### [docs/clinical-model.md](clinical-model.md)
 

@@ -188,20 +188,23 @@ The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is
 
 ## Local-first transcription
 
-**Every audio clip — recorded or uploaded — is always sent through local Whisper first, regardless of the user's configured transcription provider.**
+**Every session — recorded or uploaded — is automatically transcribed by local Whisper once the combined silence-removed audio blob is ready, regardless of the user's configured transcription provider.**
 
-The background auto-transcription effect in `useBackgroundTranscription` fires for every clip that reaches `status: 'ready'` with no `t2Transcript`. It calls `transcribeWithLocalWhisper` (whisper-tiny.en ONNX in-browser via `src/lib/audio/whisper.worker.ts`). The result is stored in both `t2Transcript` and `transcript` so the Review tab populates without any manual action.
+After the user finishes recording or uploads a clip, `handleRecordingComplete` in `useRecordingFlow` silence-trims each individual clip blob, then merges them into a single combined blob (`silencedMergedBlob`). This blob is set in `useTranscriptionFlow` state and flows to `useBackgroundTranscription`.
 
-Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit user action** that upgrades the local result. It does not replace the background pass — it runs on top of it.
+The background effect in `useBackgroundTranscription` fires once `silencedMergedBlob` is non-null. It calls `transcribeWithLocalWhisper` (whisper-tiny.en ONNX in-browser via parallel worker pool). The result is stored at session level in `session.t2Transcript` and `session.transcript` so the Review tab populates without any manual action. The effect resets and re-runs whenever `silencedMergedBlob` changes, enabling T2 to update automatically when the user adds another clip.
 
-**Do not gate the background pass behind a provider check.** The comment "when the user has chosen the 'local' provider" in `useTranscriptionFlow` is historical and wrong — it has been corrected. The background pass runs for all provider configurations.
+Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit user action** ("Improve with AI") that upgrades the local result. It does not replace the background pass — it runs on top of it. Speed-up is applied inline to the same `silencedMergedBlob` only at that moment; it is never pre-computed.
 
-**Do not skip the background pass for uploaded clips.** Uploaded files go through the same `status: 'pending' → 'ready'` transition as recorded clips; the background effect picks them up identically. The `UploadProcessingView` in `Session.tsx` waits for `status === 'transcribed' | 'failed'` before navigating to the Review tab — if you bypass the background pass, that view hangs forever.
+**Do not gate the background pass behind a provider check.** The background pass runs for all provider configurations.
+
+**Do not skip `handleRecordingComplete` for uploaded clips.** The `UploadProcessingView` in `Session.tsx` waits for `clip.status === 'ready' | 'transcribed' | 'failed'`, then calls `handleRecordingComplete()` which builds `silencedMergedBlob` and kicks off T2. If you bypass this call, the "Processing audio" screen hangs and T2 never fires.
 
 Consequences of violating this rule:
 - Uploaded audio silently skips local transcription and the "Processing audio" screen hangs with no escape for the user.
 - Users on the 'local' provider get no automatic transcript.
-- `t2Transcript` is never populated, breaking the "Revert to Draft" flow in `TranscriptPanel`.
+- `session.t2Transcript` is never populated, breaking the "Revert to Draft" flow in `TranscriptPanel`.
+- `silencedMergedBlob` remains null, blocking the "Improve with AI" (Nova) path as well.
 
 ### Worker pool and device guards
 

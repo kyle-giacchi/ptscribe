@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { trimSilence } from '@/lib/audio/silenceTrim';
-import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { useSettings } from '@/contexts/SettingsProvider';
 
 export type CompiledAudio = { blob: Blob; forId: string; savedSec: number };
@@ -8,55 +7,37 @@ type CompileError = { msg: string; forId: string };
 
 const KEY = 'merged';
 
-export function useAudioProcessing(sourceBlob: Blob | null) {
+/**
+ * Manages silence-removal for the combined session audio blob.
+ *
+ * If `precomputedSilenced` is provided (produced by handleRecordingComplete),
+ * it is used directly and no additional silence pass is run. When absent the
+ * hook auto-runs compileSilence on first blob arrival so the waveform is still
+ * populated for sessions loaded from a previous page visit.
+ *
+ * Speed-up is intentionally absent: it is applied inline inside
+ * handleCreateTranscript (the "Improve with AI" flow) immediately before the
+ * audio is sent to Nova, so it never needs to be pre-computed here.
+ */
+export function useAudioProcessing(
+  sourceBlob: Blob | null,
+  precomputedSilenced: Blob | null = null,
+) {
   const { settings } = useSettings();
   const [silenced, setSilenced] = useState<CompiledAudio | null>(null);
-  const [spedup, setSpedup] = useState<CompiledAudio | null>(null);
   const [compilingSilence, setCompilingSilence] = useState(false);
-  const [compilingSpeed, setCompilingSpeed] = useState(false);
   const [silenceError, setSilenceError] = useState<CompileError | null>(null);
-  const [speedError, setSpeedError] = useState<CompileError | null>(null);
 
   const activeSilenced = silenced?.forId === KEY ? silenced : null;
-  const activeSpedup = spedup?.forId === KEY ? spedup : null;
   const activeSilenceError = silenceError?.forId === KEY ? silenceError.msg : null;
-  const activeSpeedError = speedError?.forId === KEY ? speedError.msg : null;
 
-  // Runs the full pipeline: silence trim → speed-up on the trimmed result.
-  async function runChain() {
-    if (!sourceBlob) return;
-
-    setCompilingSilence(true);
-    setSilenceError(null);
-    let trimmedBlob: Blob;
-    let silenceSavedSec: number;
-    try {
-      const sd = settings.audio.silenceDetection;
-      const result = await trimSilence(sourceBlob, { sensitivity: sd.sensitivity, padMs: sd.padMs });
-      trimmedBlob = result.trimmed;
-      silenceSavedSec = result.report.droppedSec;
-      setSilenced({ blob: trimmedBlob, forId: KEY, savedSec: silenceSavedSec });
-      setSpedup(null);
-      setSpeedError(null);
-    } catch (e) {
-      setSilenceError({ msg: (e as Error).message, forId: KEY });
-      return;
-    } finally {
-      setCompilingSilence(false);
+  // When a pre-computed silenced blob arrives (from handleRecordingComplete),
+  // adopt it directly — no need to re-run trimSilence on the merged blob.
+  useEffect(() => {
+    if (precomputedSilenced) {
+      setSilenced({ blob: precomputedSilenced, forId: KEY, savedSec: 0 });
     }
-
-    setCompilingSpeed(true);
-    setSpeedError(null);
-    try {
-      const su = settings.audio.speedUp;
-      const result = await speedUpAudio(trimmedBlob, su.speed as SpeedFactor);
-      setSpedup({ blob: result.result, forId: KEY, savedSec: result.report.savedSec });
-    } catch (e) {
-      setSpeedError({ msg: (e as Error).message, forId: KEY });
-    } finally {
-      setCompilingSpeed(false);
-    }
-  }
+  }, [precomputedSilenced]);
 
   async function compileSilence() {
     if (!sourceBlob) return;
@@ -66,8 +47,6 @@ export function useAudioProcessing(sourceBlob: Blob | null) {
       const sd = settings.audio.silenceDetection;
       const result = await trimSilence(sourceBlob, { sensitivity: sd.sensitivity, padMs: sd.padMs });
       setSilenced({ blob: result.trimmed, forId: KEY, savedSec: result.report.droppedSec });
-      setSpedup(null);
-      setSpeedError(null);
     } catch (e) {
       setSilenceError({ msg: (e as Error).message, forId: KEY });
     } finally {
@@ -75,52 +54,24 @@ export function useAudioProcessing(sourceBlob: Blob | null) {
     }
   }
 
-  async function compileSpeed() {
-    if (!sourceBlob) return;
-    setCompilingSpeed(true);
-    setSpeedError(null);
-    try {
-      const su = settings.audio.speedUp;
-      // Always use silenced audio if available; fall back to source.
-      const source = activeSilenced?.blob ?? sourceBlob;
-      const result = await speedUpAudio(source, su.speed as SpeedFactor);
-      setSpedup({ blob: result.result, forId: KEY, savedSec: result.report.savedSec });
-    } catch (e) {
-      setSpeedError({ msg: (e as Error).message, forId: KEY });
-    } finally {
-      setCompilingSpeed(false);
-    }
-  }
-
   function resetSilence() {
     setSilenced(null);
-    setSpedup(null);
-    setSpeedError(null);
   }
 
-  function resetSpeed() {
-    setSpedup(null);
-    setSpeedError(null);
-  }
-
-  // Auto-run the full chain the first time a source blob arrives.
+  // Auto-run silence trim on first blob arrival only when no pre-computed blob
+  // was supplied (e.g. session loaded from storage on a return visit).
   const autoRanRef = useRef(false);
   useEffect(() => {
-    if (!sourceBlob || autoRanRef.current) return;
+    if (!sourceBlob || autoRanRef.current || precomputedSilenced) return;
     autoRanRef.current = true;
-    void runChain();
-  }, [sourceBlob]); // eslint-disable-line react-hooks/exhaustive-deps
+    void compileSilence();
+  }, [sourceBlob, precomputedSilenced]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     activeSilenced,
-    activeSpedup,
     compilingSilence,
-    compilingSpeed,
     activeSilenceError,
-    activeSpeedError,
     compileSilence,
-    compileSpeed,
     resetSilence,
-    resetSpeed,
   };
 }

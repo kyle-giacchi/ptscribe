@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationsProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
+import { trimSilence } from '@/lib/audio/silenceTrim';
 import { transcribeLocally, preloadLocalWhisper, LOCAL_WHISPER_DEFAULT_MODEL } from '@/services/ai/client/localWhisper';
 import { newId } from '@/utils/ids';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
@@ -24,6 +26,7 @@ export interface UseRecordingFlowParams {
   setActiveTab: (tab: 'record' | 'review') => void;
   setTranscript: (next: string) => void;
   setMergedAudioBlob: (blob: Blob | null) => void;
+  setSilencedMergedBlob: (blob: Blob | null) => void;
   setIsMerging: (v: boolean) => void;
 }
 
@@ -71,8 +74,11 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     setActiveTab,
     setTranscript,
     setMergedAudioBlob,
+    setSilencedMergedBlob,
     setIsMerging,
   } = params;
+
+  const { settings } = useSettings();
 
   const { addNotification } = useNotifications();
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
@@ -473,7 +479,24 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
         if (dropped > 0) {
           addNotification('warning', `${dropped} clip${dropped === 1 ? '' : 's'} could not be loaded for playback.`);
         }
-        if (blobs.length > 0) setMergedAudioBlob(await mergeAudioBlobs(blobs));
+        if (blobs.length > 0) {
+          // Raw merge for Full Audio display in AudioPreviewSection.
+          setMergedAudioBlob(await mergeAudioBlobs(blobs));
+
+          // Silence-remove each clip, then merge → Full Session Audio Clip.
+          // This combined blob is what T2 (Whisper) and Nova both operate on.
+          const sd = settings.audio.silenceDetection;
+          const silencedBlobs = await Promise.all(
+            blobs.map((blob) =>
+              sd.enabled
+                ? trimSilence(blob, { sensitivity: sd.sensitivity, padMs: sd.padMs })
+                    .then((r) => r.trimmed)
+                    .catch(() => blob)
+                : Promise.resolve(blob),
+            ),
+          );
+          setSilencedMergedBlob(await mergeAudioBlobs(silencedBlobs));
+        }
       } catch (e) {
         addNotification('error', `Could not combine clips for playback: ${(e as Error).message}`);
       } finally {

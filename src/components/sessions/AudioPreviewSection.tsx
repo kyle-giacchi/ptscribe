@@ -57,25 +57,26 @@ function AudioTrackRow({
 }
 
 // ── Collapsible audio preview + processing section ────────────────────────────
-export function AudioPreviewSection({ mergedAudioBlob }: { mergedAudioBlob: Blob }) {
+export function AudioPreviewSection({
+  mergedAudioBlob,
+  silencedMergedBlob,
+}: {
+  mergedAudioBlob: Blob;
+  /** Pre-computed silence-removed combined blob from handleRecordingComplete. */
+  silencedMergedBlob: Blob | null;
+}) {
   const { settings, updateAudio } = useSettings();
   const [open, setOpen] = useState(true);
 
   const {
     activeSilenced,
-    activeSpedup,
     compilingSilence,
-    compilingSpeed,
     activeSilenceError,
-    activeSpeedError,
     compileSilence,
-    compileSpeed,
     resetSilence,
-    resetSpeed,
-  } = useAudioProcessing(mergedAudioBlob);
+  } = useAudioProcessing(mergedAudioBlob, silencedMergedBlob);
 
   const sd = settings.audio.silenceDetection;
-  const su = settings.audio.speedUp;
 
   return (
     <div
@@ -228,104 +229,6 @@ export function AudioPreviewSection({ mergedAudioBlob }: { mergedAudioBlob: Blob
                     {activeSilenceError && (
                       <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
                         {activeSilenceError}
-                      </p>
-                    )}
-                  </div>
-                ))}
-            </div>
-          </AudioTrackRow>
-
-          <AudioTrackRow
-            label={`Speed Up (${su.speed}×)`}
-            savedSec={activeSpedup?.savedSec}
-            note={!activeSilenced ? 'Uses combined audio (no silence-removed clip)' : undefined}
-          >
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={su.enabled}
-                    onChange={(e) =>
-                      updateAudio({ speedUp: { ...su, enabled: e.target.checked } })
-                    }
-                  />
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: 'var(--color-pt-text-2)' }}
-                  >
-                    Speed up
-                  </span>
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-ghost p-0.5"
-                  aria-label="About speed up"
-                  title={
-                    'Compresses playback time by removing inter-word gaps. The original recording is never changed.\n\n' +
-                    '  • 1.25× — subtle; saves ~20% of playback time.\n' +
-                    '  • 1.5× — recommended for most sessions; saves ~33%.\n' +
-                    '  • 1.75× — aggressive; saves ~43%.'
-                  }
-                  style={{ color: 'var(--color-pt-text-3)', lineHeight: 0 }}
-                >
-                  <Info size={13} />
-                </button>
-                {su.enabled && (
-                  <label className="flex items-center gap-2">
-                    <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
-                      Speed
-                    </span>
-                    <Select
-                      value={String(su.speed)}
-                      className="h-7 py-0 text-xs"
-                      onChange={(e) =>
-                        updateAudio({
-                          speedUp: {
-                            ...su,
-                            speed: Number(e.target.value) as 1.25 | 1.5 | 1.75,
-                          },
-                        })
-                      }
-                    >
-                      <option value="1.25">1.25× — subtle</option>
-                      <option value="1.5">1.5× — recommended</option>
-                      <option value="1.75">1.75× — aggressive</option>
-                    </Select>
-                  </label>
-                )}
-              </div>
-              {su.enabled &&
-                (activeSpedup ? (
-                  <div className="space-y-1.5">
-                    <BlobWaveform blob={activeSpedup.blob} />
-                    <button
-                      type="button"
-                      className="btn btn-ghost py-0.5 text-[11px]"
-                      onClick={resetSpeed}
-                    >
-                      Reset
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      className="btn btn-secondary text-xs"
-                      disabled={compilingSpeed}
-                      onClick={() => void compileSpeed()}
-                    >
-                      {compilingSpeed ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" /> Applying…
-                        </>
-                      ) : (
-                        'Apply'
-                      )}
-                    </button>
-                    {activeSpeedError && (
-                      <p className="text-[11px]" style={{ color: 'var(--color-negative)' }}>
-                        {activeSpeedError}
                       </p>
                     )}
                   </div>

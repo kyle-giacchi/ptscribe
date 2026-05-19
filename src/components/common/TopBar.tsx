@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useMatch, Link, NavLink } from 'react-router-dom';
-import { Bell, Menu, ArrowLeft, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal, HardDrive } from 'lucide-react';
+import { Bell, Menu, ArrowLeft, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal, HardDrive, LogOut } from 'lucide-react';
 import { useStorageEstimate } from '@/hooks/useStorageEstimate';
 import { CommandPalette } from './CommandPalette';
 import { useClinician } from '@/contexts/ClinicianProvider';
@@ -10,6 +10,7 @@ import { vault } from '@/lib/vault/vault';
 import { labelForType } from '@/utils/labels';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { useSessionActions } from '@/contexts/SessionActionsContext';
+import { useGate } from '@/contexts/GateContext';
 
 function useVaultState(): { initialized: boolean; unlocked: boolean } {
   const [state, setState] = useState(() => ({
@@ -322,6 +323,7 @@ function RecordingIndicator({ status }: { status: string }) {
 export function ProfileButton() {
   const { clinician } = useClinician();
   const { onResetSession } = useSessionActions();
+  const { logout } = useGate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -452,6 +454,25 @@ export function ProfileButton() {
             <Terminal size={13} strokeWidth={1.75} />
             <span>Debug</span>
           </NavLink>
+          <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
+          <button
+            type="button"
+            onClick={() => { setOpen(false); logout(); }}
+            className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+            style={{
+              padding: '7px 12px',
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: 'var(--color-pt-danger, #dc2626)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <LogOut size={13} strokeWidth={1.75} />
+            <span>Log out</span>
+          </button>
         </div>
       )}
     </div>
