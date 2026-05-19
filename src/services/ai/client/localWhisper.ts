@@ -21,6 +21,22 @@ let _worker: Worker | null = null;
 let _idCounter = 0;
 const _pending = new Map<number, PendingEntry>();
 
+// ── Preload state ─────────────────────────────────────────────────────────────
+// Eagerly-created promise so getWhisperPreloadPromise() is safe to call any time.
+let _preloadComplete = false;
+let _preloadStarted = false;
+let _preloadDoneResolve: (() => void) | null = null;
+const _preloadDonePromise = new Promise<void>((res) => { _preloadDoneResolve = res; });
+
+/** Returns a Promise that resolves once the Whisper pipeline is loaded and ready. */
+export function getWhisperPreloadPromise(): Promise<void> {
+  return _preloadComplete ? Promise.resolve() : _preloadDonePromise;
+}
+
+export function isWhisperPreloadComplete(): boolean {
+  return _preloadComplete;
+}
+
 // Pool of workers for parallel chunk dispatch. Shared _pending / _idCounter
 // keep IDs unique across all workers so routing is correct.
 const _pool: Worker[] = [];
@@ -110,9 +126,20 @@ export async function blobToFloat32(blob: Blob): Promise<Float32Array> {
  * multiple times — the worker is a singleton and pipeline load is idempotent.
  */
 export function preloadLocalWhisper(model = LOCAL_WHISPER_DEFAULT_MODEL): void {
+  if (_preloadStarted) return;
+  _preloadStarted = true;
   const worker = getWorker();
   const id = ++_idCounter;
-  _pending.set(id, { resolve: () => {}, reject: () => {} });
+  _pending.set(id, {
+    resolve: () => {
+      _preloadComplete = true;
+      _preloadDoneResolve?.();
+    },
+    reject: () => {
+      // Non-fatal: resolve the gate so callers are never permanently blocked.
+      _preloadDoneResolve?.();
+    },
+  });
   worker.postMessage({ id, type: 'preload', model });
 }
 
