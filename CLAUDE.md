@@ -23,6 +23,7 @@
 | Default cloud transcription model?       | `@cf/deepgram/nova-3` (Cloudflare Workers AI, speaker diarization) via `/api/transcribe`. Allowlisted Whisper variants available in Settings.                                                                                                                       |
 | Default local transcription model?       | `Xenova/whisper-tiny.en` — see `src/services/ai/client/localWhisper.ts`. Model files served from R2 at `/api/model/*`; falls back to HuggingFace if R2 is empty. Pre-populate with `npx tsx scripts/seed-r2-models.ts`.                                            |
 | Default note generation model?           | `claude-sonnet-4-6` (Anthropic) via `/api/generate`; the browser never sees provider credentials.                                                                                                                                                                  |
+| All models, caching strategy, R2 seeding | [docs/models.md](docs/models.md) — catalog, download/IDB/R2 layers, `dtype: 'q8'` requirement for privacy filter, seeding runbook |
 | ID generation?                           | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                                                                                                                                   |
 | Where is data encrypted?                 | Inside `DataRepository` (AppData) and `AudioRepository` (audio Blobs + chunks). AES-GCM via `src/lib/vault/`. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))                                                                            |
 | Who owns the wake lock during recording? | `useRecorder` — released on stop/reset/error/unmount. ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))                                                                                                           |
@@ -62,6 +63,7 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 
 - [docs/invariants.md](docs/invariants.md) — non-obvious rules; read before any cross-cutting edit
 - [docs/architecture.md](docs/architecture.md) — provider tree, data flow, storage, AI services, units
+- [docs/models.md](docs/models.md) — AI model catalog, R2/IDB caching architecture, `dtype` requirements, seeding runbook
 - [docs/clinical-model.md](docs/clinical-model.md) — domain entities, session state machine, AI prompt shape
 - [docs/transcription.md](docs/transcription.md) — transcription pipeline: cloud vs local paths, VAD, chunking, T1/T2 sources
 - [docs/workflows.md](docs/workflows.md) — end-to-end user workflows

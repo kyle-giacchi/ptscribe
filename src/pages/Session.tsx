@@ -118,6 +118,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const {
     mergedAudioBlob,
     setMergedAudioBlob,
+    silencedMergedBlob,
+    setSilencedMergedBlob,
     isMerging,
     setIsMerging,
     debugStats,
@@ -142,6 +144,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setActiveTab,
     setTranscript,
     setMergedAudioBlob,
+    setSilencedMergedBlob,
     setIsMerging,
   });
   const {
@@ -283,7 +286,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const isTranscriptLocked = sortedClips.length === 0 && !effectiveTranscript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
-  const hasT2Transcript = sortedClips.some((c) => !!c.t2Transcript);
+  const hasT2Transcript = !!session.t2Transcript;
 
   const hasUserEdits = editedTranscript.trim().length > 0;
 
@@ -343,12 +346,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     const clip = session?.clips.find((c) => c.id === processingUploadClipId);
     if (!clip) return;
 
-    if (clip.status === 'transcribed' || clip.status === 'failed') {
+    // T2 no longer runs per-clip — it fires after handleRecordingComplete builds
+    // the combined blob. Treat 'ready' (audio saved) as "processing done" and call
+    // handleRecordingComplete to create the combined blob, kick off T2, and navigate.
+    if (clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed') {
       const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
-      const delay = Math.max(0, 3000 - elapsed);
+      const delay = Math.max(0, 2000 - elapsed);
       const t = setTimeout(() => {
         setProcessingUploadClipId(null);
-        setActiveTab('review');
+        void handleRecordingComplete();
       }, delay);
       return () => clearTimeout(t);
     }
@@ -643,7 +649,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 </button>
               </div>
             )}
-            {mergedAudioBlob && <AudioPreviewSection mergedAudioBlob={mergedAudioBlob} />}
+            {mergedAudioBlob && (
+              <AudioPreviewSection
+                mergedAudioBlob={mergedAudioBlob}
+                silencedMergedBlob={silencedMergedBlob}
+              />
+            )}
           </div>
         )}
       </div>

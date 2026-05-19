@@ -15,8 +15,7 @@ import * as path from 'path';
 const BUCKET = 'ptnotes-models';
 
 // Models to seed into R2. R2 is the fallback when HuggingFace is unreachable.
-// openai/privacy-filter is NOT seeded here — it requires ONNX conversion first.
-// Run: python scripts/convert-privacy-filter.py
+// openai/privacy-filter is seeded separately — run: python scripts/convert-privacy-filter.py
 const MODELS_TO_SEED = ['Xenova/whisper-tiny.en'];
 
 const CONTENT_TYPES: Record<string, string> = {
