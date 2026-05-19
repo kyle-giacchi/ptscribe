@@ -9,7 +9,7 @@ Every session accumulates transcription data across up to four tiers. Higher tie
 | Tier | Name | Source | When it fires | Quality | Network |
 |------|------|--------|---------------|---------|---------|
 | **T1** | **Whisper VAD Segments** | VAD-gated segment recorder → POST /api/transcribe (Cloudflare Whisper) | Each VAD-detected speech segment **during** recording; flushed on pause and stop | ~85% — same Whisper model as T2; handles medical vocabulary | PTScribe Worker → Cloudflare Workers AI |
-| **T2** | **Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** each clip reaches `status: 'ready'` | ~87% — handles medical vocabulary, fully offline | None |
+| **T2** | **Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** `handleRecordingComplete` produces the combined silence-removed blob (`silencedMergedBlob`) | ~87% — handles medical vocabulary, fully offline | None |
 | **T3** | **Nova AI** | Deepgram Nova-3 via Cloudflare Worker | **Explicit user action** ("Transcribe with AI") only | Best — speaker diarization, accent-robust | PTScribe Worker → Deepgram |
 | **Edited** | **Manual Edit** | Clinician keyboard input | On user save in the Transcript tab | N/A — human-authored | None |
 
@@ -44,10 +44,10 @@ t1Transcript present     → activeTranscriptTier: 't1'
 | Field | Tier | Written by | Notes |
 |-------|------|-----------|-------|
 | `t1Transcript?` | T1 | `useRecordingFlow` — continuous effect + pause/stop flush | Written on each Whisper VAD segment during recording; final flush on pause or stop |
-| `t2Transcript?` | T2 | `useBackgroundTranscription` auto-pass | Frozen after Whisper run; never overwritten |
-| `t3Transcript?` | T3 | `useTranscriptionFlow.runTranscribeLoop` | Written alongside `transcript`; does not overwrite `t2Transcript` |
-| `transcript?` | active | All write paths | Active per-clip transcript; merged to produce `session.transcript` |
-| `transcriptChunks?` | T2 | `useBackgroundTranscription` auto-pass | `{ startSec, text }[]` real audio timestamps |
+| `t2Transcript?` | T2 | *(legacy — not written by current pipeline)* | Field exists in schema for backward compat with pre-v2 data; T2 now writes session-level only |
+| `t3Transcript?` | T3 | *(legacy — not written by current pipeline)* | Field exists in schema for backward compat; T3 now writes session-level only |
+| `transcript?` | active | T1 write path | Per-clip T1 transcript; populated during recording |
+| `transcriptChunks?` | T2 | *(unused by current pipeline)* | Schema field preserved; T2 no longer stores per-clip chunks |
 
 ---
 
@@ -74,54 +74,44 @@ The `whisperBubbles` state displayed in the recording panel is sourced from the 
 
 ### T2 — Local Whisper auto-pass (`useBackgroundTranscription`)
 
-Fires automatically for every clip that reaches `status: 'ready'` with no `t2Transcript`. Runs regardless of the configured transcription provider.
+Fires automatically once `silencedMergedBlob` is set by `handleRecordingComplete`. Runs regardless of the configured transcription provider. Resets and re-runs when a new clip is added (new blob produced).
 
 ```
-clip → audioRepository.load(clip.id)
-     → transcribeWithLocalWhisper()    // 2-min chunks + VAD per chunk + parallel Whisper
-     → patchClip(clip.id, {
-         status: 'transcribed',
-         transcript: result.text,
-         t2Transcript: result.text,     // T2 frozen here — never overwritten
-         transcriptChunks: result.chunks,
-       })
-     → buildBestAvailableTranscript(freshClips)   // t2Transcript > t1Transcript per clip
-     → patchSession({
-         transcript: merged,
-         activeTranscriptTier: 't2',
-         t2Transcript: merged,           // T2 session snapshot frozen here
-       })
+silencedMergedBlob (combined silence-removed session audio)
+  → await getWhisperPreloadPromise()          // wait for model to be ready
+  → transcribeWithLocalWhisper(blob)
+      chunk at 2-min boundaries
+      → VAD per chunk (findSpeechRangesML)
+      → Whisper per chunk (transcribeFloat32Parallel, parallel worker pool)
+  → (T3 guard: if session.t3Transcript exists, discard result — Nova ran concurrently)
+  → patchSession({
+      transcript: text,
+      activeTranscriptTier: 't2',
+      t2Transcript: text,           // T2 frozen here — never overwritten by T3
+    })
+  → setTranscript(text)
 
-On failure → falls back to T1:
-     → buildBestAvailableTranscript(clips)         // t1Transcript per clip
-     → patchSession({
-         transcript: t1Fallback,
-         activeTranscriptTier: 't1',
-       })
+On speech-not-found → warning notification (not an error; no retry needed)
+On Whisper error    → retry up to 8× with 3s backoff → error notification on exhaustion
 ```
 
 ### T3 — Explicit Nova pass (`useTranscriptionFlow.handleCreateTranscript`)
 
-Only fires when the user explicitly triggers "Transcribe with AI."
+Only fires when the user explicitly triggers "Improve with AI."
 
 ```
-clip → audioRepository.load(clip.id)
-     → optional: trimSilence() + speedUpAudio()
-     → POST /api/transcribe (Cloudflare Worker → Deepgram Nova-3)
-     → patchClip(clip.id, {
-         status: 'transcribed',
-         transcript: result.text,
-         t3Transcript: result.text,     // T3 frozen here
-         transcriptChunks: undefined,   // Nova replaces chunk structure
-       })
-     → buildBestAvailableTranscript(updatedClips)
-     → patchSession({
-         transcript: merged,
-         activeTranscriptTier: 't3',
-         t3Transcript: merged,           // T3 session snapshot frozen here
-         status: 'draft',
-       })
-     // t2Transcript is NOT touched — T2 preserved for revert
+silencedMergedBlob (combined silence-removed session audio)
+  → optional: speedUpAudio(blob, speed)   // inline, only if settings.audio.speedUp.enabled
+                                          // speed-up is never pre-computed or stored
+  → POST /api/transcribe (Cloudflare Worker → Deepgram Nova-3)
+  → patchSession({
+      transcript: text,
+      t3Transcript: text,               // T3 frozen here
+      activeTranscriptTier: 't3',
+      status: 'draft',
+      editedTranscript: undefined,      // clears any prior manual/PII edit
+    })
+  // t2Transcript is NOT touched — T2 preserved for "Revert to Draft"
 ```
 
 ### Edited tier — manual edits and PII scrub
@@ -154,7 +144,7 @@ In both cases `session.transcript` is **not** directly updated by the edited wri
 
 **`activeTranscriptTier` drives note generation behavior.** `generate.ts` uses `activeTranscriptTier === 't2' || 't3'` to decide whether to include speaker-context diarization sections in the AI prompt. T1 and edited tiers do not trigger diarization.
 
-**The T2 background auto-pass fires for every clip regardless of provider setting.** It runs automatically after any clip reaches `ready`. Do not gate it behind a provider check.
+**The T2 background auto-pass fires once on the combined silence-removed blob, regardless of provider setting.** It runs automatically after `handleRecordingComplete` sets `silencedMergedBlob`, and re-runs whenever the blob changes (new clip added). Do not gate it behind a provider check.
 
 **Existing sessions with only `transcript` (pre-v18) are shown under "Legacy transcript" in the Admin page.** Tier origin cannot be determined retroactively. Their `t1/t2/t3Transcript` fields are absent.
 

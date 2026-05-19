@@ -170,6 +170,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
       currentPipeline = null;
       currentModel = '';
       currentPipeline = await pipeline('token-classification', model, {
+        dtype: 'q8',
         session_options: { graphOptimizationLevel: 'basic' },
         progress_callback: (p: {
           status: string;

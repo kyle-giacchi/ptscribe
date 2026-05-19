@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   HardDrive,
   Monitor,
   Zap,
+  X,
 } from 'lucide-react';
 import { SurfaceCard, Eyebrow } from '@/components/design';
 import { BlobWaveform } from '@/components/audio/BlobWaveform';
@@ -539,10 +541,7 @@ function FeaturesCard() {
 // ─── Per-clip audio player ────────────────────────────────────────────────────
 
 function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob }) {
-  const { settings } = useSettings();
-  const { activeSilenced, activeSpedup, compilingSilence, compilingSpeed } =
-    useAudioProcessing(blob);
-  const su = settings.audio.speedUp;
+  const { activeSilenced, compilingSilence } = useAudioProcessing(blob);
 
   return (
     <div className="flex flex-col gap-3">
@@ -587,26 +586,6 @@ function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob })
         ) : null}
       </div>
 
-      {/* Speed Up */}
-      <div>
-        <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
-            Speed Up Audio Clip ({su.speed}×)
-          </span>
-          {activeSpedup && (
-            <span style={{ fontSize: 9.5, fontWeight: 600, color: '#10b981' }}>
-              −{activeSpedup.savedSec.toFixed(1)}s saved
-            </span>
-          )}
-        </div>
-        {compilingSpeed ? (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
-            <Loader2 size={11} className="animate-spin" /> Computing…
-          </div>
-        ) : activeSpedup ? (
-          <BlobWaveform blob={activeSpedup.blob} />
-        ) : null}
-      </div>
     </div>
   );
 }
@@ -1128,6 +1107,7 @@ function SessionDebugRow({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
+  const navigate = useNavigate();
   const { sessions } = useSessions();
   const { patients } = usePatients();
   const { copied, copy } = useCopy();
@@ -1179,6 +1159,7 @@ export function AdminPage() {
             Environment info, storage state, and per-session audio/transcript inspection.
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           onClick={() => copy(buildReport(), 'report')}
@@ -1205,6 +1186,24 @@ export function AdminPage() {
             </>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label="Close debug page"
+          className="inline-flex shrink-0 items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: '1px solid var(--color-pt-border)',
+            background: 'var(--color-pt-surface)',
+            color: 'var(--color-pt-text-2)',
+            cursor: 'pointer',
+          }}
+        >
+          <X size={14} strokeWidth={2} />
+        </button>
+        </div>
       </div>
 
       {/* Three info cards */}
