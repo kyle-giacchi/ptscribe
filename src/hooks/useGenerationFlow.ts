@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationsProvider';
@@ -49,6 +49,7 @@ export interface UseGenerationFlowResult {
   handleDeleteSession: () => Promise<void>;
   handleCopyNoteMarkdown: (markdown: string) => void;
   missingRequiredLabels: string[];
+  lastRawPayload: string | null;
 }
 
 /**
@@ -80,6 +81,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
   const { removeSession } = useSessions();
 
   const isGeneratingRef = useRef(false);
+  const [lastRawPayload, setLastRawPayload] = useState<string | null>(null);
 
   function ensureNote(initialSections?: NoteSection[]): Note {
     if (note) return note;
@@ -142,6 +144,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
           activeTranscriptTier: session!.activeTranscriptTier,
           signal: controller.signal,
         });
+        setLastRawPayload(result.rawText);
         if (note) {
           updateNote(note.id, {
             sections: result.sections,
@@ -153,7 +156,14 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
         }
         recordAction('generate');
         patchSession({ status: 'ready' });
-        toast.success('Draft note generated');
+        const hasContent = result.sections.some((s) => s.body.trim().length > 0);
+        if (hasContent) {
+          toast.success('Draft note generated');
+        } else {
+          toast.warning(
+            'Note generated, but all sections are empty — try using a more detailed transcript.',
+          );
+        }
       } catch (e) {
         setError((e as Error).message);
         patchSession({ status: 'draft' });
@@ -254,6 +264,7 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
     handleDeleteSession,
     handleCopyNoteMarkdown,
     missingRequiredLabels,
+    lastRawPayload,
   };
 }
 
