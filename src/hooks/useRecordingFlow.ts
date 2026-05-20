@@ -18,6 +18,13 @@ export interface UseRecordingFlowParams {
   recorder: UseRecorder;
   webSpeech: UseWebSpeechTranscript;
   webSpeechEnabled: boolean;
+  /**
+   * When set, overrides `settings.ai.transcription.provider` for this session only.
+   * `'webspeech'` forces Web Speech captions even if the user's default is Local Whisper;
+   * `'none'` suppresses live transcription entirely (record-now, transcribe-later);
+   * `null`/`undefined` falls back to `webSpeechEnabled` from settings.
+   */
+  transcriptionProviderOverride?: 'webspeech' | 'none' | null;
   sortedClips: SessionClip[];
   patchSession: (patch: Partial<Session>) => void;
   patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
@@ -65,7 +72,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     session,
     recorder,
     webSpeech,
-    webSpeechEnabled,
+    webSpeechEnabled: settingsWebSpeechEnabled,
+    transcriptionProviderOverride,
     sortedClips,
     patchSession,
     patchClips,
@@ -77,6 +85,16 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     setSilencedMergedBlob,
     setIsMerging,
   } = params;
+
+  // Resolve the effective Web Speech state for this recording session. The
+  // override is in-memory only — it never mutates persisted settings, so the
+  // user's default provider stays unchanged after the session ends.
+  const webSpeechEnabled =
+    transcriptionProviderOverride === 'webspeech'
+      ? true
+      : transcriptionProviderOverride === 'none'
+        ? false
+        : settingsWebSpeechEnabled;
 
   const { settings } = useSettings();
 
@@ -197,7 +215,10 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     setWhisperBubbles([]);
     whisperTextRef.current = [];
     whisperPendingRef.current = null;
-    recorder.onChunk.current = handleChunk;
+    // 'none' override means record-now-transcribe-later: skip the live Whisper
+    // preview pipeline so no chunks are sent to the (possibly unavailable) worker.
+    recorder.onChunk.current =
+      transcriptionProviderOverride === 'none' ? null : handleChunk;
 
     const ok = await recorder.start(clipId);
     if (!ok) {
@@ -245,7 +266,8 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
       recorder.resume();
       // Re-wire with the freshest handleChunk closure so post-resume Whisper
       // segments capture the latest patchClip and whisperTextRef state.
-      recorder.onChunk.current = handleChunk;
+      recorder.onChunk.current =
+        transcriptionProviderOverride === 'none' ? null : handleChunk;
       if (webSpeechEnabled && webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
