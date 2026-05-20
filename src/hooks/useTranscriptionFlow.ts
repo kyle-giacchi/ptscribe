@@ -72,7 +72,7 @@ export function useTranscriptionFlow(
   } = params;
 
   const [mergedAudioBlob, setMergedAudioBlob] = useState<Blob | null>(null);
-  // Silence-removed combined blob — produced by handleRecordingComplete and
+  // Silence-removed combined blob — produced by buildMergedAudioForReview and
   // used as the audio source for both T2 (Whisper) and T3 (Nova).
   const [silencedMergedBlob, setSilencedMergedBlob] = useState<Blob | null>(null);
   const [isMerging, setIsMerging] = useState(false);

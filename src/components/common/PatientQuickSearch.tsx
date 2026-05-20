@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { usePatients } from '@/contexts/PatientsProvider';
 
-export function GlobalSearch() {
+export function PatientQuickSearch() {
   const { patients } = usePatients();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');

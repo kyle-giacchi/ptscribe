@@ -3,9 +3,12 @@ import { AnimatePresence, motion } from 'motion/react';
 import { AudioLines, Mic, Play, Trash2, Upload, X, CornerDownLeft } from 'lucide-react';
 import { audioRepository } from '@/services/AudioRepository';
 import { duration, ease } from '@/lib/motion';
+import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
+import { useDismissable } from '@/hooks/useDismissable';
+import { AudioFileInput, type AudioFileInputHandle } from '@/components/common/AudioFileInput';
 import type { SessionClip } from '@/types';
 
-interface ClipsInspectorProps {
+interface ClipsDrawerProps {
   open: boolean;
   clips: SessionClip[];
   onClose: () => void;
@@ -26,7 +29,7 @@ interface InnerProps {
   clips: SessionClip[];
   total: number;
   newest: SessionClip | null;
-  fileRef: React.RefObject<HTMLInputElement | null>;
+  fileRef: React.RefObject<AudioFileInputHandle | null>;
   onClose: () => void;
   onJump: (startOffsetSec: number) => void;
   onDelete: (clipId: string) => void;
@@ -106,20 +109,13 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
           type="button"
           className="btn btn-ghost"
           style={{ height: 32, fontSize: 12 }}
-          onClick={() => fileRef.current?.click()}
+          onClick={() => fileRef.current?.open()}
         >
           <Upload size={13} strokeWidth={2} /> Upload audio file
         </button>
-        <input
+        <AudioFileInput
           ref={fileRef}
-          type="file"
-          accept="audio/*"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) { onUpload(f); onClose(); }
-            e.target.value = '';
-          }}
+          onPick={(f) => { onUpload(f); onClose(); }}
         />
         <p style={{ margin: 0, fontSize: 11, color: 'var(--color-pt-text-3)', textAlign: 'center', lineHeight: 1.4 }}>
           Adding a clip re-runs the note generation across all clips.
@@ -129,24 +125,12 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
   );
 }
 
-export function ClipsInspector({ open, clips, onClose, onJump, onDelete, onRecord, onUpload }: ClipsInspectorProps) {
+export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, onUpload }: ClipsDrawerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const fileRef = useRef<AudioFileInputHandle>(null);
+  const isMobile = useBelowBreakpoint(768);
 
-  useEffect(() => {
-    function onResize() { setIsMobile(window.innerWidth < 768); }
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // Esc to close + focus trap
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useDismissable({ open, onClose, ref: dialogRef, closeOnOutside: false });
 
   const total = clips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0);
   const newest = clips.length > 0 ? clips.reduce((a, b) => (a.createdAt > b.createdAt ? a : b)) : null;

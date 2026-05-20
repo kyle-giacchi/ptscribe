@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Bell, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal, HardDrive, LogOut } from 'lucide-react';
 import { useStorageEstimate } from '@/hooks/useStorageEstimate';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { vault } from '@/lib/vault/vault';
 import { useNotifications } from '@/contexts/NotificationsProvider';
-import { useSessionActions } from '@/contexts/SessionActionsContext';
+import { useSessionReset } from '@/contexts/SessionResetContext';
 import { useGate } from '@/contexts/GateContext';
+import { useDismissable } from '@/hooks/useDismissable';
 
 function useVaultState(): { initialized: boolean; unlocked: boolean } {
   const [state, setState] = useState(() => ({
@@ -75,14 +76,11 @@ export function AlertsButton() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
-    markAllRead();
-    function onMouseDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
+    if (open) markAllRead();
   }, [open, markAllRead]);
+
+  const close = useCallback(() => setOpen(false), []);
+  useDismissable({ open, onClose: close, ref });
 
   const hasNotifications = notifications.length > 0;
   const hasUnread = unreadCount > 0;
@@ -258,19 +256,13 @@ export function AlertsButton() {
 
 export function ProfileButton() {
   const { clinician } = useClinician();
-  const { onResetSession } = useSessionActions();
+  const { onResetSession } = useSessionReset();
   const { logout } = useGate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismissable({ open, onClose: close, ref });
 
   const initials = (clinician.name || 'PT')
     .split(/\s+/)

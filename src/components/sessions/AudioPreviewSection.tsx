@@ -62,7 +62,7 @@ export function AudioPreviewSection({
   silencedMergedBlob,
 }: {
   mergedAudioBlob: Blob;
-  /** Pre-computed silence-removed combined blob from handleRecordingComplete. */
+  /** Pre-computed silence-removed combined blob from buildMergedAudioForReview. */
   silencedMergedBlob: Blob | null;
 }) {
   const { settings, updateAudio } = useSettings();

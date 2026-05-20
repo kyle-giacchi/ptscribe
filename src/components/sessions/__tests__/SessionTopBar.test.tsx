@@ -20,7 +20,7 @@ describe('SessionTopBar', () => {
         patient={patient} session={session} note={undefined}
         totalDurationSec={0} clipsCount={0} clipsOpen={false}
         onToggleClips={() => {}} onRecord={() => {}} onUpload={() => {}}
-        missingRequiredLabels={[]} pendingDeleteSession={false}
+        missingRequiredLabels={[]}
         onFinalize={() => {}} onUnfinalize={() => {}}
       />
     </MemoryRouter>);
@@ -35,7 +35,7 @@ describe('SessionTopBar', () => {
         patient={patient} session={session} note={undefined}
         totalDurationSec={0} clipsCount={3} clipsOpen={false}
         onToggleClips={onToggleClips} onRecord={() => {}} onUpload={() => {}}
-        missingRequiredLabels={[]} pendingDeleteSession={false}
+        missingRequiredLabels={[]}
         onFinalize={() => {}} onUnfinalize={() => {}}
       />
     </MemoryRouter>);
@@ -50,7 +50,7 @@ describe('SessionTopBar', () => {
         patient={patient} session={session} note={note}
         totalDurationSec={0} clipsCount={0} clipsOpen={false}
         onToggleClips={() => {}} onRecord={() => {}} onUpload={() => {}}
-        missingRequiredLabels={['Assessment']} pendingDeleteSession={false}
+        missingRequiredLabels={['Assessment']}
         onFinalize={() => {}} onUnfinalize={() => {}}
       />
     </MemoryRouter>);

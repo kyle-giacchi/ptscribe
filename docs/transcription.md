@@ -9,7 +9,7 @@ Every session accumulates transcription data across up to four tiers. Higher tie
 | Tier | Name | Source | When it fires | Quality | Network |
 |------|------|--------|---------------|---------|---------|
 | **T1** | **Whisper VAD Segments** | VAD-gated segment recorder → POST /api/transcribe (Cloudflare Whisper) | Each VAD-detected speech segment **during** recording; flushed on pause and stop | ~85% — same Whisper model as T2; handles medical vocabulary | PTScribe Worker → Cloudflare Workers AI |
-| **T2** | **Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** `handleRecordingComplete` produces the combined silence-removed blob (`silencedMergedBlob`) | ~87% — handles medical vocabulary, fully offline | None |
+| **T2** | **Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** `buildMergedAudioForReview` produces the combined silence-removed blob (`silencedMergedBlob`) | ~87% — handles medical vocabulary, fully offline | None |
 | **T3** | **Nova AI** | Deepgram Nova-3 via Cloudflare Worker | **Explicit user action** ("Transcribe with AI") only | Best — speaker diarization, accent-robust | PTScribe Worker → Deepgram |
 | **Edited** | **Manual Edit** | Clinician keyboard input | On user save in the Transcript tab | N/A — human-authored | None |
 
@@ -74,7 +74,7 @@ The `whisperBubbles` state displayed in the recording panel is sourced from the 
 
 ### T2 — Local Whisper auto-pass (`useBackgroundTranscription`)
 
-Fires automatically once `silencedMergedBlob` is set by `handleRecordingComplete`. Runs regardless of the configured transcription provider. Resets and re-runs when a new clip is added (new blob produced).
+Fires automatically once `silencedMergedBlob` is set by `buildMergedAudioForReview`. Runs regardless of the configured transcription provider. Resets and re-runs when a new clip is added (new blob produced).
 
 ```
 silencedMergedBlob (combined silence-removed session audio)
@@ -144,7 +144,7 @@ In both cases `session.transcript` is **not** directly updated by the edited wri
 
 **`activeTranscriptTier` drives note generation behavior.** `generate.ts` uses `activeTranscriptTier === 't2' || 't3'` to decide whether to include speaker-context diarization sections in the AI prompt. T1 and edited tiers do not trigger diarization.
 
-**The T2 background auto-pass fires once on the combined silence-removed blob, regardless of provider setting.** It runs automatically after `handleRecordingComplete` sets `silencedMergedBlob`, and re-runs whenever the blob changes (new clip added). Do not gate it behind a provider check.
+**The T2 background auto-pass fires once on the combined silence-removed blob, regardless of provider setting.** It runs automatically after `buildMergedAudioForReview` sets `silencedMergedBlob`, and re-runs whenever the blob changes (new clip added). Do not gate it behind a provider check.
 
 **Existing sessions with only `transcript` (pre-v18) are shown under "Legacy transcript" in the Admin page.** Tier origin cannot be determined retroactively. Their `t1/t2/t3Transcript` fields are absent.
 

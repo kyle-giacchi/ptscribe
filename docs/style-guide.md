@@ -135,7 +135,19 @@ transition: opacity 150ms ease-in;
 - **4-pt grid.** All padding, gap, and margin values should be multiples of 4 px (`1`, `1.5`, `2`, `3`, `4`, `6`, `8` in Tailwind rem units).
 - **Touch targets: 44px minimum.** The `.btn` class enforces `min-h-[44px]`. Never shrink below this for interactive elements.
 - **Card padding:** `p-6` (24px) standard; `p-8` (32px) for hero cards (`.card-hero`).
-- **Sidebar:** collapsible; collapsed state shows icon-only nav. Width managed by `SettingsProvider.setSidebarCollapsed`.
+- **GlobalTopNav** is the only persistent app chrome (height 52 px). The dashboard is the only route that adds a left `Sidebar` rail; everywhere else the page renders directly under the top nav.
+- **Session chrome:** `SessionTopBar` (height 56 px) sits beneath `GlobalTopNav` on `/sessions/:id` and owns the per-session breadcrumb, AddClip button, Audio clips toggle, and Sign & export action. Session content uses two tabs only (`record`, `review`).
+
+### Responsive defaults
+
+| Breakpoint | Component | Behavior |
+|---|---|---|
+| `< 1024 px` | `GlobalTopNav` | Horizontal nav collapses to a hamburger overflow menu. |
+| `< 1024 px` | `TranscriptPanel` | Auto-collapses on Review tab (`useBelowBreakpoint(1024)`); reopens via `TranscriptCollapsedTab` rail. |
+| `< 768 px` (md) | Dashboard `Sidebar` | Hides the rail and adds a hamburger drawer with overlay + slide-in. |
+| `< 768 px` | `ClipsDrawer` | Renders as a bottom sheet (80 vh, safe-area padding) instead of a right-side 380 px drawer. |
+
+All dismissable surfaces (overflow menus, `ClipsDrawer`, search results, alerts) close on Escape and outside-click via the shared `useDismissable` hook.
 
 ---
 

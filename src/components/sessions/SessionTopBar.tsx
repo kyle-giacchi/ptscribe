@@ -14,7 +14,6 @@ export interface SessionTopBarProps {
   onRecord: () => void;
   onUpload: (file: File) => void;
   missingRequiredLabels: string[];
-  pendingDeleteSession: boolean;
   onFinalize: () => void;
   onUnfinalize: () => void;
 }
@@ -30,7 +29,7 @@ export function SessionTopBar({
   patient, session, note,
   totalDurationSec, clipsCount, clipsOpen,
   onToggleClips, onRecord, onUpload,
-  missingRequiredLabels, pendingDeleteSession,
+  missingRequiredLabels,
   onFinalize, onUnfinalize,
 }: SessionTopBarProps) {
   const sessionDate = new Date(session.date);
@@ -90,8 +89,7 @@ export function SessionTopBar({
       </div>
 
       {/* Right cluster */}
-      {!pendingDeleteSession && (
-        <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
+      <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
           <AddClipButton onRecord={onRecord} onUpload={onUpload} />
 
           <button
@@ -146,7 +144,6 @@ export function SessionTopBar({
             </button>
           )}
         </div>
-      )}
     </div>
   );
 }
