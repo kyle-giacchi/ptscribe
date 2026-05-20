@@ -413,3 +413,14 @@ body {
     font-size: 16px;
   }
 }
+
+@media (max-width: 767px) {
+  .dashboard-shell { --dashboard-sidebar-cols: 1fr; }
+}
+
+@media (max-width: 1023px) {
+  header[role="banner"] nav[aria-label="Primary"] { display: none; }
+}
+@media (max-width: 767px) {
+  header[role="banner"] .global-search-input { display: none; }
+}

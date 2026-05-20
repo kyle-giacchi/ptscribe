@@ -61,6 +61,7 @@ const SessionClipSchema = z.object({
   t3Transcript: z.string().optional(),
   transcriptChunks: z.array(TranscriptChunkSchema).optional(),
   transcriptedAt: z.number().int().optional(),
+  startOffsetSec: z.number().min(0).optional(),
   errorMessage: z.string().optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
@@ -228,6 +229,7 @@ const SettingsSchema = z.object({
     autoFinish: z.boolean(),
     webSpeechEnabled: z.boolean(),
     piiModel: z.enum(['openai/privacy-filter', 'Xenova/bert-base-NER']).optional(),
+    phiConfirmDismissed: z.boolean().default(false),
   }),
   recordingLimits: z.object({
     softWarnAtMinutes: z.number().int().min(15).max(240),
@@ -316,7 +318,7 @@ export function defaultAppData(): AppData {
         speedUp: { enabled: true, speed: 1.25 },
       },
       security: { idleLockMinutes: 10 },
-      session: { autoFinish: false, webSpeechEnabled: false },
+      session: { autoFinish: false, webSpeechEnabled: false, phiConfirmDismissed: false },
       recordingLimits: {
         softWarnAtMinutes: 75,
         maxMinutes: 90,

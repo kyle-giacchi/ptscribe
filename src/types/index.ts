@@ -88,6 +88,7 @@ export interface SessionClip {
   t3Transcript?: string;     // Tier 3 (Nova AI): cloud result, written by explicit transcription action
   transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
   transcriptedAt?: number;
+  startOffsetSec?: number;
   errorMessage?: string;
   createdAt: number;
   updatedAt: number;
@@ -347,6 +348,13 @@ export interface SessionWorkflowSettings {
    * has ONNX exports on HuggingFace and works without R2 setup. Default: openai/privacy-filter.
    */
   piiModel?: 'openai/privacy-filter' | 'Xenova/bert-base-NER';
+  /**
+   * When true, skip the "transcript leaves device" confirmation that appears
+   * before Generate / Regenerate sends the transcript to Anthropic. Toggled via
+   * a "Don't show this again" checkbox in the dialog, restorable from User
+   * Settings → Notes & Templates. Default false.
+   */
+  phiConfirmDismissed: boolean;
 }
 
 /**

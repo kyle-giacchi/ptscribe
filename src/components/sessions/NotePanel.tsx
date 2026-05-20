@@ -1,119 +1,35 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ClipboardList, Copy, Download, FileText, Loader2, Share2, Sparkles } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Copy, Download, FileText, Loader2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import { renderNoteMarkdown, renderNotePlainText } from '@/lib/clinical/noteFormat';
 import { downloadNotePDF } from '@/lib/pdf/NotePDF';
 import { downloadFile } from '@/utils/download';
-import { Modal } from '@/components/ui/Modal';
-import { TemplateDropdown } from './TemplateDropdown';
 import type { Note, NoteSection, NoteTemplate, Patient } from '@/types';
-
-type Busy = null | 'transcribing' | 'generating';
 
 export interface NotePanelProps {
   patient: Patient;
   note: Note | undefined;
   template: NoteTemplate | undefined;
-  templates: NoteTemplate[];
-  transcript: string;
-  /** Sum of all clip durations in seconds. */
-  totalDurationSec: number;
-  busy: Busy;
-  canGenerate: boolean;
   onSectionChange: (key: string, body: string) => void;
-  onTemplateChange: (id: string) => void;
-  onManageTemplates: () => void;
-  onGenerate: () => void;
 }
 
 export function NotePanel({
   patient,
   note,
   template,
-  templates,
-  transcript: _transcript,
-  totalDurationSec: _totalDurationSec,
-  busy,
-  canGenerate,
   onSectionChange,
-  onTemplateChange,
-  onManageTemplates,
-  onGenerate,
 }: NotePanelProps) {
   const navigate = useNavigate();
-  const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
   const sections: NoteSection[] =
     note?.sections ??
     template?.sections.map((s) => ({ key: s.key, label: s.label, body: '' })) ??
     [];
 
-  const isGenerating = busy === 'generating';
-  const hasDraftContent = note?.sections.some((s) => s.body.trim().length > 0) ?? false;
-
-  function handleGenerateClick() {
-    if (hasDraftContent) {
-      setOverwriteConfirmOpen(true);
-    } else {
-      onGenerate();
-    }
-  }
-
   return (
     <div className="space-y-4">
-      {/* Heading + generate controls */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-pt-text)' }}>
-          Clinical note
-        </h2>
-        <div className="flex items-center gap-2">
-          <TemplateDropdown
-            template={template}
-            templates={templates}
-            onChange={onTemplateChange}
-            onManage={onManageTemplates}
-          />
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ height: 32, padding: '0 12px', fontSize: 12.5, boxSizing: 'border-box' }}
-            disabled={!canGenerate || isGenerating}
-            onClick={handleGenerateClick}
-          >
-            {isGenerating ? (
-              <><Loader2 size={13} className="animate-spin" /> Generating…</>
-            ) : (
-              <><Sparkles size={13} strokeWidth={2} /> {hasDraftContent ? 'Regenerate' : 'Generate'}</>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Overwrite confirmation modal */}
-      <Modal
-        open={overwriteConfirmOpen}
-        onClose={() => setOverwriteConfirmOpen(false)}
-        title="Replace existing note?"
-        size="sm"
-      >
-        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-          Regenerating will erase your current clinical note. This cannot be undone.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button className="btn btn-ghost" onClick={() => setOverwriteConfirmOpen(false)}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => { setOverwriteConfirmOpen(false); onGenerate(); }}
-          >
-            <Sparkles size={13} strokeWidth={2} /> Regenerate
-          </button>
-        </div>
-      </Modal>
-
       {/* Finalized banner */}
       {note?.finalized && (
         <div
@@ -144,13 +60,6 @@ export function NotePanel({
         </div>
       )}
 
-      {/* Generating spinner */}
-      {busy === 'generating' && (
-        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-          <Loader2 size={14} className="animate-spin" /> Generating note…
-        </div>
-      )}
-
       {/* Section list */}
       {sections.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--color-fg-subtle)' }}>
@@ -159,17 +68,26 @@ export function NotePanel({
       ) : (
         <div>
           {sections.map((s) => {
+            const isAssessment = s.key.toLowerCase() === 'assessment';
             const isPlanSection = s.key === 'plan';
             return (
               <div
                 key={s.key}
-                style={{ borderBottom: '1px dashed var(--color-pt-border)', paddingBottom: 16, marginBottom: 16 }}
+                style={{
+                  borderBottom: '1px dashed var(--color-pt-border)',
+                  paddingBottom: 16,
+                  marginBottom: 16,
+                  paddingLeft: isAssessment ? 10 : 0,
+                  borderLeft: isAssessment ? '3px solid var(--color-pt-accent-border)' : undefined,
+                }}
               >
-                {/* Section header */}
                 <div className="flex items-center gap-2 mb-2">
                   <span
                     className="text-[11px] font-semibold tracking-widest uppercase"
-                    style={{ color: 'var(--color-fg-muted)', letterSpacing: '0.1em' }}
+                    style={{
+                      color: isAssessment ? 'var(--color-pt-accent-fg)' : 'var(--color-fg-muted)',
+                      letterSpacing: '0.1em',
+                    }}
                   >
                     {s.label}
                   </span>
@@ -201,7 +119,6 @@ export function NotePanel({
                   )}
                 </div>
 
-                {/* Section body editor */}
                 <NoteSectionEditor
                   key={`${note?.id ?? 'template'}-${s.key}`}
                   value={s.body}

@@ -13,28 +13,28 @@
  */
 
 import { apiFetch } from '@/lib/apiClient';
+import { AiCallError, classifyResponse, type AiErrorKind } from '../errors';
 
 export interface CloudflareWhisperArgs {
   model: string; // e.g. '@cf/deepgram/nova-3'
   audio: Blob;
   language?: string;
   signal?: AbortSignal;
+  onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
 export interface CloudflareWhisperResult {
   text: string;
 }
 
-const RETRY_DELAYS_MS = [500, 1500, 4000];
+const RETRY_DELAYS_MS = [5_000, 10_000, 25_000];
 const RETRYABLE_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
 export async function transcribeWithCloudflare(
   args: CloudflareWhisperArgs,
 ): Promise<CloudflareWhisperResult> {
   const buffer = await args.audio.arrayBuffer();
-  // Forward the actual audio MIME so the Worker can hand a typed body to
-  // Deepgram Nova-3 (which requires contentType). Fall back to webm — that
-  // matches what MediaRecorder produces in Chromium.
   const contentType = args.audio.type || 'audio/webm';
   const headers: Record<string, string> = {
     'Content-Type': contentType,
@@ -42,57 +42,101 @@ export async function transcribeWithCloudflare(
   if (args.model) headers['x-ptscribe-model'] = args.model;
   if (args.language) headers['x-ptscribe-language'] = args.language;
 
-  const res = await fetchWithRetry('/api/transcribe', buffer, headers, args.signal);
+  let lastStatus: number | undefined;
+  let lastRaw: string | undefined;
+  let lastKind: AiErrorKind = 'network';
 
-  const data = (await res.json()) as { text?: string; error?: string };
-  if (typeof data.text !== 'string') {
-    throw new Error(data.error || 'Transcription proxy response missing `text`');
-  }
-  return { text: data.text };
-}
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (args.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
-async function fetchWithRetry(
-  url: string,
-  body: ArrayBuffer,
-  headers: Record<string, string>,
-  signal: AbortSignal | undefined,
-): Promise<Response> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
-    if (signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError');
-    }
     try {
-      const res = await apiFetch(url, {
+      const res = await apiFetch('/api/transcribe', {
         method: 'POST',
         headers,
-        body,
-        signal,
+        body: buffer,
+        signal: args.signal,
       });
 
-      if (res.ok) return res;
+      if (!res.ok) {
+        const body = await safeReadText(res);
+        lastStatus = res.status;
+        lastRaw = body || res.statusText;
 
-      if (!RETRYABLE_STATUSES.has(res.status) || attempt === RETRY_DELAYS_MS.length) {
-        const errBody = await safeReadText(res);
-        throw new Error(`Whisper proxy failed (${res.status}): ${errBody || res.statusText}`);
+        if (!RETRYABLE_STATUSES.has(res.status)) {
+          throw new AiCallError({
+            kind: classifyResponse(res, 'nova'),
+            provider: 'nova',
+            status: res.status,
+            attemptsMade: attempt,
+            rawDetail: lastRaw,
+            message: `Nova call failed (${res.status}): ${lastRaw}`,
+          });
+        }
+
+        if (attempt === MAX_ATTEMPTS) {
+          throw new AiCallError({
+            kind: 'network',
+            provider: 'nova',
+            status: res.status,
+            attemptsMade: attempt,
+            rawDetail: lastRaw,
+            message: `Nova call failed after ${attempt} attempts (${res.status})`,
+          });
+        }
+        args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: String(res.status) });
+        await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
+        continue;
       }
 
-      lastError = new Error(`Whisper proxy failed (${res.status}): ${res.statusText}`);
+      const data = (await res.json()) as { text?: string; error?: string };
+      if (typeof data.text !== 'string') {
+        throw new AiCallError({
+          kind: 'empty',
+          provider: 'nova',
+          status: res.status,
+          attemptsMade: attempt,
+          rawDetail: data.error,
+          message: data.error || 'Nova response missing `text`',
+        });
+      }
+      return { text: data.text };
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      if (!isNetworkError(err) || attempt === RETRY_DELAYS_MS.length) throw err;
-      lastError = err;
-    }
+      if (err instanceof AiCallError) throw err;
 
-    await sleep(RETRY_DELAYS_MS[attempt], signal);
+      lastRaw = err instanceof Error ? err.message : String(err);
+      lastKind = 'network';
+      if (attempt === MAX_ATTEMPTS) {
+        throw new AiCallError({
+          kind: lastKind,
+          provider: 'nova',
+          status: lastStatus,
+          attemptsMade: attempt,
+          rawDetail: lastRaw,
+          message: `Nova call failed after ${attempt} attempts: ${lastRaw}`,
+        });
+      }
+      args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: 'network' });
+      await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
+    }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('Whisper proxy request failed');
+  throw new AiCallError({
+    kind: lastKind,
+    provider: 'nova',
+    status: lastStatus,
+    attemptsMade: MAX_ATTEMPTS,
+    rawDetail: lastRaw,
+    message: 'Nova call failed',
+  });
 }
 
-function isNetworkError(err: unknown): boolean {
-  return err instanceof TypeError;
+async function safeReadText(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return '';
+  }
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -110,12 +154,4 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       signal.addEventListener('abort', onAbort, { once: true });
     }
   });
-}
-
-async function safeReadText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return '';
-  }
 }
