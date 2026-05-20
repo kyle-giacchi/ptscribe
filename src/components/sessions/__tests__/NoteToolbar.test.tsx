@@ -46,6 +46,21 @@ describe('NoteToolbar', () => {
     expect(onGenerate).not.toHaveBeenCalled();
   });
 
+  it('Overwrite modal confirm fires onGenerate', () => {
+    const onGenerate = vi.fn();
+    render(<NoteToolbar
+      template={tpl} templates={[tpl]}
+      hasDraftContent canGenerate noteExists isGenerating={false}
+      onTemplateChange={() => {}} onManageTemplates={() => {}}
+      onGenerate={onGenerate} onCopyNote={() => {}}
+    />);
+    fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
+    // Modal is open; click its Regenerate confirm (the second match)
+    const regenerateButtons = screen.getAllByText(/Regenerate/).map((el) => el.closest('button')!);
+    fireEvent.click(regenerateButtons[regenerateButtons.length - 1]);
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+  });
+
   it('Copy note calls onCopyNote when noteExists', () => {
     const onCopyNote = vi.fn();
     render(<NoteToolbar
