@@ -26,6 +26,8 @@ import { ClipsList } from '@/components/sessions/ClipsList';
 import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
+import { NoteToolbar } from '@/components/sessions/NoteToolbar';
+import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
 import { AiCallError } from '@/components/ai/AiCallError';
@@ -259,6 +261,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleReplaceSections,
     handleFinalize,
     handleUnfinalize,
+    handleCopyNoteMarkdown,
     missingRequiredLabels,
     lastRawPayload,
     aiError: generationAiError,
@@ -281,6 +284,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setPhiConfirmOpen(false);
     if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
     handleGenerateRaw();
+  }
+
+  function handleCopyNote() {
+    if (!note || !template) return;
+    const md = renderNoteMarkdown(note, template, patient!);
+    handleCopyNoteMarkdown(md);
   }
 
   const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
@@ -631,19 +640,38 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     Quick note mode — type your note directly in the sections below.
                   </div>
                 )}
+                {/* Title row */}
+                <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+                  <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-pt-text)', margin: 0 }}>
+                    Clinical note
+                  </h1>
+                  {note && (
+                    <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                      {busy === 'generating'
+                        ? 'Generating…'
+                        : `last generated ${relativeTime(note.updatedAt)}`}
+                    </span>
+                  )}
+                </div>
+
+                <NoteToolbar
+                  template={template}
+                  templates={templates}
+                  hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
+                  canGenerate={canGenerate}
+                  isGenerating={busy === 'generating'}
+                  noteExists={!!note}
+                  onTemplateChange={handleTemplateChange}
+                  onManageTemplates={() => setManageTemplatesOpen(true)}
+                  onGenerate={handleGenerate}
+                  onCopyNote={handleCopyNote}
+                />
+
                 <NotePanel
                   patient={patient}
                   note={note}
                   template={template}
-                  templates={templates}
-                  transcript={transcript}
-                  totalDurationSec={totalDurationSec}
-                  busy={busy}
-                  canGenerate={canGenerate}
                   onSectionChange={handleSectionChange}
-                  onTemplateChange={handleTemplateChange}
-                  onManageTemplates={() => setManageTemplatesOpen(true)}
-                  onGenerate={handleGenerate}
                 />
                 {generationRetryStatus ? (
                   <div style={{ marginTop: 8 }}>
@@ -845,6 +873,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     </div>
     </SessionActionsContext.Provider>
   );
+}
+
+function relativeTime(ts: number | undefined): string {
+  if (!ts) return '';
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  if (min < 24 * 60) return `${Math.floor(min / 60)}h ago`;
+  return `${Math.floor(min / (60 * 24))}d ago`;
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
