@@ -93,6 +93,7 @@ export function NoteToolbar({
         className="btn btn-primary"
         style={{ height: 34, padding: '0 14px', fontSize: 12.5 }}
         disabled={!canGenerate || isGenerating}
+        aria-busy={isGenerating}
         onClick={handleRegenerate}
       >
         {isGenerating ? (
@@ -114,10 +115,17 @@ export function NoteToolbar({
           Regenerating will erase your current clinical note. This cannot be undone.
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button className="btn btn-ghost" onClick={() => setOverwriteOpen(false)}>Cancel</button>
+          <button type="button" className="btn btn-ghost" onClick={() => setOverwriteOpen(false)}>
+            Cancel
+          </button>
           <button
+            type="button"
             className="btn btn-primary"
-            onClick={() => { setOverwriteOpen(false); onGenerate(); }}
+            disabled={!canGenerate}
+            onClick={() => {
+              setOverwriteOpen(false);
+              if (canGenerate) onGenerate();
+            }}
           >
             <RotateCw size={13} strokeWidth={2} /> Regenerate
           </button>
