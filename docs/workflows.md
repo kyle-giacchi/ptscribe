@@ -88,10 +88,10 @@ handleFinishedRecording()
 
 ### Review tab merge
 
-When the user navigates to Review, `handleRecordingComplete()` runs:
+When the user navigates to Review, `buildMergedAudioForReview()` runs:
 
 ```
-handleRecordingComplete()
+buildMergedAudioForReview()
   → load all ready/transcribed clip blobs from IDB
   → mergeAudioBlobs(blobs) → setMergedAudioBlob   ← used for playback only, not persisted
   → compile best-available transcript per clip:
@@ -99,6 +99,8 @@ handleRecordingComplete()
   → patchSession: transcript = compiled, activeTranscriptTier = 't1'
   → setActiveTab('review')
 ```
+
+The Session page only has two tabs (`record` and `review`). The legacy `clips` tab is gone — clip review is owned by `ClipsDrawer`, a side drawer (≥ 768 px) / bottom sheet (< 768 px) opened from `SessionTopBar`'s "Audio clips" toggle. Jumping from a clip to its place in the transcript calls `transcriptRef.current?.scrollToTimestamp(startOffsetSec)` on `TranscriptPanel` (a `forwardRef` panel that searches for the nearest `[data-ts]` segment and smooth-scrolls it into view). If the transcript pane is collapsed, the inspector expands it first before scrolling.
 
 ---
 

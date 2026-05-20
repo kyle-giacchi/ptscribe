@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from '
 import { toast } from 'sonner';
 import {
   Loader2, RotateCcw, Search, ChevronLeft, ChevronRight, Edit3, Wand2,
-  Copy, EyeOff, Sparkles, PanelRightClose,
+  Copy, EyeOff, PanelRightClose,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
@@ -51,11 +51,24 @@ export const TranscriptPanel = forwardRef<TranscriptPanelHandle, TranscriptPanel
     const scrollRootRef = useRef<HTMLDivElement>(null);
     useImperativeHandle(ref, () => ({
       scrollToTimestamp(seconds: number) {
-        const root = scrollRootRef.current;
-        if (!root) return;
-        const candidates = Array.from(root.querySelectorAll<HTMLElement>('[data-ts]'));
-        const target = candidates.find((el) => Number(el.dataset.ts ?? 0) >= seconds) ?? candidates[candidates.length - 1];
-        target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        // Retry across two animation frames so callers can expand the panel and
+        // jump in one call — the FormattedTranscriptView mounts before its
+        // children are laid out.
+        function attempt(retriesLeft: number) {
+          const root = scrollRootRef.current;
+          const candidates = root
+            ? Array.from(root.querySelectorAll<HTMLElement>('[data-ts]'))
+            : [];
+          if (candidates.length === 0) {
+            if (retriesLeft > 0) requestAnimationFrame(() => attempt(retriesLeft - 1));
+            return;
+          }
+          const target =
+            candidates.find((el) => Number(el.dataset.ts ?? 0) >= seconds) ??
+            candidates[candidates.length - 1];
+          target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        attempt(3);
       },
     }));
 
@@ -174,20 +187,6 @@ export const TranscriptPanel = forwardRef<TranscriptPanelHandle, TranscriptPanel
 
             <div style={{ flex: 1 }} />
 
-            {onScrubPII && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{ height: 28, padding: '0 8px', fontSize: 12, color: 'var(--color-pt-accent)' }}
-                disabled={piiScrubbing}
-                onClick={handleScrubPII}
-                title="Scan transcript for PII"
-              >
-                {piiScrubbing
-                  ? <><Loader2 size={13} className="animate-spin" /> {piiProgress ?? 'Scanning…'}</>
-                  : <><Sparkles size={13} strokeWidth={2} /> Scrub PII</>}
-              </button>
-            )}
             {onCopyTranscript && transcript.trim() && (
               <button type="button" className="btn btn-ghost p-1.5" onClick={onCopyTranscript} title="Copy transcript" aria-label="Copy transcript">
                 <Copy size={13} strokeWidth={2} />

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { SurfaceCard, Eyebrow } from '@/components/design';
 import { BlobWaveform } from '@/components/audio/BlobWaveform';
-import { ClipsListOld } from '@/components/sessions/ClipsListOld';
+import { ClipsAudioDebug } from '@/components/sessions/ClipsAudioDebug';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
@@ -1016,7 +1016,7 @@ function AudioClipsAccordion({ session }: { session: Session }) {
               ok={sd.enabled}
             />
           </div>
-          <ClipsListOld clips={sortedClips} />
+          <ClipsAudioDebug clips={sortedClips} />
           {session.clips.length > 0 && (
             <div className="mt-4">
               <SessionAudioSection session={session} />

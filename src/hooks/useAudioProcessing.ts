@@ -10,7 +10,7 @@ const KEY = 'merged';
 /**
  * Manages silence-removal for the combined session audio blob.
  *
- * If `precomputedSilenced` is provided (produced by handleRecordingComplete),
+ * If `precomputedSilenced` is provided (produced by buildMergedAudioForReview),
  * it is used directly and no additional silence pass is run. When absent the
  * hook auto-runs compileSilence on first blob arrival so the waveform is still
  * populated for sessions loaded from a previous page visit.
@@ -31,7 +31,7 @@ export function useAudioProcessing(
   const activeSilenced = silenced?.forId === KEY ? silenced : null;
   const activeSilenceError = silenceError?.forId === KEY ? silenceError.msg : null;
 
-  // When a pre-computed silenced blob arrives (from handleRecordingComplete),
+  // When a pre-computed silenced blob arrives (from buildMergedAudioForReview),
   // adopt it directly — no need to re-run trimSilence on the merged blob.
   useEffect(() => {
     if (precomputedSilenced) {

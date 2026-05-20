@@ -9,12 +9,21 @@ src/
                   ai/client/localWhisper.ts (client-side Whisper via worker pool)
   contexts/       AppDataProvider (root) + slice providers (one per domain)
   hooks/          useRecorder, useLiveTranscript, useRecordingFlow, 
-                  useTranscriptionFlow, useGenerationFlow
+                  useTranscriptionFlow, useGenerationFlow,
+                  useBelowBreakpoint (window-width matcher), useDismissable (Esc + click-outside)
   pages/          Route-level components — consume hooks/contexts only
-  components/     UI primitives (Field, PageHeader, AppShell, Sidebar) and shared widgets;
-                  sessions/ sub-directory holds the Session page panel components
-                  (SessionTopBar, AccordionSection, ClipsList, RecordingPanel, 
-                   TranscriptPanel, NotePanel)
+  components/     common/ — AppShell, GlobalTopNav, PatientQuickSearch, TopNavControls (AlertsButton/
+                            VaultPill/ProfileButton — exported for GlobalTopNav reuse),
+                            Sidebar (scoped to /today only), AudioFileInput, ErrorBanner,
+                            ConfirmBanner, Modal, Field, PageHeader
+                  sessions/ — Session page panels:
+                    SessionTopBar (chrome row: back-to-chart, breadcrumb, AddClipButton,
+                      Audio clips toggle, Sign & export),
+                    AddClipButton, ClipsDrawer (right drawer ≥768px / bottom sheet <768px),
+                    RecordingPanel, TranscriptPanel (forwardRef → scrollToTimestamp),
+                    NoteToolbar (Template, Modifier, Copy, Generate/Regenerate), NotePanel,
+                    plus small extracts: RecordWarningBanner, ReviewEmptyState,
+                    TranscriptCollapsedTab, ResetSessionModal, UploadProcessingView
   types/          Domain types (index.ts)
   schemas/        Zod schemas mirroring types + defaultAppData factory
   utils/          ids.ts, migrations.ts, downloadFile.ts, markdown.ts
@@ -22,6 +31,21 @@ src/
 ```
 
 Dependencies flow one way: `pages/components` -> `hooks` -> `contexts` -> `services`. Nothing in `services/` imports from `contexts/` or higher.
+
+## Shell and navigation
+
+`AppShell` is intentionally thin: `OfflineIndicator` + `GlobalTopNav` + optional demo banner + the routed `<Outlet/>` + `<Toaster/>`. It does **not** render a sidebar, page title, or per-page chrome — those belong to the page.
+
+| Layer | Component | Notes |
+|---|---|---|
+| App chrome (every route) | `GlobalTopNav` (52 px) | Hamburger overflow menu, brand, primary nav (My Chart, Review queue, Patients, Templates, Settings), `PatientQuickSearch` patient typeahead, `VaultPill`, `AlertsButton`, `ProfileButton`. Hamburger surfaces below 1024 px and the horizontal nav becomes the overflow menu. |
+| Dashboard rail | `Sidebar` | Rendered only by `pages/Dashboard.tsx` as a left rail. Hidden below `md` (768 px) and re-surfaced as a drawer behind a hamburger button at the page top. |
+| Session chrome | `SessionTopBar` (56 px) | Back-to-chart link, patient + session breadcrumb, status badge, `AddClipButton`, Audio clips toggle (controls `ClipsDrawer`), Sign & export / Unlock. |
+| Session content | `RecordingPanel` or `NotePanel` + `TranscriptPanel` + `ClipsDrawer` | Two tabs only: `record` and `review`. The legacy `clips` tab is gone — clips live in the inspector drawer. |
+
+`PatientQuickSearch` listens for ⌘/Ctrl-K to focus the input; results are patient matches (name or primary diagnosis), keyboard-navigable, navigate to `/patients/:id` on enter.
+
+`GlobalTopNav`'s overflow menu and `AddClipButton`'s dropdown both close on Escape and outside-click via the shared `useDismissable` hook. Width-conditional layouts (hamburger surface, transcript auto-collapse, ClipsDrawer bottom-sheet vs side drawer) use `useBelowBreakpoint(maxWidthPx)`. See [style-guide.md — Responsive defaults](style-guide.md#responsive-defaults) for the breakpoint table.
 
 ## Data flow
 
@@ -78,7 +102,7 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 | `TemplatesProvider` | `useTemplates()` | `addTemplate`, `updateTemplate` (no-op for builtins), `removeTemplate` (no-op for builtins), `cloneTemplate(id)`                                                                                                                                                                                                                       |
 | `ExercisesProvider` | `useExercises()` | `addExercise`, `updateExercise` (no-op for builtins), `removeExercise` (no-op for builtins)                                                                                                                                                                                                                                            |
 | `PlansProvider`     | `usePlans()`     | `addPlan`, `updatePlan`, `removePlan`, `setPlans`                                                                                                                                                                                                                                                                                      |
-| `SettingsProvider`  | `useSettings()`  | `updateAi(patch)`, `setDensity('cozy' \| 'compact')`, `setSidebarCollapsed(bool)`, `setRetentionDays(n?)`                                                                                                                                                                                                                              |
+| `SettingsProvider`  | `useSettings()`  | `updateSettings`, `updateAi`, `updateAudio`, `updateUi`, `updateSession`, `updateRecordingLimits`, `updateOrgPolicy`, `updateFirstRun`, `setIdleLockMinutes`, `setAutoDeleteAudioAfterDays`, `getPageMode` / `setPageMode` (per-page detail level; persisted directly to `localStorage`, not in `AppData`).                            |
 | `IdleLockProvider`  | —                | No mutators. Reads `settings.security.idleLockMinutes`; calls `vault.lock()` after that many minutes of inactivity. Must be inside `SettingsProvider`.                                                                                                                                                                                  |
 | `AuthProvider`      | `useAuth()`      | Wraps BetterAuth (passkey + magic link, served via Worker at `/api/auth`). Sits at router level, outside the app provider tree. Exposes `isAuthenticated`, `user`, `signOut`.                                                                                                                                                           |
 

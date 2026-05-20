@@ -1,17 +1,98 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesProvider';
-import { AlertsButton, ProfileButton, VaultPill } from './TopBar';
-import { GlobalSearch } from './GlobalSearch';
+import { useDismissable } from '@/hooks/useDismissable';
+import { AlertsButton, ProfileButton, VaultPill } from './TopNavControls';
+import { PatientQuickSearch } from './PatientQuickSearch';
 
-const NAV_ITEMS: Array<{ to: string; label: string; end?: boolean }> = [
+interface NavItemDef {
+  to: string;
+  label: string;
+  end?: boolean;
+}
+
+const NAV_ITEMS: NavItemDef[] = [
   { to: '/today', label: 'My Chart' },
   { to: '/notes', label: 'Review queue' },
   { to: '/patients', label: 'Patients' },
   { to: '/templates', label: 'Templates' },
   { to: '/settings', label: 'Settings' },
 ];
+
+function PendingBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      aria-label={`${count} pending`}
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        minWidth: 18,
+        padding: '0 5px',
+        borderRadius: 999,
+        background: 'var(--color-pt-accent)',
+        color: '#fff',
+        lineHeight: '15px',
+        textAlign: 'center',
+      }}
+    >
+      {count > 9 ? '9+' : count}
+    </span>
+  );
+}
+
+interface NavItemProps {
+  item: NavItemDef;
+  variant: 'horizontal' | 'dropdown';
+  pendingCount: number;
+  onNavigate?: () => void;
+}
+
+function NavItem({ item, variant, pendingCount, onNavigate }: NavItemProps) {
+  const isDropdown = variant === 'dropdown';
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      role={isDropdown ? 'menuitem' : undefined}
+      onClick={onNavigate}
+      className={({ isActive }) => `nav-item-global ${isActive ? 'active' : ''}`}
+      style={({ isActive }) =>
+        isDropdown
+          ? {
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
+              background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }
+          : {
+              padding: '6px 10px',
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: isActive ? 600 : 500,
+              color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
+              background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
+              border: isActive
+                ? '1px solid var(--color-pt-accent-border)'
+                : '1px solid transparent',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }
+      }
+    >
+      <span>{item.label}</span>
+      {item.to === '/notes' && <PendingBadge count={pendingCount} />}
+    </NavLink>
+  );
+}
 
 export function GlobalTopNav() {
   const { notes } = useNotes();
@@ -20,16 +101,8 @@ export function GlobalTopNav() {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!overflowOpen) return;
-    function handleOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOverflowOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
-  }, [overflowOpen]);
+  const closeOverflow = useCallback(() => setOverflowOpen(false), []);
+  useDismissable({ open: overflowOpen, onClose: closeOverflow, ref: menuRef });
 
   return (
     <header
@@ -85,45 +158,13 @@ export function GlobalTopNav() {
           }}
         >
           {NAV_ITEMS.map((item) => (
-            <NavLink
+            <NavItem
               key={item.to}
-              to={item.to}
-              end={item.end}
-              role="menuitem"
-              onClick={() => setOverflowOpen(false)}
-              className={({ isActive }) => `nav-item-global ${isActive ? 'active' : ''}`}
-              style={({ isActive }) => ({
-                padding: '8px 16px',
-                fontSize: 13,
-                fontWeight: isActive ? 600 : 500,
-                color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
-                background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              })}
-            >
-              <span>{item.label}</span>
-              {item.to === '/notes' && pendingCount > 0 && (
-                <span
-                  aria-label={`${pendingCount} pending`}
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    minWidth: 18,
-                    padding: '0 5px',
-                    borderRadius: 999,
-                    background: 'var(--color-pt-accent)',
-                    color: '#fff',
-                    lineHeight: '15px',
-                    textAlign: 'center',
-                  }}
-                >
-                  {pendingCount > 9 ? '9+' : pendingCount}
-                </span>
-              )}
-            </NavLink>
+              item={item}
+              variant="dropdown"
+              pendingCount={pendingCount}
+              onNavigate={closeOverflow}
+            />
           ))}
         </div>
       )}
@@ -161,47 +202,7 @@ export function GlobalTopNav() {
       {/* Primary nav */}
       <nav className="flex items-center" style={{ gap: 4 }} aria-label="Primary">
         {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => `nav-item-global ${isActive ? 'active' : ''}`}
-            style={({ isActive }) => ({
-              padding: '6px 10px',
-              borderRadius: 8,
-              fontSize: 12.5,
-              fontWeight: isActive ? 600 : 500,
-              color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
-              background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
-              border: isActive
-                ? '1px solid var(--color-pt-accent-border)'
-                : '1px solid transparent',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            })}
-          >
-            <span>{item.label}</span>
-            {item.to === '/notes' && pendingCount > 0 && (
-              <span
-                aria-label={`${pendingCount} pending`}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  minWidth: 18,
-                  padding: '0 5px',
-                  borderRadius: 999,
-                  background: 'var(--color-pt-accent)',
-                  color: '#fff',
-                  lineHeight: '15px',
-                  textAlign: 'center',
-                }}
-              >
-                {pendingCount > 9 ? '9+' : pendingCount}
-              </span>
-            )}
-          </NavLink>
+          <NavItem key={item.to} item={item} variant="horizontal" pendingCount={pendingCount} />
         ))}
       </nav>
 
@@ -210,7 +211,7 @@ export function GlobalTopNav() {
       {/* Right cluster */}
       <div className="flex items-center" style={{ gap: 10 }}>
         <div className="global-search-input">
-          <GlobalSearch />
+          <PatientQuickSearch />
         </div>
         <VaultPill />
         <AlertsButton />
