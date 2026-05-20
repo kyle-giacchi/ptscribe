@@ -89,6 +89,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     failed: whisperFailed,
     retry: retryWhisperLoad,
   } = useWhisperLoading();
+  const [clipsOpen, setClipsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
@@ -322,7 +323,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   if (!session || !patient) return <NotFound />;
 
-  // ── Copy full note ────────────────────────────────────────────────────────
+  // ── Copy full note — wired into NoteToolbar in Task 6 ────────────────────
+  // @ts-expect-error -- temporarily unused until Task 6 wires this into NoteToolbar
   function handleCopyNote() {
     if (!note || !template) return;
     const md = renderNoteMarkdown(note, template, patient!);
@@ -466,9 +468,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         session={session}
         note={note}
         totalDurationSec={totalDurationSec}
+        clipsCount={sortedClips.length}
+        clipsOpen={clipsOpen}
+        onToggleClips={() => setClipsOpen((o) => !o)}
+        onRecord={() => setActiveTab('record')}
+        onUpload={(file) => { void handleUpload(file); }}
         missingRequiredLabels={missingRequiredLabels}
         pendingDeleteSession={pendingDeleteSession}
-        onCopyNote={handleCopyNote}
         onFinalize={handleFinalizeWrapped}
         onUnfinalize={handleUnfinalize}
       />
