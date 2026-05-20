@@ -225,27 +225,30 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
 
   // R2 miss — proxy from HuggingFace so the app works before model files are uploaded.
   const hfRes = await fetch(`https://huggingface.co/${key}`);
-  if (!hfRes.ok) return new Response('Not found', { status: 404 });
+  if (!hfRes.ok || !hfRes.body) return new Response('Not found', { status: 404 });
 
   const hfContentLength = Number(hfRes.headers.get('Content-Length') ?? 0);
   const HF_SIZE_LIMIT = 200 * 1024 * 1024; // 200 MB
   if (hfContentLength > HF_SIZE_LIMIT) return new Response('Not found', { status: 404 });
 
-  // Buffer the body so we can both return it and write it to R2.
-  const buffer = await hfRes.arrayBuffer();
   const contentType = hfRes.headers.get('Content-Type') ?? 'application/octet-stream';
+  const cacheControl = 'public, max-age=31536000, immutable';
 
-  // Write to R2 fire-and-forget so future requests are served from cache.
+  // Tee the body: one branch streams to the client, the other streams into R2.
+  // Avoids buffering ~100 MB ONNX weights in worker memory (128 MB isolate cap).
+  const [toClient, toR2] = hfRes.body.tee();
+
   ctx.waitUntil(
-    env.MODELS.put(key, buffer, {
-      httpMetadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+    env.MODELS.put(key, toR2, {
+      httpMetadata: { contentType, cacheControl },
     }),
   );
 
   const headers = new Headers();
   headers.set('Content-Type', contentType);
-  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-  return new Response(buffer, { status: 200, headers });
+  headers.set('Cache-Control', cacheControl);
+  if (hfContentLength) headers.set('Content-Length', String(hfContentLength));
+  return new Response(toClient, { status: 200, headers });
 }
 
 function isOriginAllowed(origin: string, requestUrl: string, env: Env): boolean {
