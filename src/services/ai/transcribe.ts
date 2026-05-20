@@ -7,6 +7,7 @@ export interface TranscribeArgs {
   model: string;
   signal?: AbortSignal;
   onProgress?: (msg: string) => void;
+  onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
 export interface TranscribeResult {
@@ -22,6 +23,7 @@ const backends: Record<TranscriptionProvider, Backend> = {
       model: args.model || '@cf/deepgram/nova-3',
       audio: args.blob,
       signal: args.signal,
+      onRetry: args.onRetry,
     });
     return { text: out.text, source: 'whisper' };
   },
