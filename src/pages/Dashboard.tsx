@@ -42,6 +42,15 @@ export function Dashboard() {
   const hasShownResume = useRef(false);
 
   useEffect(() => {
+    if (!sidebarOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
     if (hasShownResume.current || sessions.length === 0) return;
     const candidate = sessions
       .filter((s) => s.status !== 'finalized' && s.clips.length > 0)
@@ -316,6 +325,9 @@ export function Dashboard() {
               aria-hidden
             />
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation menu"
               className="absolute inset-y-0 left-0"
               style={{ width: 220, paddingLeft: 'env(safe-area-inset-left)' }}
               initial={{ x: -220 }}
