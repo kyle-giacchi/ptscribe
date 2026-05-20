@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Upload } from 'lucide-react';
+import { useDismissable } from '@/hooks/useDismissable';
+import { AudioFileInput, type AudioFileInputHandle } from '@/components/common/AudioFileInput';
 
 interface AddClipButtonProps {
   onRecord: () => void;
@@ -9,21 +11,19 @@ interface AddClipButtonProps {
 export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<AudioFileInputHandle>(null);
   const chevronRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const close = useCallback(() => {
+    setOpen(false);
+    chevronRef.current?.focus();
+  }, []);
+  useDismissable({ open, onClose: close, ref });
+
   useEffect(() => {
     if (!open) return;
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        chevronRef.current?.focus();
-        return;
-      }
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         if (!menuRef.current) return;
         const items = Array.from(
@@ -40,20 +40,14 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
         next.focus();
       }
     }
-    document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown', onKey);
     const first = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
     first?.focus();
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) onUpload(f);
-    e.target.value = '';
+  function handleFilePick(f: File) {
+    onUpload(f);
     setOpen(false);
   }
 
@@ -138,7 +132,7 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
           <button
             type="button"
             role="menuitem"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => fileRef.current?.open()}
             className="flex w-full items-center gap-2"
             style={{
               padding: '8px 10px', borderRadius: 6,
@@ -149,13 +143,7 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
             <Upload size={13} strokeWidth={2} />
             Upload audio file
           </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="audio/*"
-            onChange={handleFile}
-            style={{ display: 'none' }}
-          />
+          <AudioFileInput ref={fileRef} onPick={handleFilePick} />
         </div>
       )}
     </div>

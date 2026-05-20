@@ -37,7 +37,10 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Transcription tier invariants (T2 never overwritten, T2/T3 clear editedTranscript) | [transcription.md](transcription.md#key-invariants)               |
 | Revert actions (Revert to Draft vs Revert edits)                          | [transcription.md](transcription.md#revert-actions)                        |
 | Admin page — tier coverage diagnostic (`/admin`, Terminal icon)           | [transcription.md](transcription.md#admin-page-admin)                      |
-| Session page panel components (`sessions/` sub-dir)                      | [architecture.md:6](architecture.md#layering)                              |
+| Session page panel components (`sessions/` sub-dir)                      | [architecture.md](architecture.md#layering)                                |
+| App chrome layers (GlobalTopNav, Sidebar scope, SessionTopBar)           | [architecture.md](architecture.md#shell-and-navigation)                    |
+| Responsive defaults (hamburger, transcript collapse, ClipsDrawer sheet) | [style-guide.md](style-guide.md#responsive-defaults)                     |
+| ClipsDrawer drawer (replaces legacy Clips tab; scrollToTimestamp jump)| [workflows.md](workflows.md#review-tab-merge)                              |
 | Inline confirmation pattern (no `window.confirm()`)                      | [invariants.md](invariants.md#destructive-actions-use-inline-confirmation) |
 | PII scrubbing model — R2-only ONNX, interceptor always active (dev + prod) | [invariants.md](invariants.md#pii-scrubbing-model--r2-only-onnx-interceptor-always-active) |
 | Boot sequence (load → migrate → safeParse → fallback)                    | [architecture.md:34](architecture.md#boot-sequence)                        |
@@ -60,6 +63,7 @@ Provider hierarchy, data flow, boot sequence, persistence (localStorage + Indexe
 | Section                   | Gist                                                                                                     |
 | ------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Layering                  | One-way dependency direction (`pages → hooks → contexts → services`).                                    |
+| Shell and navigation      | `AppShell` = `GlobalTopNav` + outlet. `Sidebar` lives on `/today` only. `SessionTopBar` owns per-session chrome. |
 | Data flow                 | Mutation chain with 300ms debounce. Audio takes a parallel path through `AudioRepository`.               |
 | Boot sequence             | `main.tsx` → `ErrorBoundary` → `AuthProvider` → `VaultGate` → `AppDataProvider` (load + migrate v15 + safeParse) → `IdleLockProvider` → first-run redirect. |
 | Units & coordinates       | Dates = ms timestamps; durations = minutes; IDs = UUID; transcripts/notes = strings.                     |
