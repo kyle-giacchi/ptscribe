@@ -6,9 +6,10 @@
 
 import type { ToneStyle } from '@/types';
 import { apiFetch } from '@/lib/apiClient';
+import { AiCallError, classifyResponse, type AiErrorKind } from '../errors';
 
 export interface AnthropicMessageArgs {
-  model: string; // e.g. 'claude-sonnet-4-6'
+  model: string;
   /** Raw template system prompt — WITHOUT the tone block. The Worker appends
    *  the tone block server-side from its static TONE_BLOCKS map so the exact
    *  string sent to Anthropic is always built from a constant, giving stable
@@ -23,22 +24,26 @@ export interface AnthropicMessageArgs {
   signal?: AbortSignal;
   /** Cache the system prompt? Defaults to true. Saves money on repeat templates. */
   cacheSystem?: boolean;
+  /** Called immediately before each backoff sleep. attempt is 1-based; max equals RETRY_DELAYS_MS.length. */
+  onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
 export interface AnthropicResult {
   text: string;
 }
 
-const RETRY_DELAYS_MS = [1_000, 3_000];
+const RETRY_DELAYS_MS = [5_000, 10_000, 25_000];
 const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
+const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
 export async function callAnthropic(args: AnthropicMessageArgs): Promise<AnthropicResult> {
-  let lastError: unknown;
+  let lastErrorKind: AiErrorKind = 'network';
+  let lastStatus: number | undefined;
+  let lastRaw: string | undefined;
 
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     if (args.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    // Tracks throws that should propagate immediately without retrying (non-transient errors).
-    let nonRetryable = false;
+
     try {
       const res = await apiFetch('/api/generate', {
         method: 'POST',
@@ -56,30 +61,78 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
       });
 
       if (!res.ok) {
-        if (!RETRYABLE_STATUSES.has(res.status) || attempt === RETRY_DELAYS_MS.length) {
-          nonRetryable = true;
-          const errBody = await safeReadText(res);
-          throw new Error(`Generate proxy failed (${res.status}): ${errBody || res.statusText}`);
+        const body = await safeReadText(res);
+        lastStatus = res.status;
+        lastRaw = body || res.statusText;
+
+        if (!RETRYABLE_STATUSES.has(res.status)) {
+          throw new AiCallError({
+            kind: classifyResponse(res, 'anthropic'),
+            provider: 'anthropic',
+            status: res.status,
+            attemptsMade: attempt,
+            rawDetail: lastRaw,
+            message: `Anthropic call failed (${res.status}): ${lastRaw}`,
+          });
         }
-        lastError = new Error(`Generate proxy failed (${res.status}): ${res.statusText}`);
-      } else {
-        const data = (await res.json()) as { text?: string; error?: string };
-        if (typeof data.text !== 'string' || data.text.length === 0) {
-          nonRetryable = true;
-          throw new Error(data.error || 'Generate proxy response had no text content');
+
+        lastErrorKind = 'network';
+        if (attempt === MAX_ATTEMPTS) {
+          throw new AiCallError({
+            kind: 'network',
+            provider: 'anthropic',
+            status: res.status,
+            attemptsMade: attempt,
+            rawDetail: lastRaw,
+            message: `Anthropic call failed after ${attempt} attempts (${res.status})`,
+          });
         }
-        return { text: data.text };
+        args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: String(res.status) });
+        await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
+        continue;
       }
+
+      const data = (await res.json()) as { text?: string; error?: string };
+      if (typeof data.text !== 'string' || data.text.length === 0) {
+        throw new AiCallError({
+          kind: 'empty',
+          provider: 'anthropic',
+          status: res.status,
+          attemptsMade: attempt,
+          rawDetail: data.error,
+          message: data.error || 'Anthropic returned no text content',
+        });
+      }
+      return { text: data.text };
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      if (nonRetryable || attempt === RETRY_DELAYS_MS.length) throw err;
-      lastError = err;
-    }
+      if (err instanceof AiCallError) throw err;
 
-    await sleep(RETRY_DELAYS_MS[attempt], args.signal);
+      lastRaw = err instanceof Error ? err.message : String(err);
+      lastErrorKind = 'network';
+      if (attempt === MAX_ATTEMPTS) {
+        throw new AiCallError({
+          kind: lastErrorKind,
+          provider: 'anthropic',
+          status: lastStatus,
+          attemptsMade: attempt,
+          rawDetail: lastRaw,
+          message: `Anthropic call failed after ${attempt} attempts: ${lastRaw}`,
+        });
+      }
+      args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: 'network' });
+      await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
+    }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('Generate proxy request failed');
+  throw new AiCallError({
+    kind: lastErrorKind,
+    provider: 'anthropic',
+    status: lastStatus,
+    attemptsMade: MAX_ATTEMPTS,
+    rawDetail: lastRaw,
+    message: 'Anthropic call failed',
+  });
 }
 
 async function safeReadText(res: Response): Promise<string> {
