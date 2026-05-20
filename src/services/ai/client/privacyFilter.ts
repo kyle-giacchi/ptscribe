@@ -29,6 +29,10 @@ function wireWorker(w: Worker): Worker {
         entry.onProgress?.(`Downloading model (${pct}%)`);
       } else if (msg.status === 'loading') {
         entry.onProgress?.('Loading model…');
+      } else if (msg.status === 'initiate') {
+        entry.onProgress?.('Preparing model…');
+      } else if (msg.status === 'ready') {
+        entry.onProgress?.('Running scan…');
       }
     } else if (msg.type === 'result') {
       _pending.delete(msg.id);

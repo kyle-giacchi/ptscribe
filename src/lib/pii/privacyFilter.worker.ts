@@ -37,11 +37,18 @@ async function openModelCacheDB(): Promise<IDBDatabase> {
 async function cacheGet(key: string): Promise<CacheEntry | null> {
   try {
     const db = await openModelCacheDB();
-    return await new Promise((resolve) => {
+    const entry = await new Promise<CacheEntry | null>((resolve) => {
       const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
       req.onsuccess = () => resolve((req.result as CacheEntry) ?? null);
       req.onerror = () => resolve(null);
     });
+    if (!entry) return null;
+    // Reject poisoned entries: HTML SPA-fallback bodies, or buffers too small
+    // to be the file they claim (heuristic: anything > 1 KB is plausibly real;
+    // tokenizer.json and onnx files are all >> 1 KB).
+    if (entry.contentType.startsWith('text/html')) return null;
+    if (entry.buffer.byteLength < 1024 && !key.endsWith('.json')) return null;
+    return entry;
   } catch {
     return null;
   }
@@ -161,6 +168,24 @@ function buildScrubbed(
 let currentPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
 let currentModel = '';
 
+const PIPELINE_LOAD_TIMEOUT_MS = 60_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(label)), ms);
+    p.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 self.onmessage = async (e: MessageEvent<InMsg>) => {
   const msg = e.data;
   const { id, model } = msg;
@@ -169,18 +194,22 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     if (!currentPipeline || currentModel !== model) {
       currentPipeline = null;
       currentModel = '';
-      currentPipeline = await pipeline('token-classification', model, {
-        dtype: 'q8',
-        session_options: { graphOptimizationLevel: 'basic' },
-        progress_callback: (p: {
-          status: string;
-          name?: string;
-          loaded?: number;
-          total?: number;
-        }) => {
-          post({ id, type: 'progress', ...p });
-        },
-      });
+      currentPipeline = await withTimeout(
+        pipeline('token-classification', model, {
+          dtype: 'q8',
+          session_options: { graphOptimizationLevel: 'basic' },
+          progress_callback: (p: {
+            status: string;
+            name?: string;
+            loaded?: number;
+            total?: number;
+          }) => {
+            post({ id, type: 'progress', ...p });
+          },
+        }),
+        PIPELINE_LOAD_TIMEOUT_MS,
+        'Privacy model load timed out — check network and try again',
+      );
       currentModel = model;
     }
 
