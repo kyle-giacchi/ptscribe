@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
-import { SessionActionsContext } from '@/contexts/SessionActionsContext';
+import { SessionResetContext } from '@/contexts/SessionResetContext';
 import { audioRepository } from '@/services/AudioRepository';
-import { Modal } from '@/components/ui/Modal';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAppData } from '@/contexts/AppDataProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
+import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import type { Session, SessionClip, NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
@@ -22,7 +22,7 @@ import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
 import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
-import { ClipsInspector } from '@/components/sessions/ClipsInspector';
+import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import type { TranscriptPanelHandle } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
@@ -37,6 +37,12 @@ import { DebugDrawer } from '@/components/sessions/DebugDrawer';
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
 import { DemoCompleteModal } from '@/components/common/DemoCompleteModal';
+import { RecordWarningBanner } from '@/components/sessions/RecordWarningBanner';
+import { ReviewEmptyState } from '@/components/sessions/ReviewEmptyState';
+import { TranscriptCollapsedTab } from '@/components/sessions/TranscriptCollapsedTab';
+import { ResetSessionModal } from '@/components/sessions/ResetSessionModal';
+import { UploadProcessingView } from '@/components/sessions/UploadProcessingView';
+import { ErrorBanner } from '@/components/common/ErrorBanner';
 
 type Busy = null | 'transcribing' | 'generating';
 
@@ -72,7 +78,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [recordingSkipped, setRecordingSkipped] = useState(quickMode);
-  const [pendingDeleteSession, setPendingDeleteSession] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'record' | 'review'>(quickMode ? 'review' : 'record');
@@ -91,9 +96,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     retry: retryWhisperLoad,
   } = useWhisperLoading();
   const transcriptRef = useRef<TranscriptPanelHandle>(null);
-  const [transcriptCollapsed, setTranscriptCollapsed] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth < 1024
-  );
+  const isNarrowViewport = useBelowBreakpoint(1024);
+  const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
   const [clipsOpen, setClipsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
@@ -182,8 +186,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleStopAndFinish,
     handleUploadAudio,
     handleDeleteClip,
-    handleRecordingComplete,
+    buildMergedAudioForReview,
   } = recording;
+
+  // Ref so effects can call the latest handler without re-firing when its
+  // identity changes each render.
+  const handleStartRecordingRef = useRef(handleStartRecording);
+  useEffect(() => {
+    handleStartRecordingRef.current = handleStartRecording;
+  });
 
   useAutoRotateClip(
     recorder.status,
@@ -231,12 +242,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (whisperDialogOpen && !whisperLoading && !whisperFailed && pendingStartRecording) {
       setWhisperDialogOpen(false);
       setPendingStartRecording(false);
-      void handleStartRecording();
+      void handleStartRecordingRef.current();
     }
-    // handleStartRecording is a function declaration that closes over fresh state
-    // each render — intentionally excluded from deps so we only fire on the
-    // load-state transition.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whisperDialogOpen, whisperLoading, whisperFailed, pendingStartRecording]);
 
   // ── Note/generation flow ─────────────────────────────────────────────────
@@ -252,7 +259,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setBusy,
     setTranscript,
     setActiveTab,
-    setPendingDeleteSession,
     checkActionGuard,
     recordAction,
   });
@@ -322,11 +328,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     const next = new URLSearchParams(searchParams);
     next.delete('autoRecord');
     setSearchParams(next, { replace: true });
-    void handleStartRecording();
-    // handleStartRecording intentionally omitted — it's a function declaration
-    // that closes over fresh state each render and we only want this effect to
-    // fire on the gating conditions, not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void handleStartRecordingRef.current();
   }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
 
   if (!session || !patient) return <NotFound />;
@@ -436,15 +438,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     const clip = session?.clips.find((c) => c.id === processingUploadClipId);
     if (!clip) return;
 
-    // T2 no longer runs per-clip — it fires after handleRecordingComplete builds
+    // T2 no longer runs per-clip — it fires after buildMergedAudioForReview builds
     // the combined blob. Treat 'ready' (audio saved) as "processing done" and call
-    // handleRecordingComplete to create the combined blob, kick off T2, and navigate.
+    // buildMergedAudioForReview to create the combined blob, kick off T2, and navigate.
     if (clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed') {
       const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
       const delay = Math.max(0, 2000 - elapsed);
       const t = setTimeout(() => {
         setProcessingUploadClipId(null);
-        void handleRecordingComplete();
+        void buildMergedAudioForReview();
       }, delay);
       return () => clearTimeout(t);
     }
@@ -452,7 +454,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }, [session?.clips, processingUploadClipId]);
 
   return (
-    <SessionActionsContext.Provider value={{ onResetSession: () => setResetModalOpen(true) }}>
+    <SessionResetContext.Provider value={{ onResetSession: () => setResetModalOpen(true) }}>
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
 
       {/* ── Error banner ──────────────────────────────────── */}
@@ -474,7 +476,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         onRecord={() => setActiveTab('record')}
         onUpload={(file) => { void handleUpload(file); }}
         missingRequiredLabels={missingRequiredLabels}
-        pendingDeleteSession={pendingDeleteSession}
         onFinalize={handleFinalizeWrapped}
         onUnfinalize={handleUnfinalize}
       />
@@ -506,63 +507,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               </div>
             )}
             {showRecordWarning && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 10,
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: '1px solid var(--color-caution)',
-                  background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
-                }}
-              >
-                <AlertTriangle
-                  size={15}
-                  strokeWidth={2}
-                  style={{ color: 'var(--color-caution)', flexShrink: 0, marginTop: 1 }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: 'var(--color-fg)',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Recording more will invalidate your generated note
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
-                    Any new clips will be added to your transcript, but your note was generated from
-                    the previous transcript. You&apos;ll need to re-run transcription and regenerate
-                    before the note reflects this recording.
-                  </div>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 4,
-                    flexShrink: 0,
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn btn-ghost py-1 text-xs"
-                    onClick={() => setActiveTab('review')}
-                  >
-                    Back to Review
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost py-1 text-xs"
-                    onClick={() => setRecordWarnDismissed(true)}
-                  >
-                    Keep recording
-                  </button>
-                </div>
-              </div>
+              <RecordWarningBanner
+                onBackToReview={() => setActiveTab('review')}
+                onDismiss={() => setRecordWarnDismissed(true)}
+              />
             )}
             {processingUploadClipId ? (
               <UploadProcessingView
@@ -590,27 +538,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         {/* ② Review tab */}
         {activeTab === 'review' &&
           (isTranscriptLocked ? (
-            <div
-              role="tabpanel"
-              id="panel-review"
-              aria-labelledby="tab-review"
-              style={{
-                padding: '44px 24px',
-                textAlign: 'center',
-                borderRadius: 12,
-                border: '1px dashed var(--color-pt-border)',
-                background: 'var(--color-pt-surface)',
-              }}
-            >
-              <div
-                style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-fg)', marginBottom: 6 }}
-              >
-                Nothing to review yet
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--color-fg-subtle)', lineHeight: 1.6 }}>
-                Record a clip or upload audio, then come back here.
-              </div>
-            </div>
+            <ReviewEmptyState />
           ) : (
             <div
               role="tabpanel"
@@ -697,23 +625,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               {/* ── Right: Transcript ── */}
               <div style={{ position: 'relative' }}>
                 {transcriptCollapsed ? (
-                  <button
-                    type="button"
-                    onClick={() => setTranscriptCollapsed(false)}
-                    aria-label="Expand transcript panel"
-                    style={{
-                      position: 'absolute', top: 0, right: 0,
-                      writingMode: 'vertical-rl',
-                      height: 120, padding: '12px 6px',
-                      border: '1px solid var(--color-pt-border)',
-                      borderRight: 'none', borderRadius: '8px 0 0 8px',
-                      background: 'var(--color-pt-surface)',
-                      color: 'var(--color-pt-text-2)', cursor: 'pointer',
-                      fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em',
-                    }}
-                  >
-                    Transcript
-                  </button>
+                  <TranscriptCollapsedTab onExpand={() => setTranscriptCollapsed(false)} />
                 ) : (
                   <>
                     <TranscriptPanel
@@ -764,14 +676,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   </>
                 )}
               </div>
-              <ClipsInspector
+              <ClipsDrawer
                 open={clipsOpen}
                 clips={sortedClips}
                 onClose={() => setClipsOpen(false)}
                 onJump={(t) => {
                   setClipsOpen(false);
                   if (transcriptCollapsed) setTranscriptCollapsed(false);
-                  setTimeout(() => transcriptRef.current?.scrollToTimestamp(t), 30);
+                  transcriptRef.current?.scrollToTimestamp(t);
                 }}
                 onDelete={handleDeleteClip}
                 onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
@@ -824,32 +736,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       )}
 
       {/* ── Reset session confirmation ────────────────────── */}
-      <Modal
+      <ResetSessionModal
         open={resetModalOpen}
         onClose={() => setResetModalOpen(false)}
-        title="Reset Session"
-        size="sm"
-      >
-        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-          This will permanently delete all recordings and transcriptions for this session,
-          including any generated note. The session will return to a fresh state.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button className="btn btn-ghost" onClick={() => setResetModalOpen(false)}>
-            Cancel
-          </button>
-          <button
-            className="btn"
-            style={{ background: 'var(--color-pt-danger, #dc2626)', color: '#fff', border: 'none' }}
-            onClick={() => void handleResetSession()}
-          >
-            <RotateCcw size={13} strokeWidth={2} />
-            Reset Session
-          </button>
-        </div>
-      </Modal>
+        onConfirm={() => void handleResetSession()}
+      />
     </div>
-    </SessionActionsContext.Provider>
+    </SessionResetContext.Provider>
   );
 }
 
@@ -875,81 +768,3 @@ function NotFound() {
   );
 }
 
-const PROCESSING_STEPS = [
-  { label: 'Reading audio file',               threshold: 0.00 },
-  { label: 'Sending to transcription service', threshold: 0.10 },
-  { label: 'Transcribing audio',               threshold: 0.25 },
-  { label: 'Finalizing transcript',            threshold: 0.88 },
-] as const;
-
-function UploadProcessingView({ durationSec }: { durationSec?: number }) {
-  // ~150ms per second of audio; realtime transcription is typically 5–10× faster than playback
-  const estimatedMs = Math.max(3000, (durationSec ?? 30) * 150);
-  const [progress, setProgress] = useState(0);
-  const rafRef = useRef<number>(0);
-
-  useEffect(() => {
-    const start = Date.now();
-    const cap = 0.95;
-
-    function tick() {
-      const t = Math.min(1, (Date.now() - start) / estimatedMs);
-      const eased = Math.min(cap, 1 - Math.pow(1 - t, 3)); // ease-out cubic
-      setProgress(eased);
-      if (eased < cap) rafRef.current = requestAnimationFrame(tick);
-    }
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [estimatedMs]);
-
-  const stepLabel =
-    [...PROCESSING_STEPS].reverse().find((s) => progress >= s.threshold)?.label ??
-    PROCESSING_STEPS[0].label;
-
-  return (
-    <div className="flex flex-col items-center gap-6 py-16 px-8">
-      <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text)' }}>
-        Processing audio
-      </span>
-      <div className="flex w-full flex-col items-center gap-2" style={{ maxWidth: 320 }}>
-        <div
-          className="w-full overflow-hidden rounded-full"
-          style={{ height: 6, background: 'var(--color-pt-border)' }}
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.round(progress * 100)}%`,
-              background: 'var(--color-pt-accent)',
-              transition: 'width 120ms linear',
-            }}
-          />
-        </div>
-        <span className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
-          {stepLabel}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss: () => void }) {
-  if (!message) return null;
-  return (
-    <div
-      className="flex items-start gap-2 rounded-lg border p-3 text-sm"
-      style={{
-        borderColor: 'var(--color-negative)',
-        background: 'var(--color-surface)',
-        color: 'var(--color-negative)',
-      }}
-    >
-      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-      <div className="flex-1">{message}</div>
-      <button type="button" className="text-xs" onClick={onDismiss}>
-        Dismiss
-      </button>
-    </div>
-  );
-}

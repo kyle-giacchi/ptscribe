@@ -87,7 +87,7 @@ interface Params {
   session: Session | undefined;
   patchSession: (patch: Partial<Session>) => void;
   setTranscript: (next: string) => void;
-  /** The silence-removed combined audio blob produced by handleRecordingComplete. */
+  /** The silence-removed combined audio blob produced by buildMergedAudioForReview. */
   silencedMergedBlob: Blob | null;
 }
 
@@ -118,7 +118,7 @@ export function useBackgroundTranscription({
   const [retryTick, setRetryTick] = useState(0);
 
   // Reset run-guards whenever the combined blob changes so T2 re-runs
-  // automatically after the user adds new clips and calls handleRecordingComplete.
+  // automatically after the user adds new clips and calls buildMergedAudioForReview.
   useEffect(() => {
     hasRunRef.current = false;
     retryCountRef.current = 0;
