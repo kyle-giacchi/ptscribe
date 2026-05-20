@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Mic, RotateCcw, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
@@ -22,8 +22,7 @@ import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
 import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
-import { ClipsList } from '@/components/sessions/ClipsList';
-import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
+import { ClipsInspector } from '@/components/sessions/ClipsInspector';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import type { TranscriptPanelHandle } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
@@ -76,7 +75,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [pendingDeleteSession, setPendingDeleteSession] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'record' | 'review' | 'clips'>(quickMode ? 'review' : 'record');
+  const [activeTab, setActiveTab] = useState<'record' | 'review'>(quickMode ? 'review' : 'record');
   // Once dismissed per session, the re-record warning does not resurface.
   const [recordWarnDismissed, setRecordWarnDismissed] = useState(false);
 
@@ -140,11 +139,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setBusy,
   });
   const {
-    mergedAudioBlob,
     setMergedAudioBlob,
-    silencedMergedBlob,
     setSilencedMergedBlob,
-    isMerging,
     setIsMerging,
     debugStats,
     generateUsed,
@@ -621,6 +617,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               id="panel-review"
               aria-labelledby="tab-review"
               style={{
+                position: 'relative',
                 display: 'grid',
                 gridTemplateColumns: transcriptCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
                 gap: 24,
@@ -767,69 +764,23 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   </>
                 )}
               </div>
+              <ClipsInspector
+                open={clipsOpen}
+                clips={sortedClips}
+                onClose={() => setClipsOpen(false)}
+                onJump={(t) => {
+                  setClipsOpen(false);
+                  if (transcriptCollapsed) setTranscriptCollapsed(false);
+                  setTimeout(() => transcriptRef.current?.scrollToTimestamp(t), 30);
+                }}
+                onDelete={handleDeleteClip}
+                onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
+                onUpload={(file) => { setClipsOpen(false); void handleUpload(file); }}
+              />
             </div>
           ))}
 
-        {/* ③ Clips tab */}
-        {activeTab === 'clips' && (
-          <div role="tabpanel" id="panel-clips" aria-labelledby="tab-clips" style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setActiveTab('record')}
-                style={{ minHeight: 44, touchAction: 'manipulation' }}
-              >
-                <Mic size={14} strokeWidth={2} /> Add clip
-              </button>
-              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation', position: 'relative' }}>
-                <Upload size={14} strokeWidth={2} /> Upload audio
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) { void handleUploadAudio(file); e.target.value = ''; }
-                  }}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-                />
-              </label>
-              <div style={{ flex: 1 }} />
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setActiveTab('review')}
-                style={{ minHeight: 44, touchAction: 'manipulation' }}
-              >
-                <ArrowLeft size={14} strokeWidth={2} /> Return to Notes
-              </button>
-            </div>
-            <ClipsList clips={sortedClips} recordingDisabled={isRecording} onDeleteClip={handleDeleteClip} />
-            {sortedClips.length > 0 && (
-              <div className="flex justify-end pt-1">
-                <button
-                  type="button"
-                  className="btn btn-primary w-full sm:w-auto"
-                  disabled={isMerging || isRecording}
-                  onClick={() => { void handleRecordingComplete(); setActiveTab('review'); }}
-                  style={{ minHeight: 44, touchAction: 'manipulation' }}
-                >
-                  {isMerging ? (
-                    <><Loader2 size={15} className="animate-spin" /> Combining clips…</>
-                  ) : (
-                    <><CheckCircle2 size={15} strokeWidth={2} /> Generate Notes</>
-                  )}
-                </button>
-              </div>
-            )}
-            {mergedAudioBlob && (
-              <AudioPreviewSection
-                mergedAudioBlob={mergedAudioBlob}
-                silencedMergedBlob={silencedMergedBlob}
-              />
-            )}
-          </div>
-        )}
+
       </div>
 
       {/* ── PHI confirmation before sending transcript to Anthropic ── */}

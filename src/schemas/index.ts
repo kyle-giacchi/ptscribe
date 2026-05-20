@@ -61,6 +61,7 @@ const SessionClipSchema = z.object({
   t3Transcript: z.string().optional(),
   transcriptChunks: z.array(TranscriptChunkSchema).optional(),
   transcriptedAt: z.number().int().optional(),
+  startOffsetSec: z.number().min(0).optional(),
   errorMessage: z.string().optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
