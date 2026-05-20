@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { generateNote } from '@/services/ai/generate';
+import { AiCallError as AiCallErrorClass, friendlyAiError } from '@/services/ai/errors';
 import { newId } from '@/utils/ids';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -50,6 +51,9 @@ export interface UseGenerationFlowResult {
   handleCopyNoteMarkdown: (markdown: string) => void;
   missingRequiredLabels: string[];
   lastRawPayload: string | null;
+  aiError: AiCallErrorClass | null;
+  retryStatus: { provider: 'anthropic' | 'nova'; attempt: number; max: number } | null;
+  clearAiError: () => void;
 }
 
 /**
@@ -82,6 +86,10 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
 
   const isGeneratingRef = useRef(false);
   const [lastRawPayload, setLastRawPayload] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<AiCallErrorClass | null>(null);
+  const [retryStatus, setRetryStatus] = useState<
+    { provider: 'anthropic' | 'nova'; attempt: number; max: number } | null
+  >(null);
 
   function ensureNote(initialSections?: NoteSection[]): Note {
     if (note) return note;
@@ -128,6 +136,8 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
       }
 
       setError(null);
+      setAiError(null);
+      setRetryStatus(null);
       setBusy('generating');
       patchSession({ status: 'generating' });
       const controller = new AbortController();
@@ -143,8 +153,11 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
           toneStyle: settings.orgPolicy.toneStyle,
           activeTranscriptTier: session!.activeTranscriptTier,
           signal: controller.signal,
+          onRetry: (info) =>
+            setRetryStatus({ provider: 'anthropic', attempt: info.attempt, max: info.max }),
         });
         setLastRawPayload(result.rawText);
+        setRetryStatus(null);
         if (note) {
           updateNote(note.id, {
             sections: result.sections,
@@ -165,7 +178,13 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
           );
         }
       } catch (e) {
-        setError((e as Error).message);
+        setRetryStatus(null);
+        if (e instanceof AiCallErrorClass) {
+          setAiError(e);
+          toast.error(friendlyAiError(e).title);
+        } else {
+          setError((e as Error).message);
+        }
         patchSession({ status: 'draft' });
       } finally {
         clearTimeout(abortTimer);
@@ -265,6 +284,9 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
     handleCopyNoteMarkdown,
     missingRequiredLabels,
     lastRawPayload,
+    aiError,
+    retryStatus,
+    clearAiError: () => setAiError(null),
   };
 }
 
