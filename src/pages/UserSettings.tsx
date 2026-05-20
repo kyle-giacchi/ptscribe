@@ -222,6 +222,7 @@ export function UserSettings() {
   const tierStyle = TIER_STYLE[tier];
   const webSpeechEnabled = settings.session.webSpeechEnabled;
   const piiModel = settings.session.piiModel ?? 'openai/privacy-filter';
+  const phiConfirmDismissed = settings.session.phiConfirmDismissed;
 
   return (
     <div
@@ -307,6 +308,31 @@ export function UserSettings() {
             onClick={() => updateSession({ webSpeechEnabled: true })}
             title="Google Web Speech"
             description="Uses your browser's built-in speech recognition for word-by-word captions. Requires an internet connection; accuracy varies by browser."
+          />
+        </div>
+      </div>
+
+      {/* Notes & Templates Settings */}
+      <div>
+        <SectionHeading>Notes &amp; Templates Settings</SectionHeading>
+        <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>Confirm before sending to Anthropic</p>
+          <p style={DESC_STYLE}>
+            Generating a clinical note sends your transcript off of your device to Anthropic. When
+            on, a confirmation prompt warns you each time so you can verify there is no PHI in the
+            transcript first.
+          </p>
+          <RadioCard
+            selected={!phiConfirmDismissed}
+            onClick={() => updateSession({ phiConfirmDismissed: false })}
+            title="On (recommended)"
+            description="Show a confirmation each time you tap Generate or Regenerate."
+          />
+          <RadioCard
+            selected={phiConfirmDismissed}
+            onClick={() => updateSession({ phiConfirmDismissed: true })}
+            title="Off"
+            description="Skip the confirmation. Generate will send the transcript immediately."
           />
         </div>
       </div>
