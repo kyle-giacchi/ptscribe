@@ -163,7 +163,7 @@ function IdleRecordingCard({
   capabilities?: DeviceCapabilities;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const whisperLoading = useWhisperLoading();
+  const { loading: whisperLoading } = useWhisperLoading();
   const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
   const hasStatusMessage = uploadStatus.phase !== 'idle';
 
