@@ -31,6 +31,7 @@ export interface GenerateNoteArgs {
   toneStyle?: ToneStyle;
   activeTranscriptTier?: TranscriptTier;
   signal?: AbortSignal;
+  onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
 export interface GenerateNoteResult {
@@ -65,6 +66,7 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       toneStyle: args.toneStyle,
       user: userPrompt,
       signal: args.signal,
+      onRetry: args.onRetry,
     });
 
     const parsed = extractJson(result.text);
