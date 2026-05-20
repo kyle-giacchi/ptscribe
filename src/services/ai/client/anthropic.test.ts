@@ -62,15 +62,17 @@ describe('callAnthropic — success and non-retryable errors', () => {
     expect(body.maxTokens).toBe(1024);
   });
 
-  it('throws when the response text field is an empty string', async () => {
+  it('throws AiCallError with kind=empty when the response text field is an empty string', async () => {
     mockApiFetch.mockResolvedValueOnce(jsonResponse(200, { text: '' }));
 
-    await expect(callAnthropic(baseArgs)).rejects.toThrow(
-      'Generate proxy response had no text content',
-    );
+    await expect(callAnthropic(baseArgs)).rejects.toMatchObject({
+      name: 'AiCallError',
+      kind: 'empty',
+      provider: 'anthropic',
+    });
   });
 
-  it('throws with the upstream error message when text is absent', async () => {
+  it('uses the upstream error message when text is absent', async () => {
     mockApiFetch.mockResolvedValueOnce(jsonResponse(200, { error: 'upstream problem' }));
 
     await expect(callAnthropic(baseArgs)).rejects.toThrow('upstream problem');
@@ -79,7 +81,12 @@ describe('callAnthropic — success and non-retryable errors', () => {
   it('throws immediately on a non-retryable 400 without retrying', async () => {
     mockApiFetch.mockResolvedValueOnce(textResponse(400, 'Bad Request'));
 
-    await expect(callAnthropic(baseArgs)).rejects.toThrow('Generate proxy failed (400)');
+    await expect(callAnthropic(baseArgs)).rejects.toMatchObject({
+      name: 'AiCallError',
+      provider: 'anthropic',
+      status: 400,
+      attemptsMade: 1,
+    });
     expect(mockApiFetch).toHaveBeenCalledTimes(1);
   });
 
@@ -95,7 +102,6 @@ describe('callAnthropic — success and non-retryable errors', () => {
 });
 
 describe('callAnthropic — retry logic', () => {
-  // Fake timers are scoped here so they do not interfere with Response.text() in non-retry tests.
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -115,26 +121,42 @@ describe('callAnthropic — retry logic', () => {
     expect(mockApiFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('throws immediately on 429 without retrying', async () => {
+  it('throws AiCallError with kind=rate_limit on 429 without retrying', async () => {
     mockApiFetch.mockResolvedValueOnce(textResponse(429, 'Rate Limited'));
 
-    await expect(callAnthropic(baseArgs)).rejects.toThrow('Generate proxy failed (429)');
+    await expect(callAnthropic(baseArgs)).rejects.toMatchObject({
+      name: 'AiCallError',
+      kind: 'rate_limit',
+      provider: 'anthropic',
+      status: 429,
+      attemptsMade: 1,
+    });
     expect(mockApiFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('throws after all retries are exhausted', async () => {
-    mockApiFetch
-      .mockResolvedValueOnce(textResponse(503, ''))
-      .mockResolvedValueOnce(textResponse(503, ''))
-      .mockResolvedValueOnce(textResponse(503, 'final failure'));
+  it('throws AiCallError with kind=auth on 401', async () => {
+    mockApiFetch.mockResolvedValueOnce(textResponse(401, 'unauthorized'));
+
+    await expect(callAnthropic(baseArgs)).rejects.toMatchObject({
+      kind: 'auth',
+      status: 401,
+    });
+  });
+
+  it('throws after all retries are exhausted with kind=network and attemptsMade=4', async () => {
+    mockApiFetch.mockResolvedValue(textResponse(503, 'final failure'));
 
     const resultPromise = callAnthropic(baseArgs);
-    // Suppress unhandled rejection — expect() below is the real assertion.
     void resultPromise.catch(() => {});
     await vi.runAllTimersAsync();
 
-    await expect(resultPromise).rejects.toThrow('Generate proxy failed (503)');
-    expect(mockApiFetch).toHaveBeenCalledTimes(3);
+    await expect(resultPromise).rejects.toMatchObject({
+      name: 'AiCallError',
+      kind: 'network',
+      provider: 'anthropic',
+      attemptsMade: 4,
+    });
+    expect(mockApiFetch).toHaveBeenCalledTimes(4);
   });
 
   it('retries on a network error and succeeds on the next attempt', async () => {
@@ -154,11 +176,36 @@ describe('callAnthropic — retry logic', () => {
     mockApiFetch.mockResolvedValueOnce(textResponse(503, 'Service Unavailable'));
 
     const resultPromise = callAnthropic({ ...baseArgs, signal: controller.signal });
-    // Suppress unhandled rejection — expect() below is the real assertion.
     void resultPromise.catch(() => {});
     controller.abort();
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('calls onRetry before each backoff sleep with 1-based attempt numbers', async () => {
+    mockApiFetch.mockResolvedValue(textResponse(503, 'down'));
+    const onRetry = vi.fn();
+    const p = callAnthropic({ ...baseArgs, onRetry });
+    void p.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(p).rejects.toMatchObject({ kind: 'network', attemptsMade: 4 });
+    expect(onRetry).toHaveBeenCalledTimes(3);
+    expect(onRetry).toHaveBeenNthCalledWith(1, { attempt: 1, max: 3, reason: '503' });
+    expect(onRetry).toHaveBeenNthCalledWith(2, { attempt: 2, max: 3, reason: '503' });
+    expect(onRetry).toHaveBeenNthCalledWith(3, { attempt: 3, max: 3, reason: '503' });
+  });
+
+  it('calls onRetry with reason="network" on TypeError fetch failures', async () => {
+    mockApiFetch.mockRejectedValue(new TypeError('Failed to fetch'));
+    const onRetry = vi.fn();
+    const p = callAnthropic({ ...baseArgs, onRetry });
+    void p.catch(() => {});
+    await vi.runAllTimersAsync();
+
+    await expect(p).rejects.toMatchObject({ kind: 'network', attemptsMade: 4 });
+    expect(onRetry).toHaveBeenCalledTimes(3);
+    expect(onRetry).toHaveBeenNthCalledWith(1, { attempt: 1, max: 3, reason: 'network' });
   });
 });
