@@ -20,12 +20,13 @@ import {
 } from 'lucide-react';
 import { SurfaceCard, Eyebrow } from '@/components/design';
 import { BlobWaveform } from '@/components/audio/BlobWaveform';
-import { ClipsList } from '@/components/sessions/ClipsList';
+import { ClipsListOld } from '@/components/sessions/ClipsListOld';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useAudioProcessing } from '@/hooks/useAudioProcessing';
 import { audioRepository } from '@/services/AudioRepository';
+import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { vault } from '@/lib/vault/vault';
 import type { Patient, Session } from '@/types';
@@ -538,13 +539,11 @@ function FeaturesCard() {
   );
 }
 
-// ─── Per-clip audio player ────────────────────────────────────────────────────
+// ─── Per-clip raw audio player ────────────────────────────────────────────────
 
 function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob }) {
-  const { activeSilenced, compilingSilence } = useAudioProcessing(blob);
-
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1.5">
       <div
         style={{
           fontSize: 10,
@@ -556,22 +555,34 @@ function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob })
       >
         Clip {clipIndex + 1}
       </div>
+      <BlobWaveform blob={blob} />
+    </div>
+  );
+}
 
-      {/* Full */}
+// ─── Session-level merged audio (T2 / T3 source) ──────────────────────────────
+
+function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
+  const { activeSilenced, compilingSilence } = useAudioProcessing(mergedBlob);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Merged full */}
       <div>
         <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)', marginBottom: 4 }}>
-          Full Audio Clip
+          Merged Full Audio
         </div>
-        <BlobWaveform blob={blob} />
+        <BlobWaveform blob={mergedBlob} />
       </div>
 
-      {/* Silenced */}
+      {/* Merged silenced — canonical T2 / T3 source */}
       <div>
         <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
           <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
-            Silenced Audio Clip
+            Merged Silenced
           </span>
-          {activeSilenced && (
+          <span style={{ fontSize: 9.5, color: '#0ea5e9' }}>T2 / T3 source</span>
+          {activeSilenced && activeSilenced.savedSec > 0 && (
             <span style={{ fontSize: 9.5, fontWeight: 600, color: '#10b981' }}>
               −{activeSilenced.savedSec.toFixed(1)}s saved
             </span>
@@ -585,7 +596,6 @@ function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob })
           <BlobWaveform blob={activeSilenced.blob} />
         ) : null}
       </div>
-
     </div>
   );
 }
@@ -594,6 +604,7 @@ function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob })
 
 function SessionAudioSection({ session }: { session: Session }) {
   const [clipBlobs, setClipBlobs] = useState<Map<string, Blob>>(new Map());
+  const [mergedBlob, setMergedBlob] = useState<Blob | null>(null);
   const [loading, setLoading] = useState(true);
   const vaultUnlocked = vault.isUnlocked();
 
@@ -604,8 +615,9 @@ function SessionAudioSection({ session }: { session: Session }) {
     }
     setLoading(true);
     async function load() {
+      const sorted = [...session.clips].sort((a, b) => a.index - b.index);
       const entries = await Promise.all(
-        session.clips.map(async (c) => {
+        sorted.map(async (c) => {
           const blob = await audioRepository.load(c.id);
           return [c.id, blob] as [string, Blob | null];
         }),
@@ -615,6 +627,15 @@ function SessionAudioSection({ session }: { session: Session }) {
         if (blob) map.set(id, blob);
       }
       setClipBlobs(map);
+
+      const blobs = sorted.map((c) => map.get(c.id)).filter((b): b is Blob => Boolean(b));
+      if (blobs.length > 0) {
+        try {
+          setMergedBlob(await mergeAudioBlobs(blobs));
+        } catch {
+          // merge failure — merged section simply won't render
+        }
+      }
       setLoading(false);
     }
     void load();
@@ -649,9 +670,28 @@ function SessionAudioSection({ session }: { session: Session }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {clipsWithBlobs.map((clip) => (
-        <ClipAudioPlayer key={clip.id} clipIndex={clip.index} blob={clipBlobs.get(clip.id)!} />
-      ))}
+      {/* Per-clip raw audio — only when there are multiple clips */}
+      {clipsWithBlobs.length > 1 && (
+        <div className="flex flex-col gap-3">
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: 'var(--color-pt-text-3)',
+            }}
+          >
+            Individual Clips
+          </div>
+          {clipsWithBlobs.map((clip) => (
+            <ClipAudioPlayer key={clip.id} clipIndex={clip.index} blob={clipBlobs.get(clip.id)!} />
+          ))}
+        </div>
+      )}
+
+      {/* Session-level merged audio (T2 / T3 canonical source) */}
+      {mergedBlob && <SessionMergedAudio mergedBlob={mergedBlob} />}
     </div>
   );
 }
@@ -929,7 +969,6 @@ function AudioClipsAccordion({ session }: { session: Session }) {
   const [open, setOpen] = useState(false);
   const { settings } = useSettings();
   const sd = settings.audio.silenceDetection;
-  const su = settings.audio.speedUp;
   const sortedClips = useMemo(
     () => [...session.clips].sort((a, b) => a.index - b.index),
     [session.clips],
@@ -976,13 +1015,8 @@ function AudioClipsAccordion({ session }: { session: Session }) {
               value={sd.enabled ? `ON · ${sd.sensitivity} · ${sd.padMs}ms pad` : 'OFF'}
               ok={sd.enabled}
             />
-            <SettingChip
-              label="Speed-up"
-              value={su.enabled ? `ON · ${su.speed}×` : 'OFF'}
-              ok={su.enabled}
-            />
           </div>
-          <ClipsList clips={sortedClips} />
+          <ClipsListOld clips={sortedClips} />
           {session.clips.length > 0 && (
             <div className="mt-4">
               <SessionAudioSection session={session} />

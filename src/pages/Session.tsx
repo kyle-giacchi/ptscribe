@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Mic, RotateCcw, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
@@ -14,7 +14,6 @@ import { useAppData } from '@/contexts/AppDataProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
-import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import type { Session, SessionClip, NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
@@ -23,10 +22,17 @@ import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
 import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
-import { ClipsList } from '@/components/sessions/ClipsList';
-import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
+import { ClipsInspector } from '@/components/sessions/ClipsInspector';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
+import type { TranscriptPanelHandle } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
+import { NoteToolbar } from '@/components/sessions/NoteToolbar';
+import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
+import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
+import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
+import { AiCallError } from '@/components/ai/AiCallError';
+import { AiCallRetryStatus } from '@/components/ai/AiCallRetryStatus';
+import { useWhisperLoading } from '@/hooks/useWhisperLoading';
 import { DebugDrawer } from '@/components/sessions/DebugDrawer';
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
@@ -44,7 +50,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getPatient, updatePatient } = usePatients();
   const { forSession, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
-  const { settings } = useSettings();
+  const { settings, updateSession } = useSettings();
   const { updateSessionsSlice } = useAppData();
 
   const session = getSession(sessionId);
@@ -69,9 +75,26 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [pendingDeleteSession, setPendingDeleteSession] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'record' | 'review' | 'clips'>(quickMode ? 'review' : 'record');
+  const [activeTab, setActiveTab] = useState<'record' | 'review'>(quickMode ? 'review' : 'record');
   // Once dismissed per session, the re-record warning does not resurface.
   const [recordWarnDismissed, setRecordWarnDismissed] = useState(false);
+
+  // ── Whisper recovery: session-scoped transcription provider override ─────
+  const [transcriptionProviderOverride, setTranscriptionProviderOverride] = useState<
+    'webspeech' | 'none' | null
+  >(null);
+  const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
+  const [pendingStartRecording, setPendingStartRecording] = useState(false);
+  const {
+    loading: whisperLoading,
+    failed: whisperFailed,
+    retry: retryWhisperLoad,
+  } = useWhisperLoading();
+  const transcriptRef = useRef<TranscriptPanelHandle>(null);
+  const [transcriptCollapsed, setTranscriptCollapsed] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 1024
+  );
+  const [clipsOpen, setClipsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
@@ -116,11 +139,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setBusy,
   });
   const {
-    mergedAudioBlob,
     setMergedAudioBlob,
-    silencedMergedBlob,
     setSilencedMergedBlob,
-    isMerging,
     setIsMerging,
     debugStats,
     generateUsed,
@@ -128,6 +148,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction,
     handleCreateTranscript,
     handleRevertToLocal,
+    aiError: transcribeAiError,
+    retryStatus: transcribeRetryStatus,
+    clearAiError: clearTranscribeAiError,
   } = transcription;
 
   // ── Recording flow ───────────────────────────────────────────────────────
@@ -136,6 +159,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recorder,
     webSpeech,
     webSpeechEnabled: settings.session.webSpeechEnabled,
+    transcriptionProviderOverride,
     sortedClips,
     patchSession,
     patchClips,
@@ -168,6 +192,53 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleStartRecording,
   );
 
+  // ── Whisper recovery: gate Start Recording behind dialog when preload failed ──
+  function handleStartRecordingWithGate() {
+    const provider = transcriptionProviderOverride ?? settings.ai.transcription.provider;
+    if (provider === 'local' && whisperFailed) {
+      setPendingStartRecording(true);
+      setWhisperDialogOpen(true);
+      return;
+    }
+    void handleStartRecording();
+  }
+
+  function handleUseWebSpeech() {
+    setTranscriptionProviderOverride('webspeech');
+    setWhisperDialogOpen(false);
+    if (pendingStartRecording) {
+      setPendingStartRecording(false);
+      void handleStartRecording();
+    }
+  }
+
+  function handleRecordWithoutTranscription() {
+    setTranscriptionProviderOverride('none');
+    setWhisperDialogOpen(false);
+    if (pendingStartRecording) {
+      setPendingStartRecording(false);
+      void handleStartRecording();
+    }
+  }
+
+  function handleCancelWhisperDialog() {
+    setWhisperDialogOpen(false);
+    setPendingStartRecording(false);
+  }
+
+  // Auto-close + proceed when the user's retry succeeds while the dialog is open.
+  useEffect(() => {
+    if (whisperDialogOpen && !whisperLoading && !whisperFailed && pendingStartRecording) {
+      setWhisperDialogOpen(false);
+      setPendingStartRecording(false);
+      void handleStartRecording();
+    }
+    // handleStartRecording is a function declaration that closes over fresh state
+    // each render — intentionally excluded from deps so we only fire on the
+    // load-state transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whisperDialogOpen, whisperLoading, whisperFailed, pendingStartRecording]);
+
   // ── Note/generation flow ─────────────────────────────────────────────────
   const generation = useGenerationFlow({
     session,
@@ -186,7 +257,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction,
   });
   const {
-    handleGenerate,
+    handleGenerate: handleGenerateRaw,
     handleSectionChange,
     handleReplaceSections,
     handleFinalize,
@@ -194,7 +265,33 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleCopyNoteMarkdown,
     missingRequiredLabels,
     lastRawPayload,
+    aiError: generationAiError,
+    retryStatus: generationRetryStatus,
+    clearAiError: clearGenerationAiError,
   } = generation;
+
+  // ── PHI confirmation gate before generation ─────────────────────────────
+  // Always shown (regardless of PII filter state) unless user has dismissed it
+  // via the "Don't show this again" checkbox.
+  const [phiConfirmOpen, setPhiConfirmOpen] = useState(false);
+  function handleGenerate() {
+    if (settings.session.phiConfirmDismissed) {
+      handleGenerateRaw();
+    } else {
+      setPhiConfirmOpen(true);
+    }
+  }
+  function handlePhiConfirm(dontShowAgain: boolean) {
+    setPhiConfirmOpen(false);
+    if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
+    handleGenerateRaw();
+  }
+
+  function handleCopyNote() {
+    if (!note || !template) return;
+    const md = renderNoteMarkdown(note, template, patient!);
+    handleCopyNoteMarkdown(md);
+  }
 
   const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
 
@@ -233,13 +330,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
 
   if (!session || !patient) return <NotFound />;
-
-  // ── Copy full note ────────────────────────────────────────────────────────
-  function handleCopyNote() {
-    if (!note || !template) return;
-    const md = renderNoteMarkdown(note, template, patient!);
-    handleCopyNoteMarkdown(md);
-  }
 
   function handleCopyTranscript() {
     navigator.clipboard.writeText(effectiveTranscript).then(
@@ -378,9 +468,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         session={session}
         note={note}
         totalDurationSec={totalDurationSec}
+        clipsCount={sortedClips.length}
+        clipsOpen={clipsOpen}
+        onToggleClips={() => setClipsOpen((o) => !o)}
+        onRecord={() => setActiveTab('record')}
+        onUpload={(file) => { void handleUpload(file); }}
         missingRequiredLabels={missingRequiredLabels}
         pendingDeleteSession={pendingDeleteSession}
-        onCopyNote={handleCopyNote}
         onFinalize={handleFinalizeWrapped}
         onUnfinalize={handleUnfinalize}
       />
@@ -481,7 +575,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 clips={sortedClips}
                 whisperBubbles={whisperBubbles}
                 uploadStatus={uploadStatus}
-                onStart={handleStartRecording}
+                onStart={handleStartRecordingWithGate}
                 onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
                 onPauseResume={handlePauseResume}
                 onUpload={handleUpload}
@@ -523,8 +617,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               id="panel-review"
               aria-labelledby="tab-review"
               style={{
+                position: 'relative',
                 display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                gridTemplateColumns: transcriptCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
                 gap: 24,
                 alignItems: 'start',
               }}
@@ -547,117 +642,163 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     Quick note mode — type your note directly in the sections below.
                   </div>
                 )}
+                {/* Title row */}
+                <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+                  <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-pt-text)', margin: 0 }}>
+                    Clinical note
+                  </h1>
+                  {note && (
+                    <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                      {busy === 'generating'
+                        ? 'Generating…'
+                        : `last generated ${relativeTime(note.updatedAt)}`}
+                    </span>
+                  )}
+                </div>
+
+                <NoteToolbar
+                  template={template}
+                  templates={templates}
+                  hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
+                  canGenerate={canGenerate}
+                  isGenerating={busy === 'generating'}
+                  noteExists={!!note}
+                  onTemplateChange={handleTemplateChange}
+                  onManageTemplates={() => setManageTemplatesOpen(true)}
+                  onGenerate={handleGenerate}
+                  onCopyNote={handleCopyNote}
+                />
+
                 <NotePanel
                   patient={patient}
                   note={note}
                   template={template}
-                  templates={templates}
-                  transcript={transcript}
-                  totalDurationSec={totalDurationSec}
-                  busy={busy}
-                  canGenerate={canGenerate}
                   onSectionChange={handleSectionChange}
-                  onTemplateChange={handleTemplateChange}
-                  onManageTemplates={() => setManageTemplatesOpen(true)}
-                  onGenerate={handleGenerate}
                 />
+                {generationRetryStatus ? (
+                  <div style={{ marginTop: 8 }}>
+                    <AiCallRetryStatus {...generationRetryStatus} />
+                  </div>
+                ) : null}
+                {generationAiError ? (
+                  <div style={{ marginTop: 8 }}>
+                    <AiCallError
+                      error={generationAiError}
+                      onRetry={() => {
+                        clearGenerationAiError();
+                        void handleGenerateRaw();
+                      }}
+                      onDismiss={clearGenerationAiError}
+                    />
+                  </div>
+                ) : null}
               </div>
 
               {/* ── Right: Transcript ── */}
-              <div>
-                <TranscriptPanel
-                  transcript={effectiveTranscript}
-                  clips={sortedClips}
-                  transcribing={busy === 'transcribing'}
-                  hasUserEdits={hasUserEdits}
-                  hasT2Transcript={hasT2Transcript}
-                  totalDurationSec={totalDurationSec}
-                  onChange={setEditedTranscript}
-                  onCommit={() => {
-                    if (editedTranscript.trim()) {
-                      patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
-                    } else if (session.editedTranscript) {
-                      patchSession({ editedTranscript: undefined });
-                    }
-                  }}
-                  onCreateTranscript={handleCreateTranscript}
-                  onRevertToLocal={handleRevertToLocal}
-                  onAddRecording={() => setActiveTab('record')}
-                  onViewRecordings={() => setActiveTab('clips')}
-                  clipsCount={sortedClips.length}
-                  onCopyTranscript={handleCopyTranscript}
-                  onScrubPII={scrubPIIFn}
-                  onApplyScrub={handleApplyScrub}
-                  piiScrubbing={piiScrubbing}
-                  piiProgress={scrubProgress}
-                  hasEditedTranscript={hasUserEdits}
-                  onRevertEdits={handleRevertEdits}
-                />
+              <div style={{ position: 'relative' }}>
+                {transcriptCollapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => setTranscriptCollapsed(false)}
+                    aria-label="Expand transcript panel"
+                    style={{
+                      position: 'absolute', top: 0, right: 0,
+                      writingMode: 'vertical-rl',
+                      height: 120, padding: '12px 6px',
+                      border: '1px solid var(--color-pt-border)',
+                      borderRight: 'none', borderRadius: '8px 0 0 8px',
+                      background: 'var(--color-pt-surface)',
+                      color: 'var(--color-pt-text-2)', cursor: 'pointer',
+                      fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em',
+                    }}
+                  >
+                    Transcript
+                  </button>
+                ) : (
+                  <>
+                    <TranscriptPanel
+                      ref={transcriptRef}
+                      transcript={effectiveTranscript}
+                      clips={sortedClips}
+                      transcribing={busy === 'transcribing'}
+                      hasUserEdits={hasUserEdits}
+                      hasT2Transcript={hasT2Transcript}
+                      totalDurationSec={totalDurationSec}
+                      collapsed={transcriptCollapsed}
+                      onCollapse={() => setTranscriptCollapsed(true)}
+                      onChange={setEditedTranscript}
+                      onCommit={() => {
+                        if (editedTranscript.trim()) {
+                          patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
+                        } else if (session.editedTranscript) {
+                          patchSession({ editedTranscript: undefined });
+                        }
+                      }}
+                      onCreateTranscript={handleCreateTranscript}
+                      onRevertToLocal={handleRevertToLocal}
+                      onCopyTranscript={handleCopyTranscript}
+                      onScrubPII={scrubPIIFn}
+                      onApplyScrub={handleApplyScrub}
+                      piiScrubbing={piiScrubbing}
+                      piiProgress={scrubProgress}
+                      hasEditedTranscript={hasUserEdits}
+                      onRevertEdits={handleRevertEdits}
+                    />
+                    {transcribeRetryStatus ? (
+                      <div style={{ marginTop: 8 }}>
+                        <AiCallRetryStatus {...transcribeRetryStatus} />
+                      </div>
+                    ) : null}
+                    {transcribeAiError ? (
+                      <div style={{ marginTop: 8 }}>
+                        <AiCallError
+                          error={transcribeAiError}
+                          onRetry={() => {
+                            clearTranscribeAiError();
+                            void handleCreateTranscript();
+                          }}
+                          onDismiss={clearTranscribeAiError}
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
+              <ClipsInspector
+                open={clipsOpen}
+                clips={sortedClips}
+                onClose={() => setClipsOpen(false)}
+                onJump={(t) => {
+                  setClipsOpen(false);
+                  if (transcriptCollapsed) setTranscriptCollapsed(false);
+                  setTimeout(() => transcriptRef.current?.scrollToTimestamp(t), 30);
+                }}
+                onDelete={handleDeleteClip}
+                onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
+                onUpload={(file) => { setClipsOpen(false); void handleUpload(file); }}
+              />
             </div>
           ))}
 
-        {/* ③ Clips tab */}
-        {activeTab === 'clips' && (
-          <div role="tabpanel" id="panel-clips" aria-labelledby="tab-clips" style={{ maxWidth: 680, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setActiveTab('record')}
-                style={{ minHeight: 44, touchAction: 'manipulation' }}
-              >
-                <Mic size={14} strokeWidth={2} /> Add clip
-              </button>
-              <label className="btn btn-ghost cursor-pointer" style={{ minHeight: 44, touchAction: 'manipulation', position: 'relative' }}>
-                <Upload size={14} strokeWidth={2} /> Upload audio
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) { void handleUploadAudio(file); e.target.value = ''; }
-                  }}
-                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
-                />
-              </label>
-              <div style={{ flex: 1 }} />
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setActiveTab('review')}
-                style={{ minHeight: 44, touchAction: 'manipulation' }}
-              >
-                <ArrowLeft size={14} strokeWidth={2} /> Return to Notes
-              </button>
-            </div>
-            <ClipsList clips={sortedClips} recordingDisabled={isRecording} onDeleteClip={handleDeleteClip} />
-            {sortedClips.length > 0 && (
-              <div className="flex justify-end pt-1">
-                <button
-                  type="button"
-                  className="btn btn-primary w-full sm:w-auto"
-                  disabled={isMerging || isRecording}
-                  onClick={() => { void handleRecordingComplete(); setActiveTab('review'); }}
-                  style={{ minHeight: 44, touchAction: 'manipulation' }}
-                >
-                  {isMerging ? (
-                    <><Loader2 size={15} className="animate-spin" /> Combining clips…</>
-                  ) : (
-                    <><CheckCircle2 size={15} strokeWidth={2} /> Generate Notes</>
-                  )}
-                </button>
-              </div>
-            )}
-            {mergedAudioBlob && (
-              <AudioPreviewSection
-                mergedAudioBlob={mergedAudioBlob}
-                silencedMergedBlob={silencedMergedBlob}
-              />
-            )}
-          </div>
-        )}
+
       </div>
+
+      {/* ── PHI confirmation before sending transcript to Anthropic ── */}
+      <PhiConfirmDialog
+        open={phiConfirmOpen}
+        onCancel={() => setPhiConfirmOpen(false)}
+        onConfirm={handlePhiConfirm}
+      />
+
+      {/* ── Local Whisper unavailable recovery dialog ───── */}
+      <WhisperUnavailableDialog
+        open={whisperDialogOpen}
+        retryingLoad={whisperLoading}
+        onUseWebSpeech={handleUseWebSpeech}
+        onRecordWithoutTranscription={handleRecordWithoutTranscription}
+        onRetryLoad={retryWhisperLoad}
+        onCancel={handleCancelWhisperDialog}
+      />
 
       {/* ── Demo complete modal ──────────────────────────── */}
       <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
@@ -710,6 +851,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     </div>
     </SessionActionsContext.Provider>
   );
+}
+
+function relativeTime(ts: number | undefined): string {
+  if (!ts) return '';
+  const min = Math.floor((Date.now() - ts) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  if (min < 24 * 60) return `${Math.floor(min / 60)}h ago`;
+  return `${Math.floor(min / (60 * 24))}d ago`;
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────

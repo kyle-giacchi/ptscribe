@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { transcribe } from '@/services/ai/transcribe';
+import { AiCallError as AiCallErrorClass, friendlyAiError } from '@/services/ai/errors';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { useActionGuard, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useActionGuard';
 import { useBackgroundTranscription } from '@/hooks/useBackgroundTranscription';
@@ -38,6 +39,9 @@ export interface UseTranscriptionFlowResult {
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
   handleCreateTranscript: (clipId?: string) => Promise<void>;
   handleRevertToLocal: () => void;
+  aiError: AiCallErrorClass | null;
+  retryStatus: { provider: 'anthropic' | 'nova'; attempt: number; max: number } | null;
+  clearAiError: () => void;
 }
 
 /**
@@ -73,6 +77,10 @@ export function useTranscriptionFlow(
   const [silencedMergedBlob, setSilencedMergedBlob] = useState<Blob | null>(null);
   const [isMerging, setIsMerging] = useState(false);
   const [debugStats, setDebugStats] = useState<DebugStats | null>(null);
+  const [aiError, setAiError] = useState<AiCallErrorClass | null>(null);
+  const [retryStatus, setRetryStatus] = useState<
+    { provider: 'anthropic' | 'nova'; attempt: number; max: number } | null
+  >(null);
 
   const sessionRef = useRef(session);
   sessionRef.current = session;
@@ -99,6 +107,8 @@ export function useTranscriptionFlow(
       return;
     }
 
+    setAiError(null);
+    setRetryStatus(null);
     setBusy('transcribing');
     patchSession({ status: 'transcribing' });
 
@@ -129,8 +139,11 @@ export function useTranscriptionFlow(
         provider: 'cloudflare',
         model: '@cf/deepgram/nova-3',
         signal: controller.signal,
+        onRetry: (info) =>
+          setRetryStatus({ provider: 'nova', attempt: info.attempt, max: info.max }),
       });
 
+      setRetryStatus(null);
       const text = result.text?.trim() ?? '';
       if (text) {
         setTranscript(text);
@@ -156,8 +169,14 @@ export function useTranscriptionFlow(
         toast.error('Transcription returned no text. Try again or check your audio.');
       }
     } catch (e) {
+      setRetryStatus(null);
       patchSession({ status: 'draft' });
-      if ((e as Error).name !== 'AbortError') {
+      if ((e as Error).name === 'AbortError') {
+        // user-initiated cancel; no UI noise
+      } else if (e instanceof AiCallErrorClass) {
+        setAiError(e);
+        toast.error(friendlyAiError(e).title);
+      } else {
         toast.error(`Transcription failed: ${(e as Error).message}`);
       }
     } finally {
@@ -198,6 +217,9 @@ export function useTranscriptionFlow(
     recordAction,
     handleCreateTranscript,
     handleRevertToLocal,
+    aiError,
+    retryStatus,
+    clearAiError: () => setAiError(null),
   };
 }
 
