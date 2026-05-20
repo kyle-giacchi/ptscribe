@@ -25,6 +25,7 @@ import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsList } from '@/components/sessions/ClipsList';
 import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
+import type { TranscriptPanelHandle } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
@@ -90,6 +91,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     failed: whisperFailed,
     retry: retryWhisperLoad,
   } = useWhisperLoading();
+  const transcriptRef = useRef<TranscriptPanelHandle>(null);
+  const [transcriptCollapsed, setTranscriptCollapsed] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 1024
+  );
   const [clipsOpen, setClipsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
@@ -617,7 +622,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               aria-labelledby="tab-review"
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+                gridTemplateColumns: transcriptCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
                 gap: 24,
                 alignItems: 'start',
               }}
@@ -693,52 +698,74 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               </div>
 
               {/* ── Right: Transcript ── */}
-              <div>
-                <TranscriptPanel
-                  transcript={effectiveTranscript}
-                  clips={sortedClips}
-                  transcribing={busy === 'transcribing'}
-                  hasUserEdits={hasUserEdits}
-                  hasT2Transcript={hasT2Transcript}
-                  totalDurationSec={totalDurationSec}
-                  onChange={setEditedTranscript}
-                  onCommit={() => {
-                    if (editedTranscript.trim()) {
-                      patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
-                    } else if (session.editedTranscript) {
-                      patchSession({ editedTranscript: undefined });
-                    }
-                  }}
-                  onCreateTranscript={handleCreateTranscript}
-                  onRevertToLocal={handleRevertToLocal}
-                  onAddRecording={() => setActiveTab('record')}
-                  onViewRecordings={() => setActiveTab('clips')}
-                  clipsCount={sortedClips.length}
-                  onCopyTranscript={handleCopyTranscript}
-                  onScrubPII={scrubPIIFn}
-                  onApplyScrub={handleApplyScrub}
-                  piiScrubbing={piiScrubbing}
-                  piiProgress={scrubProgress}
-                  hasEditedTranscript={hasUserEdits}
-                  onRevertEdits={handleRevertEdits}
-                />
-                {transcribeRetryStatus ? (
-                  <div style={{ marginTop: 8 }}>
-                    <AiCallRetryStatus {...transcribeRetryStatus} />
-                  </div>
-                ) : null}
-                {transcribeAiError ? (
-                  <div style={{ marginTop: 8 }}>
-                    <AiCallError
-                      error={transcribeAiError}
-                      onRetry={() => {
-                        clearTranscribeAiError();
-                        void handleCreateTranscript();
+              <div style={{ position: 'relative' }}>
+                {transcriptCollapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => setTranscriptCollapsed(false)}
+                    aria-label="Expand transcript panel"
+                    style={{
+                      position: 'absolute', top: 0, right: 0,
+                      writingMode: 'vertical-rl',
+                      height: 120, padding: '12px 6px',
+                      border: '1px solid var(--color-pt-border)',
+                      borderRight: 'none', borderRadius: '8px 0 0 8px',
+                      background: 'var(--color-pt-surface)',
+                      color: 'var(--color-pt-text-2)', cursor: 'pointer',
+                      fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em',
+                    }}
+                  >
+                    Transcript
+                  </button>
+                ) : (
+                  <>
+                    <TranscriptPanel
+                      ref={transcriptRef}
+                      transcript={effectiveTranscript}
+                      clips={sortedClips}
+                      transcribing={busy === 'transcribing'}
+                      hasUserEdits={hasUserEdits}
+                      hasT2Transcript={hasT2Transcript}
+                      totalDurationSec={totalDurationSec}
+                      collapsed={transcriptCollapsed}
+                      onCollapse={() => setTranscriptCollapsed(true)}
+                      onChange={setEditedTranscript}
+                      onCommit={() => {
+                        if (editedTranscript.trim()) {
+                          patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
+                        } else if (session.editedTranscript) {
+                          patchSession({ editedTranscript: undefined });
+                        }
                       }}
-                      onDismiss={clearTranscribeAiError}
+                      onCreateTranscript={handleCreateTranscript}
+                      onRevertToLocal={handleRevertToLocal}
+                      onCopyTranscript={handleCopyTranscript}
+                      onScrubPII={scrubPIIFn}
+                      onApplyScrub={handleApplyScrub}
+                      piiScrubbing={piiScrubbing}
+                      piiProgress={scrubProgress}
+                      hasEditedTranscript={hasUserEdits}
+                      onRevertEdits={handleRevertEdits}
                     />
-                  </div>
-                ) : null}
+                    {transcribeRetryStatus ? (
+                      <div style={{ marginTop: 8 }}>
+                        <AiCallRetryStatus {...transcribeRetryStatus} />
+                      </div>
+                    ) : null}
+                    {transcribeAiError ? (
+                      <div style={{ marginTop: 8 }}>
+                        <AiCallError
+                          error={transcribeAiError}
+                          onRetry={() => {
+                            clearTranscribeAiError();
+                            void handleCreateTranscript();
+                          }}
+                          onDismiss={clearTranscribeAiError}
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
             </div>
           ))}
