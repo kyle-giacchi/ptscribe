@@ -1,19 +1,20 @@
-// src/components/sessions/SessionTopBar.tsx
-import { isDemoMode } from '@/lib/demoMode';
-import { ProfileButton } from '@/components/common/TopBar';
-import {
-  CheckCircle2, Copy, LockOpen,
-} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, AudioLines, CheckCircle2, LockOpen } from 'lucide-react';
 import type { Patient, Session, Note } from '@/types';
+import { AddClipButton } from './AddClipButton';
 
 export interface SessionTopBarProps {
   patient: Patient;
   session: Session;
   note: Note | undefined;
   totalDurationSec: number;
+  clipsCount: number;
+  clipsOpen: boolean;
+  onToggleClips: () => void;
+  onRecord: () => void;
+  onUpload: (file: File) => void;
   missingRequiredLabels: string[];
   pendingDeleteSession: boolean;
-  onCopyNote: () => void;
   onFinalize: () => void;
   onUnfinalize: () => void;
 }
@@ -27,83 +28,107 @@ const SESSION_TYPE_LABEL: Record<string, string> = {
 
 export function SessionTopBar({
   patient, session, note,
-  totalDurationSec,
+  totalDurationSec, clipsCount, clipsOpen,
+  onToggleClips, onRecord, onUpload,
   missingRequiredLabels, pendingDeleteSession,
-  onCopyNote, onFinalize, onUnfinalize,
+  onFinalize, onUnfinalize,
 }: SessionTopBarProps) {
   const sessionDate = new Date(session.date);
   const dayLabel = sessionDate.toLocaleDateString(undefined, { weekday: 'short' });
   const timeLabel = sessionDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const durMin = Math.round(totalDurationSec / 60);
-  const durLabel = durMin > 0 ? `${durMin} min recorded` : null;
-  const diagnosis = patient.primaryDiagnosis ?? '';
   const sessionTypeLabel = SESSION_TYPE_LABEL[session.type] ?? session.type;
-  const subtitle = [sessionTypeLabel, diagnosis].filter(Boolean).join(' · ');
+  const headline = [`${patient.firstName} ${patient.lastName}`, sessionTypeLabel, patient.primaryDiagnosis ?? '']
+    .filter(Boolean).join(' · ');
 
   return (
-    <div style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface)' }}>
+    <div
+      className="flex items-center gap-3"
+      style={{
+        height: 56,
+        padding: '0 22px',
+        background: 'var(--color-pt-surface)',
+        borderBottom: '1px solid var(--color-pt-border)',
+      }}
+    >
+      {/* Left cluster */}
+      <Link
+        to={`/patients/${patient.id}`}
+        aria-label="Back to patient chart"
+        className="inline-flex items-center gap-1.5"
+        style={{
+          height: 30, padding: '0 10px', borderRadius: 7,
+          border: '1px solid var(--color-pt-border)',
+          background: 'var(--color-pt-surface)',
+          color: 'var(--color-pt-text-2)',
+          textDecoration: 'none', fontSize: 12,
+          flexShrink: 0,
+        }}
+      >
+        <ArrowLeft size={13} strokeWidth={2} /> Chart
+      </Link>
 
-      {isDemoMode() && (
+      <div style={{ width: 1, height: 24, background: 'var(--color-pt-border)' }} aria-hidden />
+
+      <div style={{ minWidth: 0, flex: 1 }}>
         <div
-          style={{
-            background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
-            borderBottom: '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
-            padding: '5px 22px',
-            fontSize: 11.5,
-            color: 'var(--color-caution)',
-            textAlign: 'center',
-            lineHeight: 1.4,
-          }}
+          className="truncate"
+          style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)', lineHeight: 1.25 }}
         >
-          Demo mode — data uses a shared passphrase embedded in the source code. Do not enter real
-          patient information.
+          {headline}
         </div>
-      )}
-
-      {/* ── Row 1: patient breadcrumb ── */}
-      <div className="flex items-start gap-3 px-5 pt-3">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="text-sm font-semibold truncate" style={{ color: 'var(--color-pt-text)' }}>
-            {patient.firstName} {patient.lastName}
-            {subtitle && (
-              <span style={{ color: 'var(--color-pt-text-2)', fontWeight: 400 }}>
-                {' · '}{subtitle}
-              </span>
-            )}
-          </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-2">
-            <span className="text-[11px]" style={{ color: 'var(--color-pt-text-2)' }}>
-              {dayLabel} · {timeLabel}
-              {durLabel && ` · ${durLabel}`}
-            </span>
-            <StatusBadge status={session.status} finalized={session.status === 'finalized'} />
-          </div>
+        <div
+          className="truncate flex items-center gap-2"
+          style={{ fontSize: 11.5, color: 'var(--color-pt-text-2)', marginTop: 1 }}
+        >
+          <span>
+            {dayLabel} · {timeLabel}
+            {durMin > 0 && ` · ${durMin} min recorded`}
+          </span>
+          <StatusBadge status={session.status} finalized={session.status === 'finalized'} />
         </div>
-        <ProfileButton />
       </div>
 
-      {/* ── Row 2: action cluster ── */}
+      {/* Right cluster */}
       {!pendingDeleteSession && (
-        <div
-          className="flex flex-wrap items-center gap-2 px-5 pt-2 pb-2.5"
-          style={{ borderTop: '1px solid var(--color-pt-border)' }}
-        >
-          {note && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ height: 32, padding: '0 10px', fontSize: 12, boxSizing: 'border-box' }}
-              onClick={onCopyNote}
+        <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
+          <AddClipButton onRecord={onRecord} onUpload={onUpload} />
+
+          <button
+            type="button"
+            onClick={onToggleClips}
+            aria-pressed={clipsOpen}
+            className="inline-flex items-center"
+            style={{
+              gap: 6, height: 32, padding: '0 10px',
+              borderRadius: 7,
+              border: `1px solid ${clipsOpen ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
+              background: clipsOpen ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+              color: clipsOpen ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+              cursor: 'pointer', fontSize: 12,
+            }}
+          >
+            <AudioLines size={13} strokeWidth={2} />
+            <span>Audio clips</span>
+            <span
+              style={{
+                minWidth: 18, padding: '0 5px', borderRadius: 999,
+                background: clipsOpen ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
+                color: clipsOpen ? '#fff' : 'var(--color-pt-text-2)',
+                fontSize: 10.5, fontWeight: 700, lineHeight: '15px', textAlign: 'center',
+              }}
             >
-              <Copy size={13} strokeWidth={2} /> Copy Notes
-            </button>
-          )}
-          <div style={{ flex: 1 }} />
+              {clipsCount}
+            </span>
+          </button>
+
+          <div style={{ width: 1, height: 22, background: 'var(--color-pt-border)' }} aria-hidden />
+
           {note?.finalized ? (
             <button
               type="button"
               className="btn btn-ghost"
-              style={{ height: 32, padding: '0 12px', fontSize: 12.5, boxSizing: 'border-box' }}
+              style={{ height: 32, padding: '0 12px', fontSize: 12.5 }}
               onClick={onUnfinalize}
             >
               <LockOpen size={13} strokeWidth={2} /> Unlock
@@ -112,7 +137,7 @@ export function SessionTopBar({
             <button
               type="button"
               className="btn btn-primary"
-              style={{ height: 32, padding: '0 14px', fontSize: 12.5, fontWeight: 700, boxSizing: 'border-box' }}
+              style={{ height: 32, padding: '0 14px', fontSize: 12.5, fontWeight: 700 }}
               disabled={!note || missingRequiredLabels.length > 0}
               onClick={onFinalize}
               title={missingRequiredLabels.length > 0 ? `Required sections empty: ${missingRequiredLabels.join(', ')}` : undefined}
@@ -126,17 +151,18 @@ export function SessionTopBar({
   );
 }
 
-// ── Sub-components ──────────────────────────────────────────────
-
 function StatusBadge({ status, finalized }: { status: string; finalized: boolean }) {
   const label = finalized ? 'final' : status === 'ready' ? 'ready' : 'draft';
   const isGreen = finalized || status === 'ready';
   return (
-    <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold"
+    <span
+      className="inline-block rounded-full"
       style={{
+        padding: '1px 7px', fontSize: 10, fontWeight: 700,
         background: isGreen ? 'color-mix(in oklab, var(--color-positive) 12%, transparent)' : 'rgba(26,32,48,0.07)',
         color: isGreen ? 'var(--color-positive)' : 'var(--color-pt-text-2)',
-      }}>
+      }}
+    >
       {label}
     </span>
   );
