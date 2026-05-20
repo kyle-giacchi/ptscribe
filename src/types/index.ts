@@ -88,6 +88,7 @@ export interface SessionClip {
   t3Transcript?: string;     // Tier 3 (Nova AI): cloud result, written by explicit transcription action
   transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
   transcriptedAt?: number;
+  startOffsetSec?: number;
   errorMessage?: string;
   createdAt: number;
   updatedAt: number;
