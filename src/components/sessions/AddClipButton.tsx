@@ -10,14 +10,44 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const chevronRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        chevronRef.current?.focus();
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!menuRef.current) return;
+        const items = Array.from(
+          menuRef.current.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+        );
+        if (items.length === 0) return;
+        const current = document.activeElement as HTMLElement | null;
+        const idx = items.findIndex((el) => el === current);
+        const next =
+          e.key === 'ArrowDown'
+            ? items[(idx + 1 + items.length) % items.length]
+            : items[(idx - 1 + items.length) % items.length];
+        e.preventDefault();
+        next.focus();
+      }
+    }
     document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    const first = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    first?.focus();
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -54,6 +84,7 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
 
       {/* Chevron half */}
       <button
+        ref={chevronRef}
         type="button"
         aria-label="Add clip menu"
         aria-haspopup="menu"
@@ -74,6 +105,7 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           className="absolute z-40"
           style={{

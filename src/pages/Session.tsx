@@ -14,7 +14,6 @@ import { useAppData } from '@/contexts/AppDataProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
-import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import type { Session, SessionClip, NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
@@ -260,7 +259,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleReplaceSections,
     handleFinalize,
     handleUnfinalize,
-    handleCopyNoteMarkdown,
     missingRequiredLabels,
     lastRawPayload,
     aiError: generationAiError,
@@ -322,14 +320,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
 
   if (!session || !patient) return <NotFound />;
-
-  // ── Copy full note — wired into NoteToolbar in Task 6 ────────────────────
-  // @ts-expect-error -- temporarily unused until Task 6 wires this into NoteToolbar
-  function handleCopyNote() {
-    if (!note || !template) return;
-    const md = renderNoteMarkdown(note, template, patient!);
-    handleCopyNoteMarkdown(md);
-  }
 
   function handleCopyTranscript() {
     navigator.clipboard.writeText(effectiveTranscript).then(
