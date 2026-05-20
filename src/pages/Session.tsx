@@ -27,6 +27,7 @@ import { ClipsList } from '@/components/sessions/ClipsList';
 import { AudioPreviewSection } from '@/components/sessions/AudioPreviewSection';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { NotePanel } from '@/components/sessions/NotePanel';
+import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { DebugDrawer } from '@/components/sessions/DebugDrawer';
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
@@ -44,7 +45,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getPatient, updatePatient } = usePatients();
   const { forSession, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
-  const { settings } = useSettings();
+  const { settings, updateSession } = useSettings();
   const { updateSessionsSlice } = useAppData();
 
   const session = getSession(sessionId);
@@ -186,7 +187,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     recordAction,
   });
   const {
-    handleGenerate,
+    handleGenerate: handleGenerateRaw,
     handleSectionChange,
     handleReplaceSections,
     handleFinalize,
@@ -195,6 +196,23 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     missingRequiredLabels,
     lastRawPayload,
   } = generation;
+
+  // ── PHI confirmation gate before generation ─────────────────────────────
+  // Always shown (regardless of PII filter state) unless user has dismissed it
+  // via the "Don't show this again" checkbox.
+  const [phiConfirmOpen, setPhiConfirmOpen] = useState(false);
+  function handleGenerate() {
+    if (settings.session.phiConfirmDismissed) {
+      handleGenerateRaw();
+    } else {
+      setPhiConfirmOpen(true);
+    }
+  }
+  function handlePhiConfirm(dontShowAgain: boolean) {
+    setPhiConfirmOpen(false);
+    if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
+    handleGenerateRaw();
+  }
 
   const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
 
@@ -658,6 +676,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           </div>
         )}
       </div>
+
+      {/* ── PHI confirmation before sending transcript to Anthropic ── */}
+      <PhiConfirmDialog
+        open={phiConfirmOpen}
+        onCancel={() => setPhiConfirmOpen(false)}
+        onConfirm={handlePhiConfirm}
+      />
 
       {/* ── Demo complete modal ──────────────────────────── */}
       <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />

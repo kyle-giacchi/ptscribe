@@ -347,6 +347,13 @@ export interface SessionWorkflowSettings {
    * has ONNX exports on HuggingFace and works without R2 setup. Default: openai/privacy-filter.
    */
   piiModel?: 'openai/privacy-filter' | 'Xenova/bert-base-NER';
+  /**
+   * When true, skip the "transcript leaves device" confirmation that appears
+   * before Generate / Regenerate sends the transcript to Anthropic. Toggled via
+   * a "Don't show this again" checkbox in the dialog, restorable from User
+   * Settings → Notes & Templates. Default false.
+   */
+  phiConfirmDismissed: boolean;
 }
 
 /**
