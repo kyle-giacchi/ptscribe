@@ -37,7 +37,7 @@ function useVaultState(): { initialized: boolean; unlocked: boolean } {
   return state;
 }
 
-function VaultPill() {
+export function VaultPill() {
   const { initialized, unlocked } = useVaultState();
   if (!initialized) return null;
   const Icon = unlocked ? Unlock : Lock;
@@ -72,7 +72,7 @@ function formatRelativeTime(ts: number): string {
   return `${Math.floor(min / 60)}h ago`;
 }
 
-function AlertsButton() {
+export function AlertsButton() {
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications();
   const { localModelsUnavailable, available, loading: storageLoading } = useStorageEstimate();
   const [open, setOpen] = useState(false);
