@@ -27,8 +27,8 @@ vi.mock('@/contexts/NotificationsProvider', () => ({
     clearAll: () => {},
   }),
 }));
-vi.mock('@/contexts/SessionActionsContext', () => ({
-  useSessionActions: () => ({ onResetSession: undefined }),
+vi.mock('@/contexts/SessionResetContext', () => ({
+  useSessionReset: () => ({ onResetSession: undefined }),
 }));
 vi.mock('@/contexts/GateContext', () => ({
   useGate: () => ({ logout: () => {} }),

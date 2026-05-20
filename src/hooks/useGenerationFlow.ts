@@ -35,7 +35,6 @@ export interface UseGenerationFlowParams {
   setBusy: (busy: 'transcribing' | 'generating' | null) => void;
   setTranscript: (next: string) => void;
   setActiveTab: (tab: 'record' | 'review') => void;
-  setPendingDeleteSession: (v: boolean) => void;
   /** Action guard counter + record (shared across transcription + generation flows). */
   checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
@@ -74,7 +73,6 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
     setBusy,
     setTranscript,
     setActiveTab,
-    setPendingDeleteSession,
     checkActionGuard,
     recordAction,
   } = params;
@@ -252,7 +250,6 @@ export function useGenerationFlow(params: UseGenerationFlowParams): UseGeneratio
       patchSession({ clips: [], status: 'draft', transcript: undefined, noteId: undefined });
       setTranscript('');
       setActiveTab('record');
-      setPendingDeleteSession(false);
       return;
     }
     if (note) removeNote(note.id);

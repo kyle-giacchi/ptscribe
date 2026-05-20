@@ -57,7 +57,7 @@ export interface UseRecordingFlowResult {
   handleStopAndFinish: () => void;
   handleUploadAudio: (file: File) => Promise<string | null>;
   handleDeleteClip: (clipId: string) => Promise<void>;
-  handleRecordingComplete: () => Promise<void>;
+  buildMergedAudioForReview: () => Promise<void>;
 }
 
 /**
@@ -488,7 +488,7 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
   }
 
   // ── Recording complete — merge clips + compile live transcripts ──────────
-  async function handleRecordingComplete() {
+  async function buildMergedAudioForReview() {
     const readyClips = sortedClips.filter(
       (c) => c.status === 'ready' || c.status === 'transcribed',
     );
@@ -584,6 +584,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     handleStopAndFinish,
     handleUploadAudio,
     handleDeleteClip,
-    handleRecordingComplete,
+    buildMergedAudioForReview,
   };
 }

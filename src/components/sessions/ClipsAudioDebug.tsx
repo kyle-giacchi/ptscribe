@@ -4,7 +4,7 @@ import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
 import { formatDuration, wordCount } from '@/utils/format';
 import type { ClipStatus, SessionClip } from '@/types';
 
-export function ClipsListOld({
+export function ClipsAudioDebug({
   clips,
   recordingDisabled = false,
   onDeleteClip,

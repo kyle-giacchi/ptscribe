@@ -184,13 +184,13 @@ Banner anatomy:
 </div>
 ```
 
-The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is local `useState` in the component that owns the action. Confirm handlers clear the guard then call the actual action. Cancel handlers clear the guard only. This pattern is used in `ClipsList` (delete clip), `TranscriptPanel` (overwrite transcript, re-merge), `NotePanel` (replace draft), and `Session` (delete session).
+The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is local `useState` in the component that owns the action. Confirm handlers clear the guard then call the actual action. Cancel handlers clear the guard only. This pattern is used in `ClipsDrawer` (delete clip), `TranscriptPanel` (overwrite transcript, re-merge), `NotePanel` (replace draft), `NoteToolbar` (Regenerate overwrite modal), and `Session` (reset session via `ResetSessionModal`).
 
 ## Local-first transcription
 
 **Every session — recorded or uploaded — is automatically transcribed by local Whisper once the combined silence-removed audio blob is ready, regardless of the user's configured transcription provider.**
 
-After the user finishes recording or uploads a clip, `handleRecordingComplete` in `useRecordingFlow` silence-trims each individual clip blob, then merges them into a single combined blob (`silencedMergedBlob`). This blob is set in `useTranscriptionFlow` state and flows to `useBackgroundTranscription`.
+After the user finishes recording or uploads a clip, `buildMergedAudioForReview` in `useRecordingFlow` silence-trims each individual clip blob, then merges them into a single combined blob (`silencedMergedBlob`). This blob is set in `useTranscriptionFlow` state and flows to `useBackgroundTranscription`.
 
 The background effect in `useBackgroundTranscription` fires once `silencedMergedBlob` is non-null. It calls `transcribeWithLocalWhisper` (whisper-tiny.en ONNX in-browser via parallel worker pool). The result is stored at session level in `session.t2Transcript` and `session.transcript` so the Review tab populates without any manual action. The effect resets and re-runs whenever `silencedMergedBlob` changes, enabling T2 to update automatically when the user adds another clip.
 
@@ -198,7 +198,7 @@ Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit
 
 **Do not gate the background pass behind a provider check.** The background pass runs for all provider configurations.
 
-**Do not skip `handleRecordingComplete` for uploaded clips.** The `UploadProcessingView` in `Session.tsx` waits for `clip.status === 'ready' | 'transcribed' | 'failed'`, then calls `handleRecordingComplete()` which builds `silencedMergedBlob` and kicks off T2. If you bypass this call, the "Processing audio" screen hangs and T2 never fires.
+**Do not skip `buildMergedAudioForReview` for uploaded clips.** The `UploadProcessingView` in `Session.tsx` waits for `clip.status === 'ready' | 'transcribed' | 'failed'`, then calls `buildMergedAudioForReview()` which builds `silencedMergedBlob` and kicks off T2. If you bypass this call, the "Processing audio" screen hangs and T2 never fires.
 
 Consequences of violating this rule:
 - Uploaded audio silently skips local transcription and the "Processing audio" screen hangs with no escape for the user.
