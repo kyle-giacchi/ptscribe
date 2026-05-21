@@ -19,7 +19,7 @@ function mkClip(id: string, createdAt: number, extra: Partial<SessionClip> = {})
 describe('ClipsDrawer', () => {
   it('renders one card per clip', () => {
     const clips = [mkClip('a', 100), mkClip('b', 200)];
-    render(<ClipsDrawer open clips={clips} onClose={() => {}} onJump={() => {}} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} />);
+    render(<ClipsDrawer open clips={clips} onClose={() => {}} onJump={() => {}} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} t2Phase="idle" t2Label="" />);
     expect(screen.getByText('Clip 1')).toBeInTheDocument();
     expect(screen.getByText('Clip 2')).toBeInTheDocument();
   });
@@ -28,7 +28,7 @@ describe('ClipsDrawer', () => {
     const onClose = vi.fn();
     const onJump = vi.fn();
     const clips = [mkClip('a', 100, { startOffsetSec: 42 })];
-    render(<ClipsDrawer open clips={clips} onClose={onClose} onJump={onJump} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} />);
+    render(<ClipsDrawer open clips={clips} onClose={onClose} onJump={onJump} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} t2Phase="idle" t2Label="" />);
     fireEvent.click(screen.getByText(/Jump to transcript/).closest('button')!);
     expect(onClose).toHaveBeenCalled();
     expect(onJump).toHaveBeenCalledWith(42);
@@ -37,19 +37,19 @@ describe('ClipsDrawer', () => {
   it('Delete calls onDelete with clip id', () => {
     const onDelete = vi.fn();
     const clips = [mkClip('clipX', 100)];
-    render(<ClipsDrawer open clips={clips} onClose={() => {}} onJump={() => {}} onDelete={onDelete} onRecord={() => {}} onUpload={() => {}} />);
+    render(<ClipsDrawer open clips={clips} onClose={() => {}} onJump={() => {}} onDelete={onDelete} onRecord={() => {}} onUpload={() => {}} t2Phase="idle" t2Label="" />);
     fireEvent.click(screen.getByLabelText('Delete clip 1'));
     expect(onDelete).toHaveBeenCalledWith('clipX');
   });
 
   it('renders empty state when no clips', () => {
-    render(<ClipsDrawer open clips={[]} onClose={() => {}} onJump={() => {}} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} />);
+    render(<ClipsDrawer open clips={[]} onClose={() => {}} onJump={() => {}} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} t2Phase="idle" t2Label="" />);
     expect(screen.getByText('No clips yet')).toBeInTheDocument();
   });
 
   it('Escape calls onClose', () => {
     const onClose = vi.fn();
-    render(<ClipsDrawer open clips={[]} onClose={onClose} onJump={() => {}} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} />);
+    render(<ClipsDrawer open clips={[]} onClose={onClose} onJump={() => {}} onDelete={() => {}} onRecord={() => {}} onUpload={() => {}} t2Phase="idle" t2Label="" />);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });

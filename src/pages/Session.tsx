@@ -19,11 +19,10 @@ import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
 import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
-import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
-import type { TranscriptPanelHandle } from '@/components/sessions/TranscriptPanel';
+import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
@@ -89,14 +88,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   >(null);
   const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
   const [pendingStartRecording, setPendingStartRecording] = useState(false);
-  const {
-    loading: whisperLoading,
-    failed: whisperFailed,
-    retry: retryWhisperLoad,
-  } = useWhisperLoading();
-  const transcriptRef = useRef<TranscriptPanelHandle>(null);
+  const { exhausted: whisperExhausted } = useWhisperLoading();
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
+  const [piiScrubOpen, setPiiScrubOpen] = useState(false);
+  const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
   const [clipsOpen, setClipsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
@@ -172,7 +168,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ── Whisper recovery: gate Start Recording behind dialog when preload failed ──
   function handleStartRecordingWithGate() {
     const provider = transcriptionProviderOverride ?? settings.ai.transcription.provider;
-    if (provider === 'local' && whisperFailed) {
+    if (provider === 'local' && whisperExhausted) {
       setPendingStartRecording(true);
       setWhisperDialogOpen(true);
       return;
@@ -201,32 +197,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   function handleCancelWhisperDialog() {
     setWhisperDialogOpen(false);
     setPendingStartRecording(false);
-  }
-
-  // Mirror pending-start state into a ref so the retry .then() callback sees
-  // current values (handles the cancel-during-retry race — if the user clicks
-  // Cancel while the preload is in flight, we must NOT auto-resume).
-  const pendingStartRecordingRef = useRef(pendingStartRecording);
-  useEffect(() => {
-    pendingStartRecordingRef.current = pendingStartRecording;
-  });
-
-  // When the user clicks Retry inside the recovery dialog, chain auto-resume
-  // onto the new preload promise — the setStates fire from a promise callback
-  // (allowed) instead of an effect that watches `whisperLoading`/`whisperFailed`.
-  function handleRetryWhisperLoad() {
-    void retryWhisperLoad().then(
-      () => {
-        if (!pendingStartRecordingRef.current) return; // user cancelled mid-retry
-        setWhisperDialogOpen(false);
-        setPendingStartRecording(false);
-        void handleStartRecordingRef.current();
-      },
-      () => {
-        // Failure surfaces through whisperFailed; dialog stays open so the
-        // user can retry again or pick a fallback.
-      },
-    );
   }
 
   // ── Note/generation flow — sourced from the same sessionMachine above ────
@@ -264,7 +234,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleCopyNoteMarkdown(md);
   }
 
-  const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
 
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
 
@@ -630,7 +599,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 ) : (
                   <>
                     <TranscriptPanel
-                      ref={transcriptRef}
                       transcript={effectiveTranscript}
                       clips={sortedClips}
                       transcribing={busy === 'transcribing'}
@@ -651,12 +619,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       canImproveWithAI={!isDemoMode() && !session.t3Transcript}
                       onRevertToLocal={handleRevertToLocal}
                       onCopyTranscript={handleCopyTranscript}
-                      onScrubPII={scrubPIIFn}
-                      onApplyScrub={handleApplyScrub}
-                      piiScrubbing={piiScrubbing}
-                      piiProgress={scrubProgress}
+                      onOpenPIIScrub={() => setPiiScrubOpen(true)}
                       hasEditedTranscript={hasUserEdits}
                       onRevertEdits={handleRevertEdits}
+                      seekSignal={seekSignal}
                     />
                     {transcribeRetryStatus ? (
                       <div style={{ marginTop: 8 }}>
@@ -685,11 +651,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 onJump={(t) => {
                   setClipsOpen(false);
                   if (transcriptCollapsed) setTranscriptCollapsed(false);
-                  transcriptRef.current?.scrollToTimestamp(t);
+                  setSeekSignal({ seconds: t, id: Date.now() });
                 }}
                 onDelete={handleDeleteClip}
                 onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
                 onUpload={(file) => { setClipsOpen(false); void handleUpload(file); }}
+                t2Phase={t2Phase}
+                t2Label={t2Label}
               />
             </div>
           ))}
@@ -707,15 +675,21 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       {/* ── Local Whisper unavailable recovery dialog ───── */}
       <WhisperUnavailableDialog
         open={whisperDialogOpen}
-        retryingLoad={whisperLoading}
         onUseWebSpeech={handleUseWebSpeech}
         onRecordWithoutTranscription={handleRecordWithoutTranscription}
-        onRetryLoad={handleRetryWhisperLoad}
         onCancel={handleCancelWhisperDialog}
       />
 
       {/* ── Demo complete modal ──────────────────────────── */}
       <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
+
+      {/* ── PII scrub modal ──────────────────────────────── */}
+      <PIIScrubModal
+        open={piiScrubOpen}
+        transcript={effectiveTranscript}
+        onApply={handleApplyScrub}
+        onClose={() => setPiiScrubOpen(false)}
+      />
 
       {/* ── Manage templates modal ────────────────────────── */}
       <ManageTemplatesModal

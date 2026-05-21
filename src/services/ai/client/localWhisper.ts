@@ -21,36 +21,6 @@ let _worker: Worker | null = null;
 let _idCounter = 0;
 const _pending = new Map<number, PendingEntry>();
 
-// ── Preload state ─────────────────────────────────────────────────────────────
-let _preloadComplete = false;
-let _preloadStarted = false;
-let _preloadDoneResolve: (() => void) | null = null;
-let _preloadDoneReject: ((e: Error) => void) | null = null;
-
-function newPreloadPromise(): Promise<void> {
-  return new Promise<void>((res, rej) => {
-    _preloadDoneResolve = res;
-    _preloadDoneReject = rej;
-  });
-}
-
-let _preloadDonePromise: Promise<void> = newPreloadPromise();
-
-/**
- * Returns a Promise that resolves once the Whisper pipeline is ready, or
- * rejects if the last load attempt failed. Automatically starts a preload if
- * none is in progress — retries are self-healing without external coordination.
- */
-export function getWhisperPreloadPromise(): Promise<void> {
-  if (_preloadComplete) return Promise.resolve();
-  if (!_preloadStarted) preloadLocalWhisper();
-  return _preloadDonePromise;
-}
-
-export function isWhisperPreloadComplete(): boolean {
-  return _preloadComplete;
-}
-
 // Pool of workers for parallel chunk dispatch. Shared _pending / _idCounter
 // keep IDs unique across all workers so routing is correct.
 const _pool: Worker[] = [];
@@ -115,6 +85,79 @@ function getWorker(): Worker {
   return _worker;
 }
 
+// ── WhisperLoader ─────────────────────────────────────────────────────────────
+
+export class WhisperExhaustedError extends Error {
+  constructor() {
+    super('Whisper unavailable — model failed to load');
+    this.name = 'WhisperExhaustedError';
+  }
+}
+
+export type WhisperLoadStatus = 'idle' | 'loading' | 'ready' | 'exhausted';
+
+class WhisperLoader {
+  private _status: WhisperLoadStatus = 'idle';
+  // Null until the first ensureReady() call; non-null while loading or after settling.
+  private _promise: Promise<void> | null = null;
+  private readonly _model: string;
+  private readonly _maxAttempts: number;
+
+  constructor(model: string, maxAttempts: number) {
+    this._model = model;
+    this._maxAttempts = maxAttempts;
+  }
+
+  get status(): WhisperLoadStatus {
+    return this._status;
+  }
+
+  /**
+   * Returns a Promise that resolves when the Whisper pipeline is ready.
+   * Idempotent — multiple callers get the same in-flight promise.
+   * On first failure the loader auto-retries once; only rejects after both
+   * attempts fail, at which point status transitions to 'exhausted'.
+   */
+  ensureReady(): Promise<void> {
+    if (this._status === 'ready') return Promise.resolve();
+    if (this._status === 'exhausted') return Promise.reject(new WhisperExhaustedError());
+    if (this._promise) return this._promise;
+
+    this._status = 'loading';
+    this._promise = this._loadWithRetry(1);
+    return this._promise;
+  }
+
+  private async _loadWithRetry(attempt: number): Promise<void> {
+    try {
+      await this._doLoad();
+      this._status = 'ready';
+    } catch (err) {
+      if (attempt < this._maxAttempts) {
+        return this._loadWithRetry(attempt + 1);
+      }
+      this._status = 'exhausted';
+      throw err;
+    }
+  }
+
+  private _doLoad(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const worker = getWorker();
+      const id = ++_idCounter;
+      _pending.set(id, {
+        resolve: () => resolve(),
+        reject,
+      });
+      worker.postMessage({ id, type: 'preload', model: this._model });
+    });
+  }
+}
+
+export const whisperLoader = new WhisperLoader(LOCAL_WHISPER_DEFAULT_MODEL, 2);
+
+// ── Audio utilities ───────────────────────────────────────────────────────────
+
 export async function blobToFloat32(blob: Blob): Promise<Float32Array> {
   const arrayBuffer = await blob.arrayBuffer();
   const context = new AudioContext();
@@ -134,33 +177,7 @@ export async function blobToFloat32(blob: Blob): Promise<Float32Array> {
   return resampled.getChannelData(0).slice();
 }
 
-/**
- * Starts the worker and warms up the Whisper pipeline so the first real
- * transcription doesn't have to wait for the model download. Safe to call
- * multiple times — the worker is a singleton and pipeline load is idempotent.
- */
-export function preloadLocalWhisper(model = LOCAL_WHISPER_DEFAULT_MODEL): void {
-  if (_preloadStarted) return;
-  _preloadStarted = true;
-  const worker = getWorker();
-  const id = ++_idCounter;
-  _pending.set(id, {
-    resolve: () => {
-      _preloadComplete = true;
-      _preloadDoneResolve?.();
-    },
-    reject: (err: Error) => {
-      // Reset so the next getWhisperPreloadPromise() call can start a fresh attempt.
-      _preloadStarted = false;
-      const rejectCurrent = _preloadDoneReject;
-      // Swap in a fresh promise before rejecting so new callers get a pending promise,
-      // not an already-rejected one.
-      _preloadDonePromise = newPreloadPromise();
-      rejectCurrent?.(err);
-    },
-  });
-  worker.postMessage({ id, type: 'preload', model });
-}
+// ── Transcription functions ───────────────────────────────────────────────────
 
 /** Send a pre-decoded 16 kHz mono Float32Array directly to the Whisper worker,
  *  bypassing the blob-decode step. Use this when the caller has already decoded
@@ -170,12 +187,13 @@ export async function transcribeFloat32(
   model = LOCAL_WHISPER_DEFAULT_MODEL,
   onProgress?: (msg: string) => void,
 ): Promise<TranscribeResult> {
+  await whisperLoader.ensureReady();
   const worker = getWorker();
   const id = ++_idCounter;
   const text = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
       _pending.delete(id);
-      reject(new Error('Transcription timed out — model may still be downloading'));
+      reject(new Error('Transcription timed out'));
     }, TRANSCRIBE_TIMEOUT_MS);
     _pending.set(id, { resolve, reject, onProgress, timer });
     worker.postMessage({ id, type: 'transcribe', audio, model }, [audio.buffer]);
@@ -188,6 +206,7 @@ export async function transcribeLocally(
   model = LOCAL_WHISPER_DEFAULT_MODEL,
   onProgress?: (msg: string) => void,
 ): Promise<TranscribeResult> {
+  await whisperLoader.ensureReady();
   const audio = await blobToFloat32(blob);
   const worker = getWorker();
   const id = ++_idCounter;
@@ -195,7 +214,7 @@ export async function transcribeLocally(
   const text = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
       _pending.delete(id);
-      reject(new Error('Transcription timed out — model may still be downloading'));
+      reject(new Error('Transcription timed out'));
     }, TRANSCRIBE_TIMEOUT_MS);
     _pending.set(id, { resolve, reject, onProgress, timer });
     worker.postMessage({ id, type: 'transcribe', audio, model }, [audio.buffer]);
@@ -216,6 +235,7 @@ export async function transcribeFloat32Parallel(
   model: string,
   onProgress?: (completed: number, total: number) => void,
 ): Promise<string[]> {
+  await whisperLoader.ensureReady();
   const n = calcPoolSize(chunks.length);
 
   if (n <= 1) {

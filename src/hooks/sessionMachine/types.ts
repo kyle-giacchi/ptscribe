@@ -52,12 +52,22 @@ export interface CaptureState {
   uploadStatus: UploadStatus;
 }
 
+// ── T2 slice (background local-Whisper pass) ──────────────────────────────
+
+/** Reducer-managed mirror of T2Phase for testable machine state. */
+export type T2ReducerPhase = 'idle' | 'running' | 'done' | 'error';
+
+export interface T2State {
+  phase: T2ReducerPhase;
+}
+
 // ── Combined state ────────────────────────────────────────────────────────
 
 export interface SessionMachineState {
   generate: GenerateState;
   transcribe: TranscribeState;
   capture: CaptureState;
+  t2: T2State;
 }
 
 export type SessionMachineAction =
@@ -67,7 +77,7 @@ export type SessionMachineAction =
   | { type: 'generate/success'; rawText: string; prompts: AiDebugPrompts }
   | { type: 'generate/error'; aiError: AiCallError | null }
   | { type: 'generate/clearAiError' }
-  // transcribe
+  // transcribe (T3 cloud Nova)
   | { type: 'transcribe/start' }
   | { type: 'transcribe/retry'; status: RetryStatus }
   | { type: 'transcribe/success'; stats: TranscribeDebugStats }
@@ -75,6 +85,10 @@ export type SessionMachineAction =
   | { type: 'transcribe/error'; aiError: AiCallError | null }
   | { type: 'transcribe/abort' }
   | { type: 'transcribe/clearAiError' }
+  // t2 (background local-Whisper pass)
+  | { type: 't2/start' }
+  | { type: 't2/done' }
+  | { type: 't2/error' }
   // capture
   | { type: 'capture/upload'; status: UploadStatus };
 
@@ -95,4 +109,5 @@ export const initialSessionMachineState: SessionMachineState = {
   capture: {
     uploadStatus: { phase: 'idle', message: '' },
   },
+  t2: { phase: 'idle' },
 };

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/contexts/NotificationsProvider';
-import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, getWhisperPreloadPromise } from '@/services/ai/client/localWhisper';
+import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, WhisperExhaustedError } from '@/services/ai/client/localWhisper';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
 import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
@@ -145,8 +145,7 @@ export function useBackgroundTranscription({
     setPhase('transcribing');
     setProgressLabel('');
 
-    getWhisperPreloadPromise()
-      .then(() => transcribeWithLocalWhisper(silencedMergedBlob, (msg) => setProgressLabel(msg)))
+    transcribeWithLocalWhisper(silencedMergedBlob!, (msg) => setProgressLabel(msg))
       .then((result) => {
         // Don't overwrite a cloud (T3) result if Nova ran while Whisper was processing.
         if (sessionRef.current?.t3Transcript) {
@@ -173,7 +172,12 @@ export function useBackgroundTranscription({
           setPhase('done');
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err instanceof WhisperExhaustedError) {
+          setPhase('error');
+          setProgressLabel('');
+          return;
+        }
         const retries = retryCountRef.current + 1;
         if (retries <= MAX_AUTO_RETRIES) {
           retryCountRef.current = retries;

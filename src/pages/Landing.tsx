@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock } from 'lucide-react';
-import { preloadLocalWhisper } from '@/services/ai/client/localWhisper';
+import { whisperLoader } from '@/services/ai/client/localWhisper';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -176,7 +176,7 @@ export function Landing({ onSignIn }: LandingProps) {
   }, []);
 
   function handleDemo() {
-    preloadLocalWhisper();
+    void whisperLoader.ensureReady();
     if (!onSignIn) {
       navigate('/today', { state: { showCode: true } });
       return;
@@ -188,7 +188,7 @@ export function Landing({ onSignIn }: LandingProps) {
   }
 
   function handleLogin() {
-    preloadLocalWhisper();
+    void whisperLoader.ensureReady();
     navigate('/login');
   }
 

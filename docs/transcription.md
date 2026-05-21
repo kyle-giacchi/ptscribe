@@ -124,11 +124,12 @@ patchSession({ editedTranscript: value, activeTranscriptTier: 'edited' })
 ```
 If the user clears the field, `editedTranscript` is set to `undefined` (drops back to the previous tier).
 
-**PII scrub:** User clicks "Scrub PII". After the local NER model runs, `handleApplyScrub(scrubbed)`:
+**PII scrub:** User clicks "Scrub PII" → `PIIScrubModal` opens showing the current transcript. User clicks "Scan for PII" to trigger the on-device NER model. The modal shows an inline word-level diff (deletions in strikethrough, replacements highlighted). User reviews and clicks "Apply N redactions". `handleApplyScrub(scrubbed)` in `Session.tsx`:
 ```
 setEditedTranscript(scrubbed)
 patchSession({ editedTranscript: scrubbed, activeTranscriptTier: 'edited' })
 ```
+The scan is lazy — the NER model only runs after the user explicitly clicks "Scan for PII" inside the modal, not on modal open.
 
 In both cases `session.transcript` is **not** directly updated by the edited write path. `Session.tsx` derives `effectiveTranscript = editedTranscript.trim() ? editedTranscript : transcript` for display and note generation.
 

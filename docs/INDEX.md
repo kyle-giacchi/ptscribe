@@ -40,7 +40,7 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 | Session page panel components (`sessions/` sub-dir)                      | [architecture.md](architecture.md#layering)                                |
 | App chrome layers (GlobalTopNav, Sidebar scope, SessionTopBar)           | [architecture.md](architecture.md#shell-and-navigation)                    |
 | Responsive defaults (hamburger, transcript collapse, ClipsDrawer sheet) | [style-guide.md](style-guide.md#responsive-defaults)                     |
-| ClipsDrawer drawer (replaces legacy Clips tab; scrollToTimestamp jump)| [workflows.md](workflows.md#review-tab-merge)                              |
+| ClipsDrawer drawer (replaces legacy Clips tab; clip timestamp jump)   | [workflows.md](workflows.md#review-tab-merge)                              |
 | Inline confirmation pattern (no `window.confirm()`)                      | [invariants.md](invariants.md#destructive-actions-use-inline-confirmation) |
 | PII scrubbing model — R2-only ONNX, interceptor always active (dev + prod) | [invariants.md](invariants.md#pii-scrubbing-model--r2-only-onnx-interceptor-always-active) |
 | Boot sequence (load → migrate → safeParse → fallback)                    | [architecture.md:34](architecture.md#boot-sequence)                        |
