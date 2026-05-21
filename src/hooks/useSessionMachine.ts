@@ -204,6 +204,9 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   // Used by the auto-stop finalization effect below to always call the latest
   // handleFinishedRecording without including it in the effect's dep array.
   const handleFinishedRecordingRef = useRef<() => Promise<void>>(async () => {});
+  // Same pattern for buildMergedAudioForReview so handleStopAndFinish can defer
+  // the merge until after React commits the patchClip({status:'ready'}) update.
+  const buildMergedAudioForReviewRef = useRef<() => Promise<void>>(async () => {});
   // Guards against calling finalization twice for the same auto-stop event.
   const autoStopFinalizedRef = useRef(false);
 
@@ -462,7 +465,14 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   }
 
   function handleStopAndFinish() {
-    void handleFinishedRecording().then(() => setActiveTab('review'));
+    // buildMergedAudioForReview produces silencedMergedBlob (which triggers T2)
+    // and sets activeTab to 'review' itself. Defer via setTimeout(0) so React
+    // commits the patchClip({status:'ready'}) update inside handleFinishedRecording
+    // before the merge reads sortedClips — otherwise the just-recorded clip is
+    // still 'pending' in the captured closure and gets filtered out.
+    void handleFinishedRecording().then(() => {
+      setTimeout(() => void buildMergedAudioForReviewRef.current(), 0);
+    });
   }
 
   // ── Audio upload ─────────────────────────────────────────────────────────
@@ -661,6 +671,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
 
   // Keep ref current so the auto-stop effect always invokes the latest closure.
   handleFinishedRecordingRef.current = handleFinishedRecording;
+  buildMergedAudioForReviewRef.current = buildMergedAudioForReview;
 
   // When the hard cap or idle auto-stop fires, the MediaRecorder stops itself
   // internally — handleFinishedRecording is never called by user action, so the clip
@@ -678,7 +689,9 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     if (autoStopFinalizedRef.current) return;
     if (recorder.status !== 'stopped') return;
     autoStopFinalizedRef.current = true;
-    void handleFinishedRecordingRef.current();
+    void handleFinishedRecordingRef.current().then(() => {
+      setTimeout(() => void buildMergedAudioForReviewRef.current(), 0);
+    });
   }, [
     recorder.hardCapStopped,
     recorder.idleAutoStopped,
