@@ -1,6 +1,7 @@
 import { Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { motion } from 'motion/react';
 import type { AiDebugPrompts } from '@/types';
 
 export interface DebugDrawerStats {
@@ -51,41 +52,57 @@ export function DebugDrawer({
       }}
       onClick={onClose}
     >
+      {/* Backdrop */}
       <div
         style={{
-          width: 320,
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.22)',
+        }}
+      />
+
+      {/* Slide-in card */}
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        transition={{ type: 'tween', duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          position: 'relative',
+          width: 'min(500px, 100vw)',
           height: '100%',
           background: 'var(--color-pt-surface)',
           borderLeft: '1px solid var(--color-pt-border)',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '-4px 0 24px rgba(26,32,48,0.08)',
+          boxShadow: '-8px 0 40px rgba(26,32,48,0.18)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drawer header */}
+        {/* Header */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            padding: '14px 16px',
+            padding: '0 20px',
+            height: 56,
             borderBottom: '1px solid var(--color-pt-border)',
+            flexShrink: 0,
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--color-fg)', flex: 1 }}>
-            Debug tools
+          <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-pt-text)', flex: 1 }}>
+            Debug Tools
           </span>
           <button type="button" className="btn btn-ghost p-1.5" onClick={onClose}>
-            <X size={14} strokeWidth={2} />
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
-        {/* Drawer body */}
+        {/* Body */}
         <div
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: 16,
+            padding: 20,
             display: 'flex',
             flexDirection: 'column',
             gap: 12,
@@ -396,7 +413,7 @@ export function DebugDrawer({
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

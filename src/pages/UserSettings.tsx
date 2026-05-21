@@ -1,3 +1,6 @@
+import { useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { usePlan } from '@/hooks/usePlan';
 import type { PlanTier } from '@/types/plans';
@@ -217,6 +220,7 @@ function RadioCard({ selected, onClick, title, description }: RadioCardProps) {
 export function UserSettings() {
   const { settings, updateUi, updateSession } = useSettings();
   const { tier } = usePlan();
+  const navigate = useNavigate();
 
   const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const tierStyle = TIER_STYLE[tier];
@@ -224,142 +228,202 @@ export function UserSettings() {
   const piiModel = settings.session.piiModel ?? 'openai/privacy-filter';
   const phiConfirmDismissed = settings.session.phiConfirmDismissed;
 
+  const handleClose = () => navigate(-1);
+
   return (
     <div
       style={{
-        maxWidth: 560,
-        margin: '0 auto',
-        padding: '24px 16px 48px',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
         display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
+        justifyContent: 'flex-end',
       }}
+      onClick={handleClose}
     >
-      {/* Plan tier */}
-      <div>
-        <SectionHeading>Plan</SectionHeading>
-        <div style={CARD_STYLE}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <span
-              style={{
-                padding: '3px 10px',
-                borderRadius: 20,
-                fontSize: 11.5,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                background: tierStyle.bg,
-                color: tierStyle.fg,
-                border: `1px solid ${tierStyle.border}`,
-              }}
-            >
-              {TIER_LABELS[tier]}
-            </span>
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: 0 }}>
-            {TIER_DESCRIPTIONS[tier]}
-          </p>
-        </div>
-      </div>
+      {/* Backdrop */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.22)',
+        }}
+      />
 
-      {/* Timezone */}
-      <div>
-        <SectionHeading>Time Zone</SectionHeading>
-        <div style={CARD_STYLE}>
-          <p style={LABEL_STYLE}>Display time zone</p>
-          <p style={DESC_STYLE}>
-            Controls how session dates and times are shown throughout the app.
-          </p>
-          <select
-            style={SELECT_STYLE}
-            value={settings.ui.timezone ?? ''}
-            onChange={(e) => updateUi({ timezone: e.target.value || undefined })}
+      {/* Slide-in card */}
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        transition={{ type: 'tween', duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          position: 'relative',
+          width: 'min(580px, 100vw)',
+          height: '100%',
+          background: 'var(--color-pt-surface)',
+          borderLeft: '1px solid var(--color-pt-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '-8px 0 40px rgba(26,32,48,0.18)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 20px',
+            height: 56,
+            borderBottom: '1px solid var(--color-pt-border)',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-pt-text)', flex: 1 }}>
+            Account Settings
+          </span>
+          <button type="button" className="btn btn-ghost p-1.5" onClick={handleClose}>
+            <X size={16} strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div
+            style={{
+              padding: '24px 20px 48px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 24,
+            }}
           >
-            <option value="">Browser default ({browserTz})</option>
-            {TIMEZONE_GROUPS.map((group) => (
-              <optgroup key={group.label} label={group.label}>
-                {group.zones.map((z) => (
-                  <option key={z.value} value={z.value}>
-                    {z.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-      </div>
+            {/* Plan tier */}
+            <div>
+              <SectionHeading>Plan</SectionHeading>
+              <div style={CARD_STYLE}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <span
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      background: tierStyle.bg,
+                      color: tierStyle.fg,
+                      border: `1px solid ${tierStyle.border}`,
+                    }}
+                  >
+                    {TIER_LABELS[tier]}
+                  </span>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: 0 }}>
+                  {TIER_DESCRIPTIONS[tier]}
+                </p>
+              </div>
+            </div>
 
-      {/* Live transcription provider */}
-      <div>
-        <SectionHeading>Live Transcription</SectionHeading>
-        <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>Transcription source</p>
-          <p style={DESC_STYLE}>
-            How the live preview transcript is generated while you record. Takes effect on the next
-            recording.
-          </p>
-          <RadioCard
-            selected={!webSpeechEnabled}
-            onClick={() => updateSession({ webSpeechEnabled: false })}
-            title="Local PC Processing"
-            description="Whisper AI runs in your browser — segments arrive after each natural pause. Works offline, no extra API calls."
-          />
-          <RadioCard
-            selected={webSpeechEnabled}
-            onClick={() => updateSession({ webSpeechEnabled: true })}
-            title="Google Web Speech"
-            description="Uses your browser's built-in speech recognition for word-by-word captions. Requires an internet connection; accuracy varies by browser."
-          />
-        </div>
-      </div>
+            {/* Timezone */}
+            <div>
+              <SectionHeading>Time Zone</SectionHeading>
+              <div style={CARD_STYLE}>
+                <p style={LABEL_STYLE}>Display time zone</p>
+                <p style={DESC_STYLE}>
+                  Controls how session dates and times are shown throughout the app.
+                </p>
+                <select
+                  style={SELECT_STYLE}
+                  value={settings.ui.timezone ?? ''}
+                  onChange={(e) => updateUi({ timezone: e.target.value || undefined })}
+                >
+                  <option value="">Browser default ({browserTz})</option>
+                  {TIMEZONE_GROUPS.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.zones.map((z) => (
+                        <option key={z.value} value={z.value}>
+                          {z.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-      {/* Notes & Templates Settings */}
-      <div>
-        <SectionHeading>Notes &amp; Templates Settings</SectionHeading>
-        <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>Confirm before sending to Anthropic</p>
-          <p style={DESC_STYLE}>
-            Generating a clinical note sends your transcript off of your device to Anthropic. When
-            on, a confirmation prompt warns you each time so you can verify there is no PHI in the
-            transcript first.
-          </p>
-          <RadioCard
-            selected={!phiConfirmDismissed}
-            onClick={() => updateSession({ phiConfirmDismissed: false })}
-            title="On (recommended)"
-            description="Show a confirmation each time you tap Generate or Regenerate."
-          />
-          <RadioCard
-            selected={phiConfirmDismissed}
-            onClick={() => updateSession({ phiConfirmDismissed: true })}
-            title="Off"
-            description="Skip the confirmation. Generate will send the transcript immediately."
-          />
-        </div>
-      </div>
+            {/* Live transcription provider */}
+            <div>
+              <SectionHeading>Live Transcription</SectionHeading>
+              <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>Transcription source</p>
+                <p style={DESC_STYLE}>
+                  How the live preview transcript is generated while you record. Takes effect on the
+                  next recording.
+                </p>
+                <RadioCard
+                  selected={!webSpeechEnabled}
+                  onClick={() => updateSession({ webSpeechEnabled: false })}
+                  title="Local PC Processing"
+                  description="Whisper AI runs in your browser — segments arrive after each natural pause. Works offline, no extra API calls."
+                />
+                <RadioCard
+                  selected={webSpeechEnabled}
+                  onClick={() => updateSession({ webSpeechEnabled: true })}
+                  title="Google Web Speech"
+                  description="Uses your browser's built-in speech recognition for word-by-word captions. Requires an internet connection; accuracy varies by browser."
+                />
+              </div>
+            </div>
 
-      {/* AI PII Scrubbing System */}
-      <div>
-        <SectionHeading>AI PII Scrubbing System</SectionHeading>
-        <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>On-device PII detection model</p>
-          <p style={DESC_STYLE}>
-            Model used when you tap "Scrub PII" on a transcript. Runs entirely in your browser —
-            no transcript text is sent to any server. Takes effect on the next scrub.
-          </p>
-          <RadioCard
-            selected={piiModel === 'openai/privacy-filter'}
-            onClick={() => updateSession({ piiModel: 'openai/privacy-filter' })}
-            title="OpenAI Privacy Filter (recommended)"
-            description="Specialized PII model — detects names, phone numbers, SSNs, dates of birth, addresses, and more. Requires ONNX files to be pre-seeded to R2."
-          />
-          <RadioCard
-            selected={piiModel === 'Xenova/bert-base-NER'}
-            onClick={() => updateSession({ piiModel: 'Xenova/bert-base-NER' })}
-            title="BERT Base NER"
-            description="General-purpose named-entity model — detects person names, organizations, and locations. Downloads automatically from HuggingFace; works without R2 setup."
-          />
+            {/* Notes & Templates Settings */}
+            <div>
+              <SectionHeading>Notes &amp; Templates Settings</SectionHeading>
+              <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>Confirm before sending to Anthropic</p>
+                <p style={DESC_STYLE}>
+                  Generating a clinical note sends your transcript off of your device to Anthropic.
+                  When on, a confirmation prompt warns you each time so you can verify there is no
+                  PHI in the transcript first.
+                </p>
+                <RadioCard
+                  selected={!phiConfirmDismissed}
+                  onClick={() => updateSession({ phiConfirmDismissed: false })}
+                  title="On (recommended)"
+                  description="Show a confirmation each time you tap Generate or Regenerate."
+                />
+                <RadioCard
+                  selected={phiConfirmDismissed}
+                  onClick={() => updateSession({ phiConfirmDismissed: true })}
+                  title="Off"
+                  description="Skip the confirmation. Generate will send the transcript immediately."
+                />
+              </div>
+            </div>
+
+            {/* AI PII Scrubbing System */}
+            <div>
+              <SectionHeading>AI PII Scrubbing System</SectionHeading>
+              <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>On-device PII detection model</p>
+                <p style={DESC_STYLE}>
+                  Model used when you tap "Scrub PII" on a transcript. Runs entirely in your browser
+                  — no transcript text is sent to any server. Takes effect on the next scrub.
+                </p>
+                <RadioCard
+                  selected={piiModel === 'openai/privacy-filter'}
+                  onClick={() => updateSession({ piiModel: 'openai/privacy-filter' })}
+                  title="OpenAI Privacy Filter (recommended)"
+                  description="Specialized PII model — detects names, phone numbers, SSNs, dates of birth, addresses, and more. Requires ONNX files to be pre-seeded to R2."
+                />
+                <RadioCard
+                  selected={piiModel === 'Xenova/bert-base-NER'}
+                  onClick={() => updateSession({ piiModel: 'Xenova/bert-base-NER' })}
+                  title="BERT Base NER"
+                  description="General-purpose named-entity model — detects person names, organizations, and locations. Downloads automatically from HuggingFace; works without R2 setup."
+                />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
