@@ -197,7 +197,9 @@ After the budget is spent the action disappears (or shows a disabled-with-toolti
 
 ## Scrub PII
 
-A manual, clinician-triggered action during Curate. The clinician clicks "Scrub PII" when they want detected PHI replaced with placeholders. No automatic scrubbing at T2 land or at Generate — the system never silently rewrites the clinician's text. Scrubbing is local (no network); the result is editable like any other text — the clinician can unscrub or adjust placeholders if the detector got it wrong. The clinician has unrestricted editorial control over the curated transcript (fix errors, remove PII, add clarifying content, restructure) — so the system cannot claim the AI is bound to "what was said," only to "what the clinician chose to write." The original machine transcript is preserved as a fallback (Revert to Draft).
+A manual, clinician-triggered action during Curate. The clinician clicks "Scrub PII" to open the PII review modal. Inside the modal they click "Scan for PII" to trigger on-device NER detection — the scan is deliberately a second step so the clinician confirms scope before processing. The modal shows an inline diff of exactly what will change: original text with detected entities struck through, replacement placeholders highlighted. The clinician reviews and clicks "Apply N redactions" to write the scrubbed text to the Edited transcript tier, or closes the modal to discard.
+
+No automatic scrubbing at T2 land or at Generate — the system never silently rewrites the clinician's text. Scrubbing is entirely local (no network); the result is editable like any other text — the clinician can adjust placeholders if the detector got something wrong. The original machine transcript is preserved as a fallback (Revert to Draft).
 
 ## Vault and the recording workflow
 

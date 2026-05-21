@@ -20,7 +20,8 @@ src/
                     SessionTopBar (chrome row: back-to-chart, breadcrumb, AddClipButton,
                       Audio clips toggle, Sign & export),
                     AddClipButton, ClipsDrawer (right drawer ≥768px / bottom sheet <768px),
-                    RecordingPanel, TranscriptPanel (forwardRef → scrollToTimestamp),
+                    RecordingPanel, TranscriptPanel (seekSignal prop drives clip timestamp scroll),
+                    PIIScrubModal (owned usePrivacyFilter; lazy scan + inline diff),
                     NoteToolbar (Template, Modifier, Copy, Generate/Regenerate), NotePanel,
                     plus small extracts: RecordWarningBanner, ReviewEmptyState,
                     TranscriptCollapsedTab, ResetSessionModal, UploadProcessingView
