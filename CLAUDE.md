@@ -31,6 +31,10 @@
 | Demo mode build flag?                    | `VITE_DEMO_MODE=false` to disable. Default is **ON** — auto-unlocks vault with a hardcoded passphrase, skips first-run wizard, seeds a demo patient. **Cloud transcription (Nova) is hard-disabled in demo mode**; T2 local Whisper and Anthropic note generation remain on. Must be `false` for production builds. |
 | Cloud transcription cap per session?     | **1** total Nova call per session, lifetime. Counter persists with the Session entity and is not reset by Revert, Unlock, reload, or any client action. Consumed by "Improve with AI" or the T2-failure dialog's cloud option. See [CONTEXT.md §Cloud-transcription cap](CONTEXT.md#cloud-transcription-cap). |
 
+## Environment
+
+- **Shell: PowerShell** (Windows 11). Use PowerShell syntax in all shell commands — `$env:VAR`, backtick line continuation, `$null` not `/dev/null`. Bash is available via the Bash tool but PowerShell is the default shell.
+
 ## Commands
 
 ```
