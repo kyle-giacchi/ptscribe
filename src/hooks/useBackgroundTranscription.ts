@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, getWhisperPreloadPromise } from '@/services/ai/client/localWhisper';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
@@ -9,7 +9,15 @@ import type { Session, TranscriptChunk } from '@/types';
 const LOCAL_CHUNK_SEC = 120; // 2-minute segments — each maps to a real audio timestamp
 
 const RETRY_DELAY_MS = 3_000;
-const MAX_AUTO_RETRIES = 8;
+const MAX_AUTO_RETRIES = 1; // 1 auto-retry; after that surface error to user
+
+export type T2Phase = 'idle' | 'transcribing' | 'retrying' | 'done' | 'error';
+
+export interface BackgroundT2State {
+  phase: T2Phase;
+  progressLabel: string;
+  retry: () => void;
+}
 
 /**
  * Local-first transcription pipeline for the background auto-pass.
@@ -107,10 +115,15 @@ export function useBackgroundTranscription({
   patchSession,
   setTranscript,
   silencedMergedBlob,
-}: Params): void {
+}: Params): BackgroundT2State {
   const { addNotification } = useNotifications();
   const sessionRef = useRef(session);
-  sessionRef.current = session;
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  const [phase, setPhase] = useState<T2Phase>('idle');
+  const [progressLabel, setProgressLabel] = useState('');
 
   const hasRunRef = useRef(false);
   const retryCountRef = useRef(0);
@@ -119,6 +132,7 @@ export function useBackgroundTranscription({
 
   // Reset run-guards whenever the combined blob changes so T2 re-runs
   // automatically after the user adds new clips and calls buildMergedAudioForReview.
+  // Phase transitions ('idle'→'transcribing') are driven by the main effect below.
   useEffect(() => {
     hasRunRef.current = false;
     retryCountRef.current = 0;
@@ -128,12 +142,17 @@ export function useBackgroundTranscription({
     if (!session || !silencedMergedBlob || hasRunRef.current) return;
 
     hasRunRef.current = true;
+    setPhase('transcribing');
+    setProgressLabel('');
 
     getWhisperPreloadPromise()
-      .then(() => transcribeWithLocalWhisper(silencedMergedBlob))
+      .then(() => transcribeWithLocalWhisper(silencedMergedBlob, (msg) => setProgressLabel(msg)))
       .then((result) => {
         // Don't overwrite a cloud (T3) result if Nova ran while Whisper was processing.
-        if (sessionRef.current?.t3Transcript) return;
+        if (sessionRef.current?.t3Transcript) {
+          setPhase('done');
+          return;
+        }
 
         if (result.ok) {
           setTranscript(result.text);
@@ -142,34 +161,29 @@ export function useBackgroundTranscription({
             activeTranscriptTier: 't2',
             t2Transcript: result.text,
           });
+          setPhase('done');
         } else if (result.error !== 'Aborted.') {
+          // Content error (no speech, too short) — notify and treat as done
           addNotification(
             'warning',
             'Automatic transcription found no usable audio. Use Improve with AI to retry with cloud.',
           );
+          setPhase('done');
+        } else {
+          setPhase('done');
         }
       })
-      .catch((e: Error) => {
+      .catch(() => {
         const retries = retryCountRef.current + 1;
         if (retries <= MAX_AUTO_RETRIES) {
           retryCountRef.current = retries;
           hasRunRef.current = false;
+          setPhase('retrying');
+          setProgressLabel('Retrying…');
           setTimeout(() => setRetryTick((t) => t + 1), RETRY_DELAY_MS);
         } else {
-          const isFetchError =
-            e.message.toLowerCase().includes('fetch') ||
-            e.message.toLowerCase().includes('network');
-          if (isFetchError) {
-            addNotification(
-              'error',
-              'Whisper model unavailable — use Improve with AI for cloud transcription.',
-            );
-          } else {
-            addNotification(
-              'error',
-              'Automatic transcription failed. Use Improve with AI to retry.',
-            );
-          }
+          setPhase('error');
+          setProgressLabel('');
         }
       });
 
@@ -177,4 +191,12 @@ export function useBackgroundTranscription({
     // updates — safe to omit. retryTick re-triggers after each backoff period.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [silencedMergedBlob, retryTick]);
+
+  const retry = useCallback(() => {
+    retryCountRef.current = 0;
+    hasRunRef.current = false;
+    setRetryTick((t) => t + 1);
+  }, []);
+
+  return { phase, progressLabel, retry };
 }
