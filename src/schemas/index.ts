@@ -43,6 +43,14 @@ const PatientSchema = z.object({
   updatedAt: z.number().int(),
 });
 
+// ─── Modifiers ──────────────────────────────────────────────────────────────
+
+const SessionModifiersSchema = z.object({
+  tone: z.enum(['narrative', 'terse', 'clinical']).optional(),
+  emphasis: z.array(z.enum(['more_detail', 'functional_outcomes', 'patient_progress'])),
+  customInstruction: z.string().max(200).optional(),
+});
+
 // ─── Session ────────────────────────────────────────────────────────────────
 
 const TranscriptChunkSchema = z.object({
@@ -83,6 +91,7 @@ const SessionSchema = z.object({
   activeTranscriptTier: z.enum(['t1', 't2', 't3', 'edited']).optional(),
   noteId: z.string().optional(),
   templateId: z.string().optional(),
+  modifiers: SessionModifiersSchema.optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
@@ -106,6 +115,8 @@ const NoteSchema = z.object({
   finalizedAt: z.number().int().optional(),
   editedAfterFinalizedAt: z.number().int().optional(),
   editedAfterFinalizedCount: z.number().int().optional(),
+  modifiers: SessionModifiersSchema.optional(),
+  generatedFromTranscript: z.string().optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
@@ -238,7 +249,6 @@ const SettingsSchema = z.object({
   }),
   orgPolicy: z.object({
     activeTemplateId: z.string().optional(),
-    toneStyle: z.enum(['narrative', 'terse', 'clinical']),
   }),
   firstRun: z.object({
     role: z.enum(['owner', 'clinician']).optional(),
@@ -324,7 +334,7 @@ export function defaultAppData(): AppData {
         maxMinutes: 90,
         idleAutoStopMinutes: 10,
       },
-      orgPolicy: { toneStyle: 'narrative' },
+      orgPolicy: {},
       firstRun: {},
       ui: { sidebarCollapsed: false, densityMode: 'cozy', theme: 'light' },
       retention: {},

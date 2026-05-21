@@ -764,7 +764,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
           transcript,
           patient: patient!,
           sessionType: session!.type,
-          toneStyle: settings.orgPolicy.toneStyle,
+          modifiers: session!.modifiers,
           activeTranscriptTier: session!.activeTranscriptTier,
           signal: controller.signal,
           onRetry: (info) =>
@@ -774,17 +774,25 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
             }),
         });
 
+        const modifierSnapshot = session!.modifiers;
+        const transcriptSnapshot = transcript;
         if (note) {
           updateNote(note.id, {
             sections: result.sections,
             templateId: template.id,
             format: template.format,
+            modifiers: modifierSnapshot,
+            generatedFromTranscript: transcriptSnapshot,
           });
         } else {
-          ensureNote(result.sections);
+          const created = ensureNote(result.sections);
+          updateNote(created.id, {
+            modifiers: modifierSnapshot,
+            generatedFromTranscript: transcriptSnapshot,
+          });
         }
         recordAction('generate');
-        dispatch({ type: 'generate/success', rawText: result.rawText });
+        dispatch({ type: 'generate/success', rawText: result.rawText, prompts: result.debugPrompts });
         patchSession({ status: 'ready' });
 
         const hasContent = result.sections.some((s) => s.body.trim().length > 0);

@@ -470,12 +470,6 @@ describe('migrate v12 → v13', () => {
     });
   });
 
-  it('seeds default orgPolicy.toneStyle to narrative', () => {
-    const result = migrate(v12AppData());
-    expect(result.settings.orgPolicy.toneStyle).toBe('narrative');
-    expect(result.settings.orgPolicy.activeTemplateId).toBeUndefined();
-  });
-
   it('seeds an empty firstRun block', () => {
     const result = migrate(v12AppData());
     expect(result.settings.firstRun).toEqual({});
@@ -525,35 +519,18 @@ describe('migrate v12 → v13', () => {
     });
   });
 
-  it('preserves an existing orgPolicy with valid tone and template id', () => {
+  it('preserves an existing orgPolicy activeTemplateId', () => {
     const seed = defaultAppData();
     const data: Record<string, unknown> = {
       ...seed,
       version: 12,
       settings: {
         ...seed.settings,
-        orgPolicy: { activeTemplateId: 'tpl-123', toneStyle: 'terse' },
+        orgPolicy: { activeTemplateId: 'tpl-123' },
       } as unknown,
     };
     const result = migrate(data);
-    expect(result.settings.orgPolicy).toEqual({
-      activeTemplateId: 'tpl-123',
-      toneStyle: 'terse',
-    });
-  });
-
-  it('falls back to narrative tone when an unknown style is encountered', () => {
-    const seed = defaultAppData();
-    const data: Record<string, unknown> = {
-      ...seed,
-      version: 12,
-      settings: {
-        ...seed.settings,
-        orgPolicy: { toneStyle: 'colloquial' },
-      } as unknown,
-    };
-    const result = migrate(data);
-    expect(result.settings.orgPolicy.toneStyle).toBe('narrative');
+    expect(result.settings.orgPolicy.activeTemplateId).toBe('tpl-123');
   });
 
   it('preserves an existing firstRun block', () => {
@@ -755,33 +732,6 @@ describe('migrate v12 → v13: null/corrupt field robustness', () => {
       maxMinutes: 90,
       idleAutoStopMinutes: 10,
     });
-  });
-
-  it('does not throw when orgPolicy.toneStyle is null', () => {
-    const seed = defaultAppData();
-    const data: Record<string, unknown> = {
-      ...seed,
-      version: 12,
-      settings: {
-        ...seed.settings,
-        orgPolicy: { toneStyle: null, activeTemplateId: null },
-      } as unknown,
-    };
-    expect(() => migrate(data)).not.toThrow();
-  });
-
-  it('falls back to narrative toneStyle when value is null', () => {
-    const seed = defaultAppData();
-    const data: Record<string, unknown> = {
-      ...seed,
-      version: 12,
-      settings: {
-        ...seed.settings,
-        orgPolicy: { toneStyle: null },
-      } as unknown,
-    };
-    const result = migrate(data);
-    expect(result.settings.orgPolicy.toneStyle).toBe('narrative');
   });
 
   it('does not throw when firstRun is null', () => {

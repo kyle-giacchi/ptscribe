@@ -35,6 +35,7 @@ export function sessionMachineReducer(
           ...state.generate,
           phase: 'idle',
           lastRawPayload: action.rawText,
+          lastAiPrompts: action.prompts,
           retryStatus: null,
           aiError: null,
         },

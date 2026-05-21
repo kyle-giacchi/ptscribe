@@ -1,4 +1,4 @@
-import type { NoteTemplate, Patient, Note, SessionType, ToneStyle } from '@/types';
+import type { NoteTemplate, Patient, Note, SessionType, SessionModifiers } from '@/types';
 
 export interface BuildPromptArgs {
   template: NoteTemplate;
@@ -8,7 +8,7 @@ export interface BuildPromptArgs {
   sessionType?: SessionType;
 }
 
-const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {
+const TONE_INSTRUCTIONS: Record<NonNullable<SessionModifiers['tone']>, string> = {
   narrative: 'Write in flowing professional prose. Full sentences. Clinical but readable.',
   terse:
     'Write in bullet-point shorthand. Phrases over sentences. Skip articles where ambiguity is low. Prefer abbreviations a PT will recognize (PROM, AROM, MMT, WBAT, NWB, etc.).',
@@ -16,12 +16,29 @@ const TONE_INSTRUCTIONS: Record<ToneStyle, string> = {
     'Write in formal clinical documentation style. Third-person passive where natural. Use precise anatomical and biomechanical terminology. Cite specific measurements when transcript supplies them.',
 };
 
-export function buildSystemPrompt(
-  template: NoteTemplate,
-  toneStyle: ToneStyle = 'narrative',
-): string {
-  const base = template.systemPrompt.trimEnd();
-  return `${base}\n\n# Tone & style\n${TONE_INSTRUCTIONS[toneStyle]}`;
+const EMPHASIS_INSTRUCTIONS: Record<NonNullable<SessionModifiers['emphasis'][number]>, string> = {
+  more_detail: 'Include more clinical detail and specificity throughout.',
+  functional_outcomes: 'Emphasize functional outcomes and their impact on the patient\'s daily activities.',
+  patient_progress: 'Highlight patient progress, improvements, and response to treatment.',
+};
+
+export function buildModifierBlock(modifiers: SessionModifiers): string {
+  const lines: string[] = [];
+
+  if (modifiers.tone) {
+    lines.push(`# Tone & style\n${TONE_INSTRUCTIONS[modifiers.tone]}`);
+  }
+
+  if (modifiers.emphasis.length > 0) {
+    const emphasisLines = modifiers.emphasis.map((e) => `- ${EMPHASIS_INSTRUCTIONS[e]}`);
+    lines.push(`# Emphasis\n${emphasisLines.join('\n')}`);
+  }
+
+  if (modifiers.customInstruction?.trim()) {
+    lines.push(`# Additional instruction\n${modifiers.customInstruction.trim()}`);
+  }
+
+  return lines.join('\n\n');
 }
 
 /**

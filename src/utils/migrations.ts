@@ -58,6 +58,8 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   (type `TranscriptTier`). Old `transcriptSource` values mapped: 'webspeech'→'t1',
  *   'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'. New `Session.editedTranscript`
  *   optional field added (no structural transform needed — defaults to absent).
+ * - v19 → v20: Removes `Settings.orgPolicy.toneStyle` — tone is now a Modifier chip on
+ *   each Session. Zod strips the stale field automatically; migration just bumps version.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -128,6 +130,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 18) {
     working = migrateV18ToV19(working);
+  }
+  if ((working as { version?: number }).version === 19) {
+    working = migrateV19ToV20(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -435,6 +440,11 @@ function migrateV16ToV17(input: Record<string, unknown>): Record<string, unknown
   // (aiTranscript) all default to absent. TranscriptSource gains 'nova'. No structural
   // transformation needed — existing data passes the updated schema as-is.
   return { ...input, version: 17 };
+}
+
+function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {
+  // toneStyle removed from orgPolicy — Zod strips the stale field; just bump version.
+  return { ...input, version: 20 };
 }
 
 function migrateV18ToV19(input: Record<string, unknown>): Record<string, unknown> {

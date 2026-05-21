@@ -235,7 +235,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const handleUnfinalize = sessionMachine.generate.unfinalize;
   const handleCopyNoteMarkdown = sessionMachine.generate.copyMarkdown;
   const { missingRequiredLabels } = sessionMachine.generate;
-  const { lastRawPayload, aiError: generationAiError, retryStatus: generationRetryStatus } =
+  const { lastRawPayload, lastAiPrompts, aiError: generationAiError, retryStatus: generationRetryStatus } =
     sessionMachine.state.generate;
   const clearGenerationAiError = sessionMachine.generate.clearAiError;
 
@@ -357,6 +357,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     effectiveTranscript.trim().length > 0 &&
     settings.ai.generation.provider === 'anthropic' &&
     generateUsed < MAX_GENERATES_PER_SESSION;
+
+  const currentModifiers = session.modifiers ?? { emphasis: [] };
+
+  const canRegenerate = !note || (
+    effectiveTranscript !== (note.generatedFromTranscript ?? '') ||
+    JSON.stringify(currentModifiers) !== JSON.stringify(note.modifiers ?? { emphasis: [] })
+  );
+
+  function handleModifiersChange(next: import('@/types').SessionModifiers) {
+    patchSession({ modifiers: next });
+  }
 
   const isTranscriptLocked = sortedClips.length === 0 && !effectiveTranscript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
@@ -552,12 +563,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   templates={templates}
                   hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
                   canGenerate={canGenerate}
+                  canRegenerate={canRegenerate}
                   isGenerating={busy === 'generating'}
                   noteExists={!!note}
+                  modifiers={currentModifiers}
                   onTemplateChange={handleTemplateChange}
                   onManageTemplates={() => setManageTemplatesOpen(true)}
                   onGenerate={handleGenerate}
                   onCopyNote={handleCopyNote}
+                  onModifiersChange={handleModifiersChange}
                 />
 
                 <NotePanel
@@ -696,6 +710,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           debugStats={debugStats}
           speedFactor={settings.audio.speedUp.speed}
           lastRawPayload={lastRawPayload}
+          lastAiPrompts={lastAiPrompts}
         />
       )}
 
