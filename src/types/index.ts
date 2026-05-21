@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 19;
+export const APP_DATA_VERSION = 20;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -46,6 +46,17 @@ export interface Patient {
   status: PatientStatus;
   createdAt: number;
   updatedAt: number;
+}
+
+// ─── Modifiers ──────────────────────────────────────────────────────────────
+
+export type ModifierTone = 'narrative' | 'terse' | 'clinical';
+export type ModifierEmphasis = 'more_detail' | 'functional_outcomes' | 'patient_progress';
+
+export interface SessionModifiers {
+  tone?: ModifierTone;
+  emphasis: ModifierEmphasis[];
+  customInstruction?: string;
 }
 
 // ─── Session ────────────────────────────────────────────────────────────────
@@ -110,6 +121,7 @@ export interface Session {
   activeTranscriptTier?: TranscriptTier;
   noteId?: ID;
   templateId?: ID;
+  modifiers?: SessionModifiers;
   createdAt: number;
   updatedAt: number;
 }
@@ -144,6 +156,8 @@ export interface Note {
    * at the time of unlock.
    */
   editedAfterFinalizedCount?: number;
+  modifiers?: SessionModifiers;
+  generatedFromTranscript?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -371,18 +385,13 @@ export interface RecordingLimitsSettings {
   idleAutoStopMinutes: number;
 }
 
-export type ToneStyle = 'narrative' | 'terse' | 'clinical';
-
 /**
  * Org-wide documentation policy. The `activeTemplateId` makes one template the
  * organization default — NewSession and the generator use it unless the
- * clinician explicitly picks another. `toneStyle` flows into the generator
- * prompt so two clinicians dictating the same visit produce notes that read
- * alike.
+ * clinician explicitly picks another.
  */
 export interface OrgPolicySettings {
   activeTemplateId?: ID;
-  toneStyle: ToneStyle;
 }
 
 export type FirstRunRole = 'owner' | 'clinician';
@@ -441,6 +450,14 @@ export type PageKey =
   | 'notes'
   | 'templates'
   | 'exercises';
+
+// ─── AI debug ───────────────────────────────────────────────────────────────
+
+export interface AiDebugPrompts {
+  system: string;
+  modifierBlock: string;
+  user: string;
+}
 
 // ─── AppData root ───────────────────────────────────────────────────────────
 

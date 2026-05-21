@@ -32,31 +32,11 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
 }
 
-type ToneStyle = 'narrative' | 'terse' | 'clinical';
-
-/**
- * Tone blocks are kept server-side so the composed system prompt is built from
- * a static constant — the exact string that Anthropic caches never varies due
- * to client-side reconstruction differences.
- */
-const TONE_BLOCKS: Record<ToneStyle, string> = {
-  narrative: 'Write in flowing professional prose. Full sentences. Clinical but readable.',
-  terse:
-    'Write in bullet-point shorthand. Phrases over sentences. Skip articles where ambiguity is low. Prefer abbreviations a PT will recognize (PROM, AROM, MMT, WBAT, NWB, etc.).',
-  clinical:
-    'Write in formal clinical documentation style. Third-person passive where natural. Use precise anatomical and biomechanical terminology. Cite specific measurements when transcript supplies them.',
-};
-
-const DEFAULT_TONE: ToneStyle = 'narrative';
-
 interface GenerateBody {
   model?: string;
-  /** Raw template system prompt — WITHOUT the tone block. The Worker appends
-   *  the tone block from TONE_BLOCKS so the cached string is always built from
-   *  a server-side constant. */
   system?: string;
-  /** Tone style key. Defaults to 'narrative'. */
-  toneStyle?: ToneStyle;
+  /** Pre-built modifier block (tone + emphasis + custom). Appended to system prompt when present. */
+  modifierBlock?: string;
   user?: string;
   maxTokens?: number;
   temperature?: number;
@@ -502,12 +482,10 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     return apiError('MISSING_FIELDS', 'user prompt too large', 400);
   }
 
-  // Compose the final system prompt server-side so the cached string is built
-  // from a static constant (TONE_BLOCKS) rather than a client-reconstructed
-  // string, guaranteeing stable Anthropic prompt-cache keys.
-  const toneStyle: ToneStyle =
-    body.toneStyle && body.toneStyle in TONE_BLOCKS ? body.toneStyle : DEFAULT_TONE;
-  const finalSystem = `${body.system.trimEnd()}\n\n# Tone & style\n${TONE_BLOCKS[toneStyle]}`;
+  const modifierBlock = body.modifierBlock?.trim();
+  const finalSystem = modifierBlock
+    ? `${body.system.trimEnd()}\n\n${modifierBlock}`
+    : body.system.trimEnd();
 
   const cacheSystem = body.cacheSystem !== false;
   const systemBlocks = [
