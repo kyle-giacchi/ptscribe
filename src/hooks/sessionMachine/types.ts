@@ -37,11 +37,25 @@ export interface TranscribeState {
   debugStats: TranscribeDebugStats | null;
 }
 
+// ── Capture slice ─────────────────────────────────────────────────────────
+
+export type UploadPhase = 'idle' | 'reading' | 'saving' | 'done' | 'error';
+
+export interface UploadStatus {
+  phase: UploadPhase;
+  message: string;
+}
+
+export interface CaptureState {
+  uploadStatus: UploadStatus;
+}
+
 // ── Combined state ────────────────────────────────────────────────────────
 
 export interface SessionMachineState {
   generate: GenerateState;
   transcribe: TranscribeState;
+  capture: CaptureState;
 }
 
 export type SessionMachineAction =
@@ -58,7 +72,9 @@ export type SessionMachineAction =
   | { type: 'transcribe/empty' }
   | { type: 'transcribe/error'; aiError: AiCallError | null }
   | { type: 'transcribe/abort' }
-  | { type: 'transcribe/clearAiError' };
+  | { type: 'transcribe/clearAiError' }
+  // capture
+  | { type: 'capture/upload'; status: UploadStatus };
 
 export const initialSessionMachineState: SessionMachineState = {
   generate: {
@@ -72,5 +88,8 @@ export const initialSessionMachineState: SessionMachineState = {
     aiError: null,
     retryStatus: null,
     debugStats: null,
+  },
+  capture: {
+    uploadStatus: { phase: 'idle', message: '' },
   },
 };

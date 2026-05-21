@@ -125,6 +125,12 @@ export function sessionMachineReducer(
         transcribe: { ...state.transcribe, aiError: null },
       };
 
+    case 'capture/upload':
+      return {
+        ...state,
+        capture: { ...state.capture, uploadStatus: action.status },
+      };
+
     default:
       return state;
   }
