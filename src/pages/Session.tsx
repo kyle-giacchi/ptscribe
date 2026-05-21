@@ -19,7 +19,8 @@ import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useRecordingFlow } from '@/hooks/useRecordingFlow';
 import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
-import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
+import { useSessionMachine } from '@/hooks/useSessionMachine';
+import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
@@ -245,7 +246,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   // ── Note/generation flow ─────────────────────────────────────────────────
-  const generation = useGenerationFlow({
+  const sessionMachine = useSessionMachine({
     session,
     patient,
     note,
@@ -255,24 +256,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     patchSession,
     setError,
     setBusy,
-    setTranscript,
-    setActiveTab,
     checkActionGuard,
     recordAction,
   });
-  const {
-    handleGenerate: handleGenerateRaw,
-    handleSectionChange,
-    handleReplaceSections,
-    handleFinalize,
-    handleUnfinalize,
-    handleCopyNoteMarkdown,
-    missingRequiredLabels,
-    lastRawPayload,
-    aiError: generationAiError,
-    retryStatus: generationRetryStatus,
-    clearAiError: clearGenerationAiError,
-  } = generation;
+  const handleGenerateRaw = sessionMachine.generate.run;
+  const handleSectionChange = sessionMachine.generate.sectionChange;
+  const handleReplaceSections = sessionMachine.generate.replaceSections;
+  const handleFinalize = sessionMachine.generate.finalize;
+  const handleUnfinalize = sessionMachine.generate.unfinalize;
+  const handleCopyNoteMarkdown = sessionMachine.generate.copyMarkdown;
+  const { missingRequiredLabels } = sessionMachine.generate;
+  const { lastRawPayload, aiError: generationAiError, retryStatus: generationRetryStatus } =
+    sessionMachine.state.generate;
+  const clearGenerationAiError = sessionMachine.generate.clearAiError;
 
   // ── PHI confirmation gate before generation ─────────────────────────────
   // Always shown (regardless of PII filter state) unless user has dismissed it
