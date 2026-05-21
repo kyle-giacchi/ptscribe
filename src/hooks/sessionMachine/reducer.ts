@@ -126,6 +126,15 @@ export function sessionMachineReducer(
         transcribe: { ...state.transcribe, aiError: null },
       };
 
+    case 't2/start':
+      return { ...state, t2: { phase: 'running' } };
+
+    case 't2/done':
+      return { ...state, t2: { phase: 'done' } };
+
+    case 't2/error':
+      return { ...state, t2: { phase: 'error' } };
+
     case 'capture/upload':
       return {
         ...state,
