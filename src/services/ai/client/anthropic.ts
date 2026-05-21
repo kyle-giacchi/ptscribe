@@ -4,20 +4,18 @@
  * secret. The browser never sees the key.
  */
 
-import type { ToneStyle } from '@/types';
 import { apiFetch } from '@/lib/apiClient';
 import { AiCallError, classifyResponse, type AiErrorKind } from '../errors';
 
 export interface AnthropicMessageArgs {
   model: string;
-  /** Raw template system prompt — WITHOUT the tone block. The Worker appends
-   *  the tone block server-side from its static TONE_BLOCKS map so the exact
-   *  string sent to Anthropic is always built from a constant, giving stable
-   *  prompt-cache keys. */
+  /** Raw template system prompt — WITHOUT the modifier block. The Worker
+   *  appends the modifier block server-side so the string sent to Anthropic
+   *  is always composed server-side, giving stable prompt-cache keys. */
   system: string;
-  /** Tone style; forwarded to the Worker which appends the matching block.
-   *  Defaults to 'narrative' if omitted. */
-  toneStyle?: ToneStyle;
+  /** Pre-built modifier block (tone + emphasis + custom instruction).
+   *  Forwarded to the Worker which appends it to the system prompt. */
+  modifierBlock?: string;
   user: string;
   maxTokens?: number;
   temperature?: number;
@@ -51,7 +49,7 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
         body: JSON.stringify({
           model: args.model,
           system: args.system,
-          toneStyle: args.toneStyle,
+          modifierBlock: args.modifierBlock,
           user: args.user,
           maxTokens: args.maxTokens,
           temperature: args.temperature,

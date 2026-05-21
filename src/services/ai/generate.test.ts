@@ -7,6 +7,7 @@ import type { NoteTemplate, Patient } from '@/types';
 vi.mock('./client/anthropic');
 vi.mock('@/lib/clinical/prompts', () => ({
   buildUserPrompt: vi.fn().mockReturnValue('mock user prompt'),
+  buildModifierBlock: vi.fn().mockReturnValue('# Tone & style\nbullet-point shorthand'),
 }));
 
 const mockCallAnthropic = vi.mocked(callAnthropic);
@@ -105,16 +106,27 @@ describe('generateNote', () => {
     expect(result.sections[1].body).toBe('');
   });
 
-  it('passes model, systemPrompt, and toneStyle through to callAnthropic', async () => {
+  it('passes model and systemPrompt through to callAnthropic', async () => {
     mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
 
-    await generateNote({ ...baseArgs, toneStyle: 'terse' });
+    await generateNote({ ...baseArgs });
 
     expect(mockCallAnthropic).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'claude-sonnet-4-6',
         system: mockTemplate.systemPrompt,
-        toneStyle: 'terse',
+      }),
+    );
+  });
+
+  it('passes modifier block to callAnthropic when modifiers are set', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+    await generateNote({ ...baseArgs, modifiers: { tone: 'terse', emphasis: [] } });
+
+    expect(mockCallAnthropic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modifierBlock: expect.stringContaining('bullet-point shorthand'),
       }),
     );
   });

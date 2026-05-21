@@ -1,15 +1,16 @@
 import type {
+  AiDebugPrompts,
   GenerationProvider,
   NoteSection,
   NoteTemplate,
   Note,
   Patient,
+  SessionModifiers,
   SessionType,
-  ToneStyle,
   TranscriptTier,
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
-import { buildUserPrompt } from '@/lib/clinical/prompts';
+import { buildUserPrompt, buildModifierBlock } from '@/lib/clinical/prompts';
 
 // Appended to the system prompt when no AI (diarized) transcript is available.
 // Browser speech recognition captures a single merged audio stream with no
@@ -28,7 +29,7 @@ export interface GenerateNoteArgs {
   patient: Patient;
   priorNote?: Note;
   sessionType?: SessionType;
-  toneStyle?: ToneStyle;
+  modifiers?: SessionModifiers;
   activeTranscriptTier?: TranscriptTier;
   signal?: AbortSignal;
   onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
@@ -37,6 +38,7 @@ export interface GenerateNoteArgs {
 export interface GenerateNoteResult {
   sections: NoteSection[];
   rawText: string;
+  debugPrompts: AiDebugPrompts;
 }
 
 type GenerateBackend = (args: GenerateNoteArgs) => Promise<GenerateNoteResult>;
@@ -57,13 +59,12 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       ? args.template.systemPrompt
       : args.template.systemPrompt.trimEnd() + NO_DIARIZATION_NOTE;
 
+    const modifierBlock = args.modifiers ? buildModifierBlock(args.modifiers) : '';
+
     const result = await callAnthropic({
       model: args.model || 'claude-sonnet-4-6',
-      // Send the raw template system prompt WITHOUT the tone block. The Worker
-      // appends the tone block server-side from its static TONE_BLOCKS constant,
-      // so the string Anthropic caches is always built from a stable source.
       system,
-      toneStyle: args.toneStyle,
+      modifierBlock,
       user: userPrompt,
       signal: args.signal,
       onRetry: args.onRetry,
@@ -75,7 +76,11 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       label: s.label,
       body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
     }));
-    return { sections, rawText: result.text };
+    return {
+      sections,
+      rawText: result.text,
+      debugPrompts: { system, modifierBlock, user: userPrompt },
+    };
   },
   none: () => {
     throw new Error('AI generation is disabled. Pick a provider in Settings.');
