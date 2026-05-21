@@ -119,9 +119,11 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
 
 // ── Worker message types ─────────────────────────────────────────────────────
 
+type PipelineDtype = 'q8' | 'q4' | 'q4f16' | 'fp16' | 'fp32' | 'int8' | 'uint8';
+
 type InMsg =
-  | { id: number; type: 'preload'; model: string }
-  | { id: number; type: 'scrub'; text: string; model: string };
+  | { id: number; type: 'preload'; model: string; dtype?: PipelineDtype }
+  | { id: number; type: 'scrub'; text: string; model: string; dtype?: PipelineDtype };
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
@@ -167,6 +169,7 @@ function buildScrubbed(
 
 let currentPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
 let currentModel = '';
+let currentDtype = '';
 
 const PIPELINE_LOAD_TIMEOUT_MS = 60_000;
 
@@ -189,14 +192,16 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 self.onmessage = async (e: MessageEvent<InMsg>) => {
   const msg = e.data;
   const { id, model } = msg;
+  const dtype = msg.dtype ?? 'q8';
 
   try {
-    if (!currentPipeline || currentModel !== model) {
+    if (!currentPipeline || currentModel !== model || currentDtype !== dtype) {
       currentPipeline = null;
       currentModel = '';
+      currentDtype = '';
       currentPipeline = await withTimeout(
         pipeline('token-classification', model, {
-          dtype: 'q8',
+          dtype,
           session_options: { graphOptimizationLevel: 'basic' },
           progress_callback: (p: {
             status: string;

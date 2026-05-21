@@ -28,6 +28,7 @@ interface TranscriptPanelProps {
   onChange: (next: string) => void;
   onCommit: () => void;
   onCreateTranscript: (clipId?: string) => void;
+  canImproveWithAI?: boolean;
   onRevertToLocal: () => void;
   onCopyTranscript?: () => void;
   onScrubPII?: (text: string) => Promise<{ scrubbed: string; entityCount: number }>;
@@ -45,7 +46,7 @@ export const TranscriptPanel = forwardRef<TranscriptPanelHandle, TranscriptPanel
       totalDurationSec, collapsed, onCollapse,
       onChange, onCommit, onCreateTranscript, onRevertToLocal,
       onCopyTranscript, onScrubPII, onApplyScrub, piiScrubbing, piiProgress,
-      hasEditedTranscript, onRevertEdits,
+      hasEditedTranscript, onRevertEdits, canImproveWithAI = true,
     } = props;
 
     const scrollRootRef = useRef<HTMLDivElement>(null);
@@ -252,24 +253,26 @@ export const TranscriptPanel = forwardRef<TranscriptPanelHandle, TranscriptPanel
 
           {/* Body */}
           <div>
-            {/* Improve with AI strip — unchanged */}
-            {transcript.trim() && (
+            {/* Improve with AI strip — hidden in demo mode and after Nova has run once */}
+            {transcript.trim() && (canImproveWithAI || onScrubPII) && (
               <div
                 className="flex items-center gap-1 px-3 py-2"
                 style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
               >
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ fontSize: 12 }}
-                  disabled={transcribing}
-                  onClick={handleCreateClick}
-                  title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result."
-                >
-                  {transcribing
-                    ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
-                    : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
-                </button>
+                {canImproveWithAI && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12 }}
+                    disabled={transcribing}
+                    onClick={handleCreateClick}
+                    title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result."
+                  >
+                    {transcribing
+                      ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
+                      : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
+                  </button>
+                )}
                 {onScrubPII && (
                   <button
                     type="button"

@@ -23,7 +23,6 @@ export interface SettingsContextValue {
   updateRecordingLimits: (patch: Partial<RecordingLimitsSettings>) => void;
   updateOrgPolicy: (patch: Partial<OrgPolicySettings>) => void;
   updateFirstRun: (patch: Partial<FirstRunState>) => void;
-  setIdleLockMinutes: (minutes: number) => void;
   setAutoDeleteAudioAfterDays: (days: number | undefined) => void;
   // Per-page detail-level toggle (kept from prior app for the dashboard etc.).
   // We persist this in localStorage directly because it isn't part of the
@@ -101,11 +100,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updateSettingsSlice({ ...settings, orgPolicy: { ...settings.orgPolicy, ...patch } }),
       updateFirstRun: (patch) =>
         updateSettingsSlice({ ...settings, firstRun: { ...settings.firstRun, ...patch } }),
-      setIdleLockMinutes: (minutes: number) =>
-        updateSettingsSlice({
-          ...settings,
-          security: { ...settings.security, idleLockMinutes: minutes },
-        }),
       setAutoDeleteAudioAfterDays: (days: number | undefined) =>
         updateSettingsSlice({
           ...settings,
