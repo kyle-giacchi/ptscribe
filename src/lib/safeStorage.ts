@@ -43,7 +43,7 @@ export const safeLocalStorage = {
     } catch (e) {
       const name = (e as DOMException)?.name;
       if (name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-        throw new Error('QuotaExceeded: localStorage is full');
+        throw new Error('QuotaExceeded: localStorage is full', { cause: e });
       }
       throw e;
     }

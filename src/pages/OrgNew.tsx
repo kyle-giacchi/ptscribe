@@ -45,7 +45,12 @@ export function OrgNew() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
 
-  const [gate, setGate] = useState<GateState>({ status: 'loading' });
+  // Synchronously gate on "no token in URL" — the effect only runs the async
+  // validate() call. This keeps setState out of the effect body for the trivial
+  // missing-token case.
+  const [gate, setGate] = useState<GateState>(() =>
+    token ? { status: 'loading' } : { status: 'invalid', message: 'No invite token found in this URL.' },
+  );
   const [step, setStep] = useState<Step>('details');
   const [org, setOrg] = useState<OrgDraft>({
     name: '',
@@ -65,11 +70,7 @@ export function OrgNew() {
   }, [authLoading, isAuthenticated, navigate, token]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
-    if (!token) {
-      setGate({ status: 'invalid', message: 'No invite token found in this URL.' });
-      return;
-    }
+    if (!isAuthenticated || !token) return;
     let cancelled = false;
     async function validate() {
       try {
