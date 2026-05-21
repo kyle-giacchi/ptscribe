@@ -17,7 +17,7 @@ import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { newId } from '@/utils/ids';
 import { useActionGuard } from './useActionGuard';
-import { useBackgroundTranscription } from './useBackgroundTranscription';
+import { useBackgroundTranscription, type BackgroundT2State } from './useBackgroundTranscription';
 import { sessionMachineReducer } from './sessionMachine/reducer';
 import {
   initialSessionMachineState,
@@ -106,7 +106,7 @@ export interface SessionMachineCaptureApi {
   handleStopAndFinish: () => void;
   handleUploadAudio: (file: File) => Promise<string | null>;
   handleDeleteClip: (clipId: string) => Promise<void>;
-  buildMergedAudioForReview: () => Promise<void>;
+  buildMergedAudioForReview: (opts?: { skipNav?: boolean }) => Promise<void>;
 }
 
 export interface SessionMachine {
@@ -115,6 +115,7 @@ export interface SessionMachine {
   transcribe: SessionMachineTranscribeApi;
   capture: SessionMachineCaptureApi;
   actionGuard: SessionMachineActionGuardApi;
+  backgroundT2: BackgroundT2State;
 }
 
 /**
@@ -176,7 +177,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
 
   // Background local-Whisper pass — auto-fires when silencedMergedBlob is
   // produced by the recording flow.
-  useBackgroundTranscription({ session, patchSession, setTranscript, silencedMergedBlob });
+  const backgroundT2 = useBackgroundTranscription({ session, patchSession, setTranscript, silencedMergedBlob });
 
   // ── Capture slice (recording lifecycle) ─────────────────────────────────
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
@@ -613,7 +614,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   }
 
   // ── Recording complete — merge clips + compile live transcripts ──────────
-  async function buildMergedAudioForReview() {
+  async function buildMergedAudioForReview(opts?: { skipNav?: boolean }) {
     const readyClips = sortedClips.filter(
       (c) => c.status === 'ready' || c.status === 'transcribed',
     );
@@ -666,7 +667,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       patchSession(patch);
     }
 
-    setActiveTab('review');
+    if (!opts?.skipNav) setActiveTab('review');
   }
 
   // Keep ref current so the auto-stop effect always invokes the latest closure.
@@ -1100,7 +1101,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   );
 
   return useMemo(
-    () => ({ state, generate, transcribe: transcribeApi, capture, actionGuard }),
-    [state, generate, transcribeApi, capture, actionGuard],
+    () => ({ state, generate, transcribe: transcribeApi, capture, actionGuard, backgroundT2 }),
+    [state, generate, transcribeApi, capture, actionGuard, backgroundT2],
   );
 }

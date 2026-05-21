@@ -201,6 +201,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
       currentDtype = '';
       currentPipeline = await withTimeout(
         pipeline('token-classification', model, {
+          device: 'wasm',
           dtype,
           session_options: { graphOptimizationLevel: 'basic' },
           progress_callback: (p: {
