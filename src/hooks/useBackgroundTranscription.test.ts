@@ -27,7 +27,6 @@ vi.mock('@/services/ai/client/localWhisper', () => ({
   blobToFloat32: vi.fn(),
   transcribeFloat32Parallel: vi.fn(),
   LOCAL_WHISPER_DEFAULT_MODEL: 'Xenova/whisper-tiny.en',
-  getWhisperPreloadPromise: vi.fn(),
 }));
 
 // ── Import mocked functions ───────────────────────────────────────────────────
@@ -37,14 +36,12 @@ import { extractRanges } from '@/lib/audio/silenceTrim';
 import {
   blobToFloat32,
   transcribeFloat32Parallel,
-  getWhisperPreloadPromise,
 } from '@/services/ai/client/localWhisper';
 
 const mockFindSpeechRangesML = vi.mocked(findSpeechRangesML);
 const mockExtractRanges = vi.mocked(extractRanges);
 const mockBlobToFloat32 = vi.mocked(blobToFloat32);
 const mockTranscribeFloat32Parallel = vi.mocked(transcribeFloat32Parallel);
-const mockGetWhisperPreloadPromise = vi.mocked(getWhisperPreloadPromise);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +60,6 @@ function makeSilencedBlob() {
 beforeEach(() => {
   vi.clearAllMocks();
 
-  mockGetWhisperPreloadPromise.mockResolvedValue(undefined);
   mockBlobToFloat32.mockResolvedValue(new Float32Array(SAMPLES));
   mockFindSpeechRangesML.mockResolvedValue([{ startSec: 0, endSec: 2 }]);
   mockExtractRanges.mockReturnValue(new Float32Array(SAMPLES));
@@ -137,31 +133,6 @@ describe('useBackgroundTranscription — T2 success path', () => {
     expect(setTranscript).toHaveBeenCalledWith('hello world');
   });
 
-  it('awaits the Whisper preload promise before transcribing', async () => {
-    let resolvePreload!: () => void;
-    mockGetWhisperPreloadPromise.mockReturnValue(
-      new Promise<void>((r) => { resolvePreload = r; }),
-    );
-
-    const patchSession = vi.fn();
-
-    renderHook(() =>
-      useBackgroundTranscription({
-        session: makeSession(),
-        patchSession,
-        setTranscript: vi.fn(),
-        silencedMergedBlob: makeSilencedBlob(),
-      }),
-    );
-
-    // Preload not resolved — Whisper should not have run yet
-    await new Promise((r) => setTimeout(r, 20));
-    expect(mockBlobToFloat32).not.toHaveBeenCalled();
-
-    resolvePreload();
-    await waitFor(() => expect(patchSession).toHaveBeenCalled());
-    expect(mockBlobToFloat32).toHaveBeenCalled();
-  });
 });
 
 describe('useBackgroundTranscription — T3 guard', () => {

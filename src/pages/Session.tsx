@@ -89,11 +89,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   >(null);
   const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
   const [pendingStartRecording, setPendingStartRecording] = useState(false);
-  const {
-    loading: whisperLoading,
-    failed: whisperFailed,
-    retry: retryWhisperLoad,
-  } = useWhisperLoading();
+  const { exhausted: whisperExhausted } = useWhisperLoading();
   const transcriptRef = useRef<TranscriptPanelHandle>(null);
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
@@ -172,7 +168,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ── Whisper recovery: gate Start Recording behind dialog when preload failed ──
   function handleStartRecordingWithGate() {
     const provider = transcriptionProviderOverride ?? settings.ai.transcription.provider;
-    if (provider === 'local' && whisperFailed) {
+    if (provider === 'local' && whisperExhausted) {
       setPendingStartRecording(true);
       setWhisperDialogOpen(true);
       return;
@@ -201,32 +197,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   function handleCancelWhisperDialog() {
     setWhisperDialogOpen(false);
     setPendingStartRecording(false);
-  }
-
-  // Mirror pending-start state into a ref so the retry .then() callback sees
-  // current values (handles the cancel-during-retry race — if the user clicks
-  // Cancel while the preload is in flight, we must NOT auto-resume).
-  const pendingStartRecordingRef = useRef(pendingStartRecording);
-  useEffect(() => {
-    pendingStartRecordingRef.current = pendingStartRecording;
-  });
-
-  // When the user clicks Retry inside the recovery dialog, chain auto-resume
-  // onto the new preload promise — the setStates fire from a promise callback
-  // (allowed) instead of an effect that watches `whisperLoading`/`whisperFailed`.
-  function handleRetryWhisperLoad() {
-    void retryWhisperLoad().then(
-      () => {
-        if (!pendingStartRecordingRef.current) return; // user cancelled mid-retry
-        setWhisperDialogOpen(false);
-        setPendingStartRecording(false);
-        void handleStartRecordingRef.current();
-      },
-      () => {
-        // Failure surfaces through whisperFailed; dialog stays open so the
-        // user can retry again or pick a fallback.
-      },
-    );
   }
 
   // ── Note/generation flow — sourced from the same sessionMachine above ────
@@ -709,10 +679,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       {/* ── Local Whisper unavailable recovery dialog ───── */}
       <WhisperUnavailableDialog
         open={whisperDialogOpen}
-        retryingLoad={whisperLoading}
         onUseWebSpeech={handleUseWebSpeech}
         onRecordWithoutTranscription={handleRecordWithoutTranscription}
-        onRetryLoad={handleRetryWhisperLoad}
         onCancel={handleCancelWhisperDialog}
       />
 

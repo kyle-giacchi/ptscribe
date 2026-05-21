@@ -1,21 +1,17 @@
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 
 interface Props {
   open: boolean;
-  retryingLoad: boolean;
   onUseWebSpeech: () => void;
   onRecordWithoutTranscription: () => void;
-  onRetryLoad: () => void;
   onCancel: () => void;
 }
 
 export function WhisperUnavailableDialog({
   open,
-  retryingLoad,
   onUseWebSpeech,
   onRecordWithoutTranscription,
-  onRetryLoad,
   onCancel,
 }: Props) {
   return (
@@ -54,7 +50,6 @@ export function WhisperUnavailableDialog({
             minHeight: 'unset',
           }}
           onClick={onUseWebSpeech}
-          disabled={retryingLoad}
         >
           <div>
             <div style={{ fontWeight: 600, fontSize: 13 }}>
@@ -77,7 +72,6 @@ export function WhisperUnavailableDialog({
             minHeight: 'unset',
           }}
           onClick={onRecordWithoutTranscription}
-          disabled={retryingLoad}
         >
           <div>
             <div style={{ fontWeight: 600, fontSize: 13 }}>Record now, transcribe later</div>
@@ -91,9 +85,7 @@ export function WhisperUnavailableDialog({
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
+          justifyContent: 'flex-end',
           borderTop: '1px solid var(--color-pt-border, rgba(127,127,127,0.18))',
           paddingTop: 10,
           marginTop: 4,
@@ -103,30 +95,7 @@ export function WhisperUnavailableDialog({
           type="button"
           className="btn btn-ghost"
           style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
-          onClick={onRetryLoad}
-          disabled={retryingLoad}
-        >
-          {retryingLoad ? (
-            <>
-              <Loader2
-                size={12}
-                strokeWidth={2}
-                className="animate-spin"
-                style={{ marginRight: 4 }}
-                aria-hidden="true"
-              />
-              Retrying…
-            </>
-          ) : (
-            'Try loading local model again'
-          )}
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
           onClick={onCancel}
-          disabled={retryingLoad}
         >
           Cancel
         </button>

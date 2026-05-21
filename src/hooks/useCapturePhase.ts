@@ -7,7 +7,7 @@ import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { trimSilence } from '@/lib/audio/silenceTrim';
 import {
   transcribeLocally,
-  preloadLocalWhisper,
+  whisperLoader,
   LOCAL_WHISPER_DEFAULT_MODEL,
 } from '@/services/ai/client/localWhisper';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
@@ -116,7 +116,7 @@ export function useCapturePhase({
 
   // Warm up the Whisper worker + model as soon as the session mounts.
   useEffect(() => {
-    preloadLocalWhisper();
+    void whisperLoader.ensureReady();
   }, []);
 
   // Re-arm the dismiss flag every time a new recording starts.
