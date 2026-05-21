@@ -1,4 +1,19 @@
-export const PRIVACY_FILTER_MODEL = 'openai/privacy-filter';
+export const PRIVACY_FILTER_MODEL = 'Xenova/bert-base-NER';
+export const PRIVACY_FILTER_MODEL_OPENAI_Q4 = 'openai/privacy-filter';
+
+// dtype passed to Transformers.js pipeline per model.
+// bert-base-NER → 'q8' (model_quantized.onnx, ~90 MB, no external data file)
+// openai/privacy-filter → 'q4' (model_q4.onnx + model_q4.onnx_data, ~875 MB)
+type PipelineDtype = 'q8' | 'q4' | 'q4f16' | 'fp16' | 'fp32' | 'int8' | 'uint8';
+
+const MODEL_DTYPES: Record<string, PipelineDtype> = {
+  'Xenova/bert-base-NER': 'q8',
+  'openai/privacy-filter': 'q4',
+};
+
+function dtypeFor(model: string): PipelineDtype {
+  return MODEL_DTYPES[model] ?? 'q8';
+}
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
@@ -67,7 +82,7 @@ export function preloadPrivacyFilter(model = PRIVACY_FILTER_MODEL): void {
   const worker = getWorker();
   const id = ++_idCounter;
   _pending.set(id, { resolve: () => {}, reject: () => {} });
-  worker.postMessage({ id, type: 'preload', model });
+  worker.postMessage({ id, type: 'preload', model, dtype: dtypeFor(model) });
 }
 
 export async function scrubPII(
@@ -79,6 +94,6 @@ export async function scrubPII(
   const id = ++_idCounter;
   return new Promise((resolve, reject) => {
     _pending.set(id, { resolve, reject, onProgress });
-    worker.postMessage({ id, type: 'scrub', text, model });
+    worker.postMessage({ id, type: 'scrub', text, model, dtype: dtypeFor(model) });
   });
 }
