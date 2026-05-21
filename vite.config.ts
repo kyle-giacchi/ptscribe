@@ -92,13 +92,22 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /ort-wasm-simd-threaded.*\.mjs$/,
+            // WASM JS module — cacheable, loaded on every whisper/pii session
+            urlPattern: /ort-wasm-simd-threaded(?!.*\.jsep).*\.mjs$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'ml-assets',
               expiration: { maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
+          },
+          {
+            // JSEP (WebGPU) module — we use device:'wasm' in all workers so
+            // this should never be requested, but if it is, let it fall through
+            // to the network rather than risk a CacheFirst handler throwing and
+            // blocking the ONNX runtime load entirely.
+            urlPattern: /ort-wasm-simd-threaded.*\.jsep\.mjs$/,
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/,
