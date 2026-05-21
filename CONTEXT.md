@@ -167,25 +167,21 @@ Re-running the AI on the same locked transcript to produce a new Note draft. The
 
 ### Soft-gate
 
-After 3 regenerations in a session, every subsequent regeneration is preceded by a reflective dialog:
+The Regenerate button is **disabled** after a Note exists if neither the transcript nor the active Modifiers have changed since the last generation — re-running would produce an identical result. The button shows a tooltip: *"No changes to transcript or modifiers since last generation."*
 
-> *"You've regenerated this Note 3 times. What isn't quite right?"*
-> Checkboxes: Wrong emphasis · Too verbose / too brief · Missing clinical detail · Made up something · Other
-> Free-text field (optional, length-capped, sanitized)
-> Suggestions: **Review the locked transcript** · **Review the selected template's prompt** (both open read-only panels)
-> Buttons: Continue with current modifiers · Update modifiers and try again
-
-Properties:
-- The checkbox selections and the free-text field are **injected into the next regeneration's AI prompt** as an ad-hoc modifier — the AI is told what the clinician said wasn't working. This is in addition to any preset Modifiers and Custom instruction.
-- No required input — the clinician can hit Continue with the form empty. The friction is the pause + the "review your inputs" suggestion, not the form.
-- The dialog appears every time the clinician regenerates beyond the third attempt. No escalating friction beyond regen #4.
-- Feedback is also persisted in the Note's audit trail for the clinician's own retrospective.
+Regenerate becomes enabled again the moment either input changes: the clinician edits the transcript (unlock → edit → relock) or adjusts any Modifier chip or Custom instruction.
 
 ## Modifier
 
-A clinician-supplied instruction attached to a Regeneration that augments the AI prompt without changing the transcript. Modifiers are how the clinician steers the AI's *style* or *emphasis* when the transcript itself isn't the problem.
+A clinician-supplied instruction that augments the AI prompt without changing the transcript. Modifiers steer the AI's *style* or *emphasis* and can be set before the first Generate or before any Regeneration.
 
-Form: a curated library of preset chips (tone, emphasis, format) the clinician toggles on, plus one optional length-capped free-text "Custom instruction" slot. Active modifiers are sanitized, shown in the "Sending to AI" preview, persisted with the resulting Note draft for audit, and seed the next regeneration. Modifiers reset when the transcript is Unlocked.
+Form: two chip categories plus one free-text slot:
+
+- **Tone** (single-select, nothing active by default): Narrative · Terse · Clinical / Formal. Replaces the former standalone `toneStyle` field — if no Tone chip is selected the base template prompt is used without a tone block.
+- **Emphasis** (multi-select, all off by default): More detail · Focus on functional outcomes · Highlight patient progress.
+- **Custom instruction** (optional, length-capped free text, one slot).
+
+Active modifiers are appended to the system prompt by the Worker at generation time. They are persisted with the resulting Note draft for audit (each Note records the exact modifiers that produced it, alongside the transcript snapshot). Modifiers persist on the Session until the clinician clears them or a new session starts — they are **not** reset by Unlock.
 
 ## Improve with AI
 

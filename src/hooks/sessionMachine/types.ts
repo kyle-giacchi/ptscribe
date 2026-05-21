@@ -1,4 +1,5 @@
 import type { AiCallError } from '@/services/ai/errors';
+import type { AiDebugPrompts } from '@/types';
 
 // ── Shared ────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ export type GeneratePhase = 'idle' | 'generating' | 'error';
 export interface GenerateState {
   phase: GeneratePhase;
   lastRawPayload: string | null;
+  lastAiPrompts: AiDebugPrompts | null;
   aiError: AiCallError | null;
   retryStatus: RetryStatus | null;
 }
@@ -62,7 +64,7 @@ export type SessionMachineAction =
   // generate
   | { type: 'generate/start' }
   | { type: 'generate/retry'; status: RetryStatus }
-  | { type: 'generate/success'; rawText: string }
+  | { type: 'generate/success'; rawText: string; prompts: AiDebugPrompts }
   | { type: 'generate/error'; aiError: AiCallError | null }
   | { type: 'generate/clearAiError' }
   // transcribe
@@ -80,6 +82,7 @@ export const initialSessionMachineState: SessionMachineState = {
   generate: {
     phase: 'idle',
     lastRawPayload: null,
+    lastAiPrompts: null,
     aiError: null,
     retryStatus: null,
   },

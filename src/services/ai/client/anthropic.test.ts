@@ -51,14 +51,14 @@ describe('callAnthropic — success and non-retryable errors', () => {
   it('posts to /api/generate with the correct method, headers, and body shape', async () => {
     mockApiFetch.mockResolvedValueOnce(jsonResponse(200, { text: 'ok' }));
 
-    await callAnthropic({ ...baseArgs, toneStyle: 'narrative', maxTokens: 1024 });
+    await callAnthropic({ ...baseArgs, modifierBlock: '# Tone & style\nNarrative.', maxTokens: 1024 });
 
     const [url, init] = mockApiFetch.mock.calls[0];
     expect(url).toBe('/api/generate');
     expect(init?.method).toBe('POST');
     const body = JSON.parse(init?.body as string);
     expect(body.model).toBe('claude-sonnet-4-6');
-    expect(body.toneStyle).toBe('narrative');
+    expect(body.modifierBlock).toContain('# Tone & style');
     expect(body.maxTokens).toBe(1024);
   });
 
