@@ -1,8 +1,7 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Loader2, RotateCcw, Search, ChevronLeft, ChevronRight, Edit3, Wand2,
-  Copy, EyeOff, PanelRightClose,
+  RotateCcw, Search, ChevronLeft, ChevronRight, Edit3, Wand2,
+  Copy, EyeOff, PanelRightClose, Loader2,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
@@ -11,10 +10,6 @@ import {
 } from '@/utils/clips';
 import { parseTranscriptSegments, parseChunkedTranscript } from '@/utils/transcriptGrouping';
 import { ConfirmBanner } from './ConfirmBanner';
-
-export interface TranscriptPanelHandle {
-  scrollToTimestamp(seconds: number): void;
-}
 
 interface TranscriptPanelProps {
   transcript: string;
@@ -31,311 +26,280 @@ interface TranscriptPanelProps {
   canImproveWithAI?: boolean;
   onRevertToLocal: () => void;
   onCopyTranscript?: () => void;
-  onScrubPII?: (text: string) => Promise<{ scrubbed: string; entityCount: number }>;
-  onApplyScrub?: (scrubbed: string) => void;
-  piiScrubbing?: boolean;
-  piiProgress?: string | null;
+  onOpenPIIScrub?: () => void;
   hasEditedTranscript?: boolean;
   onRevertEdits?: () => void;
+  /** Fired by parent (e.g. clip jump); creates a new object on each jump so the effect always re-fires. */
+  seekSignal?: { seconds: number; id: number } | null;
 }
 
-export const TranscriptPanel = forwardRef<TranscriptPanelHandle, TranscriptPanelProps>(
-  function TranscriptPanel(props, ref) {
-    const {
-      transcript, clips, transcribing, hasUserEdits, hasT2Transcript,
-      totalDurationSec, collapsed, onCollapse,
-      onChange, onCommit, onCreateTranscript, onRevertToLocal,
-      onCopyTranscript, onScrubPII, onApplyScrub, piiScrubbing, piiProgress,
-      hasEditedTranscript, onRevertEdits, canImproveWithAI = true,
-    } = props;
+export function TranscriptPanel(props: TranscriptPanelProps) {
+  const {
+    transcript, clips, transcribing, hasUserEdits, hasT2Transcript,
+    totalDurationSec, collapsed, onCollapse,
+    onChange, onCommit, onCreateTranscript, onRevertToLocal,
+    onCopyTranscript, onOpenPIIScrub,
+    hasEditedTranscript, onRevertEdits, canImproveWithAI = true,
+    seekSignal,
+  } = props;
 
-    const scrollRootRef = useRef<HTMLDivElement>(null);
-    useImperativeHandle(ref, () => ({
-      scrollToTimestamp(seconds: number) {
-        // Retry across two animation frames so callers can expand the panel and
-        // jump in one call — the FormattedTranscriptView mounts before its
-        // children are laid out.
-        function attempt(retriesLeft: number) {
-          const root = scrollRootRef.current;
-          const candidates = root
-            ? Array.from(root.querySelectorAll<HTMLElement>('[data-ts]'))
-            : [];
-          if (candidates.length === 0) {
-            if (retriesLeft > 0) requestAnimationFrame(() => attempt(retriesLeft - 1));
-            return;
-          }
-          const target =
-            candidates.find((el) => Number(el.dataset.ts ?? 0) >= seconds) ??
-            candidates[candidates.length - 1];
-          target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
-        attempt(3);
-      },
-    }));
+  const scrollRootRef = useRef<HTMLDivElement>(null);
 
-    // ── existing local state ─────────────────────────────────────────────
-    const [pendingOverwrite, setPendingOverwrite] = useState(false);
-    const [editMode, setEditMode] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [matchIndex, setMatchIndex] = useState(0);
-    const [scrubResult, setScrubResult] = useState<{ scrubbed: string; entityCount: number } | null>(null);
-    const [replaceStr, setReplaceStr] = useState('');
-    const [replaceCount, setReplaceCount] = useState<number | null>(null);
-
-    // ── existing derived data ────────────────────────────────────────────
-    const transcribedClips = clips.filter(
-      (c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0,
-    );
-    const showClipMarkers = transcribedClips.length > 1 && !hasUserEdits;
-    const displayTranscript = showClipMarkers ? mergeClipTranscriptsWithMarkers(clips) : transcript;
-
-    const chunkedSegments = clips.some((c) => c.transcriptChunks?.length)
-      ? parseChunkedTranscript(clips) : null;
-    const segments = chunkedSegments ?? parseTranscriptSegments(transcript, totalDurationSec);
-    const allMatches = buildMatches(segments, searchQuery);
-    const matchCount = allMatches.length;
-    const safeIndex = matchCount > 0 ? matchIndex % matchCount : 0;
-
-    // ── tier chip ────────────────────────────────────────────────────────
-    const tier: 'edited' | 'ai' | 'live' | null =
-      hasUserEdits ? 'edited' : hasT2Transcript ? 'ai' : transcript.trim() ? 'live' : null;
-
-    function handleTranscriptChange(next: string) {
-      onChange(showClipMarkers ? stripClipMarkers(next) : next);
-    }
-    function handleCreateClick() {
-      if (hasUserEdits) setPendingOverwrite(true);
-      else onCreateTranscript();
-    }
-    function handleReplaceAll() {
-      if (!searchQuery) return;
-      const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      const count = (transcript.match(regex) ?? []).length;
-      onChange(transcript.replace(regex, replaceStr));
-      onCommit();
-      setReplaceCount(count);
-    }
-    async function handleScrubPII() {
-      if (!onScrubPII) return;
-      setScrubResult(null);
-      try {
-        const result = await onScrubPII(transcript);
-        if (result.entityCount === 0) toast.info('No PII detected in transcript');
-        else setScrubResult(result);
-      } catch {
-        toast.error('PII scan failed — try again');
+  // Reactive scroll-to-timestamp — fires whenever seekSignal changes identity
+  useEffect(() => {
+    if (!seekSignal) return;
+    const { seconds } = seekSignal;
+    // Retry across animation frames so the panel can expand before scroll runs
+    function attempt(retriesLeft: number) {
+      const root = scrollRootRef.current;
+      const candidates = root
+        ? Array.from(root.querySelectorAll<HTMLElement>('[data-ts]'))
+        : [];
+      if (candidates.length === 0) {
+        if (retriesLeft > 0) requestAnimationFrame(() => attempt(retriesLeft - 1));
+        return;
       }
+      const target =
+        candidates.find((el) => Number(el.dataset.ts ?? 0) >= seconds) ??
+        candidates[candidates.length - 1];
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
+    attempt(3);
+  }, [seekSignal]);
 
-    if (collapsed) return null;
+  const [pendingOverwrite, setPendingOverwrite] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [replaceStr, setReplaceStr] = useState('');
+  const [replaceCount, setReplaceCount] = useState<number | null>(null);
 
-    return (
-      <div className="space-y-3">
-        {/* Scrub PII confirm banner */}
-        {scrubResult !== null && (
-          <ConfirmBanner
-            message={`Found ${scrubResult.entityCount} PII item${scrubResult.entityCount !== 1 ? 's' : ''} — replace with redacted placeholders?`}
-            confirmLabel="Apply redaction"
-            onCancel={() => setScrubResult(null)}
-            onConfirm={() => { onApplyScrub?.(scrubResult.scrubbed); setScrubResult(null); toast.success('PII redacted from transcript'); }}
-          />
-        )}
+  const transcribedClips = clips.filter(
+    (c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0,
+  );
+  const showClipMarkers = transcribedClips.length > 1 && !hasUserEdits;
+  const displayTranscript = showClipMarkers ? mergeClipTranscriptsWithMarkers(clips) : transcript;
 
-        {/* Existing overwrite-confirm / revert banners */}
-        {pendingOverwrite ? (
-          <ConfirmBanner
-            message="This will replace your edited transcript."
-            confirmLabel="Yes, replace"
-            onCancel={() => setPendingOverwrite(false)}
-            onConfirm={() => { setPendingOverwrite(false); onCreateTranscript(); }}
-          />
-        ) : (
-          (hasEditedTranscript || hasT2Transcript) && (
-            <div className="flex flex-wrap items-center gap-2">
-              {hasEditedTranscript && onRevertEdits && (
-                <button type="button" className="btn btn-ghost" onClick={onRevertEdits}
-                  title="Clear your edits and show the original transcript.">
-                  <RotateCcw size={14} strokeWidth={2} /> Revert edits
-                </button>
-              )}
-              {hasT2Transcript && (
-                <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}
-                  title="Restore the on-device draft transcript captured while you were recording.">
-                  <RotateCcw size={14} strokeWidth={2} /> Revert to draft transcript
-                </button>
+  const chunkedSegments = clips.some((c) => c.transcriptChunks?.length)
+    ? parseChunkedTranscript(clips) : null;
+  const segments = chunkedSegments ?? parseTranscriptSegments(transcript, totalDurationSec);
+  const allMatches = buildMatches(segments, searchQuery);
+  const matchCount = allMatches.length;
+  const safeIndex = matchCount > 0 ? matchIndex % matchCount : 0;
+
+  const tier: 'edited' | 'ai' | 'live' | null =
+    hasUserEdits ? 'edited' : hasT2Transcript ? 'ai' : transcript.trim() ? 'live' : null;
+
+  function handleTranscriptChange(next: string) {
+    onChange(showClipMarkers ? stripClipMarkers(next) : next);
+  }
+  function handleCreateClick() {
+    if (hasUserEdits) setPendingOverwrite(true);
+    else onCreateTranscript();
+  }
+  function handleReplaceAll() {
+    if (!searchQuery) return;
+    const regex = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const count = (transcript.match(regex) ?? []).length;
+    onChange(transcript.replace(regex, replaceStr));
+    onCommit();
+    setReplaceCount(count);
+  }
+
+  if (collapsed) return null;
+
+  const showActionStrip = transcript.trim() && (canImproveWithAI || onOpenPIIScrub);
+
+  return (
+    <div className="space-y-3">
+      {pendingOverwrite ? (
+        <ConfirmBanner
+          message="This will replace your edited transcript."
+          confirmLabel="Yes, replace"
+          onCancel={() => setPendingOverwrite(false)}
+          onConfirm={() => { setPendingOverwrite(false); onCreateTranscript(); }}
+        />
+      ) : (
+        (hasEditedTranscript || hasT2Transcript) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {hasEditedTranscript && onRevertEdits && (
+              <button type="button" className="btn btn-ghost" onClick={onRevertEdits}
+                title="Clear your edits and show the original transcript.">
+                <RotateCcw size={14} strokeWidth={2} /> Revert edits
+              </button>
+            )}
+            {hasT2Transcript && (
+              <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}
+                title="Restore the on-device draft transcript captured while you were recording.">
+                <RotateCcw size={14} strokeWidth={2} /> Revert to draft transcript
+              </button>
+            )}
+          </div>
+        )
+      )}
+
+      <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--color-pt-border)' }}>
+
+        {/* Header — Row 1 (tier + actions) */}
+        <div
+          className="flex items-center gap-2"
+          style={{ padding: '12px 20px 8px', background: 'var(--color-pt-surface-alt)' }}
+        >
+          <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: 'var(--color-fg-muted)' }}>
+            Transcript
+          </span>
+          {tier && <TierChip tier={tier} />}
+          {transcript.trim() && (
+            <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+              {transcript.trim().split(/\s+/).filter(Boolean).length}w
+            </span>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {onCopyTranscript && transcript.trim() && (
+            <button type="button" className="btn btn-ghost p-1.5" onClick={onCopyTranscript} title="Copy transcript" aria-label="Copy transcript">
+              <Copy size={13} strokeWidth={2} />
+            </button>
+          )}
+          <div style={{ width: 1, height: 18, background: 'var(--color-pt-border)' }} aria-hidden />
+          {transcript.trim() && (
+            <button type="button" className="btn btn-ghost p-1.5"
+              title={editMode ? 'Switch to formatted view' : 'Edit transcript'}
+              onClick={() => setEditMode((m) => !m)}
+              style={{ color: editMode ? 'var(--color-pt-accent)' : 'var(--color-fg-subtle)' }}>
+              <Edit3 size={13} strokeWidth={2} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-ghost p-1.5"
+            onClick={onCollapse}
+            aria-label="Collapse transcript panel"
+            title="Collapse transcript panel"
+            style={{ color: 'var(--color-fg-subtle)' }}
+          >
+            <PanelRightClose size={13} strokeWidth={2} />
+          </button>
+        </div>
+
+        {/* Header — Row 2 (search, read-only mode only) */}
+        {!editMode && (
+          <div
+            style={{ padding: '0 20px 12px', background: 'var(--color-pt-surface-alt)', borderBottom: '1px solid var(--color-pt-border)' }}
+          >
+            <div className="relative flex items-center" style={{ maxWidth: 280 }}>
+              <Search size={12} strokeWidth={2} style={{ position: 'absolute', left: 7, color: 'var(--color-fg-subtle)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                aria-label="Search transcript"
+                placeholder="Search transcript…"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setMatchIndex(0); }}
+                className="input h-7 py-0 text-xs"
+                style={{ paddingLeft: 24, paddingRight: searchQuery ? 56 : 8, width: '100%' }}
+              />
+              {searchQuery && (
+                <>
+                  <span className="absolute text-[10px] tabular-nums" style={{ right: 44, color: 'var(--color-fg-subtle)' }}>
+                    {matchCount > 0 ? `${safeIndex + 1}/${matchCount}` : '0'}
+                  </span>
+                  <button type="button" className="absolute flex items-center justify-center"
+                    style={{ right: 24, width: 18, height: 18, color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    onClick={() => setMatchIndex((i) => (i - 1 + matchCount) % Math.max(matchCount, 1))}>
+                    <ChevronLeft size={11} strokeWidth={2.5} />
+                  </button>
+                  <button type="button" className="absolute flex items-center justify-center"
+                    style={{ right: 6, width: 18, height: 18, color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    onClick={() => setMatchIndex((i) => (i + 1) % Math.max(matchCount, 1))}>
+                    <ChevronRight size={11} strokeWidth={2.5} />
+                  </button>
+                </>
               )}
             </div>
-          )
+          </div>
         )}
 
-        {/* Panel */}
-        <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--color-pt-border)' }}>
-
-          {/* Header — Row 1 (tier + actions) */}
-          <div
-            className="flex items-center gap-2"
-            style={{ padding: '12px 20px 8px', background: 'var(--color-pt-surface-alt)' }}
-          >
-            <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: 'var(--color-fg-muted)' }}>
-              Transcript
-            </span>
-            {tier && <TierChip tier={tier} />}
-            {transcript.trim() && (
-              <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
-                {transcript.trim().split(/\s+/).filter(Boolean).length}w
-              </span>
-            )}
-
-            <div style={{ flex: 1 }} />
-
-            {onCopyTranscript && transcript.trim() && (
-              <button type="button" className="btn btn-ghost p-1.5" onClick={onCopyTranscript} title="Copy transcript" aria-label="Copy transcript">
-                <Copy size={13} strokeWidth={2} />
-              </button>
-            )}
-            <div style={{ width: 1, height: 18, background: 'var(--color-pt-border)' }} aria-hidden />
-            {transcript.trim() && (
-              <button type="button" className="btn btn-ghost p-1.5"
-                title={editMode ? 'Switch to formatted view' : 'Edit transcript'}
-                onClick={() => setEditMode((m) => !m)}
-                style={{ color: editMode ? 'var(--color-pt-accent)' : 'var(--color-fg-subtle)' }}>
-                <Edit3 size={13} strokeWidth={2} />
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-ghost p-1.5"
-              onClick={onCollapse}
-              aria-label="Collapse transcript panel"
-              title="Collapse transcript panel"
-              style={{ color: 'var(--color-fg-subtle)' }}
-            >
-              <PanelRightClose size={13} strokeWidth={2} />
-            </button>
-          </div>
-
-          {/* Header — Row 2 (search) */}
-          {!editMode && (
+        {/* Body */}
+        <div>
+          {showActionStrip && (
             <div
-              style={{ padding: '0 20px 12px', background: 'var(--color-pt-surface-alt)', borderBottom: '1px solid var(--color-pt-border)' }}
+              className="flex items-center gap-1 px-3 py-2"
+              style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
             >
-              <div className="relative flex items-center" style={{ maxWidth: 280 }}>
-                <Search size={12} strokeWidth={2} style={{ position: 'absolute', left: 7, color: 'var(--color-fg-subtle)', pointerEvents: 'none' }} />
-                <input
-                  type="text"
-                  aria-label="Search transcript"
-                  placeholder="Search transcript…"
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setMatchIndex(0); }}
-                  className="input h-7 py-0 text-xs"
-                  style={{ paddingLeft: 24, paddingRight: searchQuery ? 56 : 8, width: '100%' }}
-                />
-                {searchQuery && (
-                  <>
-                    <span className="absolute text-[10px] tabular-nums" style={{ right: 44, color: 'var(--color-fg-subtle)' }}>
-                      {matchCount > 0 ? `${safeIndex + 1}/${matchCount}` : '0'}
-                    </span>
-                    <button type="button" className="absolute flex items-center justify-center"
-                      style={{ right: 24, width: 18, height: 18, color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
-                      onClick={() => setMatchIndex((i) => (i - 1 + matchCount) % Math.max(matchCount, 1))}>
-                      <ChevronLeft size={11} strokeWidth={2.5} />
-                    </button>
-                    <button type="button" className="absolute flex items-center justify-center"
-                      style={{ right: 6, width: 18, height: 18, color: 'var(--color-fg-subtle)', background: 'none', border: 'none', cursor: 'pointer' }}
-                      onClick={() => setMatchIndex((i) => (i + 1) % Math.max(matchCount, 1))}>
-                      <ChevronRight size={11} strokeWidth={2.5} />
-                    </button>
-                  </>
-                )}
-              </div>
+              {canImproveWithAI && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12 }}
+                  disabled={transcribing}
+                  onClick={handleCreateClick}
+                  title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result."
+                >
+                  {transcribing
+                    ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
+                    : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
+                </button>
+              )}
+              {onOpenPIIScrub && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12 }}
+                  onClick={onOpenPIIScrub}
+                >
+                  <EyeOff size={13} strokeWidth={2} /> Scrub PII
+                </button>
+              )}
             </div>
           )}
 
-          {/* Body */}
-          <div>
-            {/* Improve with AI strip — hidden in demo mode and after Nova has run once */}
-            {transcript.trim() && (canImproveWithAI || onScrubPII) && (
+          {editMode ? (
+            <>
               <div
-                className="flex items-center gap-1 px-3 py-2"
+                className="flex flex-wrap items-center gap-2 px-3 py-2"
                 style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
               >
-                {canImproveWithAI && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ fontSize: 12 }}
-                    disabled={transcribing}
-                    onClick={handleCreateClick}
-                    title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result."
-                  >
-                    {transcribing
-                      ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
-                      : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
-                  </button>
-                )}
-                {onScrubPII && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ fontSize: 12 }}
-                    disabled={piiScrubbing}
-                    onClick={handleScrubPII}
-                  >
-                    {piiScrubbing
-                      ? <><Loader2 size={13} className="animate-spin" /> {piiProgress ?? 'Scanning…'}</>
-                      : <><EyeOff size={13} strokeWidth={2} /> Scrub PII</>}
-                  </button>
+                <input type="text" aria-label="Find" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
+                  placeholder="Find" value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setReplaceCount(null); }} />
+                <input type="text" aria-label="Replace with" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
+                  placeholder="Replace with" value={replaceStr}
+                  onChange={(e) => setReplaceStr(e.target.value)} />
+                <button type="button" className="btn btn-secondary"
+                  style={{ height: '1.75rem', paddingTop: 0, paddingBottom: 0 }}
+                  disabled={!searchQuery} onClick={handleReplaceAll}>
+                  Replace All
+                </button>
+                {replaceCount !== null && (
+                  <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+                    {replaceCount === 0 ? 'No matches' : `Replaced ${replaceCount} occurrence${replaceCount !== 1 ? 's' : ''}`}
+                  </span>
                 )}
               </div>
-            )}
-
-            {editMode ? (
-              <>
-                <div
-                  className="flex flex-wrap items-center gap-2 px-3 py-2"
-                  style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
-                >
-                  <input type="text" aria-label="Find" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
-                    placeholder="Find" value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setReplaceCount(null); }} />
-                  <input type="text" aria-label="Replace with" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
-                    placeholder="Replace with" value={replaceStr}
-                    onChange={(e) => setReplaceStr(e.target.value)} />
-                  <button type="button" className="btn btn-secondary"
-                    style={{ height: '1.75rem', paddingTop: 0, paddingBottom: 0 }}
-                    disabled={!searchQuery} onClick={handleReplaceAll}>
-                    Replace All
-                  </button>
-                  {replaceCount !== null && (
-                    <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
-                      {replaceCount === 0 ? 'No matches' : `Replaced ${replaceCount} occurrence${replaceCount !== 1 ? 's' : ''}`}
-                    </span>
-                  )}
-                </div>
-                <textarea
-                  className="input min-h-48 w-full rounded-none leading-relaxed"
-                  style={{ borderLeft: 'none', borderRight: 'none', borderBottom: 'none', borderTop: '1px solid var(--color-pt-border)' }}
-                  placeholder="Speak while recording, paste in a transcript, or type freely."
-                  value={displayTranscript}
-                  onChange={(e) => handleTranscriptChange(e.target.value)}
-                  onBlur={onCommit}
-                />
-              </>
-            ) : (
-              <FormattedTranscriptView
-                rootRef={scrollRootRef}
-                segments={segments}
-                searchQuery={searchQuery}
-                activeMatchIndex={safeIndex}
-                transcript={transcript}
+              <textarea
+                className="input min-h-48 w-full rounded-none leading-relaxed"
+                style={{ borderLeft: 'none', borderRight: 'none', borderBottom: 'none', borderTop: '1px solid var(--color-pt-border)' }}
+                placeholder="Speak while recording, paste in a transcript, or type freely."
+                value={displayTranscript}
+                onChange={(e) => handleTranscriptChange(e.target.value)}
+                onBlur={onCommit}
               />
-            )}
-          </div>
+            </>
+          ) : (
+            <FormattedTranscriptView
+              rootRef={scrollRootRef}
+              segments={segments}
+              searchQuery={searchQuery}
+              activeMatchIndex={safeIndex}
+              transcript={transcript}
+            />
+          )}
         </div>
       </div>
-    );
-  },
-);
+    </div>
+  );
+}
 
 function TierChip({ tier }: { tier: 'edited' | 'ai' | 'live' }) {
   const label = tier === 'edited' ? 'Edited' : tier === 'ai' ? 'AI Enhanced' : 'Live';
@@ -389,6 +353,8 @@ function FormattedTranscriptView({
   activeMatchIndex: number;
   transcript: string;
 }) {
+  const allMatches = buildMatches(segments, searchQuery);
+
   const callbackRef = useCallback(
     (el: HTMLElement | null) => { el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -404,8 +370,6 @@ function FormattedTranscriptView({
       </div>
     );
   }
-
-  const allMatches = buildMatches(segments, searchQuery);
 
   return (
     <div

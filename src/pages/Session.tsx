@@ -19,11 +19,10 @@ import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
 import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
-import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
-import type { TranscriptPanelHandle } from '@/components/sessions/TranscriptPanel';
+import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
 import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
@@ -90,9 +89,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
   const [pendingStartRecording, setPendingStartRecording] = useState(false);
   const { exhausted: whisperExhausted } = useWhisperLoading();
-  const transcriptRef = useRef<TranscriptPanelHandle>(null);
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
+  const [piiScrubOpen, setPiiScrubOpen] = useState(false);
+  const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
   const [clipsOpen, setClipsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
@@ -234,7 +234,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleCopyNoteMarkdown(md);
   }
 
-  const { scrubbing: piiScrubbing, scrubProgress, scrub: scrubPIIFn } = usePrivacyFilter();
 
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
 
@@ -600,7 +599,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 ) : (
                   <>
                     <TranscriptPanel
-                      ref={transcriptRef}
                       transcript={effectiveTranscript}
                       clips={sortedClips}
                       transcribing={busy === 'transcribing'}
@@ -621,12 +619,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       canImproveWithAI={!isDemoMode() && !session.t3Transcript}
                       onRevertToLocal={handleRevertToLocal}
                       onCopyTranscript={handleCopyTranscript}
-                      onScrubPII={scrubPIIFn}
-                      onApplyScrub={handleApplyScrub}
-                      piiScrubbing={piiScrubbing}
-                      piiProgress={scrubProgress}
+                      onOpenPIIScrub={() => setPiiScrubOpen(true)}
                       hasEditedTranscript={hasUserEdits}
                       onRevertEdits={handleRevertEdits}
+                      seekSignal={seekSignal}
                     />
                     {transcribeRetryStatus ? (
                       <div style={{ marginTop: 8 }}>
@@ -655,7 +651,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 onJump={(t) => {
                   setClipsOpen(false);
                   if (transcriptCollapsed) setTranscriptCollapsed(false);
-                  transcriptRef.current?.scrollToTimestamp(t);
+                  setSeekSignal({ seconds: t, id: Date.now() });
                 }}
                 onDelete={handleDeleteClip}
                 onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
@@ -686,6 +682,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
       {/* ── Demo complete modal ──────────────────────────── */}
       <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
+
+      {/* ── PII scrub modal ──────────────────────────────── */}
+      <PIIScrubModal
+        open={piiScrubOpen}
+        transcript={effectiveTranscript}
+        onApply={handleApplyScrub}
+        onClose={() => setPiiScrubOpen(false)}
+      />
 
       {/* ── Manage templates modal ────────────────────────── */}
       <ManageTemplatesModal

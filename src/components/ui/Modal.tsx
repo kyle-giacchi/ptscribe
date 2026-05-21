@@ -7,7 +7,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   title?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   children: ReactNode;
 }
 
@@ -15,6 +15,7 @@ const SIZE: Record<NonNullable<Props['size']>, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
+  xl: 'max-w-xl',
 };
 
 export function Modal({ open, onClose, title, size = 'md', children }: Props) {
