@@ -22,17 +22,16 @@ ErrorBoundary                    <- catches any uncaught render error
                         ExercisesProvider
                           PlansProvider
                             SettingsProvider
-                              IdleLockProvider   <- auto-locks vault on idle
-                                DemoBootstrap    <- seeds demo data if needed
-                                  FirstRunGuard
-                                    Routes (app routes)
+                              DemoBootstrap    <- seeds demo data if needed
+                                FirstRunGuard
+                                  Routes (app routes)
 ```
 
 All slice providers call `useAppData()` internally — they must be nested inside `AppDataProvider`. Reordering slice providers among themselves is safe. Moving any slice provider outside `AppDataProvider` will throw at runtime.
 
 `VaultGate` must wrap `AppDataProvider` — it gates access until the vault is unlocked (or no vault is configured). `AppGate` only appears in demo mode and sits outside `VaultGate`.
 
-`IdleLockProvider` reads from `useSettings()` so it must stay inside `SettingsProvider`. It calls `vault.lock()` after the configured idle duration.
+Vault lifetime is **tab-lifetime only**. Tab close evicts the in-memory DEK; the next mount requires the passphrase again. There is no idle-timeout relock — by design, a clinician mid-visit is never interrupted by a vault prompt. (See [Vault and at-rest encryption](#vault-and-at-rest-encryption).)
 
 `FirstRunGuard` calls `useClinician()` so it must stay inside `ClinicianProvider`. Its current innermost position (just before `<Routes>`) is intentional.
 
@@ -136,7 +135,7 @@ When the vault is unlocked, **everything persisted goes through AES-GCM**. The e
 Key lifecycle (see `src/lib/vault/`):
 
 - KEK = PBKDF2-SHA-256 over the clinician's passphrase (16-byte salt, 600k iters). DEK = random AES-GCM-256 key, wrapped under KEK and persisted at `ptnotes.vault`.
-- The unwrapped DEK lives in memory only. Tab close evicts it; the next mount requires the passphrase again. There is no recovery — losing the passphrase wipes access to all encrypted data.
+- The unwrapped DEK lives in memory only. Tab close evicts it; the next mount requires the passphrase again. There is no recovery — losing the passphrase wipes access to all encrypted data. **No idle-timeout relock exists** — a recording in progress is never interrupted by a vault prompt. If idle-locking is ever reintroduced, it must define WAL-chunk behavior during the locked window.
 - `vault.isUnlocked()` is the gate. Repository methods that detect a locked vault while encrypted data exists must return `null` rather than crash, so `AppDataProvider` can fall through to `defaultAppData()` and let `VaultGate` prompt for the passphrase.
 
 Legacy plaintext migration (one-shot):

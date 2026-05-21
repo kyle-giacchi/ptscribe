@@ -56,6 +56,10 @@ Section-anchored map of every doc. Read with `Read tool offset:LINE limit:N` or 
 
 ## Project docs
 
+### [CONTEXT.md](../CONTEXT.md)
+
+Shared vocabulary for the core workflow (Capture → Curate → Generate → Finalize). Glossary only — not a spec. Canonical names for clinician-facing concepts: curated transcript, locked transcript, Improve with AI, Scrub PII, Modifiers, audio retention, demo mode. Read first to align terminology before editing code, UI, or docs. Some sections describe intended (not yet implemented) behavior — verify against code before assuming presence.
+
 ### [docs/architecture.md](architecture.md)
 
 Provider hierarchy, data flow, boot sequence, persistence (localStorage + IndexedDB), AI services, units. Read when wiring a new provider, debugging re-renders, or tracking down where a write happens.

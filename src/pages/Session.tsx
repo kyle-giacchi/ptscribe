@@ -610,6 +610,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         }
                       }}
                       onCreateTranscript={handleCreateTranscript}
+                      canImproveWithAI={!isDemoMode() && !session.t3Transcript}
                       onRevertToLocal={handleRevertToLocal}
                       onCopyTranscript={handleCopyTranscript}
                       onScrubPII={scrubPIIFn}

@@ -2,7 +2,21 @@
 
 State transitions and data changes for every major user journey in PTScribe. Read when adding a new flow, debugging unexpected state, or understanding what owns a particular side-effect.
 
+For canonical names of the phases (Capture / Curate / Generate / Finalize) and clinician-facing concepts (curated transcript, locked transcript, Improve with AI, Modifiers, audio retention), see [CONTEXT.md](../CONTEXT.md). This file documents the *implementation* of that vocabulary.
+
 Each section names the hook(s) that own the relevant handlers.
+
+---
+
+## Session entry points
+
+Three named ways to start a session, presented at session creation after patient + visit-type selection:
+
+1. **Recording** — capture a live visit with the mic; live preview (T1) during, T2 transcription on stop.
+2. **Audio Upload** — provide one or more existing audio files; no live preview, T2 runs on the combined silence-removed blob.
+3. **Skip / Manually type** — no audio at all; clinician types/pastes the transcript and proceeds directly to Curate. "Improve with AI" is hidden in this path (no audio to re-transcribe).
+
+All three converge on the same state machine after Capture (Curate → Generate → Finalize). Differences are only in *how the transcript gets into the system*. Entry 3 bypasses [Capture flow](#capture-flow-t2-before-curate) entirely.
 
 ---
 
@@ -80,7 +94,7 @@ handleFinishedRecording()
 
 ### Stop & finish
 
-`handleStopAndFinish()` calls `handleFinishedRecording()` then immediately switches to the Review tab. No additional state changes — transcription and generation remain explicit.
+`handleStopAndFinish()` calls `handleFinishedRecording()` then triggers the Capture-end pipeline. See [Capture flow — T2 before Curate](#capture-flow-t2-before-curate) for the gating contract: navigation to Curate only happens **after** T2 lands (or the T2-failure dialog resolves), not immediately on stop.
 
 ### Pause / resume
 
@@ -169,6 +183,21 @@ When any of these flags is true and `recorder.status === 'stopped'`, an effect i
 A background visibility warning (`wasBackgrounded`) is a separate sticky flag set by `useRecorder` the first time the tab is hidden during a clip. It surfaces a "verify duration" banner in `Session.tsx` but does not stop recording.
 
 ---
+
+## Capture flow — T2 before Curate
+
+**Contract (per [CONTEXT.md §Capture phase](../CONTEXT.md#capture-phase)):** T2 (local Whisper, post-stop, on the combined silence-removed blob) **must complete before the clinician is navigated to Curate**. There is no Curate UI with an in-flight "transcribing…" indicator. Capture is "active" — the system does the work the clinician trusts is happening, then hands them a finished transcript.
+
+The pipeline on Stop / Upload-complete:
+
+1. Consolidate all clips into one combined audio blob (`buildMergedAudioForReview`).
+2. Silence-remove and run local Whisper (T2) on that blob.
+3. Only when T2 resolves successfully → navigate to Curate.
+4. On T2 failure (see below) → show explicit dialog; do not silently fall through.
+
+### T2 failure handling (not-yet-built)
+
+Currently `useBackgroundTranscription` retries up to 8× then surfaces a notification. CONTEXT.md §T2 failure handling specifies a richer end-of-Capture dialog with two paths — **Re-transcribe with cloud AI** (consumes the per-session Nova budget) or **Proceed with live preview as transcript** (T1 fallback with an inline banner). Empty / no-speech-detected is **not** a failure path — clinician is navigated into Curate with an empty editable transcript.
 
 ## T2 background transcription
 
@@ -298,10 +327,22 @@ Rate-limits expensive AI operations per session to prevent runaway costs:
 
 | Action | Limit |
 |--------|-------|
-| `transcribe` | `MAX_TRANSCRIBES_PER_SESSION` (cloud Nova passes only) |
+| `transcribe` | **1 per session, lifetime** (cloud Nova passes only). The counter is per-Session, persisted with the entity, and is **not** reset by Revert to original, Unlock, page reload, or any other client action. The same counter is consumed by an explicit "Improve with AI" click *and* by a "Re-transcribe with cloud AI" choice from the T2-failure dialog. |
 | `generate` | `MAX_GENERATES_PER_SESSION` |
 
+**Demo mode:** Cloud transcription is **hard-disabled**. "Improve with AI" and the T2-failure dialog's cloud option are both unavailable with an explanatory tooltip ("Cloud transcription is disabled in demo mode."). T2 local Whisper and note generation against the real Anthropic Worker remain enabled — see [CONTEXT.md §Demo mode](../CONTEXT.md#demo-mode).
+
 The background T2 Whisper pass bypasses the guard — `useBackgroundTranscription` calls `transcribeWithLocalWhisper` directly and never touches `checkActionGuard`.
+
+## Audio retention
+
+Two-stage automatic retention model defined in [CONTEXT.md §Audio retention](../CONTEXT.md#audio-retention) — pre-Finalize keeps everything; at-Finalize drops per-clip audio + WAL chunks (keeps silenced+combined blob); +14 days drops the combined blob (keeps transcript + Note). After full purge, Improve with AI is no longer available for the session; the Note and locked transcript remain intact.
+
+Today the silenced+combined Blob is computed for playback only and is not persisted. The Finalize prune step requires it to become persistent — a small storage change still to be made.
+
+## Regeneration and Modifiers (not-yet-built)
+
+[CONTEXT.md §Modifier](../CONTEXT.md#modifier) and [§Regeneration](../CONTEXT.md#regeneration) define a curated chip library (tone, emphasis, format) + an optional length-capped Custom-instruction free-text slot, attached to each Regenerate call. After **3 regenerations** in a session, every subsequent regen is preceded by a reflective dialog ("You've regenerated this Note 3 times — what isn't quite right?") whose checkbox + free-text feedback is injected into the next regen's AI prompt. None of this exists in the current code; the present Regenerate path is a straight re-call of `generateNote()` with no modifier injection and no soft-gate.
 
 ---
 
