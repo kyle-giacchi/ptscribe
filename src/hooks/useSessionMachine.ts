@@ -1,15 +1,18 @@
-import { useCallback, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useMemo, useReducer, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useNotes } from '@/contexts/NotesProvider';
 import { generateNote } from '@/services/ai/generate';
+import { transcribe } from '@/services/ai/transcribe';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
+import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { newId } from '@/utils/ids';
+import { useActionGuard } from './useActionGuard';
+import { useBackgroundTranscription } from './useBackgroundTranscription';
 import { sessionMachineReducer } from './sessionMachine/reducer';
 import {
   initialSessionMachineState,
   type SessionMachineState,
 } from './sessionMachine/types';
-import type { useActionGuard } from './useActionGuard';
 import type {
   Note,
   NoteFormat,
@@ -17,6 +20,7 @@ import type {
   NoteTemplate,
   Patient,
   Session,
+  SessionClip,
   Settings,
 } from '@/types';
 
@@ -28,10 +32,15 @@ export interface UseSessionMachineParams {
   settings: Settings;
   transcript: string;
   patchSession: (patch: Partial<Session>) => void;
+  // Used by the transcribe slice — recording flow (still external in PR 2B)
+  // produces the merged blobs by calling our setters and dropping into
+  // patchClips/patchClip; PR 2C absorbs that producer side.
+  patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
+  patchClip: (clipId: string, patch: Partial<SessionClip>) => void;
+  setTranscript: (next: string) => void;
+  setEditedTranscript?: (next: string) => void;
   setError: (msg: string | null) => void;
   setBusy: (busy: 'transcribing' | 'generating' | null) => void;
-  checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
-  recordAction: ReturnType<typeof useActionGuard>['recordAction'];
 }
 
 export interface SessionMachineGenerateApi {
@@ -45,18 +54,47 @@ export interface SessionMachineGenerateApi {
   missingRequiredLabels: string[];
 }
 
+export interface SessionMachineTranscribeApi {
+  run: (clipId?: string) => Promise<void>;
+  revertToLocal: () => void;
+  clearAiError: () => void;
+  mergedAudioBlob: Blob | null;
+  setMergedAudioBlob: (b: Blob | null) => void;
+  silencedMergedBlob: Blob | null;
+  setSilencedMergedBlob: (b: Blob | null) => void;
+  isMerging: boolean;
+  setIsMerging: (v: boolean) => void;
+}
+
+export interface SessionMachineActionGuardApi {
+  checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
+  recordAction: ReturnType<typeof useActionGuard>['recordAction'];
+  transcribeUsed: number;
+  generateUsed: number;
+}
+
 export interface SessionMachine {
   state: SessionMachineState;
   generate: SessionMachineGenerateApi;
+  transcribe: SessionMachineTranscribeApi;
+  actionGuard: SessionMachineActionGuardApi;
 }
 
 /**
- * Session lifecycle machine. PR 2A scope: generation phase only.
- * PR 2B will absorb transcription; PR 2C the recording flow.
+ * Session lifecycle machine.
+ *   PR 2A: generation phase (note draft → finalize)
+ *   PR 2B: transcription phase (cloud Nova + auto local Whisper + revert)
+ *   PR 2C: recording phase (clips, merged-blob production)
  *
- * State (phase + transient AI surface) lives in the reducer. Side effects
- * — the AI call, toasts, repository writes, abort timers, status patches
- * on the underlying `Session` — live in runners that dispatch into it.
+ * Phase + transient AI surface live in the reducer (pure, no React).
+ * Async side effects — provider calls, toasts, repository writes, abort
+ * timers, status patches on the underlying `Session` — live in runners
+ * that dispatch into it. Slot-style state (Blob refs, isMerging flag)
+ * stays as useState because it isn't a lifecycle transition.
+ *
+ * IMPORTANT: this hook calls `useBackgroundTranscription` internally, so
+ * it MUST be invoked before `useRecordingFlow` in the consumer — the
+ * background pass depends on hook-ordering for its registered effects.
  */
 export function useSessionMachine(params: UseSessionMachineParams): SessionMachine {
   const {
@@ -67,18 +105,29 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     settings,
     transcript,
     patchSession,
+    setTranscript,
+    setEditedTranscript,
     setError,
     setBusy,
-    checkActionGuard,
-    recordAction,
   } = params;
 
   const { addNote, updateNote, finalizeNote, unfinalizeNote } = useNotes();
   const [state, dispatch] = useReducer(sessionMachineReducer, initialSessionMachineState);
 
+  // ── Slot state (not lifecycle) ──────────────────────────────────────────
+  const [mergedAudioBlob, setMergedAudioBlob] = useState<Blob | null>(null);
+  const [silencedMergedBlob, setSilencedMergedBlob] = useState<Blob | null>(null);
+  const [isMerging, setIsMerging] = useState(false);
+
+  const { checkActionGuard, recordAction, transcribeUsed, generateUsed } = useActionGuard();
+
+  // Background local-Whisper pass — auto-fires when silencedMergedBlob is
+  // produced by the recording flow.
+  useBackgroundTranscription({ session, patchSession, setTranscript, silencedMergedBlob });
+
+  // ── Generate runner ─────────────────────────────────────────────────────
   const isGeneratingRef = useRef(false);
 
-  // Lazy note creation — keeps empty sessions free of placeholder notes.
   const ensureNote = useCallback(
     (initialSections?: NoteSection[]): Note => {
       if (note) return note;
@@ -105,7 +154,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     [note, template, session, patient, addNote, patchSession],
   );
 
-  const run = useCallback(async () => {
+  const runGenerate = useCallback(async () => {
     if (isGeneratingRef.current) return;
     isGeneratingRef.current = true;
     try {
@@ -207,8 +256,6 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     (key: string, body: string) => {
       const target = ensureNote();
       const next = target.sections.map((s) => (s.key === key ? { ...s, body } : s));
-      // Audit trail: if this note was previously finalized then unfinalized,
-      // record the first-edit timestamp and increment the edit count.
       const wasFinalized = !target.finalized && target.finalizedAt !== undefined;
       const auditPatch = wasFinalized
         ? {
@@ -261,32 +308,196 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     );
   }, []);
 
-  const clearAiError = useCallback(() => {
+  const clearGenerateAiError = useCallback(() => {
     dispatch({ type: 'generate/clearAiError' });
   }, []);
 
+  // ── Transcribe runner ───────────────────────────────────────────────────
+  const runTranscribe = useCallback(
+    async (_clipId?: string) => {
+      if (!session) return;
+      if (!silencedMergedBlob) {
+        toast.error('No audio to transcribe yet. Record or upload audio first.');
+        return;
+      }
+
+      const guard = checkActionGuard('transcribe');
+      if (!guard.allowed) {
+        toast.error(guard.reason);
+        return;
+      }
+
+      dispatch({ type: 'transcribe/start' });
+      setBusy('transcribing');
+      patchSession({ status: 'transcribing' });
+
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 180_000);
+      try {
+        // Apply speed-up to the combined silenced blob if the setting is
+        // enabled. Speed-up is generated on demand — never pre-computed.
+        let blobToSend: Blob = silencedMergedBlob;
+        let speedReport: { savedSec: number; originalSec: number } | undefined;
+
+        const su = settings.audio.speedUp;
+        if (su.enabled) {
+          try {
+            const speedResult = await speedUpAudio(blobToSend, su.speed as SpeedFactor);
+            blobToSend = speedResult.result;
+            speedReport = {
+              savedSec: speedResult.report.savedSec,
+              originalSec: speedResult.report.originalSec,
+            };
+          } catch {
+            /* speed-up failure must never block transcription */
+          }
+        }
+
+        const result = await transcribe({
+          blob: blobToSend,
+          provider: 'cloudflare',
+          model: '@cf/deepgram/nova-3',
+          signal: controller.signal,
+          onRetry: (info) =>
+            dispatch({
+              type: 'transcribe/retry',
+              status: { provider: 'nova', attempt: info.attempt, max: info.max },
+            }),
+        });
+
+        const text = result.text?.trim() ?? '';
+        if (text) {
+          setTranscript(text);
+          setEditedTranscript?.('');
+          // t3Transcript frozen here — t2 preserved untouched
+          patchSession({
+            transcript: text,
+            t3Transcript: text,
+            activeTranscriptTier: 't3',
+            status: 'draft',
+            editedTranscript: undefined,
+          });
+          recordAction('transcribe');
+          dispatch({
+            type: 'transcribe/success',
+            stats: {
+              droppedSec: 0,
+              originalSec: 0,
+              speedSavedSec: speedReport?.savedSec ?? 0,
+              speedOriginalSec: speedReport?.originalSec ?? 0,
+            },
+          });
+          toast.success('Transcription complete.');
+        } else {
+          patchSession({ status: 'draft' });
+          dispatch({ type: 'transcribe/empty' });
+          toast.error('Transcription returned no text. Try again or check your audio.');
+        }
+      } catch (e) {
+        patchSession({ status: 'draft' });
+        if ((e as Error).name === 'AbortError') {
+          // user-initiated cancel; silent
+          dispatch({ type: 'transcribe/abort' });
+        } else if (e instanceof AiCallError) {
+          dispatch({ type: 'transcribe/error', aiError: e });
+          toast.error(friendlyAiError(e).title);
+        } else {
+          dispatch({ type: 'transcribe/error', aiError: null });
+          toast.error(`Transcription failed: ${(e as Error).message}`);
+        }
+      } finally {
+        clearTimeout(abortTimer);
+        setBusy(null);
+      }
+    },
+    [
+      session,
+      silencedMergedBlob,
+      settings,
+      checkActionGuard,
+      recordAction,
+      patchSession,
+      setBusy,
+      setTranscript,
+      setEditedTranscript,
+    ],
+  );
+
+  const revertToLocal = useCallback(() => {
+    const t2 = session?.t2Transcript;
+    const t1 = session?.t1Transcript;
+    const text = t2 || t1;
+    if (text?.trim()) {
+      setTranscript(text);
+      setEditedTranscript?.('');
+      patchSession({
+        transcript: text,
+        activeTranscriptTier: t2 ? 't2' : 't1',
+        editedTranscript: undefined,
+      });
+      toast.success('Reverted to local transcription.');
+    } else {
+      toast.error('No local transcription to revert to.');
+    }
+  }, [session, setTranscript, setEditedTranscript, patchSession]);
+
+  const clearTranscribeAiError = useCallback(() => {
+    dispatch({ type: 'transcribe/clearAiError' });
+  }, []);
+
+  // ── Public API ──────────────────────────────────────────────────────────
   const generate = useMemo<SessionMachineGenerateApi>(
     () => ({
-      run,
+      run: runGenerate,
       finalize,
       unfinalize,
       sectionChange,
       replaceSections,
       copyMarkdown,
-      clearAiError,
+      clearAiError: clearGenerateAiError,
       missingRequiredLabels,
     }),
     [
-      run,
+      runGenerate,
       finalize,
       unfinalize,
       sectionChange,
       replaceSections,
       copyMarkdown,
-      clearAiError,
+      clearGenerateAiError,
       missingRequiredLabels,
     ],
   );
 
-  return useMemo(() => ({ state, generate }), [state, generate]);
+  const transcribeApi = useMemo<SessionMachineTranscribeApi>(
+    () => ({
+      run: runTranscribe,
+      revertToLocal,
+      clearAiError: clearTranscribeAiError,
+      mergedAudioBlob,
+      setMergedAudioBlob,
+      silencedMergedBlob,
+      setSilencedMergedBlob,
+      isMerging,
+      setIsMerging,
+    }),
+    [
+      runTranscribe,
+      revertToLocal,
+      clearTranscribeAiError,
+      mergedAudioBlob,
+      silencedMergedBlob,
+      isMerging,
+    ],
+  );
+
+  const actionGuard = useMemo<SessionMachineActionGuardApi>(
+    () => ({ checkActionGuard, recordAction, transcribeUsed, generateUsed }),
+    [checkActionGuard, recordAction, transcribeUsed, generateUsed],
+  );
+
+  return useMemo(
+    () => ({ state, generate, transcribe: transcribeApi, actionGuard }),
+    [state, generate, transcribeApi, actionGuard],
+  );
 }
