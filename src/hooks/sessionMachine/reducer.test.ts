@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sessionMachineReducer } from './reducer';
 import {
   initialSessionMachineState,
+  type CaptureState,
   type GenerateState,
   type SessionMachineState,
   type TranscribeState,
@@ -28,6 +29,13 @@ function seedTranscribe(overrides: Partial<TranscribeState>): SessionMachineStat
   return {
     ...initialSessionMachineState,
     transcribe: { ...initialSessionMachineState.transcribe, ...overrides },
+  };
+}
+
+function seedCapture(overrides: Partial<CaptureState>): SessionMachineState {
+  return {
+    ...initialSessionMachineState,
+    capture: { ...initialSessionMachineState.capture, ...overrides },
   };
 }
 
@@ -249,6 +257,62 @@ describe('sessionMachineReducer — transcribe slice', () => {
   });
 });
 
+describe('sessionMachineReducer — capture slice', () => {
+  describe('capture/upload', () => {
+    it('stores reading phase status', () => {
+      const next = sessionMachineReducer(initialSessionMachineState, {
+        type: 'capture/upload',
+        status: { phase: 'reading', message: 'Reading file…' },
+      });
+      expect(next.capture.uploadStatus).toEqual({
+        phase: 'reading',
+        message: 'Reading file…',
+      });
+    });
+
+    it('progresses reading → saving → done across dispatches', () => {
+      const reading = sessionMachineReducer(initialSessionMachineState, {
+        type: 'capture/upload',
+        status: { phase: 'reading', message: 'Reading file…' },
+      });
+      const saving = sessionMachineReducer(reading, {
+        type: 'capture/upload',
+        status: { phase: 'saving', message: 'Saving clip…' },
+      });
+      const done = sessionMachineReducer(saving, {
+        type: 'capture/upload',
+        status: { phase: 'done', message: 'Upload complete' },
+      });
+      expect(reading.capture.uploadStatus.phase).toBe('reading');
+      expect(saving.capture.uploadStatus.phase).toBe('saving');
+      expect(done.capture.uploadStatus.phase).toBe('done');
+      expect(done.capture.uploadStatus.message).toBe('Upload complete');
+    });
+
+    it('stores error phase status', () => {
+      const next = sessionMachineReducer(initialSessionMachineState, {
+        type: 'capture/upload',
+        status: { phase: 'error', message: 'Upload failed' },
+      });
+      expect(next.capture.uploadStatus).toEqual({
+        phase: 'error',
+        message: 'Upload failed',
+      });
+    });
+
+    it('can return to idle (clear status)', () => {
+      const seeded = seedCapture({
+        uploadStatus: { phase: 'error', message: 'Upload failed' },
+      });
+      const next = sessionMachineReducer(seeded, {
+        type: 'capture/upload',
+        status: { phase: 'idle', message: '' },
+      });
+      expect(next.capture.uploadStatus).toEqual({ phase: 'idle', message: '' });
+    });
+  });
+});
+
 describe('sessionMachineReducer — slice isolation', () => {
   it('generate actions do not affect transcribe slice', () => {
     const seeded = seedTranscribe({
@@ -266,6 +330,28 @@ describe('sessionMachineReducer — slice isolation', () => {
     });
     const next = sessionMachineReducer(seeded, { type: 'transcribe/start' });
     expect(next.generate).toBe(seeded.generate);
+  });
+
+  it('capture actions do not affect generate or transcribe slices', () => {
+    const seeded: SessionMachineState = {
+      ...initialSessionMachineState,
+      generate: { ...initialSessionMachineState.generate, phase: 'generating' },
+      transcribe: { ...initialSessionMachineState.transcribe, phase: 'transcribing' },
+    };
+    const next = sessionMachineReducer(seeded, {
+      type: 'capture/upload',
+      status: { phase: 'saving', message: 'Saving…' },
+    });
+    expect(next.generate).toBe(seeded.generate);
+    expect(next.transcribe).toBe(seeded.transcribe);
+  });
+
+  it('generate actions do not affect capture slice', () => {
+    const seeded = seedCapture({
+      uploadStatus: { phase: 'saving', message: 'Saving…' },
+    });
+    const next = sessionMachineReducer(seeded, { type: 'generate/start' });
+    expect(next.capture).toBe(seeded.capture);
   });
 });
 

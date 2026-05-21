@@ -23,7 +23,7 @@ import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseWebSpeechTranscript, TranscriptSegment } from '@/hooks/useLiveTranscript';
-import type { UploadStatus } from '@/hooks/useRecordingFlow';
+import type { UploadStatus } from '@/hooks/sessionMachine/types';
 import type { DeviceCapabilities } from '@/hooks/useDeviceCapabilities';
 import type { SessionClip } from '@/types';
 

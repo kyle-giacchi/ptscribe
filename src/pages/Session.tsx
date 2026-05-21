@@ -17,7 +17,6 @@ import { useSessionPatcher } from '@/hooks/useSessionPatcher';
 import type { NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
-import { useRecordingFlow } from '@/hooks/useRecordingFlow';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
 import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
@@ -111,9 +110,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   const sortedClips = session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : [];
 
-  // ── Session lifecycle machine (must be initialised before recording flow
-  // because the machine's internal useBackgroundTranscription depends on
-  // hook-ordering for its registered effects). ──
+  // ── Session lifecycle machine (owns generate, transcribe, AND capture slices) ──
   const sessionMachine = useSessionMachine({
     session,
     patient,
@@ -121,25 +118,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     template,
     settings,
     transcript: effectiveTranscript,
-    patchSession,
-    patchClips,
-    patchClip,
-    setTranscript,
-    setEditedTranscript,
-    setError,
-    setBusy,
-  });
-  const { setMergedAudioBlob, setSilencedMergedBlob, setIsMerging } = sessionMachine.transcribe;
-  const handleCreateTranscript = sessionMachine.transcribe.run;
-  const handleRevertToLocal = sessionMachine.transcribe.revertToLocal;
-  const clearTranscribeAiError = sessionMachine.transcribe.clearAiError;
-  const { aiError: transcribeAiError, retryStatus: transcribeRetryStatus, debugStats } =
-    sessionMachine.state.transcribe;
-  const { generateUsed } = sessionMachine.actionGuard;
-
-  // ── Recording flow ───────────────────────────────────────────────────────
-  const recording = useRecordingFlow({
-    session,
     recorder,
     webSpeech,
     webSpeechEnabled: settings.session.webSpeechEnabled,
@@ -148,13 +126,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     patchSession,
     patchClips,
     patchClip,
-    setError,
-    setActiveTab,
     setTranscript,
-    setMergedAudioBlob,
-    setSilencedMergedBlob,
-    setIsMerging,
+    setEditedTranscript,
+    setError,
+    setBusy,
+    setActiveTab,
   });
+  const handleCreateTranscript = sessionMachine.transcribe.run;
+  const handleRevertToLocal = sessionMachine.transcribe.revertToLocal;
+  const clearTranscribeAiError = sessionMachine.transcribe.clearAiError;
+  const { setMergedAudioBlob, setIsMerging } = sessionMachine.transcribe;
+  const { aiError: transcribeAiError, retryStatus: transcribeRetryStatus, debugStats } =
+    sessionMachine.state.transcribe;
+  const { generateUsed } = sessionMachine.actionGuard;
   const {
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
@@ -167,7 +151,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleUploadAudio,
     handleDeleteClip,
     buildMergedAudioForReview,
-  } = recording;
+  } = sessionMachine.capture;
 
   // Ref so effects can call the latest handler without re-firing when its
   // identity changes each render.
