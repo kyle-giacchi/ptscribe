@@ -61,6 +61,8 @@ component event (recorder stop)
 
 Bypassing any step in the AppData chain — especially writing to `localStorage` from a component or hook — breaks the debounce, skips `lastModified` stamping, and creates two sources of truth.
 
+**Session mutations go through `useSessionPatcher`.** The hook provides three stable, memoized callbacks (`patchSession`, `patchClips`, `patchClip`) that automatically scope writes to the current `sessionId` and stamp `updatedAt: Date.now()` on every mutation. Calling `updateSessionsSlice` directly from a hook or component skips the timestamp stamping and scatters the scoping logic. Always use `useSessionPatcher` for session and clip writes.
+
 ## Schema validation at boundaries
 
 `DataRepository.load()` runs `AppDataSchema.safeParse` on the raw JSON. On parse failure it logs and returns `null`; `AppDataProvider` falls back to `defaultAppData()`.
