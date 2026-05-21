@@ -10,7 +10,8 @@ Reference for every AI model used in PTScribe: what it does, how files are deliv
 |---|---|---|---|
 | `@cf/deepgram/nova-3` | Cloudflare Workers AI | Cloudflare edge | Cloud transcription with speaker diarization |
 | `Xenova/whisper-tiny.en` | HuggingFace / Transformers.js | Browser Web Worker | Local (on-device) transcription |
-| `openai/privacy-filter` (INT8 ONNX) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing |
+| `Xenova/bert-base-NER` (INT8 ONNX) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing (default) |
+| `openai/privacy-filter` (Q4 ONNX) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing (backup, larger) |
 | `claude-sonnet-4-6` | Anthropic | Cloudflare Worker proxy | Structured note generation |
 
 ---
@@ -36,18 +37,20 @@ Pre-seeded to R2 with:
 npx tsx scripts/seed-r2-models.ts
 ```
 
-### `openai/privacy-filter` — PII scrubbing
+### `Xenova/bert-base-NER` — PII scrubbing (default)
 
-Runs in `src/lib/pii/privacyFilter.worker.ts` via `@huggingface/transformers`. This is a token-classification (NER) model used to detect and redact names, dates, locations, and other identifiers from transcripts before sharing or export.
+Runs in `src/lib/pii/privacyFilter.worker.ts` via `@huggingface/transformers`. BERT-base fine-tuned for NER (CoNLL-2003 categories: PER, ORG, LOC, MISC). ~90 MB INT8 quantized — practical for browser download.
 
-**Important:** The pipeline must be loaded with `dtype: 'q8'` so that Transformers.js requests `onnx/model_quantized.onnx` rather than `model.onnx`. Without this, the library falls back to `model.safetensors` (400 MB+ PyTorch weights), which fails in the browser.
-
-```ts
-// privacyFilter.worker.ts
-pipeline('token-classification', model, { dtype: 'q8', ... })
+Loaded with `dtype: 'q8'` → requests `onnx/model_quantized.onnx`. Pre-seeded to R2 with:
+```
+npx tsx scripts/seed-r2-models.ts
 ```
 
-The HuggingFace repo ships pre-built ONNX INT8 files — no local conversion is required. Files are pre-seeded to R2 with:
+### `openai/privacy-filter` — PII scrubbing (backup)
+
+Available as an alternative via `settings.session.piiModel`. Loaded with `dtype: 'q4'` → requests `onnx/model_q4.onnx` + `onnx/model_q4.onnx_data` (~875 MB total). Impractical for first-time users but works after download is cached in IDB.
+
+Pre-seeded to R2 with:
 ```
 python scripts/convert-privacy-filter.py
 ```
