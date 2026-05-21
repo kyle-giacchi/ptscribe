@@ -9,7 +9,6 @@ import { TemplatesProvider } from '@/contexts/TemplatesProvider';
 import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
-import { IdleLockProvider } from '@/contexts/IdleLockProvider';
 import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
@@ -64,10 +63,9 @@ function AppProviders() {
                   <ExercisesProvider>
                     <PlansProvider>
                       <SettingsProvider>
-                        <IdleLockProvider>
-                          <DemoBootstrap>
-                            <FirstRunGuard>
-                              <Suspense fallback={<PageLoader />}>
+                        <DemoBootstrap>
+                          <FirstRunGuard>
+                            <Suspense fallback={<PageLoader />}>
                                 <Routes>
                                   <Route path="/setup" element={<Setup />} />
                                   <Route element={<AppShell />}>
@@ -110,10 +108,9 @@ function AppProviders() {
                                     }
                                   />
                                 </Routes>
-                              </Suspense>
-                            </FirstRunGuard>
-                          </DemoBootstrap>
-                        </IdleLockProvider>
+                            </Suspense>
+                          </FirstRunGuard>
+                        </DemoBootstrap>
                       </SettingsProvider>
                     </PlansProvider>
                   </ExercisesProvider>

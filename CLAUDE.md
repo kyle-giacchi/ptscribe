@@ -4,9 +4,10 @@
 
 ## Before editing
 
-1. **Open [docs/INDEX.md](docs/INDEX.md) to navigate docs by section** — read targeted ranges instead of whole files.
-2. **Read [docs/invariants.md](docs/invariants.md) first.** It lists the non-obvious rules (single-write-path persistence, provider nesting, slice mutator pattern, schema validation at boundaries, built-in template/exercise guards, Worker-proxied AI calls, vault encryption boundary, recorder lifecycle, etc.).
-3. Run `npm run dev` (http://localhost:8080) and try the feature in a browser before reporting a task as complete.
+1. **Read [CONTEXT.md](CONTEXT.md) for the shared vocabulary.** It is the glossary for the core workflow (Capture → Curate → Generate → Finalize) and the canonical names for clinician-facing concepts (curated transcript, locked transcript, Improve with AI, Scrub PII, Modifiers, audio retention, demo mode, etc.). Use these terms in code, UI, and PRs. If you find code or docs using older names, treat CONTEXT.md as the source of truth for *vocabulary*. Note: CONTEXT.md describes the intended workflow — some sections (locked transcript, 14-day audio sweep, Modifiers, demo namespace) are not yet implemented; check the code before assuming they exist.
+2. **Open [docs/INDEX.md](docs/INDEX.md) to navigate docs by section** — read targeted ranges instead of whole files.
+3. **Read [docs/invariants.md](docs/invariants.md) first.** It lists the non-obvious rules (single-write-path persistence, provider nesting, slice mutator pattern, schema validation at boundaries, built-in template/exercise guards, Worker-proxied AI calls, vault encryption boundary, recorder lifecycle, etc.).
+4. Run `npm run dev` (http://localhost:8080) and try the feature in a browser before reporting a task as complete.
 
 ## Quick lookup
 
@@ -27,7 +28,8 @@
 | ID generation?                           | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                                                                                                                                   |
 | Where is data encrypted?                 | Inside `DataRepository` (AppData) and `AudioRepository` (audio Blobs + chunks). AES-GCM via `src/lib/vault/`. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))                                                                            |
 | Who owns the wake lock during recording? | `useRecorder` — released on stop/reset/error/unmount. ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))                                                                                                           |
-| Demo mode build flag?                    | `VITE_DEMO_MODE=false` to disable. Default is **ON** — auto-unlocks vault with a hardcoded passphrase, skips first-run wizard, seeds a demo patient. Must be `false` for production builds.                                                                         |
+| Demo mode build flag?                    | `VITE_DEMO_MODE=false` to disable. Default is **ON** — auto-unlocks vault with a hardcoded passphrase, skips first-run wizard, seeds a demo patient. **Cloud transcription (Nova) is hard-disabled in demo mode**; T2 local Whisper and Anthropic note generation remain on. Must be `false` for production builds. |
+| Cloud transcription cap per session?     | **1** total Nova call per session, lifetime. Counter persists with the Session entity and is not reset by Revert, Unlock, reload, or any client action. Consumed by "Improve with AI" or the T2-failure dialog's cloud option. See [CONTEXT.md §Cloud-transcription cap](CONTEXT.md#cloud-transcription-cap). |
 
 ## Commands
 
@@ -61,6 +63,7 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 
 [docs/INDEX.md](docs/INDEX.md) is the nav hub — every doc mapped to section headings. Pinpoint-read; don't pull whole files.
 
+- [CONTEXT.md](CONTEXT.md) — shared vocabulary for the core workflow; the glossary, not a spec. Read first for naming.
 - [docs/invariants.md](docs/invariants.md) — non-obvious rules; read before any cross-cutting edit
 - [docs/architecture.md](docs/architecture.md) — provider tree, data flow, storage, AI services, units
 - [docs/models.md](docs/models.md) — AI model catalog, R2/IDB caching architecture, `dtype` requirements, seeding runbook
@@ -87,3 +90,5 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 - **Encryption is enforced inside the Repository layer.** When the vault is unlocked, `DataRepository` and `AudioRepository` round-trip every byte through AES-GCM. Do not add a second persistence path that bypasses them. Tab close evicts the in-memory key; there is no passphrase recovery. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))
 - **Recorder owns wake lock + visibility.** `useRecorder` holds a `'screen'` wake lock and a `visibilitychange` listener for the lifetime of each clip; both must be released on every exit path (stop, reset, error, unmount). ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))
 - **Console calls are DEV-only.** All `console.error/warn` calls are wrapped in `if (import.meta.env.DEV)` — Vite tree-shakes them out of production builds. Never add bare console calls.
+- **Vault is tab-lifetime only — no idle-lock.** Clinicians mid-visit are never interrupted by a vault prompt. If you introduce an idle relock, it must define WAL-chunk behavior during the locked window. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))
+- **Cloud transcription is hard-disabled in demo mode.** The "Improve with AI" action and the T2-failure dialog's cloud option must both be unavailable when `VITE_DEMO_MODE=true`. T2 local Whisper and Anthropic generation remain enabled.

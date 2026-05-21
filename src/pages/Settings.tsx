@@ -82,7 +82,6 @@ export function Settings() {
     updateAudio,
     updateUi,
     updateSession,
-    setIdleLockMinutes,
     setAutoDeleteAudioAfterDays,
   } = useSettings();
   const { appData, bulkUpdate, resetAll } = useAppData();
@@ -245,23 +244,6 @@ export function Settings() {
             Your data on this device is encrypted with your passphrase. The key lives in this tab
             and is cleared when you close it. Use Lock now if you need to hand the device over.
           </p>
-          <div style={{ maxWidth: 280 }}>
-            <Field
-              label="Auto-lock after inactivity"
-              hint="Locks the vault after this much idle time. Pointer, key, or tab activity resets the timer."
-            >
-              <Select
-                value={String(settings.security.idleLockMinutes)}
-                onChange={(e) => setIdleLockMinutes(Number(e.target.value))}
-              >
-                <option value="0">Off</option>
-                <option value="5">5 minutes</option>
-                <option value="10">10 minutes</option>
-                <option value="15">15 minutes</option>
-                <option value="30">30 minutes</option>
-              </Select>
-            </Field>
-          </div>
           <ChangePassphraseForm />
           <div>
             <PtButton
