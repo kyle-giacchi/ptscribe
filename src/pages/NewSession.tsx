@@ -51,6 +51,9 @@ export function NewSession() {
   const [showAllTemplates, showAllTemplatesOn, showAllTemplatesOff] = useToggle();
   const [creatingTemplate, openCreatingTemplate, closeCreatingTemplate] = useToggle();
   const [query, setQuery] = useState('');
+  // Pinned at mount — same-day filter only needs today's date once per visit
+  // to this page; remount on navigation re-pins it.
+  const [now] = useState(() => Date.now());
 
   const selectedPatient = useMemo(
     () => patients.find((p) => p.id === patientId),
@@ -60,9 +63,9 @@ export function NewSession() {
   const todaySessions = useMemo<Session[]>(() => {
     if (!patientId) return [];
     return sessionsForPatient(patientId).filter(
-      (s) => s.status !== 'finalized' && isSameDay(s.date, Date.now()),
+      (s) => s.status !== 'finalized' && isSameDay(s.date, now),
     );
-  }, [patientId, sessionsForPatient]);
+  }, [patientId, sessionsForPatient, now]);
 
   const filteredPatients = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
@@ -23,7 +24,10 @@ function makeNote(overrides: Partial<Note> = {}): Note {
 }
 
 function Probe({ ref }: { ref: { current: Api | null } }) {
-  ref.current = useNotes();
+  const api = useNotes();
+  useEffect(() => {
+    ref.current = api;
+  });
   return null;
 }
 
