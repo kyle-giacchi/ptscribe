@@ -18,7 +18,6 @@ import type { NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useRecordingFlow } from '@/hooks/useRecordingFlow';
-import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
 import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
@@ -112,32 +111,31 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   const sortedClips = session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : [];
 
-  // ── Transcription flow (must be initialised before recording flow because
-  // recording's stop/upload handlers schedule the local-Whisper background pass). ──
-  const transcription = useTranscriptionFlow({
+  // ── Session lifecycle machine (must be initialised before recording flow
+  // because the machine's internal useBackgroundTranscription depends on
+  // hook-ordering for its registered effects). ──
+  const sessionMachine = useSessionMachine({
     session,
+    patient,
+    note,
+    template,
     settings,
-    setTranscript,
-    setEditedTranscript,
+    transcript: effectiveTranscript,
     patchSession,
     patchClips,
     patchClip,
+    setTranscript,
+    setEditedTranscript,
+    setError,
     setBusy,
   });
-  const {
-    setMergedAudioBlob,
-    setSilencedMergedBlob,
-    setIsMerging,
-    debugStats,
-    generateUsed,
-    checkActionGuard,
-    recordAction,
-    handleCreateTranscript,
-    handleRevertToLocal,
-    aiError: transcribeAiError,
-    retryStatus: transcribeRetryStatus,
-    clearAiError: clearTranscribeAiError,
-  } = transcription;
+  const { setMergedAudioBlob, setSilencedMergedBlob, setIsMerging } = sessionMachine.transcribe;
+  const handleCreateTranscript = sessionMachine.transcribe.run;
+  const handleRevertToLocal = sessionMachine.transcribe.revertToLocal;
+  const clearTranscribeAiError = sessionMachine.transcribe.clearAiError;
+  const { aiError: transcribeAiError, retryStatus: transcribeRetryStatus, debugStats } =
+    sessionMachine.state.transcribe;
+  const { generateUsed } = sessionMachine.actionGuard;
 
   // ── Recording flow ───────────────────────────────────────────────────────
   const recording = useRecordingFlow({
@@ -245,20 +243,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     );
   }
 
-  // ── Note/generation flow ─────────────────────────────────────────────────
-  const sessionMachine = useSessionMachine({
-    session,
-    patient,
-    note,
-    template,
-    settings,
-    transcript: effectiveTranscript,
-    patchSession,
-    setError,
-    setBusy,
-    checkActionGuard,
-    recordAction,
-  });
+  // ── Note/generation flow — sourced from the same sessionMachine above ────
   const handleGenerateRaw = sessionMachine.generate.run;
   const handleSectionChange = sessionMachine.generate.sectionChange;
   const handleReplaceSections = sessionMachine.generate.replaceSections;
