@@ -9,17 +9,16 @@ import { SessionResetContext } from '@/contexts/SessionResetContext';
 import { audioRepository } from '@/services/AudioRepository';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { useAppData } from '@/contexts/AppDataProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
-import type { Session, SessionClip, NoteSection } from '@/types';
+import { useSessionPatcher } from '@/hooks/useSessionPatcher';
+import type { NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
-import { useRecordingFlow } from '@/hooks/useRecordingFlow';
-import { useTranscriptionFlow } from '@/hooks/useTranscriptionFlow';
-import { useGenerationFlow, MAX_GENERATES_PER_SESSION } from '@/hooks/useGenerationFlow';
+import { useSessionMachine } from '@/hooks/useSessionMachine';
+import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
 import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
@@ -57,7 +56,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { forSession, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
   const { settings, updateSession } = useSettings();
-  const { updateSessionsSlice } = useAppData();
+  const { patchSession, patchClips, patchClip } = useSessionPatcher(sessionId);
 
   const session = getSession(sessionId);
   const patient = session ? getPatient(session.patientId) : undefined;
@@ -107,59 +106,18 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
   const processingStartedAtRef = useRef<number | null>(null);
 
-  // ── Atomic session/clip patches via functional slice update ──────────────
-  function patchSession(patch: Partial<Session>) {
-    updateSessionsSlice((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, ...patch, updatedAt: Date.now() } : s)),
-    );
-  }
-  function patchClips(mapper: (clips: SessionClip[]) => SessionClip[]) {
-    updateSessionsSlice((prev) =>
-      prev.map((s) =>
-        s.id === sessionId ? { ...s, clips: mapper(s.clips), updatedAt: Date.now() } : s,
-      ),
-    );
-  }
-  function patchClip(clipId: string, patch: Partial<SessionClip>) {
-    patchClips((clips) =>
-      clips.map((c) => (c.id === clipId ? { ...c, ...patch, updatedAt: Date.now() } : c)),
-    );
-  }
-
   useAudioRecovery(sessionId, session, patchClips);
 
   const sortedClips = session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : [];
 
-  // ── Transcription flow (must be initialised before recording flow because
-  // recording's stop/upload handlers schedule the local-Whisper background pass). ──
-  const transcription = useTranscriptionFlow({
+  // ── Session lifecycle machine (owns generate, transcribe, AND capture slices) ──
+  const sessionMachine = useSessionMachine({
     session,
+    patient,
+    note,
+    template,
     settings,
-    setTranscript,
-    setEditedTranscript,
-    patchSession,
-    patchClips,
-    patchClip,
-    setBusy,
-  });
-  const {
-    setMergedAudioBlob,
-    setSilencedMergedBlob,
-    setIsMerging,
-    debugStats,
-    generateUsed,
-    checkActionGuard,
-    recordAction,
-    handleCreateTranscript,
-    handleRevertToLocal,
-    aiError: transcribeAiError,
-    retryStatus: transcribeRetryStatus,
-    clearAiError: clearTranscribeAiError,
-  } = transcription;
-
-  // ── Recording flow ───────────────────────────────────────────────────────
-  const recording = useRecordingFlow({
-    session,
+    transcript: effectiveTranscript,
     recorder,
     webSpeech,
     webSpeechEnabled: settings.session.webSpeechEnabled,
@@ -168,13 +126,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     patchSession,
     patchClips,
     patchClip,
-    setError,
-    setActiveTab,
     setTranscript,
-    setMergedAudioBlob,
-    setSilencedMergedBlob,
-    setIsMerging,
+    setEditedTranscript,
+    setError,
+    setBusy,
+    setActiveTab,
   });
+  const handleCreateTranscript = sessionMachine.transcribe.run;
+  const handleRevertToLocal = sessionMachine.transcribe.revertToLocal;
+  const clearTranscribeAiError = sessionMachine.transcribe.clearAiError;
+  const { setMergedAudioBlob, setIsMerging } = sessionMachine.transcribe;
+  const { aiError: transcribeAiError, retryStatus: transcribeRetryStatus, debugStats } =
+    sessionMachine.state.transcribe;
+  const { generateUsed } = sessionMachine.actionGuard;
   const {
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
@@ -187,7 +151,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleUploadAudio,
     handleDeleteClip,
     buildMergedAudioForReview,
-  } = recording;
+  } = sessionMachine.capture;
 
   // Ref so effects can call the latest handler without re-firing when its
   // identity changes each render.
@@ -263,35 +227,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     );
   }
 
-  // ── Note/generation flow ─────────────────────────────────────────────────
-  const generation = useGenerationFlow({
-    session,
-    patient,
-    note,
-    template,
-    settings,
-    transcript: effectiveTranscript,
-    patchSession,
-    setError,
-    setBusy,
-    setTranscript,
-    setActiveTab,
-    checkActionGuard,
-    recordAction,
-  });
-  const {
-    handleGenerate: handleGenerateRaw,
-    handleSectionChange,
-    handleReplaceSections,
-    handleFinalize,
-    handleUnfinalize,
-    handleCopyNoteMarkdown,
-    missingRequiredLabels,
-    lastRawPayload,
-    aiError: generationAiError,
-    retryStatus: generationRetryStatus,
-    clearAiError: clearGenerationAiError,
-  } = generation;
+  // ── Note/generation flow — sourced from the same sessionMachine above ────
+  const handleGenerateRaw = sessionMachine.generate.run;
+  const handleSectionChange = sessionMachine.generate.sectionChange;
+  const handleReplaceSections = sessionMachine.generate.replaceSections;
+  const handleFinalize = sessionMachine.generate.finalize;
+  const handleUnfinalize = sessionMachine.generate.unfinalize;
+  const handleCopyNoteMarkdown = sessionMachine.generate.copyMarkdown;
+  const { missingRequiredLabels } = sessionMachine.generate;
+  const { lastRawPayload, aiError: generationAiError, retryStatus: generationRetryStatus } =
+    sessionMachine.state.generate;
+  const clearGenerationAiError = sessionMachine.generate.clearAiError;
 
   // ── PHI confirmation gate before generation ─────────────────────────────
   // Always shown (regardless of PII filter state) unless user has dismissed it
