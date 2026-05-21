@@ -237,14 +237,31 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setPendingStartRecording(false);
   }
 
-  // Auto-close + proceed when the user's retry succeeds while the dialog is open.
+  // Mirror pending-start state into a ref so the retry .then() callback sees
+  // current values (handles the cancel-during-retry race — if the user clicks
+  // Cancel while the preload is in flight, we must NOT auto-resume).
+  const pendingStartRecordingRef = useRef(pendingStartRecording);
   useEffect(() => {
-    if (whisperDialogOpen && !whisperLoading && !whisperFailed && pendingStartRecording) {
-      setWhisperDialogOpen(false);
-      setPendingStartRecording(false);
-      void handleStartRecordingRef.current();
-    }
-  }, [whisperDialogOpen, whisperLoading, whisperFailed, pendingStartRecording]);
+    pendingStartRecordingRef.current = pendingStartRecording;
+  });
+
+  // When the user clicks Retry inside the recovery dialog, chain auto-resume
+  // onto the new preload promise — the setStates fire from a promise callback
+  // (allowed) instead of an effect that watches `whisperLoading`/`whisperFailed`.
+  function handleRetryWhisperLoad() {
+    void retryWhisperLoad().then(
+      () => {
+        if (!pendingStartRecordingRef.current) return; // user cancelled mid-retry
+        setWhisperDialogOpen(false);
+        setPendingStartRecording(false);
+        void handleStartRecordingRef.current();
+      },
+      () => {
+        // Failure surfaces through whisperFailed; dialog stays open so the
+        // user can retry again or pick a fallback.
+      },
+    );
+  }
 
   // ── Note/generation flow ─────────────────────────────────────────────────
   const generation = useGenerationFlow({
@@ -330,6 +347,26 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     setSearchParams(next, { replace: true });
     void handleStartRecordingRef.current();
   }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!processingUploadClipId) return;
+    const clip = session?.clips.find((c) => c.id === processingUploadClipId);
+    if (!clip) return;
+
+    // T2 no longer runs per-clip — it fires after buildMergedAudioForReview builds
+    // the combined blob. Treat 'ready' (audio saved) as "processing done" and call
+    // buildMergedAudioForReview to create the combined blob, kick off T2, and navigate.
+    if (clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed') {
+      const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
+      const delay = Math.max(0, 2000 - elapsed);
+      const t = setTimeout(() => {
+        setProcessingUploadClipId(null);
+        void buildMergedAudioForReview();
+      }, delay);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.clips, processingUploadClipId]);
 
   if (!session || !patient) return <NotFound />;
 
@@ -432,26 +469,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       setProcessingUploadClipId(clipId);
     }
   }
-
-  useEffect(() => {
-    if (!processingUploadClipId) return;
-    const clip = session?.clips.find((c) => c.id === processingUploadClipId);
-    if (!clip) return;
-
-    // T2 no longer runs per-clip — it fires after buildMergedAudioForReview builds
-    // the combined blob. Treat 'ready' (audio saved) as "processing done" and call
-    // buildMergedAudioForReview to create the combined blob, kick off T2, and navigate.
-    if (clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed') {
-      const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
-      const delay = Math.max(0, 2000 - elapsed);
-      const t = setTimeout(() => {
-        setProcessingUploadClipId(null);
-        void buildMergedAudioForReview();
-      }, delay);
-      return () => clearTimeout(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.clips, processingUploadClipId]);
 
   return (
     <SessionResetContext.Provider value={{ onResetSession: () => setResetModalOpen(true) }}>
@@ -708,7 +725,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         retryingLoad={whisperLoading}
         onUseWebSpeech={handleUseWebSpeech}
         onRecordWithoutTranscription={handleRecordWithoutTranscription}
-        onRetryLoad={retryWhisperLoad}
+        onRetryLoad={handleRetryWhisperLoad}
         onCancel={handleCancelWhisperDialog}
       />
 

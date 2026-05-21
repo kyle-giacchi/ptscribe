@@ -339,10 +339,12 @@ interface StorageInfo {
 function StorageCard() {
   const [info, setInfo] = useState<StorageInfo | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
+  // `refreshing` flips to true at the event boundary (the refresh click) and
+  // back to false in the effect's async-finally — avoids a sync setState in
+  // the effect body.
+  const [refreshing, setRefreshing] = useState(true);
 
   useEffect(() => {
-    setRefreshing(true);
     async function load() {
       try {
         const lsItems = Object.values(STORAGE_KEYS).map((key) => ({
@@ -384,7 +386,10 @@ function StorageCard() {
         </div>
         <button
           type="button"
-          onClick={() => setRefreshKey((k) => k + 1)}
+          onClick={() => {
+            setRefreshing(true);
+            setRefreshKey((k) => k + 1);
+          }}
           disabled={refreshing}
           title="Refresh storage info"
           className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
@@ -603,17 +608,18 @@ function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
 // ─── Session audio section (lazy-mounted on expand) ───────────────────────────
 
 function SessionAudioSection({ session }: { session: Session }) {
-  const [clipBlobs, setClipBlobs] = useState<Map<string, Blob>>(new Map());
-  const [mergedBlob, setMergedBlob] = useState<Blob | null>(null);
-  const [loading, setLoading] = useState(true);
+  // We track which session.id the loaded blobs belong to, so `loading` can be
+  // derived synchronously — avoids a sync setState(true) in the effect body
+  // when session.id changes.
+  const [loaded, setLoaded] = useState<{ id: string; clipBlobs: Map<string, Blob>; mergedBlob: Blob | null } | null>(null);
   const vaultUnlocked = vault.isUnlocked();
+  const loading = vaultUnlocked && loaded?.id !== session.id;
+  const clipBlobs = loaded?.clipBlobs ?? new Map<string, Blob>();
+  const mergedBlob = loaded?.mergedBlob ?? null;
 
   useEffect(() => {
-    if (!vaultUnlocked) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!vaultUnlocked) return;
+    let cancelled = false;
     async function load() {
       const sorted = [...session.clips].sort((a, b) => a.index - b.index);
       const entries = await Promise.all(
@@ -622,23 +628,28 @@ function SessionAudioSection({ session }: { session: Session }) {
           return [c.id, blob] as [string, Blob | null];
         }),
       );
+      if (cancelled) return;
       const map = new Map<string, Blob>();
       for (const [id, blob] of entries) {
         if (blob) map.set(id, blob);
       }
-      setClipBlobs(map);
 
       const blobs = sorted.map((c) => map.get(c.id)).filter((b): b is Blob => Boolean(b));
+      let merged: Blob | null = null;
       if (blobs.length > 0) {
         try {
-          setMergedBlob(await mergeAudioBlobs(blobs));
+          merged = await mergeAudioBlobs(blobs);
         } catch {
           // merge failure — merged section simply won't render
         }
       }
-      setLoading(false);
+      if (cancelled) return;
+      setLoaded({ id: session.id, clipBlobs: map, mergedBlob: merged });
     }
     void load();
+    return () => {
+      cancelled = true;
+    };
   }, [session.id, vaultUnlocked]);
 
   if (!vaultUnlocked) {

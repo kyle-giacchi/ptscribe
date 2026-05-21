@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
@@ -36,7 +37,10 @@ function makeClip(overrides: Partial<SessionClip> = {}): SessionClip {
 }
 
 function Probe({ ref }: { ref: { current: Api | null } }) {
-  ref.current = useSessions();
+  const api = useSessions();
+  useEffect(() => {
+    ref.current = api;
+  });
   return null;
 }
 

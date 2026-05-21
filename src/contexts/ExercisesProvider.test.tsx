@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
@@ -24,7 +25,10 @@ function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
 }
 
 function Probe({ ref }: { ref: { current: Api | null } }) {
-  ref.current = useExercises();
+  const api = useExercises();
+  useEffect(() => {
+    ref.current = api;
+  });
   return null;
 }
 

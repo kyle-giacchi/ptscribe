@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import {
   checkGateCode,
   checkStoredGateHash,
@@ -12,17 +12,17 @@ import { Landing } from '@/pages/Landing';
 type Status = 'locked' | 'unlocked';
 
 export function AppGate({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<Status>(() => (getStoredGateHash() ? 'unlocked' : 'locked'));
-
-  // Validate stored hash on mount in case localStorage was tampered with
-  useEffect(() => {
+  // Synchronously validate the stored hash at init — tampered localStorage
+  // gets cleared and resolves to 'locked' on the first render.
+  const [status, setStatus] = useState<Status>(() => {
     const hash = getStoredGateHash();
-    if (!hash) return;
+    if (!hash) return 'locked';
     if (!checkStoredGateHash(hash)) {
       clearGateCode();
-      setStatus('locked');
+      return 'locked';
     }
-  }, []);
+    return 'unlocked';
+  });
 
   const logout = useCallback(() => {
     clearGateCode();
