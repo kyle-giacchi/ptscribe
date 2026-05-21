@@ -9,12 +9,12 @@ import { SessionResetContext } from '@/contexts/SessionResetContext';
 import { audioRepository } from '@/services/AudioRepository';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { useAppData } from '@/contexts/AppDataProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
-import type { Session, SessionClip, NoteSection } from '@/types';
+import { useSessionPatcher } from '@/hooks/useSessionPatcher';
+import type { NoteSection } from '@/types';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useRecordingFlow } from '@/hooks/useRecordingFlow';
@@ -57,7 +57,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { forSession, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
   const { settings, updateSession } = useSettings();
-  const { updateSessionsSlice } = useAppData();
+  const { patchSession, patchClips, patchClip } = useSessionPatcher(sessionId);
 
   const session = getSession(sessionId);
   const patient = session ? getPatient(session.patientId) : undefined;
@@ -106,25 +106,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
   const processingStartedAtRef = useRef<number | null>(null);
-
-  // ── Atomic session/clip patches via functional slice update ──────────────
-  function patchSession(patch: Partial<Session>) {
-    updateSessionsSlice((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, ...patch, updatedAt: Date.now() } : s)),
-    );
-  }
-  function patchClips(mapper: (clips: SessionClip[]) => SessionClip[]) {
-    updateSessionsSlice((prev) =>
-      prev.map((s) =>
-        s.id === sessionId ? { ...s, clips: mapper(s.clips), updatedAt: Date.now() } : s,
-      ),
-    );
-  }
-  function patchClip(clipId: string, patch: Partial<SessionClip>) {
-    patchClips((clips) =>
-      clips.map((c) => (c.id === clipId ? { ...c, ...patch, updatedAt: Date.now() } : c)),
-    );
-  }
 
   useAudioRecovery(sessionId, session, patchClips);
 
