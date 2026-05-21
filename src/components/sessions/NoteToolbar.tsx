@@ -1,28 +1,45 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Copy, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { TemplateDropdown } from './TemplateDropdown';
-import type { NoteTemplate } from '@/types';
+import { ModifierPopover } from './ModifierPopover';
+import type { NoteTemplate, SessionModifiers } from '@/types';
 
 interface NoteToolbarProps {
   template: NoteTemplate | undefined;
   templates: NoteTemplate[];
   hasDraftContent: boolean;
   canGenerate: boolean;
+  canRegenerate: boolean;
   isGenerating: boolean;
   noteExists: boolean;
+  modifiers: SessionModifiers;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
   onGenerate: () => void;
   onCopyNote: () => void;
+  onModifiersChange: (next: SessionModifiers) => void;
+}
+
+function countActiveModifiers(m: SessionModifiers): number {
+  return (m.tone ? 1 : 0) + m.emphasis.length + (m.customInstruction?.trim() ? 1 : 0);
 }
 
 export function NoteToolbar({
   template, templates,
-  hasDraftContent, canGenerate, isGenerating, noteExists,
-  onTemplateChange, onManageTemplates, onGenerate, onCopyNote,
+  hasDraftContent, canGenerate, canRegenerate, isGenerating, noteExists,
+  modifiers, onTemplateChange, onManageTemplates, onGenerate, onCopyNote, onModifiersChange,
 }: NoteToolbarProps) {
   const [overwriteOpen, setOverwriteOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const modifierBtnRef = useRef<HTMLButtonElement>(null);
+
+  const activeCount = countActiveModifiers(modifiers);
+
+  const generateDisabled = !canGenerate || isGenerating || (noteExists && !canRegenerate);
+  const generateTitle = noteExists && !canRegenerate
+    ? 'No changes to transcript or modifiers since last generation'
+    : undefined;
 
   function handleRegenerate() {
     if (hasDraftContent) {
@@ -55,23 +72,32 @@ export function NoteToolbar({
       />
 
       <button
+        ref={modifierBtnRef}
         type="button"
-        disabled
-        aria-disabled="true"
-        title="Prompt modifiers — coming soon"
+        onClick={() => setPopoverOpen((o) => !o)}
         className="inline-flex items-center"
         style={{
           gap: 8, height: 34, padding: '0 12px', borderRadius: 7,
           border: '1px solid var(--color-pt-border)',
-          background: 'var(--color-pt-surface)',
-          color: 'var(--color-pt-text-2)',
+          background: popoverOpen ? 'var(--color-pt-border)' : 'var(--color-pt-surface)',
+          color: activeCount > 0 ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
           fontSize: 12.5, fontWeight: 500,
-          opacity: 0.55, cursor: 'not-allowed',
+          cursor: 'pointer',
         }}
+        title="Prompt modifiers"
       >
         <SlidersHorizontal size={13} strokeWidth={2} />
-        Modifier
+        {activeCount > 0 ? `Modifier · ${activeCount}` : 'Modifier'}
       </button>
+
+      {popoverOpen && (
+        <ModifierPopover
+          modifiers={modifiers}
+          anchorRef={modifierBtnRef}
+          onClose={() => setPopoverOpen(false)}
+          onChange={onModifiersChange}
+        />
+      )}
 
       <div style={{ flex: 1 }} />
 
@@ -92,8 +118,9 @@ export function NoteToolbar({
         type="button"
         className="btn btn-primary"
         style={{ height: 34, padding: '0 14px', fontSize: 12.5 }}
-        disabled={!canGenerate || isGenerating}
+        disabled={generateDisabled}
         aria-busy={isGenerating}
+        title={generateTitle}
         onClick={handleRegenerate}
       >
         {isGenerating ? (
@@ -121,10 +148,10 @@ export function NoteToolbar({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!canGenerate}
+            disabled={generateDisabled}
             onClick={() => {
               setOverwriteOpen(false);
-              if (canGenerate) onGenerate();
+              if (!generateDisabled) onGenerate();
             }}
           >
             <RotateCw size={13} strokeWidth={2} /> Regenerate

@@ -1,6 +1,7 @@
 import { Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import type { AiDebugPrompts } from '@/types';
 
 export interface DebugDrawerStats {
   droppedSec: number;
@@ -18,6 +19,7 @@ export interface DebugDrawerProps {
   debugStats: DebugDrawerStats | null;
   speedFactor: number;
   lastRawPayload?: string | null;
+  lastAiPrompts?: AiDebugPrompts | null;
 }
 
 /**
@@ -34,8 +36,10 @@ export function DebugDrawer({
   debugStats,
   speedFactor,
   lastRawPayload,
+  lastAiPrompts,
 }: DebugDrawerProps) {
   const [rawPayloadOpen, setRawPayloadOpen] = useState(false);
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
   return (
     <div
       style={{
@@ -211,6 +215,105 @@ export function DebugDrawer({
                 ) : (
                   <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
                     Run transcription to see speed-up data.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── AI prompt ───────────────────────────────── */}
+          <div
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--color-pt-border)',
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                width: '100%',
+                background: 'var(--color-pt-surface-alt)',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onClick={() => setAiPromptOpen((v) => !v)}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+                AI prompt
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                {aiPromptOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {aiPromptOpen && (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {lastAiPrompts ? (
+                  <>
+                    {(
+                      [
+                        { label: 'System', value: lastAiPrompts.system },
+                        ...(lastAiPrompts.modifierBlock
+                          ? [{ label: 'Modifiers', value: lastAiPrompts.modifierBlock }]
+                          : []),
+                        { label: 'User', value: lastAiPrompts.user },
+                      ] as { label: string; value: string }[]
+                    ).map(({ label, value }) => (
+                      <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {label}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                            onClick={() => {
+                              void navigator.clipboard.writeText(value).then(
+                                () => toast.success('Copied'),
+                                () => toast.error('Copy failed'),
+                              );
+                            }}
+                          >
+                            <Copy size={11} strokeWidth={2} />
+                            Copy
+                          </button>
+                        </div>
+                        <pre
+                          style={{
+                            fontSize: 10.5,
+                            color: 'var(--color-fg-subtle)',
+                            background: 'var(--color-pt-surface)',
+                            border: '1px solid var(--color-pt-border)',
+                            borderRadius: 6,
+                            padding: '8px 10px',
+                            overflowX: 'auto',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all',
+                            maxHeight: 200,
+                            overflowY: 'auto',
+                            margin: 0,
+                          }}
+                        >
+                          {value}
+                        </pre>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                    Generate a note to see the AI prompt.
                   </div>
                 )}
               </div>

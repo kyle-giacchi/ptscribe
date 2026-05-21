@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, buildUserPrompt } from './prompts';
-import type { Note, NoteTemplate, Patient } from '@/types';
+import { buildModifierBlock, buildUserPrompt } from './prompts';
+import type { Note, NoteTemplate, Patient, SessionModifiers } from '@/types';
 
 const basePatient: Patient = {
   id: 'p1',
@@ -29,68 +29,58 @@ const baseTemplate: NoteTemplate = {
 
 const baseTranscript = 'Patient reports left knee pain rated 6 out of 10.';
 
-describe('buildSystemPrompt', () => {
-  const templateWithPrompt: NoteTemplate = {
-    ...baseTemplate,
-    systemPrompt: 'You are a physical therapy documentation assistant.\n\n## Subjective\n## Objective\n## Assessment\n## Plan',
-  };
+describe('buildModifierBlock', () => {
+  const empty: SessionModifiers = { emphasis: [] };
 
-  it('appends the tone block after the base system prompt', () => {
-    const result = buildSystemPrompt(templateWithPrompt, 'narrative');
-    expect(result).toContain(templateWithPrompt.systemPrompt.trimEnd());
+  it('returns empty string when no modifiers are active', () => {
+    expect(buildModifierBlock(empty)).toBe('');
+  });
+
+  it('includes tone block for narrative', () => {
+    const result = buildModifierBlock({ emphasis: [], tone: 'narrative' });
     expect(result).toContain('# Tone & style');
-  });
-
-  it('preserves the full base system prompt verbatim', () => {
-    const result = buildSystemPrompt(templateWithPrompt, 'narrative');
-    expect(result.startsWith(templateWithPrompt.systemPrompt.trimEnd())).toBe(true);
-  });
-
-  it('defaults to narrative tone when no toneStyle is supplied', () => {
-    const result = buildSystemPrompt(templateWithPrompt);
     expect(result).toContain('flowing professional prose');
   });
 
-  it('includes narrative tone instruction for narrative style', () => {
-    const result = buildSystemPrompt(templateWithPrompt, 'narrative');
-    expect(result).toContain('flowing professional prose');
-  });
-
-  it('includes bullet-point / abbreviation instruction for terse style', () => {
-    const result = buildSystemPrompt(templateWithPrompt, 'terse');
+  it('includes tone block for terse', () => {
+    const result = buildModifierBlock({ emphasis: [], tone: 'terse' });
     expect(result).toContain('bullet-point shorthand');
     expect(result).toContain('PROM');
   });
 
-  it('includes anatomical / formal instruction for clinical style', () => {
-    const result = buildSystemPrompt(templateWithPrompt, 'clinical');
+  it('includes tone block for clinical', () => {
+    const result = buildModifierBlock({ emphasis: [], tone: 'clinical' });
     expect(result).toContain('formal clinical documentation style');
     expect(result).toContain('anatomical');
   });
 
-  it('produces different output for each tone style', () => {
-    const narrative = buildSystemPrompt(templateWithPrompt, 'narrative');
-    const terse = buildSystemPrompt(templateWithPrompt, 'terse');
-    const clinical = buildSystemPrompt(templateWithPrompt, 'clinical');
-    expect(narrative).not.toBe(terse);
-    expect(narrative).not.toBe(clinical);
-    expect(terse).not.toBe(clinical);
+  it('includes emphasis block with active chips', () => {
+    const result = buildModifierBlock({ emphasis: ['more_detail', 'patient_progress'] });
+    expect(result).toContain('# Emphasis');
+    expect(result).toContain('more clinical detail');
+    expect(result).toContain('patient progress');
   });
 
-  it('strips trailing whitespace from the base prompt before appending', () => {
-    const templateWithTrailing: NoteTemplate = {
-      ...baseTemplate,
-      systemPrompt: 'Base prompt.   \n  \n',
-    };
-    const result = buildSystemPrompt(templateWithTrailing, 'narrative');
-    // The tone block must follow the trimmed base with a blank-line separator
-    expect(result).toMatch(/Base prompt\.\s*\n\n# Tone & style/);
+  it('includes custom instruction when provided', () => {
+    const result = buildModifierBlock({ emphasis: [], customInstruction: 'Focus on gait.' });
+    expect(result).toContain('# Additional instruction');
+    expect(result).toContain('Focus on gait.');
   });
 
-  it('works with an empty system prompt on the template', () => {
-    const result = buildSystemPrompt(baseTemplate, 'terse');
+  it('omits custom instruction when blank', () => {
+    const result = buildModifierBlock({ emphasis: [], customInstruction: '   ' });
+    expect(result).not.toContain('# Additional instruction');
+  });
+
+  it('combines tone + emphasis + custom in one block', () => {
+    const result = buildModifierBlock({
+      tone: 'terse',
+      emphasis: ['functional_outcomes'],
+      customInstruction: 'Mention home exercise compliance.',
+    });
     expect(result).toContain('# Tone & style');
-    expect(result).toContain('bullet-point shorthand');
+    expect(result).toContain('# Emphasis');
+    expect(result).toContain('# Additional instruction');
   });
 });
 
