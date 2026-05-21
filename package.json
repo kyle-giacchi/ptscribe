@@ -19,7 +19,11 @@
     "test:e2e:ui": "playwright test --ui",
     "upload-model": "node scripts/upload-model.mjs",
     "deploy": "vite build && wrangler deploy",
-    "cf:tail": "wrangler tail"
+    "cf:tail": "wrangler tail",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.6.9",
@@ -78,7 +82,9 @@
     "eslint-plugin-react-refresh": "^0.5.0",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.3.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.2",
+    "lint-staged": "^17.0.5",
     "postcss": "^8.4.47",
     "prettier": "^3.8.2",
     "prettier-plugin-tailwindcss": "^0.8.0",

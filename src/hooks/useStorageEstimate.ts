@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Whisper tiny (q8) ~75 MB + privacy-filter ~30 MB, with headroom.
 const LOCAL_MODELS_MIN_BYTES = 150 * 1024 * 1024;
@@ -23,23 +23,29 @@ export function useStorageEstimate(): StorageEstimate {
   const [usage, setUsage] = useState<number | null>(null);
   const [isPersistent, setIsPersistent] = useState(false);
 
-  const refresh = useCallback(async () => {
-    try {
-      const [est, persistent] = await Promise.all([
-        navigator.storage?.estimate?.() ?? Promise.resolve({}),
-        navigator.storage?.persisted?.() ?? Promise.resolve(false),
-      ]);
-      setQuota(est.quota ?? null);
-      setUsage(est.usage ?? null);
-      setIsPersistent(persistent);
-    } catch {
-      // API unavailable — leave null, localModelsUnavailable stays false
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    // setState calls happen in async callbacks (Promise resolution / event
+    // handlers), i.e. the "subscribe to external state changes" pattern that
+    // useEffect is designed for.
+    let cancelled = false;
+
+    async function refresh() {
+      try {
+        const [est, persistent] = await Promise.all([
+          navigator.storage?.estimate?.() ?? Promise.resolve({}),
+          navigator.storage?.persisted?.() ?? Promise.resolve(false),
+        ]);
+        if (cancelled) return;
+        setQuota(est.quota ?? null);
+        setUsage(est.usage ?? null);
+        setIsPersistent(persistent);
+      } catch {
+        // API unavailable — leave null, localModelsUnavailable stays false
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
     void refresh();
 
     // Re-check when the user returns to the tab — they may have cleared storage elsewhere.
@@ -47,8 +53,11 @@ export function useStorageEstimate(): StorageEstimate {
       if (document.visibilityState === 'visible') void refresh();
     }
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [refresh]);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   const available = quota !== null && usage !== null ? quota - usage : null;
   const localModelsUnavailable = available !== null && available < LOCAL_MODELS_MIN_BYTES;

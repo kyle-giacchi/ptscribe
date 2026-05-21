@@ -1,0 +1,34 @@
+echo "Running lint-staged..."
+npx lint-staged
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Lint errors on staged files — commit blocked. Fix errors before committing."
+  exit 1
+fi
+
+echo "Running typecheck..."
+npm run typecheck 2>&1
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "TypeScript errors found — commit blocked. Fix errors before committing."
+  exit 1
+fi
+
+echo "Running tests..."
+test_output=$(npm run test -- --run 2>&1)
+echo "$test_output"
+
+# Parse the vitest summary rather than trusting exit code — vitest can exit
+# non-zero on worker-infrastructure crashes even when all tests pass.
+if echo "$test_output" | grep -qE "^ +Tests +[0-9]+ failed"; then
+  echo ""
+  echo "Tests failed — commit blocked. Fix failing tests before committing."
+  exit 1
+fi
+if echo "$test_output" | grep -qE "^ +Test Files +[0-9]+ failed"; then
+  echo ""
+  echo "Test files failed — commit blocked. Fix failing tests before committing."
+  exit 1
+fi
+
+exit 0

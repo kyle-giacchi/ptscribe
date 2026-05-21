@@ -568,8 +568,6 @@ export function useRecordingFlow(params: UseRecordingFlowParams): UseRecordingFl
     if (recorder.status !== 'stopped') return;
     autoStopFinalizedRef.current = true;
     void handleFinishedRecordingRef.current();
-    // handleFinishedRecordingRef is a stable ref — intentionally excluded from deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorder.hardCapStopped, recorder.idleAutoStopped, recorder.recorderInterrupted, recorder.micDisconnected, recorder.status]);
 
   return {

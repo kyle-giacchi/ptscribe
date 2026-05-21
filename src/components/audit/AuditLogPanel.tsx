@@ -17,7 +17,9 @@ function fmt(ts: number): string {
 }
 
 export function AuditLogPanel() {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  // Lazy initial read — auditLog.read() is synchronous and cheap, so we can
+  // populate from the external store on first render without an effect.
+  const [entries, setEntries] = useState<AuditEntry[]>(() => auditLog.read());
   const [integrity, setIntegrity] = useState<{
     valid: boolean;
     truncated: boolean;
@@ -26,15 +28,22 @@ export function AuditLogPanel() {
   const [expanded, setExpanded] = useState(false);
 
   const refresh = useCallback(async () => {
-    const all = auditLog.read();
-    setEntries(all);
+    setEntries(auditLog.read());
     const result = await auditLog.verify();
     setIntegrity(result);
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    // Verify the chain async on mount; setIntegrity runs in the Promise
+    // callback (external-state-change pattern), not synchronously in the body.
+    let cancelled = false;
+    auditLog.verify().then((result) => {
+      if (!cancelled) setIntegrity(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleClear() {
     if (!confirm('Clear the audit log? This cannot be undone.')) return;

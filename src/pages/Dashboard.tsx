@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Sun, Mic, ChevronRight, Inbox, Headphones, ClipboardCheck, Menu } from 'lucide-react';
@@ -37,9 +37,19 @@ export function Dashboard() {
   const { clinician } = useClinician();
   const navigate = useNavigate();
 
-  const [resumeModal, setResumeModal] = useState<Session | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const hasShownResume = useRef(false);
+  // Resume-modal candidate is derived from sessions; `resumeDismissed` is set
+  // by the user's "Not now"/"Resume" click, so we don't need an effect to
+  // trigger the modal.
+  const [resumeDismissed, setResumeDismissed] = useState(false);
+  const resumeModal = useMemo<Session | null>(() => {
+    if (resumeDismissed) return null;
+    return (
+      sessions
+        .filter((s) => s.status !== 'finalized' && s.clips.length > 0)
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null
+    );
+  }, [sessions, resumeDismissed]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -49,17 +59,6 @@ export function Dashboard() {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [sidebarOpen]);
-
-  useEffect(() => {
-    if (hasShownResume.current || sessions.length === 0) return;
-    const candidate = sessions
-      .filter((s) => s.status !== 'finalized' && s.clips.length > 0)
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-    if (candidate) {
-      hasShownResume.current = true;
-      setResumeModal(candidate);
-    }
-  }, [sessions]);
 
   // Quick Record: create a draft session attached to the built-in Unassigned
   // patient and jump straight into recording. The user can reassign on the
@@ -290,7 +289,7 @@ export function Dashboard() {
                 variant="primary"
                 style={{ fontSize: 12, padding: '5px 12px' }}
                 onClick={() => {
-                  setResumeModal(null);
+                  setResumeDismissed(true);
                   navigate(`/sessions/${resumeModal.id}?mode=quick`);
                 }}
               >
@@ -299,7 +298,7 @@ export function Dashboard() {
               <PtButton
                 variant="ghost"
                 style={{ fontSize: 12, padding: '5px 12px' }}
-                onClick={() => setResumeModal(null)}
+                onClick={() => setResumeDismissed(true)}
               >
                 Dismiss
               </PtButton>
@@ -370,6 +369,9 @@ function PendingSignOffRail({
   const navigate = useNavigate();
   const shown = sessions.slice(0, PENDING_RAIL_MAX);
   const overflow = sessions.length - shown.length;
+  // Pinned at mount for the session-age tone classifier — a remount on
+  // navigation re-pins it.
+  const [now] = useState(() => Date.now());
 
   // Build a quick lookup: sessionId → note (only draft notes were passed in)
   const noteBySessionId = useMemo(() => {
@@ -447,7 +449,7 @@ function PendingSignOffRail({
             ? `${patient.firstName} ${patient.lastName}`.trim()
             : 'Unknown patient';
           const note = noteBySessionId.get(s.id);
-          const ageHours = note ? (Date.now() - note.updatedAt) / 3_600_000 : 0;
+          const ageHours = note ? (now - note.updatedAt) / 3_600_000 : 0;
           const ageTone: StatusTone = ageHours > 48 ? 'flagged' : ageHours > 24 ? 'plateau' : 'on-track';
 
           return (
