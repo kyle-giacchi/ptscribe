@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-export const MAX_TRANSCRIBES_PER_SESSION = 10;
+export const MAX_TRANSCRIBES_PER_SESSION = 1;
 export const MAX_GENERATES_PER_SESSION = 10;
 
 const ACTION_COOLDOWN_MS = 3000;
