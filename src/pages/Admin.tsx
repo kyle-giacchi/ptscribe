@@ -650,7 +650,7 @@ function SessionAudioSection({ session }: { session: Session }) {
     return () => {
       cancelled = true;
     };
-  }, [session.id, vaultUnlocked]);
+  }, [session.id, session.clips, vaultUnlocked]);
 
   if (!vaultUnlocked) {
     return (

@@ -460,16 +460,17 @@ function LiveTranscriptView({
   const [isAtBottom, setIsAtBottom] = useState(true);
   const hasWebSpeech = segments.length > 0 || !!interimText;
   const hasContent = hasWebSpeech || whisperBubbles.length > 0;
-  const [showNoSpeechHint, setShowNoSpeechHint] = useState(false);
-
+  // The hint reveals once the user has been silent for ≥ 8 s. We track the
+  // timer-fired flag separately from `hasContent` so the visible hint is a
+  // derived value (`hintTimerFired && !hasContent`) — no sync setState in
+  // effect needed to clear it when speech arrives.
+  const [hintTimerFired, setHintTimerFired] = useState(false);
   useEffect(() => {
-    if (hasContent) {
-      setShowNoSpeechHint(false);
-      return;
-    }
-    const t = window.setTimeout(() => setShowNoSpeechHint(true), 8000);
+    if (hasContent) return;
+    const t = window.setTimeout(() => setHintTimerFired(true), 8000);
     return () => window.clearTimeout(t);
   }, [hasContent]);
+  const showNoSpeechHint = hintTimerFired && !hasContent;
 
   // Auto-scroll only when user is already at the bottom
   useEffect(() => {
@@ -646,6 +647,10 @@ function ActiveRecordingCard({
   const [transcriptVisible, setTranscriptVisible] = useState(true);
   // Always-fresh elapsed-sec so the restart callback captures current duration, not a snapshot.
   const durationSecRef = useRef(durationSec);
+  // Idiomatic ref-mirror. React 19 strict prefers writes inside useEffect, but
+  // the consumer (a stable restart callback) only reads from event handlers
+  // after commit, so the divergence window doesn't manifest in practice.
+  // eslint-disable-next-line react-hooks/refs
   durationSecRef.current = durationSec;
 
   const micState: MicState = paused ? 'paused' : 'connected';
@@ -845,7 +850,10 @@ export function RecordingPanel({
   }, [recorder.silenceWarning]);
 
   // Auto-clear the dismiss flag when voice resumes so the next silence period warns again.
+  // Legitimate external-state mirror — silenceWarning is owned by the recorder
+  // state machine and we need to reset our dismiss snapshot at its falling edge.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!recorder.silenceWarning) setSilenceWarnDismissed(false);
   }, [recorder.silenceWarning]);
   const idle =
@@ -862,8 +870,12 @@ export function RecordingPanel({
     }
   }, [recorder.hardCapStopped, settings.recordingLimits.maxMinutes]);
 
+  // Legitimate external-state mirrors — recorder.idleAutoStopped and
+  // recorder.status are owned by the recorder state machine; this component
+  // latches its own "was auto-stopped" flag in response.
   useEffect(() => {
     if (recorder.idleAutoStopped) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWasAutoStopped(true);
     }
   }, [recorder.idleAutoStopped]);
@@ -878,6 +890,7 @@ export function RecordingPanel({
 
   useEffect(() => {
     if (recorder.status === 'recording') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWasAutoStopped(false);
     }
   }, [recorder.status]);
