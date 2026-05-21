@@ -116,6 +116,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const segmentStartAtRef = useRef(0);
 
   const voiceDetectorRef = useRef<VoiceDetector>(createVoiceDetector());
+  // Mirror the detector's analyser node into state so consumers re-render
+  // reliably when it becomes available (on setup) or is torn down. The bare
+  // ref-read in the return value was a refs-in-render rule violation and would
+  // hand consumers a stale snapshot if no other state change triggered a render.
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
   const limitsRef = useRef<RecordingLimitsSettings | undefined>(options.limits);
   useEffect(() => {
@@ -148,6 +153,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       heartbeatRef.current = null;
     }
     voiceDetectorRef.current.teardown();
+    setAnalyser(null);
     if (segmentRecRef.current) {
       try { segmentRecRef.current.stop(); } catch { /* best-effort */ }
       segmentRecRef.current = null;
@@ -373,6 +379,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         }
 
         voiceDetectorRef.current.setup(stream);
+        setAnalyser(voiceDetectorRef.current.analyser);
 
         const mimeType = pickMimeType();
         currentMimeRef.current = mimeType ?? 'audio/webm';
@@ -552,7 +559,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     recorderInterrupted,
     micDisconnected,
     silenceWarning,
-    analyser: voiceDetectorRef.current.analyser,
+    analyser,
     onChunk: onChunkRef,
   };
 }
