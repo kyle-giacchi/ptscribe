@@ -690,6 +690,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 onDelete={handleDeleteClip}
                 onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
                 onUpload={(file) => { setClipsOpen(false); void handleUpload(file); }}
+                t2Phase={t2Phase}
+                t2Label={t2Label}
               />
             </div>
           ))}

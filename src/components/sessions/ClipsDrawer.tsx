@@ -6,6 +6,7 @@ import { duration, ease } from '@/lib/motion';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import { useDismissable } from '@/hooks/useDismissable';
 import { AudioFileInput, type AudioFileInputHandle } from '@/components/common/AudioFileInput';
+import type { T2Phase } from '@/hooks/useBackgroundTranscription';
 import type { SessionClip } from '@/types';
 
 interface ClipsDrawerProps {
@@ -16,6 +17,8 @@ interface ClipsDrawerProps {
   onDelete: (clipId: string) => void;
   onRecord: () => void;
   onUpload: (file: File) => void;
+  t2Phase: T2Phase;
+  t2Label: string;
 }
 
 function formatDuration(sec: number): string {
@@ -36,9 +39,11 @@ interface InnerProps {
   onRecord: () => void;
   onUpload: (file: File) => void;
   isMobile: boolean;
+  t2Phase: T2Phase;
+  t2Label: string;
 }
 
-function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRecord, onUpload, isMobile }: InnerProps) {
+function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRecord, onUpload, isMobile, t2Phase, t2Label }: InnerProps) {
   return (
     <>
       {/* Header */}
@@ -82,6 +87,8 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
               isActive={clip.id === newest?.id}
               onJump={() => { onClose(); onJump(clip.startOffsetSec ?? 0); }}
               onDelete={() => onDelete(clip.id)}
+              t2Phase={t2Phase}
+              t2Label={t2Label}
             />
           ))
         )}
@@ -125,7 +132,7 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
   );
 }
 
-export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, onUpload }: ClipsDrawerProps) {
+export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, onUpload, t2Phase, t2Label }: ClipsDrawerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<AudioFileInputHandle>(null);
   const isMobile = useBelowBreakpoint(768);
@@ -135,7 +142,7 @@ export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, 
   const total = clips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0);
   const newest = clips.length > 0 ? clips.reduce((a, b) => (a.createdAt > b.createdAt ? a : b)) : null;
 
-  const innerProps: InnerProps = { clips, total, newest, fileRef, onClose, onJump, onDelete, onRecord, onUpload, isMobile };
+  const innerProps: InnerProps = { clips, total, newest, fileRef, onClose, onJump, onDelete, onRecord, onUpload, isMobile, t2Phase, t2Label };
 
   return (
     <AnimatePresence>
@@ -188,13 +195,15 @@ export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, 
 }
 
 function ClipCard({
-  clip, index, isActive, onJump, onDelete,
+  clip, index, isActive, onJump, onDelete, t2Phase, t2Label,
 }: {
   clip: SessionClip;
   index: number;
   isActive: boolean;
   onJump: () => void;
   onDelete: () => void;
+  t2Phase: T2Phase;
+  t2Label: string;
 }) {
   const [playing, setPlaying] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -225,14 +234,17 @@ function ClipCard({
 
   const time = new Date(clip.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const source = 'in-room mic';
-  const statusTone =
-    clip.status === 'transcribed' ? 'accent'
-    : clip.status === 'failed' ? 'negative'
-    : 'amber';
-  const statusLabel =
-    clip.status === 'transcribed' ? 'transcribed'
-    : clip.status === 'failed' ? 'failed'
-    : 'transcribing…';
+  const { statusTone, statusLabel } = (() => {
+    if (clip.status === 'transcribed') return { statusTone: 'accent', statusLabel: 'Transcribed' };
+    if (clip.status === 'failed') return { statusTone: 'negative', statusLabel: 'Failed' };
+    if (clip.status === 'pending') return { statusTone: 'amber', statusLabel: 'Recording…' };
+    // 'ready' or 'transcribing' — reflect T2 pipeline state
+    if (t2Phase === 'transcribing') return { statusTone: 'amber', statusLabel: t2Label || 'Transcribing…' };
+    if (t2Phase === 'retrying') return { statusTone: 'amber', statusLabel: 'Retrying…' };
+    if (t2Phase === 'done') return { statusTone: 'accent', statusLabel: 'Transcribed' };
+    if (t2Phase === 'error') return { statusTone: 'negative', statusLabel: 'Failed' };
+    return { statusTone: 'amber', statusLabel: 'Queued' };
+  })();
 
   return (
     <div
