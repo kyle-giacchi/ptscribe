@@ -146,6 +146,10 @@ async function getPipeline(
   // If a load is already in progress for the same model, wait for it.
   if (pipelineLoadPromise) return pipelineLoadPromise;
   pipelineLoadPromise = pipeline('automatic-speech-recognition', model, {
+    // Force WASM backend — prevents onnxruntime-web from probing WebGPU/JSEP
+    // (ort-wasm-simd-threaded.jsep.mjs), which fails when the Workbox service
+    // worker intercepts the request and the CacheFirst handler throws.
+    device: 'wasm',
     // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
     // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
     // and crashes because the required scale tensor is absent. 'basic' skips it.

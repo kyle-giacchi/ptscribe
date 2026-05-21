@@ -105,6 +105,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
   const processingStartedAtRef = useRef<number | null>(null);
+  const [isUploadInProgress, setIsUploadInProgress] = useState(false);
 
   useAudioRecovery(sessionId, session, patchClips);
 
@@ -152,6 +153,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     handleDeleteClip,
     buildMergedAudioForReview,
   } = sessionMachine.capture;
+  const { phase: t2Phase, progressLabel: t2Label, retry: retryT2 } = sessionMachine.backgroundT2;
 
   // Ref so effects can call the latest handler without re-firing when its
   // identity changes each render.
@@ -294,25 +296,40 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     void handleStartRecordingRef.current();
   }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
 
+  // Tracks whether buildMergedAudioForReview has been called for the current upload.
+  // Reset when processingUploadClipId clears so a subsequent upload re-triggers it.
+  const mergeStartedRef = useRef(false);
   useEffect(() => {
-    if (!processingUploadClipId) return;
+    if (!processingUploadClipId) {
+      mergeStartedRef.current = false;
+      return;
+    }
     const clip = session?.clips.find((c) => c.id === processingUploadClipId);
     if (!clip) return;
 
-    // T2 no longer runs per-clip — it fires after buildMergedAudioForReview builds
-    // the combined blob. Treat 'ready' (audio saved) as "processing done" and call
-    // buildMergedAudioForReview to create the combined blob, kick off T2, and navigate.
-    if (clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed') {
+    const audioSaved =
+      clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed';
+
+    // Once audio is saved: kick off merge+T2 once (skipNav keeps us on the processing screen).
+    if (audioSaved && !mergeStartedRef.current) {
+      mergeStartedRef.current = true;
+      void buildMergedAudioForReview({ skipNav: true });
+      return;
+    }
+
+    // T2 finished — navigate to review after a brief minimum display time.
+    if (mergeStartedRef.current && t2Phase === 'done') {
       const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
       const delay = Math.max(0, 2000 - elapsed);
       const t = setTimeout(() => {
         setProcessingUploadClipId(null);
-        void buildMergedAudioForReview();
+        setActiveTab('review');
       }, delay);
       return () => clearTimeout(t);
     }
+    // t2Phase === 'error': stay on processing screen; retry/go-to-notes buttons handle it
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.clips, processingUploadClipId]);
+  }, [session?.clips, processingUploadClipId, t2Phase]);
 
   if (!session || !patient) return <NotFound />;
 
@@ -420,7 +437,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   // ── Upload audio + auto-transcribe ────────────────────────────────────────
   async function handleUpload(file: File) {
+    setIsUploadInProgress(true);
+    setActiveTab('record');
     const clipId = await handleUploadAudio(file);
+    setIsUploadInProgress(false);
     if (clipId) {
       processingStartedAtRef.current = Date.now();
       setProcessingUploadClipId(clipId);
@@ -486,9 +506,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 onDismiss={() => setRecordWarnDismissed(true)}
               />
             )}
-            {processingUploadClipId ? (
+            {(processingUploadClipId || isUploadInProgress) ? (
               <UploadProcessingView
                 durationSec={sortedClips.find((c) => c.id === processingUploadClipId)?.durationSec}
+                t2Phase={t2Phase}
+                t2Label={t2Label}
+                onRetry={() => { retryT2(); }}
+                onGoToNotes={() => { setProcessingUploadClipId(null); setActiveTab('review'); }}
               />
             ) : (
               <RecordingPanel
