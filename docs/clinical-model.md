@@ -30,8 +30,12 @@ One treatment encounter. Owns the audio + transcript and (eventually) the genera
 | `date`             | ms timestamp                                               | Set when the session is created.                                |
 | `status`           | see below                                                  | State machine.                                                  |
 | `audioRef`         | sessionId (string)                                         | Key into `AudioRepository` (IndexedDB). Absent if no recording. |
-| `transcript`       | string                                                     | Final transcript text.                                          |
-| `transcriptSource` | `'whisper' \| 'webspeech' \| 'manual'`                     | Where the transcript came from.                                 |
+| `transcript`             | string                                                     | Denormalized mirror of the active tier; used by note generation. |
+| `t1Transcript?`          | string                                                     | Live preview accumulated during recording (Whisper VAD or Web Speech). |
+| `t2Transcript?`          | string                                                     | Post-stop local Whisper pass on the combined silence-removed blob. Frozen — never overwritten by Nova. |
+| `t3Transcript?`          | string                                                     | Explicit cloud (Nova) pass via "Improve with AI". Optional. |
+| `editedTranscript?`      | string                                                     | Manual edit or PII-scrub result. Cleared when T2/T3 writes land. |
+| `activeTranscriptTier?`  | `'t1' \| 't2' \| 't3' \| 'edited'`                         | Provenance of `transcript`. See [transcription.md](transcription.md). |
 | `noteId`           | id                                                         | FK into `notes`. Set on first generate or first manual edit.    |
 | `templateId`       | id                                                         | FK into `templates`. Stamped at session start.                  |
 
@@ -45,7 +49,7 @@ draft  -- generate -->  generating  -->  ready
 ready  -- finalize -->  finalized
 ```
 
-Transitions are owned by the `Session` page. A session can skip transcription entirely if the clinician dictates straight into the note editor (`transcriptSource: 'manual'`).
+Transitions are owned by the `Session` page. A session can skip transcription entirely if the clinician picks the "Skip / Manually type" entry point or dictates straight into the note editor — in either case the active tier is `'edited'`.
 
 #### SessionClip status state machine
 
@@ -130,6 +134,8 @@ Return a single JSON object whose keys are the section keys above. If the transc
 ```
 
 The system prompt is the template's `systemPrompt`. Models are asked to produce JSON; `extractJson()` is forgiving about markdown fences.
+
+**Bound on what the AI sees** (per [CONTEXT.md §Generation input](../CONTEXT.md#generation-input)): the curated transcript + the template + the visit type + the patient context block above (first/last name, derived age, `primaryDiagnosis`). MRN, ICD-10, prior Notes, Plan of Care, prior goals, and prior exercises are **never** injected. If the clinician wants any of those in the prompt, they paste it into the curated transcript themselves during Curate. The patient context block is identity scaffolding (pronouns, clinical framing); it never substitutes for what the clinician wrote.
 
 ## Manual fallback
 

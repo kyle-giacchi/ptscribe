@@ -55,11 +55,11 @@ The clinician's primary working surface during Curate. Layout stays close to the
 
 ## Generation input
 
-The set of data sent to the note-generation AI. Bounded to: the curated transcript + the chosen template (structure, section keys, labels, prompt hints, system prompt) + the visit type. Patient identity, age, and stored diagnosis are **not** included. **Prior session content (previous Notes, Plan of Care, prior goals, prior exercises) is never injected.** If a clinician wants any of those in the prompt, they paste it into the curated transcript themselves during Curate.
+The set of data sent to the note-generation AI. Bounded to: the curated transcript + the chosen template (structure, section keys, labels, prompt hints, system prompt) + the visit type + the patient context block (first/last name, age derived from `dob`, `primaryDiagnosis`). MRN and ICD-10 are **not** sent. **Prior session content (previous Notes, Plan of Care, prior goals, prior exercises) is never injected.** If a clinician wants any of those in the prompt, they paste it into the curated transcript themselves during Curate.
 
 The clinician is trusted to know what is in the transcript and what is in the template — both are visible in the existing UI (Curate panel + session settings). No separate "Sending to AI" preview surface is required.
 
-The bound is strict because the curated transcript is the contract: the AI is only asked to summarize what the clinician explicitly approved for this session.
+The bound is strict because the curated transcript is the contract: the AI is only asked to summarize what the clinician explicitly approved for this session. The patient context block is identity scaffolding (so the AI uses correct pronouns and clinical framing); it never substitutes for what the clinician put in the transcript.
 
 ## Visit type vs. template
 
@@ -251,7 +251,7 @@ A finalized session opens directly into its read-only Note view with **Re-open**
 
 Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** — a clinician trying the app should walk through the real workflow end-to-end against their own audio, not a canned scripted demo. The contract:
 
-- **Vault auto-unlocks**, first-run wizard is skipped, and demo data lives in a **separate storage namespace** (separate `localStorage` key + IDB database) so toggling demo mode never touches real clinical data in either direction.
+- **Vault auto-unlocks**, first-run wizard is skipped, and a demo patient + a sample session are seeded into the same storage the rest of the app uses. There is no namespace split — demo and real data share `ptnotes.appData` and `ptnotes-audio`. The persistent "DEMO MODE" badge and the seeded-demo-patient affordance are the safeguards; clinicians who care about isolation should run a separate browser profile.
 - **Note generation hits the real Anthropic Worker.** A clinician trying the app needs to see the actual AI output for the audio they recorded. The cost is bounded by the clinician's own input rate.
 - **T2 local Whisper runs normally** — it's free and is the local-pipeline showcase.
 - **Cloud transcription (Nova) is hard-disabled.** "Improve with AI" in Curate and "Re-transcribe with cloud AI" in the T2-failure dialog are both unavailable with an explanatory tooltip (*"Cloud transcription is disabled in demo mode."*). This is the single largest provider cost and is the deliberate exclusion.
