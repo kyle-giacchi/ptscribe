@@ -286,8 +286,12 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
                 </div>
               )}
               <textarea
-                className="input min-h-48 w-full rounded-none leading-relaxed"
-                style={{ borderLeft: 'none', borderRight: 'none', borderBottom: 'none', borderTop: '1px solid var(--color-pt-border)' }}
+                className="input w-full rounded-none leading-relaxed"
+                style={{
+                  borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
+                  borderTop: '1px solid var(--color-pt-border)',
+                  height: 'max(320px, calc(100vh - 300px))',
+                }}
                 placeholder="Speak while recording, paste in a transcript, or type freely."
                 value={displayTranscript}
                 onChange={(e) => handleTranscriptChange(e.target.value)}
