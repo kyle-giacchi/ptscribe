@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Loader2, EyeOff, AlertCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Loader2, EyeOff, AlertCircle, Sparkles } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
-import { usePrivacyFilter } from '@/hooks/usePrivacyFilter';
+import { usePrivacyFilter, type ScrubResult } from '@/hooks/usePrivacyFilter';
 
 interface Props {
   open: boolean;
@@ -10,7 +10,7 @@ interface Props {
   onClose: () => void;
 }
 
-type ScanState = 'idle' | 'scanning' | 'done' | 'error';
+type ScanState = 'ready' | 'scanning' | 'error';
 
 type DiffPart =
   | { type: 'same'; text: string }
@@ -62,31 +62,43 @@ function computeWordDiff(original: string, scrubbed: string): DiffPart[] {
 }
 
 export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
-  const { scrubProgress, scrub } = usePrivacyFilter();
-  const [scanState, setScanState] = useState<ScanState>('idle');
-  const [diffParts, setDiffParts] = useState<DiffPart[]>([]);
-  const [entityCount, setEntityCount] = useState(0);
-  const [scrubbedText, setScrubbedText] = useState('');
+  const { scrubProgress, scrubbing, scrubRegex, scrubModel } = usePrivacyFilter();
+  const [scanState, setScanState] = useState<ScanState>('ready');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Deep-scan (NER) result, when the user opts in. Null until then.
+  const [deepResult, setDeepResult] = useState<ScrubResult | null>(null);
+
+  const hasText = transcript.trim().length > 0;
+
+  // Instant regex pass — pure + synchronous, so derive it during render.
+  const regexResult = useMemo<ScrubResult>(
+    () => (hasText ? scrubRegex(transcript) : { scrubbed: transcript, entityCount: 0, spans: [] }),
+    [hasText, transcript, scrubRegex],
+  );
+
+  const deepScanned = deepResult !== null;
+  const active = deepResult ?? regexResult;
+  const { entityCount, scrubbed: scrubbedText } = active;
+
+  const diffParts = useMemo<DiffPart[]>(
+    () => computeWordDiff(transcript, scrubbedText),
+    [transcript, scrubbedText],
+  );
 
   function resetAndClose() {
-    setScanState('idle');
-    setDiffParts([]);
-    setEntityCount(0);
-    setScrubbedText('');
+    setScanState('ready');
     setErrorMsg(null);
+    setDeepResult(null);
     onClose();
   }
 
-  async function handleScan() {
+  async function handleDeepScan() {
     setScanState('scanning');
     setErrorMsg(null);
     try {
-      const result = await scrub(transcript);
-      setEntityCount(result.entityCount);
-      setScrubbedText(result.scrubbed);
-      setDiffParts(computeWordDiff(transcript, result.scrubbed));
-      setScanState('done');
+      const result = await scrubModel(transcript, regexResult.spans);
+      setDeepResult(result);
+      setScanState('ready');
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'PII scan failed — try again');
       setScanState('error');
@@ -101,8 +113,9 @@ export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
   return (
     <Modal open={open} onClose={resetAndClose} title="Scrub PII" size="xl">
       <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-        Scan the transcript on-device for names, dates, addresses, and other identifiers.
-        The scrubbed version will replace your edited transcript — review the diff before applying.
+        Structured identifiers (email, phone, SSN, MRN) are matched instantly on-device.
+        Run a deep scan to also catch names and places with the local AI model.
+        Review the diff before applying — the scrubbed version replaces your edited transcript.
       </p>
 
       {/* Diff / preview area */}
@@ -120,11 +133,9 @@ export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
           wordBreak: 'break-word',
         }}
       >
-        {scanState === 'idle' && (
-          <span style={{ color: 'var(--color-pt-text)' }}>
-            {transcript.trim() || (
-              <em style={{ color: 'var(--color-fg-subtle)' }}>No transcript to scan.</em>
-            )}
+        {!hasText && (
+          <span style={{ color: 'var(--color-fg-subtle)' }}>
+            <em>No transcript to scan.</em>
           </span>
         )}
 
@@ -135,7 +146,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
           </span>
         )}
 
-        {scanState === 'done' && (
+        {hasText && scanState === 'ready' && (
           <>
             {diffParts.map((part, idx) => {
               if (part.type === 'same') return <span key={idx}>{part.text}</span>;
@@ -181,40 +192,43 @@ export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
       </div>
 
       {/* Entity count summary */}
-      {scanState === 'done' && (
+      {hasText && scanState === 'ready' && (
         <p className="text-sm" style={{ color: entityCount === 0 ? 'var(--color-fg-muted)' : 'var(--color-pt-accent)' }}>
           {entityCount === 0
-            ? 'No PII detected — transcript looks clean.'
-            : `${entityCount} item${entityCount !== 1 ? 's' : ''} flagged for redaction.`}
+            ? deepScanned
+              ? 'No PII detected — transcript looks clean.'
+              : 'No structured PII found. Run a deep scan to check for names and places.'
+            : `${entityCount} item${entityCount !== 1 ? 's' : ''} flagged for redaction${deepScanned ? '' : ' (deep scan can find more)'}.`}
         </p>
       )}
 
       {/* Footer actions */}
       <div className="flex items-center justify-between gap-2">
         <button type="button" className="btn btn-ghost" onClick={resetAndClose}>
-          {scanState === 'done' && entityCount === 0 ? 'Close' : 'Cancel'}
+          {scanState === 'ready' && entityCount === 0 && deepScanned ? 'Close' : 'Cancel'}
         </button>
 
         <div className="flex items-center gap-2">
-          {(scanState === 'idle' || scanState === 'error') && (
+          {(scanState === 'ready' || scanState === 'error') && !deepScanned && hasText && (
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={handleScan}
-              disabled={!transcript.trim()}
+              onClick={handleDeepScan}
+              disabled={scrubbing || !transcript.trim()}
             >
-              <EyeOff size={13} strokeWidth={2} />
-              {scanState === 'error' ? 'Retry scan' : 'Scan for PII'}
+              <Sparkles size={13} strokeWidth={2} />
+              {scanState === 'error' ? 'Retry deep scan' : 'Deep scan with AI'}
             </button>
           )}
 
-          {scanState === 'done' && entityCount > 0 && (
+          {scanState === 'ready' && entityCount > 0 && (
             <button
               type="button"
               className="btn"
               style={{ background: 'var(--color-pt-accent)', color: '#fff', border: 'none' }}
               onClick={handleApply}
             >
+              <EyeOff size={13} strokeWidth={2} />
               Apply {entityCount} redaction{entityCount !== 1 ? 's' : ''}
             </button>
           )}
