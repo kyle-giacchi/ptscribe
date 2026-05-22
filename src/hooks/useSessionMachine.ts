@@ -51,7 +51,7 @@ export interface UseSessionMachineParams {
 }
 
 export interface SessionMachineGenerateApi {
-  run: () => Promise<void>;
+  run: (mode?: 'replace' | 'append') => Promise<void>;
   finalize: () => void;
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;

@@ -41,6 +41,7 @@ import { TranscriptCollapsedTab } from '@/components/sessions/TranscriptCollapse
 import { ResetSessionModal } from '@/components/sessions/ResetSessionModal';
 import { UploadProcessingView } from '@/components/sessions/UploadProcessingView';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
+import { Modal } from '@/components/ui/Modal';
 
 type Busy = null | 'transcribing' | 'generating';
 
@@ -91,6 +92,27 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { exhausted: whisperExhausted } = useWhisperLoading();
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
+  // Note/transcript split as a percentage of the note column. Live-drag only; resets to 50/50 on mount.
+  const [notePct, setNotePct] = useState(50);
+  const reviewGridRef = useRef<HTMLDivElement>(null);
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const grid = reviewGridRef.current;
+    if (!grid) return;
+    const rect = grid.getBoundingClientRect();
+    function onMove(ev: PointerEvent) {
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      setNotePct(Math.min(70, Math.max(30, pct)));
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.userSelect = '';
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    document.body.style.userSelect = 'none';
+  }
   const [piiScrubOpen, setPiiScrubOpen] = useState(false);
   const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
   const [clipsOpen, setClipsOpen] = useState(false);
@@ -98,6 +120,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
   const [sectionCache, setSectionCache] = useState<Map<string, NoteSection[]>>(new Map());
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
   const processingStartedAtRef = useRef<number | null>(null);
@@ -215,9 +238,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // Always shown (regardless of PII filter state) unless user has dismissed it
   // via the "Don't show this again" checkbox.
   const [phiConfirmOpen, setPhiConfirmOpen] = useState(false);
-  function handleGenerate() {
+  const pendingGenerateMode = useRef<'replace' | 'append'>('replace');
+  function handleGenerate(mode: 'replace' | 'append') {
+    pendingGenerateMode.current = mode;
     if (settings.session.phiConfirmDismissed) {
-      handleGenerateRaw();
+      handleGenerateRaw(mode);
     } else {
       setPhiConfirmOpen(true);
     }
@@ -225,7 +250,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   function handlePhiConfirm(dontShowAgain: boolean) {
     setPhiConfirmOpen(false);
     if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
-    handleGenerateRaw();
+    handleGenerateRaw(pendingGenerateMode.current);
   }
 
   function handleCopyNote() {
@@ -320,6 +345,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   function handleTemplateChange(newTemplateId: string) {
+    if (newTemplateId === session?.templateId) return;
+    // Warn before discarding hand-written note content when switching templates.
+    const hasNoteContent = !!note?.sections.some((s) => s.body.trim().length > 0);
+    if (hasNoteContent) {
+      setPendingTemplateId(newTemplateId);
+      return;
+    }
+    applyTemplateChange(newTemplateId);
+  }
+
+  function applyTemplateChange(newTemplateId: string) {
     const newTpl = templates.find((t) => t.id === newTemplateId);
     if (!newTpl) return;
     // Snapshot sections for the template we're leaving
@@ -443,6 +479,23 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         onUnfinalize={handleUnfinalize}
       />
 
+      {/* Collapsed transcript: a zero-height sticky bar pins the reopen pill to the top of
+          the scroll area (its nearest scroll ancestor is <main>, not the content div below
+          which has its own overflow). Lives outside the scroll content so it can't ride off. */}
+      {activeTab === 'review' && !isTranscriptLocked && transcriptCollapsed && (
+        <div
+          style={{
+            position: 'sticky', top: 0, height: 0, zIndex: 20,
+            display: 'flex', justifyContent: 'flex-end',
+            padding: '0 22px', pointerEvents: 'none',
+          }}
+        >
+          <div style={{ pointerEvents: 'auto' }}>
+            <TranscriptCollapsedTab onExpand={() => setTranscriptCollapsed(false)} />
+          </div>
+        </div>
+      )}
+
       {/* ── Scrollable content ────────────────────────────── */}
       <div
         style={{
@@ -507,18 +560,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           (isTranscriptLocked ? (
             <ReviewEmptyState />
           ) : (
-            <div
-              role="tabpanel"
-              id="panel-review"
-              aria-labelledby="tab-review"
-              style={{
-                position: 'relative',
-                display: 'grid',
-                gridTemplateColumns: transcriptCollapsed ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
-                gap: 24,
-                alignItems: 'start',
-              }}
-            >
+            <div role="tabpanel" id="panel-review" aria-labelledby="tab-review" style={{ position: 'relative' }}>
+              <div
+                ref={reviewGridRef}
+                style={{
+                  position: 'relative',
+                  display: 'grid',
+                  gridTemplateColumns: transcriptCollapsed
+                    ? 'minmax(0, 1fr)'
+                    : `minmax(0, ${notePct}fr) 10px minmax(0, ${100 - notePct}fr)`,
+                  gap: transcriptCollapsed ? 24 : 16,
+                  alignItems: 'start',
+                }}
+              >
               {/* ── Left: Clinical Note ── */}
               <div>
                 {quickMode && (
@@ -592,12 +646,26 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 ) : null}
               </div>
 
+              {/* ── Drag-to-resize divider ── */}
+              {!transcriptCollapsed && (
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize transcript panel"
+                  onPointerDown={startResize}
+                  style={{
+                    alignSelf: 'stretch', cursor: 'col-resize',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    minHeight: 80,
+                  }}
+                >
+                  <div style={{ width: 4, height: 48, borderRadius: 999, background: 'var(--color-pt-border)' }} />
+                </div>
+              )}
+
               {/* ── Right: Transcript ── */}
-              <div style={{ position: 'relative' }}>
-                {transcriptCollapsed ? (
-                  <TranscriptCollapsedTab onExpand={() => setTranscriptCollapsed(false)} />
-                ) : (
-                  <>
+              {!transcriptCollapsed && (
+                <div style={{ position: 'relative' }}>
                     <TranscriptPanel
                       transcript={effectiveTranscript}
                       clips={sortedClips}
@@ -641,9 +709,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         />
                       </div>
                     ) : null}
-                  </>
-                )}
-              </div>
+                </div>
+              )}
               <ClipsDrawer
                 open={clipsOpen}
                 clips={sortedClips}
@@ -659,6 +726,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 t2Phase={t2Phase}
                 t2Label={t2Label}
               />
+              </div>
             </div>
           ))}
 
@@ -696,6 +764,36 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         open={manageTemplatesOpen}
         onClose={() => setManageTemplatesOpen(false)}
       />
+
+      {/* ── Template-change confirmation (note has content) ── */}
+      <Modal
+        open={pendingTemplateId !== null}
+        onClose={() => setPendingTemplateId(null)}
+        title="Change template?"
+        size="sm"
+      >
+        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+          Switching to{' '}
+          <strong>{templates.find((t) => t.id === pendingTemplateId)?.name ?? 'another template'}</strong>{' '}
+          will clear the text you've written in this note.
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button type="button" className="btn btn-ghost" onClick={() => setPendingTemplateId(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              const target = pendingTemplateId;
+              setPendingTemplateId(null);
+              if (target) applyTemplateChange(target);
+            }}
+          >
+            Change template
+          </button>
+        </div>
+      </Modal>
 
       {/* ── Debug drawer ──────────────────────────────────── */}
       {drawerOpen && (

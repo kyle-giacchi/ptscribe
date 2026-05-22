@@ -32,8 +32,10 @@ export interface UseGeneratePhaseParams {
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
 }
 
+export type GenerateMode = 'replace' | 'append';
+
 export interface GeneratePhaseResult {
-  run: () => Promise<void>;
+  run: (mode?: GenerateMode) => Promise<void>;
   finalize: () => void;
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;
@@ -41,6 +43,22 @@ export interface GeneratePhaseResult {
   copyMarkdown: (markdown: string) => void;
   clearAiError: () => void;
   missingRequiredLabels: string[];
+}
+
+/**
+ * Merge freshly generated sections onto existing ones, keyed by section key.
+ * Existing body text is preserved and the generated text is appended below it
+ * (blank-line separated). Sections empty on one side fall back to the other.
+ */
+function appendSections(existing: NoteSection[], generated: NoteSection[]): NoteSection[] {
+  const priorByKey = new Map(existing.map((s) => [s.key, s.body]));
+  return generated.map((s) => {
+    const prior = (priorByKey.get(s.key) ?? '').trim();
+    const next = s.body.trim();
+    if (prior && next) return { ...s, body: `${priorByKey.get(s.key)}\n\n${s.body}` };
+    if (prior) return { ...s, body: priorByKey.get(s.key)! };
+    return s;
+  });
 }
 
 /**
@@ -90,7 +108,7 @@ export function useGeneratePhase({
     [note, template, session, patient, addNote, patchSession],
   );
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (mode: GenerateMode = 'replace') => {
     if (isGeneratingRef.current) return;
     isGeneratingRef.current = true;
     try {
@@ -138,8 +156,10 @@ export function useGeneratePhase({
         const modifierSnapshot = session!.modifiers;
         const transcriptSnapshot = transcript;
         if (note) {
+          const nextSections =
+            mode === 'append' ? appendSections(note.sections, result.sections) : result.sections;
           updateNote(note.id, {
-            sections: result.sections,
+            sections: nextSections,
             templateId: template.id,
             format: template.format,
             modifiers: modifierSnapshot,
