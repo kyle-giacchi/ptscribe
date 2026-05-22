@@ -15,13 +15,17 @@ function dtypeFor(model: string): PipelineDtype {
   return MODEL_DTYPES[model] ?? 'q8';
 }
 
+import type { PIISpan } from '@/lib/pii/scrubSpans';
+
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
-  | { id: number; type: 'result'; scrubbed: string; entityCount: number }
+  | { id: number; type: 'result'; scrubbed: string; entityCount: number; spans: PIISpan[] }
   | { id: number; type: 'error'; error: string };
 
+export type ScrubModelResult = { scrubbed: string; entityCount: number; spans: PIISpan[] };
+
 type PendingEntry = {
-  resolve: (result: { scrubbed: string; entityCount: number }) => void;
+  resolve: (result: ScrubModelResult) => void;
   reject: (err: Error) => void;
   onProgress?: (msg: string) => void;
 };
@@ -52,7 +56,7 @@ function wireWorker(w: Worker): Worker {
     } else if (msg.type === 'result') {
       _pending.delete(msg.id);
       _modelLoaded = true;
-      entry.resolve({ scrubbed: msg.scrubbed, entityCount: msg.entityCount });
+      entry.resolve({ scrubbed: msg.scrubbed, entityCount: msg.entityCount, spans: msg.spans });
     } else if (msg.type === 'error') {
       _pending.delete(msg.id);
       entry.reject(new Error(msg.error));
@@ -89,7 +93,7 @@ export async function scrubPII(
   text: string,
   onProgress?: (msg: string) => void,
   model = PRIVACY_FILTER_MODEL,
-): Promise<{ scrubbed: string; entityCount: number }> {
+): Promise<ScrubModelResult> {
   const worker = getWorker();
   const id = ++_idCounter;
   return new Promise((resolve, reject) => {
