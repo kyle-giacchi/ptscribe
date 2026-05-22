@@ -108,6 +108,12 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 
   if (collapsed) return null;
 
+  // With no transcript yet (e.g. the clinician skipped transcription), drop straight
+  // into the textarea so they can type a transcript by hand. Don't force it open while
+  // a transcription is in flight — the result is about to land.
+  const isEmpty = !transcript.trim();
+  const effectiveEditMode = editMode || (isEmpty && !transcribing);
+
   const showActionStrip = transcript.trim() && (canImproveWithAI || onOpenPIIScrub);
 
   return (
@@ -184,7 +190,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
         </div>
 
         {/* Header — Row 2 (search, read-only mode only) */}
-        {!editMode && (
+        {!effectiveEditMode && (
           <div
             style={{ padding: '0 20px 12px', background: 'var(--color-pt-surface-alt)', borderBottom: '1px solid var(--color-pt-border)' }}
           >
@@ -254,29 +260,31 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
             </div>
           )}
 
-          {editMode ? (
+          {effectiveEditMode ? (
             <>
-              <div
-                className="flex flex-wrap items-center gap-2 px-3 py-2"
-                style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
-              >
-                <input type="text" aria-label="Find" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
-                  placeholder="Find" value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setReplaceCount(null); }} />
-                <input type="text" aria-label="Replace with" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
-                  placeholder="Replace with" value={replaceStr}
-                  onChange={(e) => setReplaceStr(e.target.value)} />
-                <button type="button" className="btn btn-secondary"
-                  style={{ height: '1.75rem', paddingTop: 0, paddingBottom: 0 }}
-                  disabled={!searchQuery} onClick={handleReplaceAll}>
-                  Replace All
-                </button>
-                {replaceCount !== null && (
-                  <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
-                    {replaceCount === 0 ? 'No matches' : `Replaced ${replaceCount} occurrence${replaceCount !== 1 ? 's' : ''}`}
-                  </span>
-                )}
-              </div>
+              {!isEmpty && (
+                <div
+                  className="flex flex-wrap items-center gap-2 px-3 py-2"
+                  style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
+                >
+                  <input type="text" aria-label="Find" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
+                    placeholder="Find" value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setReplaceCount(null); }} />
+                  <input type="text" aria-label="Replace with" className="input h-7 py-0 text-sm" style={{ width: '10rem' }}
+                    placeholder="Replace with" value={replaceStr}
+                    onChange={(e) => setReplaceStr(e.target.value)} />
+                  <button type="button" className="btn btn-secondary"
+                    style={{ height: '1.75rem', paddingTop: 0, paddingBottom: 0 }}
+                    disabled={!searchQuery} onClick={handleReplaceAll}>
+                    Replace All
+                  </button>
+                  {replaceCount !== null && (
+                    <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+                      {replaceCount === 0 ? 'No matches' : `Replaced ${replaceCount} occurrence${replaceCount !== 1 ? 's' : ''}`}
+                    </span>
+                  )}
+                </div>
+              )}
               <textarea
                 className="input min-h-48 w-full rounded-none leading-relaxed"
                 style={{ borderLeft: 'none', borderRight: 'none', borderBottom: 'none', borderTop: '1px solid var(--color-pt-border)' }}
