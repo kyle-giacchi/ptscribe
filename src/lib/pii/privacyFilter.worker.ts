@@ -1,4 +1,5 @@
 import { pipeline, env } from '@huggingface/transformers';
+import { applySpans, type PIISpan } from './scrubSpans';
 
 // ── Model source routing ─────────────────────────────────────────────────────
 // Mirrors whisper.worker.ts: R2 (via /api/model/*) is primary; HuggingFace is
@@ -127,7 +128,7 @@ type InMsg =
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
-  | { id: number; type: 'result'; scrubbed: string; entityCount: number }
+  | { id: number; type: 'result'; scrubbed: string; entityCount: number; spans: PIISpan[] }
   | { id: number; type: 'error'; error: string };
 
 const post = (msg: OutMsg) => (self as unknown as Worker).postMessage(msg);
@@ -139,33 +140,6 @@ type Entity = {
   start: number;
   end: number;
 };
-
-function buildScrubbed(
-  text: string,
-  entities: Entity[],
-): { scrubbed: string; entityCount: number } {
-  // Sort by position, then drop overlapping spans (keep whichever starts first).
-  const sorted = [...entities].sort((a, b) => a.start - b.start);
-  const deduped: Entity[] = [];
-  let lastEnd = 0;
-  for (const entity of sorted) {
-    if (entity.start >= lastEnd) {
-      deduped.push(entity);
-      lastEnd = entity.end;
-    }
-  }
-
-  let result = '';
-  let cursor = 0;
-  for (const entity of deduped) {
-    result += text.slice(cursor, entity.start);
-    result += `[${entity.entity_group}]`;
-    cursor = entity.end;
-  }
-  result += text.slice(cursor);
-
-  return { scrubbed: result, entityCount: deduped.length };
-}
 
 let currentPipeline: Awaited<ReturnType<typeof pipeline>> | null = null;
 let currentModel = '';
@@ -220,7 +194,7 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
     }
 
     if (msg.type === 'preload') {
-      post({ id, type: 'result', scrubbed: '', entityCount: 0 });
+      post({ id, type: 'result', scrubbed: '', entityCount: 0, spans: [] });
       return;
     }
 
@@ -228,8 +202,13 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
       currentPipeline as unknown as (text: string, opts: object) => Promise<Entity[]>
     )(msg.text, { aggregation_strategy: 'simple' });
 
-    const { scrubbed, entityCount } = buildScrubbed(msg.text, raw);
-    post({ id, type: 'result', scrubbed, entityCount });
+    const spans: PIISpan[] = raw.map((e) => ({
+      entity_group: e.entity_group,
+      start: e.start,
+      end: e.end,
+    }));
+    const { scrubbed, entityCount } = applySpans(msg.text, spans);
+    post({ id, type: 'result', scrubbed, entityCount, spans });
   } catch (err) {
     post({ id, type: 'error', error: (err as Error).message ?? 'Unknown worker error' });
   }
