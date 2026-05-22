@@ -169,7 +169,7 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
             }}
           >
             <span className="text-[11px]" style={{ color: 'var(--color-pt-text-2)' }}>
-              Changing template re-generates the note.
+              Changing template clears the current note.
             </span>
             <button
               type="button"

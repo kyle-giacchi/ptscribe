@@ -16,7 +16,7 @@ interface NoteToolbarProps {
   modifiers: SessionModifiers;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
-  onGenerate: () => void;
+  onGenerate: (mode: 'replace' | 'append') => void;
   onCopyNote: () => void;
   onModifiersChange: (next: SessionModifiers) => void;
 }
@@ -45,7 +45,7 @@ export function NoteToolbar({
     if (hasDraftContent) {
       setOverwriteOpen(true);
     } else {
-      onGenerate();
+      onGenerate('replace');
     }
   }
 
@@ -135,11 +135,13 @@ export function NoteToolbar({
       <Modal
         open={overwriteOpen}
         onClose={() => setOverwriteOpen(false)}
-        title="Replace existing note?"
+        title="This note already has content"
         size="sm"
       >
         <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-          Regenerating will erase your current clinical note. This cannot be undone.
+          You've already written into this note. Choose <strong>Append</strong> to add the newly
+          generated text below what's there, or <strong>Replace</strong> to overwrite it. Replacing
+          cannot be undone.
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button type="button" className="btn btn-ghost" onClick={() => setOverwriteOpen(false)}>
@@ -147,14 +149,25 @@ export function NoteToolbar({
           </button>
           <button
             type="button"
+            className="btn btn-secondary"
+            disabled={generateDisabled}
+            onClick={() => {
+              setOverwriteOpen(false);
+              if (!generateDisabled) onGenerate('append');
+            }}
+          >
+            <Sparkles size={13} strokeWidth={2} /> Append
+          </button>
+          <button
+            type="button"
             className="btn btn-primary"
             disabled={generateDisabled}
             onClick={() => {
               setOverwriteOpen(false);
-              if (!generateDisabled) onGenerate();
+              if (!generateDisabled) onGenerate('replace');
             }}
           >
-            <RotateCw size={13} strokeWidth={2} /> Regenerate
+            <RotateCw size={13} strokeWidth={2} /> Replace
           </button>
         </div>
       </Modal>
