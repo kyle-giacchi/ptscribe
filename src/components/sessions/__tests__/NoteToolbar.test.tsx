@@ -39,9 +39,10 @@ describe('NoteToolbar', () => {
     render(<NoteToolbar {...baseProps} onGenerate={onGenerate} />);
     fireEvent.click(screen.getByText(/Generate/).closest('button')!);
     expect(onGenerate).toHaveBeenCalledTimes(1);
+    expect(onGenerate).toHaveBeenCalledWith('replace');
   });
 
-  it('Regenerate opens overwrite confirmation when hasDraftContent', () => {
+  it('Regenerate opens append/replace confirmation when hasDraftContent', () => {
     const onGenerate = vi.fn();
     render(<NoteToolbar
       {...baseProps}
@@ -49,11 +50,11 @@ describe('NoteToolbar', () => {
       onGenerate={onGenerate}
     />);
     fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
-    expect(screen.getByText('Replace existing note?')).toBeInTheDocument();
+    expect(screen.getByText('This note already has content')).toBeInTheDocument();
     expect(onGenerate).not.toHaveBeenCalled();
   });
 
-  it('Overwrite modal confirm fires onGenerate', () => {
+  it('Replace button in modal fires onGenerate with replace mode', () => {
     const onGenerate = vi.fn();
     render(<NoteToolbar
       {...baseProps}
@@ -61,9 +62,22 @@ describe('NoteToolbar', () => {
       onGenerate={onGenerate}
     />);
     fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
-    const regenerateButtons = screen.getAllByText(/Regenerate/).map((el) => el.closest('button')!);
-    fireEvent.click(regenerateButtons[regenerateButtons.length - 1]);
+    fireEvent.click(screen.getByRole('button', { name: /Replace/ }));
     expect(onGenerate).toHaveBeenCalledTimes(1);
+    expect(onGenerate).toHaveBeenCalledWith('replace');
+  });
+
+  it('Append button in modal fires onGenerate with append mode', () => {
+    const onGenerate = vi.fn();
+    render(<NoteToolbar
+      {...baseProps}
+      hasDraftContent canGenerate noteExists={true}
+      onGenerate={onGenerate}
+    />);
+    fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
+    fireEvent.click(screen.getByRole('button', { name: /Append/ }));
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+    expect(onGenerate).toHaveBeenCalledWith('append');
   });
 
   it('Regenerate button is disabled when canRegenerate is false', () => {
