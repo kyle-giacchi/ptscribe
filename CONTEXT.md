@@ -245,6 +245,27 @@ Generate is **not** silently re-fired — provider charges are per request initi
 
 A finalized session opens directly into its read-only Note view with **Re-open** available. No special recovery UI — this is the normal finalized state.
 
+## Notification and error surfaces
+
+How the app tells the clinician something happened. The "never silent" contract (see [Interruption and recovery](#interruption-and-recovery)) requires every notable event to reach the clinician — and the corollary is **one event uses one surface**: the same event is never announced in two places at once.
+
+Which surface a message uses is decided by two questions: *did the clinician just trigger it, in their current focus?* and *does it require an action to move forward?* Five canonical surfaces:
+
+- **Toast** — a transient, auto-dismissing confirmation of an in-context action the clinician just took ("Transcript copied", "Note copied"). Never used for anything actionable or anything that must persist.
+- **Inline alert** — a failure or notable outcome anchored to the artifact or affordance it concerns. A generation failure sits under the Note; a transcription failure sits under the transcript; a Note that generated with all sections empty shows a note-anchored alert (usually a section-key mismatch or thin transcript) with Regenerate; an unavailable audio playback shows a quiet informational notice on the player / ClipsDrawer. Actionable cases carry the retry/recovery action in place; non-actionable degradations use an informational tone, not a red alert. A "No speech detected — type your transcript" banner in the Curate panel is the inline form used when no usable transcript was produced.
+- **Blocking dialog** — a decision the clinician must make before continuing (the T2-failure choice, the PHI confirmation, the local-Whisper-unavailable recovery).
+- **Alerts** — the persistent "Warnings & Errors" list in the top nav (the bell). Holds only ambient, cross-session events the clinician did not directly trigger and can review later: background transcription finished, low device storage, sessions reopened after a crash. A failure specific to the artifact or affordance the clinician is currently working on does *not* go here — it is an Inline alert.
+- **Page banner** — a persistent, session-wide failure that is *not* tied to a single artifact. Reserved for storage/persistence write failures ("your edits may not be saved") — severe enough that a transient toast would be insufficient. (Unclassified failures of a specific action belong in that action's Inline alert, not here.)
+
+### Pointer to an off-screen inline alert
+
+An Inline alert is the source of truth for an actionable failure, but its host can be hidden — the transcript may be collapsed, or the alert may be scrolled out of view. Because a missed transient toast would leave a persistent failure silent (violating the never-silent contract), the off-screen cases are handled differently:
+
+- **Scrolled away (still on screen):** a one-time toast points to the alert; acting on it scrolls the alert into view.
+- **Collapsed transcript (alert not on screen at all):** a **persistent error badge** on the collapsed-transcript tab stays until the failure resolves, plus a one-time toast when it first occurs. Either one expands the transcript and scrolls to the Inline alert.
+
+A transient toast is never the *only* indicator of a persistent error.
+
 ## Demo mode
 
 Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** — a clinician trying the app should walk through the real workflow end-to-end against their own audio, not a canned scripted demo. The contract:
