@@ -25,8 +25,7 @@ import { dataRepository } from '@/services/DataRepository';
 import { audioRepository } from '@/services/AudioRepository';
 import { vault } from '@/lib/vault/vault';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
-import { AuthContext } from '@/contexts/AuthContext';
-import { isDemoMode } from '@/lib/demoMode';
+import { requestPersistentStorage } from '@/lib/persistentStorage';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 
 type SliceUpdater<T> = T | ((prev: T) => T);
@@ -113,13 +112,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [appData, setAppData] = useState<AppData | null>(null);
   const [corruptWarning, setCorruptWarning] = useState(false);
   const [twoTabWarning, setTwoTabWarning] = useState(false);
-  const isAuthenticated = useContext(AuthContext)?.isAuthenticated ?? false;
-
+  // Request durable storage for every user (demo / unauthenticated / authenticated)
+  // once at startup — the only defense against the browser evicting the cached
+  // Whisper weights. Idempotent and best-effort. See ADR-0002.
   useEffect(() => {
-    if (!isDemoMode() && isAuthenticated && navigator.storage?.persist) {
-      void navigator.storage.persist();
-    }
-  }, [isAuthenticated]);
+    void requestPersistentStorage();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

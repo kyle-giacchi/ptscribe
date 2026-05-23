@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, Copy, Download, Upload, Eraser, RefreshCw } from 'lucide-react';
+import { Activity, Copy, Download, Upload, Eraser, RefreshCw, HardDriveDownload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
@@ -14,6 +14,7 @@ import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { exportBackup, importBackup } from '@/services/BackupService';
+import { clearWhisperModelCache } from '@/services/ai/client/localWhisper';
 import { vault } from '@/lib/vault/vault';
 import { ChangePassphraseForm } from '@/components/vault/ChangePassphraseForm';
 import { auditLog } from '@/lib/audit/auditLog';
@@ -91,6 +92,7 @@ export function Settings() {
   const { notes } = useNotes();
   const importRef = useRef<HTMLInputElement>(null);
   const [showFullDisclosure, setShowFullDisclosure] = useState(false);
+  const [modelBusy, setModelBusy] = useState(false);
 
   // ── iOS "Add to Home Screen" detection ───────────────────────────────────
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !('MSStream' in window);
@@ -189,6 +191,36 @@ export function Settings() {
     resetAll();
     void auditLog.append('data:reset');
     toast.success('All local data erased');
+  }
+
+  async function handleClearModel() {
+    // Guard: never pull the model out from under an in-flight session. The
+    // model cache is app-global (see ADR-0002), so re-downloading mid-transcribe
+    // would break the active worker.
+    const inFlight = sessions.some(
+      (s) => s.status === 'recording' || s.status === 'transcribing',
+    );
+    if (inFlight) {
+      toast.error('Finish or stop the active recording/transcription before re-downloading the model.');
+      return;
+    }
+    if (
+      !confirm(
+        'Clear the on-device transcription model and download it again (~150 MB)? Your patients, sessions, and notes are not affected.',
+      )
+    ) {
+      return;
+    }
+    setModelBusy(true);
+    const t = toast.loading('Re-downloading on-device model…');
+    try {
+      await clearWhisperModelCache();
+      toast.success('On-device model re-downloaded', { id: t });
+    } catch (e) {
+      toast.error(`Could not re-download the model: ${(e as Error).message}`, { id: t });
+    } finally {
+      setModelBusy(false);
+    }
   }
 
   return (
@@ -686,6 +718,28 @@ export function Settings() {
                 if (importRef.current) importRef.current.value = '';
               }}
             />
+          </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <Eyebrow>On-device model</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0, lineHeight: 1.5 }}>
+            The local Whisper transcription model (~150 MB) is downloaded once and cached on this
+            device — it persists across sessions, reloads, and resets, so you only download it
+            again if you choose to. Clear and re-download it if transcription stops working or you
+            suspect the cached files are corrupt.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <PtButton
+              variant="ghost"
+              iconLeft={<HardDriveDownload size={14} strokeWidth={2} />}
+              disabled={modelBusy}
+              onClick={handleClearModel}
+            >
+              {modelBusy ? 'Re-downloading…' : 'Clear & re-download model'}
+            </PtButton>
           </div>
         </div>
       </SurfaceCard>

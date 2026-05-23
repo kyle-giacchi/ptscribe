@@ -227,6 +227,17 @@ Rationale: each worker loads a full copy of the whisper-tiny ONNX weights (~40 M
 
 **Do not collapse the pool back to a singleton** as a "simplification." Low-end and low-memory devices already get pool size 1 automatically via the formula above. Removing the pool and hardcoding N=1 breaks parallel throughput for capable devices with no benefit to constrained ones. The complexity is load-bearing.
 
+### Model cache is app-global and survives every reset path
+
+The Whisper weights live in their own IndexedDB database, **`ptscribe-model-cache`** (`whisper.worker.ts`), distinct from `ptnotes-audio` (clip audio) and from `localStorage` (AppData). It is the **sole** cache for the weights — the Workbox SW matches `/api/model/*` as `/\/api\/.*/ → NetworkOnly` *first*, so the service worker never caches them. It is scoped to **neither a `Session` nor a patient**; it is app-global infrastructure. See [ADR-0002](adr/0002-whisper-model-cache-persistence.md).
+
+Rules:
+
+- **No reset path may clear `ptscribe-model-cache`.** `handleResetSession` (`Session.tsx`), demo "Start fresh" (`DemoBootstrap`), and Settings' "Erase ALL local data" (`Settings.tsx`, which calls `audioRepository.clear()`) must all leave it intact. The model is a public, non-PHI asset — preserving it across a full wipe leaks nothing and keeps local transcription instantly ready. A regression test guards this; do not "fix" it by adding a blanket clear-all.
+- **`navigator.storage.persist()` is requested for all users at startup** (demo, unauthenticated, authenticated), idempotently. It is the only defense against the browser evicting the weights from IDB. Do not re-gate it behind auth/demo.
+- **The `ml-assets` Workbox cache has no `maxAgeSeconds`.** The onnxruntime WASM runtime must not time-expire (Workbox's expiration plugin purges proactively, independent of storage pressure). Rely on `maxEntries` LRU only; content-hashed filenames make a stale entry benign.
+- **Cache is cleared only on load *exhaustion*, never on a transient retry.** The interceptor is strictly cache-first with no bypass, so a corrupt file is otherwise permanent. The auto-retry inside `whisperLoader` must stay cache-preserving (it handles the `pipelineLoadPromise` init race); only genuine exhaustion — and the explicit Settings "Clear & re-download model" / gate "Retry" — clears the store. A `CACHE_VERSION` stamp evicts stale files on a deliberate model swap.
+
 ## Type changes ripple
 
 Adding a new field to a domain type requires all four of:
