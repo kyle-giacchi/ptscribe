@@ -125,6 +125,11 @@ Transcription (Cloudflare Workers AI Whisper) and note generation (Anthropic Mes
 - Access control is the `AppGate` 6-digit code persisted in `localStorage` and matched against a SHA-256 hash in `src/lib/gate.ts`. The gate is **obscurity, not authentication** — anyone reading the bundle can derive it. Treat it as a friction layer, not a trust boundary. Worker abuse caps live server-side.
 - Do not reintroduce browser-direct calls to `api.cloudflare.com` or `api.anthropic.com` from `src/services/ai/`. The dev proxy in `vite.config.ts` forwards `/api/*` → `localhost:8787` for local Worker development.
 - HIPAA disclaimer on Settings still applies: audio and transcripts leave the device en route to the providers, even though they pass through our Worker. Provider `'none'` keeps everything local (Web Speech for live transcript, manual note editing).
+- **PHI handling at the providers — know before enabling cloud paths in a regulated deployment:**
+  - **Cloudflare Workers AI / Deepgram Nova** receives the raw session audio for cloud transcription.
+  - **Anthropic** receives the transcript-bearing user prompt for note generation, and `handleGenerate` sends the system prompt with `cache_control: { type: 'ephemeral' }` (prompt caching). The system prompt is a template, not patient data — but when a Modifier block or template carries PHI it would be cached at Anthropic's edge for the cache TTL (~5 min). The transcript itself rides in the `user` message and is **not** cached.
+  - **No BAA is referenced anywhere in this codebase.** A production HIPAA deployment needs signed BAAs with both Cloudflare and Anthropic; absent those, treat the cloud paths as out-of-scope for PHI and rely on `provider: 'none'` + local Whisper.
+  - **Scrub PII is opt-in and user-driven**, so the default generate path can send un-scrubbed PHI to Anthropic. If a deployment must minimize PHI egress, make scrub mandatory before the cloud generate/transcribe call rather than relying on the clinician to trigger it.
 
 ## Vault and at-rest encryption
 

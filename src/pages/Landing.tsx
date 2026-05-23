@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
+import { CompareModal } from '@/components/landing/CompareModal';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -67,6 +68,7 @@ export function Landing({ onSignIn }: LandingProps) {
   const [workflowStep, setWorkflowStep] = useState(0);
   const [cardsVisible, setCardsVisible] = useState(false);
   const [section6Visible, setSection6Visible] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinel1 = useRef<HTMLDivElement>(null);
@@ -335,6 +337,21 @@ export function Landing({ onSignIn }: LandingProps) {
               <Lock size={11} color="#8893a5" strokeWidth={2} />
               <span style={{ fontSize: 12 }}>Encrypted at rest · AI calls sent over TLS</span>
             </div>
+            <button
+              onClick={() => setCompareOpen(true)}
+              style={{
+                all: 'unset', cursor: 'pointer',
+                fontSize: 13, color: '#8893a5',
+                borderBottom: '1px dashed rgba(136,147,165,0.5)',
+                lineHeight: 1.4, paddingBottom: 1,
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                transition: 'color 150ms',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#1a2030')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#8893a5')}
+            >
+              How does PTScribe compare to Heidi Clinician? →
+            </button>
           </div>
         ) : (
           <form
@@ -759,6 +776,7 @@ export function Landing({ onSignIn }: LandingProps) {
         </div>
       </footer>
 
+      <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} onTryDemo={handleDemo} />
     </div>
   );
 }
