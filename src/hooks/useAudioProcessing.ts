@@ -27,17 +27,20 @@ export function useAudioProcessing(
   const [silenced, setSilenced] = useState<CompiledAudio | null>(null);
   const [compilingSilence, setCompilingSilence] = useState(false);
   const [silenceError, setSilenceError] = useState<CompileError | null>(null);
+  const [seededPrecomputed, setSeededPrecomputed] = useState<Blob | null>(null);
 
   const activeSilenced = silenced?.forId === KEY ? silenced : null;
   const activeSilenceError = silenceError?.forId === KEY ? silenceError.msg : null;
 
   // When a pre-computed silenced blob arrives (from buildMergedAudioForReview),
   // adopt it directly — no need to re-run trimSilence on the merged blob.
-  useEffect(() => {
-    if (precomputedSilenced) {
-      setSilenced({ blob: precomputedSilenced, forId: KEY, savedSec: 0 });
-    }
-  }, [precomputedSilenced]);
+  // Done during render (not in an effect) so it doesn't trigger a cascading
+  // re-render; guarded by seededPrecomputed so it runs once per distinct blob
+  // and a later compileSilence() result is not clobbered.
+  if (precomputedSilenced && precomputedSilenced !== seededPrecomputed) {
+    setSeededPrecomputed(precomputedSilenced);
+    setSilenced({ blob: precomputedSilenced, forId: KEY, savedSec: 0 });
+  }
 
   async function compileSilence() {
     if (!sourceBlob) return;
