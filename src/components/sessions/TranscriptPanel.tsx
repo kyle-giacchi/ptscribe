@@ -17,6 +17,7 @@ interface TranscriptPanelProps {
   transcribing: boolean;
   hasUserEdits: boolean;
   hasT2Transcript: boolean;
+  hasT3Transcript: boolean;
   totalDurationSec: number;
   collapsed: boolean;
   onCollapse: () => void;
@@ -35,7 +36,7 @@ interface TranscriptPanelProps {
 
 export function TranscriptPanel(props: TranscriptPanelProps) {
   const {
-    transcript, clips, transcribing, hasUserEdits, hasT2Transcript,
+    transcript, clips, transcribing, hasUserEdits, hasT2Transcript, hasT3Transcript,
     totalDurationSec, collapsed, onCollapse,
     onChange, onCommit, onCreateTranscript, onRevertToLocal,
     onCopyTranscript, onOpenPIIScrub,
@@ -87,8 +88,8 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
   const matchCount = allMatches.length;
   const safeIndex = matchCount > 0 ? matchIndex % matchCount : 0;
 
-  const tier: 'edited' | 'ai' | 'live' | null =
-    hasUserEdits ? 'edited' : hasT2Transcript ? 'ai' : transcript.trim() ? 'live' : null;
+  const tier: 'modified' | 'cloud' | 'local' | null =
+    hasUserEdits ? 'modified' : hasT3Transcript ? 'cloud' : transcript.trim() ? 'local' : null;
 
   function handleTranscriptChange(next: string) {
     onChange(showClipMarkers ? stripClipMarkers(next) : next);
@@ -289,16 +290,19 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
   );
 }
 
-function TierChip({ tier }: { tier: 'edited' | 'ai' | 'live' }) {
-  const label = tier === 'edited' ? 'Edited' : tier === 'ai' ? 'AI Enhanced' : 'Live';
+function TierChip({ tier }: { tier: 'modified' | 'cloud' | 'local' }) {
+  const label =
+    tier === 'modified' ? 'User Modified' :
+    tier === 'cloud' ? 'AI Enhanced' :
+    'Locally Processed';
   return (
     <span
       style={{
         fontSize: 10, fontWeight: 700, padding: '2px 7px',
         borderRadius: 999,
-        background: tier === 'live' ? 'var(--color-pt-surface-mut)' : 'var(--color-pt-accent-soft)',
-        color: tier === 'live' ? 'var(--color-pt-text-2)' : 'var(--color-pt-accent-fg)',
-        border: tier === 'live' ? '1px solid var(--color-pt-border)' : '1px solid var(--color-pt-accent-border)',
+        background: 'var(--color-pt-accent-soft)',
+        color: 'var(--color-pt-accent-fg)',
+        border: '1px solid var(--color-pt-accent-border)',
         textTransform: 'uppercase', letterSpacing: '0.06em',
       }}
     >

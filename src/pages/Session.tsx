@@ -711,6 +711,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       transcribing={busy === 'transcribing'}
                       hasUserEdits={hasUserEdits}
                       hasT2Transcript={hasT2Transcript}
+                      hasT3Transcript={!!session.t3Transcript}
                       totalDurationSec={totalDurationSec}
                       collapsed={transcriptCollapsed}
                       onCollapse={() => setTranscriptCollapsed(true)}
