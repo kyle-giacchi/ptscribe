@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Copy, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Copy, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { TemplateDropdown } from './TemplateDropdown';
 import { ModifierPopover } from './ModifierPopover';
@@ -10,39 +10,49 @@ interface NoteToolbarProps {
   templates: NoteTemplate[];
   hasDraftContent: boolean;
   canGenerate: boolean;
-  canRegenerate: boolean;
+  requiresFeedback: boolean;
   isGenerating: boolean;
   noteExists: boolean;
   modifiers: SessionModifiers;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
-  onGenerate: (mode: 'replace' | 'append') => void;
+  onGenerate: (mode: 'replace' | 'append', feedback?: string) => void;
   onCopyNote: () => void;
   onModifiersChange: (next: SessionModifiers) => void;
 }
 
 function countActiveModifiers(m: SessionModifiers): number {
-  return (m.tone ? 1 : 0) + m.emphasis.length + (m.customInstruction?.trim() ? 1 : 0);
+  return (
+    (m.voice ? 1 : 0) +
+    (m.length ? 1 : 0) +
+    (m.language ? 1 : 0) +
+    m.clinicalDetail.length +
+    m.codingBilling.length +
+    m.beyondNote.length +
+    m.customInstructions.filter((c) => c.active).length
+  );
 }
 
 export function NoteToolbar({
   template, templates,
-  hasDraftContent, canGenerate, canRegenerate, isGenerating, noteExists,
+  hasDraftContent, canGenerate, requiresFeedback, isGenerating, noteExists,
   modifiers, onTemplateChange, onManageTemplates, onGenerate, onCopyNote, onModifiersChange,
 }: NoteToolbarProps) {
   const [overwriteOpen, setOverwriteOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
   const modifierBtnRef = useRef<HTMLButtonElement>(null);
 
   const activeCount = countActiveModifiers(modifiers);
+  const hasCustomActive = modifiers.customInstructions.some((c) => c.active);
 
-  const generateDisabled = !canGenerate || isGenerating || (noteExists && !canRegenerate);
-  const generateTitle = noteExists && !canRegenerate
-    ? 'No changes to transcript or modifiers since last generation'
-    : undefined;
+  const generateDisabled = !canGenerate || isGenerating;
 
   function handleRegenerate() {
-    if (hasDraftContent) {
+    if (requiresFeedback) {
+      setFeedbackOpen(true);
+    } else if (hasDraftContent) {
       setOverwriteOpen(true);
     } else {
       onGenerate('replace');
@@ -75,19 +85,35 @@ export function NoteToolbar({
         ref={modifierBtnRef}
         type="button"
         onClick={() => setPopoverOpen((o) => !o)}
-        className="inline-flex items-center"
         style={{
-          gap: 8, height: 34, padding: '0 12px', borderRadius: 7,
-          border: '1px solid var(--color-pt-border)',
+          display: 'inline-flex', alignItems: 'center',
+          gap: 6, height: 34, padding: '0 10px', borderRadius: 7,
+          border: `1px solid ${popoverOpen ? 'var(--color-pt-text-2)' : 'var(--color-pt-border)'}`,
           background: popoverOpen ? 'var(--color-pt-border)' : 'var(--color-pt-surface)',
-          color: activeCount > 0 ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
+          color: 'var(--color-pt-text)',
           fontSize: 12.5, fontWeight: 500,
           cursor: 'pointer',
         }}
         title="Prompt modifiers"
       >
         <SlidersHorizontal size={13} strokeWidth={2} />
-        {activeCount > 0 ? `Modifier · ${activeCount}` : 'Modifier'}
+        Modifier
+        {activeCount > 0 && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center',
+            height: 18, padding: '0 6px', borderRadius: 999,
+            border: '1px solid var(--color-pt-border)',
+            background: 'var(--color-pt-bg, var(--color-pt-surface))',
+            color: 'var(--color-pt-text-2)',
+            fontSize: 10, fontWeight: 600,
+          }}>
+            {activeCount}
+          </span>
+        )}
+        {hasCustomActive && (
+          <Sparkles size={11} style={{ color: '#5e7e62', marginLeft: -2 }} />
+        )}
+        <ChevronDown size={12} style={{ color: 'var(--color-pt-text-2)' }} />
       </button>
 
       {popoverOpen && (
@@ -95,7 +121,10 @@ export function NoteToolbar({
           modifiers={modifiers}
           anchorRef={modifierBtnRef}
           onClose={() => setPopoverOpen(false)}
-          onChange={onModifiersChange}
+          onApply={(next) => {
+            onModifiersChange(next);
+            setPopoverOpen(false);
+          }}
         />
       )}
 
@@ -120,7 +149,6 @@ export function NoteToolbar({
         style={{ height: 34, padding: '0 14px', fontSize: 12.5 }}
         disabled={generateDisabled}
         aria-busy={isGenerating}
-        title={generateTitle}
         onClick={handleRegenerate}
       >
         {isGenerating ? (
@@ -168,6 +196,51 @@ export function NoteToolbar({
             }}
           >
             <RotateCw size={13} strokeWidth={2} /> Replace
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={feedbackOpen}
+        onClose={() => { setFeedbackOpen(false); setFeedbackText(''); }}
+        title="What would you like improved?"
+        size="sm"
+      >
+        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5, marginBottom: 10 }}>
+          The transcript and settings haven't changed. Tell the AI what to fix.
+        </p>
+        <textarea
+          value={feedbackText}
+          onChange={(e) => setFeedbackText(e.target.value)}
+          placeholder="e.g. The assessment was too vague — expand functional limitations"
+          autoFocus
+          style={{
+            width: '100%', minHeight: 80, padding: '8px 10px', borderRadius: 6,
+            border: '1px solid var(--color-pt-border)',
+            background: 'var(--color-pt-surface)', color: 'var(--color-pt-text)',
+            fontSize: 13.5, lineHeight: 1.5, resize: 'vertical', boxSizing: 'border-box',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => { setFeedbackOpen(false); setFeedbackText(''); }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!feedbackText.trim() || generateDisabled}
+            onClick={() => {
+              const fb = feedbackText.trim();
+              setFeedbackOpen(false);
+              setFeedbackText('');
+              onGenerate('replace', fb);
+            }}
+          >
+            <RotateCw size={13} strokeWidth={2} /> Regenerate
           </button>
         </div>
       </Modal>

@@ -45,10 +45,39 @@ const PatientSchema = z.object({
 
 // ─── Modifiers ──────────────────────────────────────────────────────────────
 
+const CustomInstructionSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().max(240),
+  active: z.boolean(),
+});
+
 const SessionModifiersSchema = z.object({
-  tone: z.enum(['narrative', 'terse', 'clinical']).optional(),
-  emphasis: z.array(z.enum(['more_detail', 'functional_outcomes', 'patient_progress'])),
-  customInstruction: z.string().max(200).optional(),
+  voice: z.enum(['1st_person', '2nd_person', '3rd_person']).optional(),
+  length: z.enum(['concise', 'balanced', 'detailed']).optional(),
+  language: z.enum(['medical_terminology', 'plain_language', 'spanish_output']).optional(),
+  clinicalDetail: z
+    .array(
+      z.enum([
+        'pertinent_negatives',
+        'include_ros',
+        'quote_verbatim',
+        'differential_diagnosis',
+        'risk_scores',
+      ]),
+    )
+    .default([]),
+  codingBilling: z.array(z.enum(['icd10_suggestions', 'em_level', 'hcc_flags'])).default([]),
+  beyondNote: z
+    .array(
+      z.enum([
+        'suggested_orders',
+        'med_rec_check',
+        'patient_education',
+        'transcript_timestamps',
+      ]),
+    )
+    .default([]),
+  customInstructions: z.array(CustomInstructionSchema).default([]),
 });
 
 // ─── Session ────────────────────────────────────────────────────────────────

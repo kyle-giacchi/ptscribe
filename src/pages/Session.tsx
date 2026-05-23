@@ -262,10 +262,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // via the "Don't show this again" checkbox.
   const [phiConfirmOpen, setPhiConfirmOpen] = useState(false);
   const pendingGenerateMode = useRef<'replace' | 'append'>('replace');
-  function handleGenerate(mode: 'replace' | 'append') {
+  const pendingFeedback = useRef<string | undefined>(undefined);
+  function handleGenerate(mode: 'replace' | 'append', feedback?: string) {
     pendingGenerateMode.current = mode;
+    pendingFeedback.current = feedback;
     if (settings.session.phiConfirmDismissed) {
-      handleGenerateRaw(mode);
+      handleGenerateRaw(mode, feedback);
     } else {
       setPhiConfirmOpen(true);
     }
@@ -273,7 +275,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   function handlePhiConfirm(dontShowAgain: boolean) {
     setPhiConfirmOpen(false);
     if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
-    handleGenerateRaw(pendingGenerateMode.current);
+    handleGenerateRaw(pendingGenerateMode.current, pendingFeedback.current);
   }
 
   function handleCopyNote() {
@@ -418,11 +420,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     settings.ai.generation.provider === 'anthropic' &&
     generateUsed < MAX_GENERATES_PER_SESSION;
 
-  const currentModifiers = session.modifiers ?? { emphasis: [] };
+  const emptyModifiers = { clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] };
+  const currentModifiers = session.modifiers ?? emptyModifiers;
 
-  const canRegenerate = !note || (
-    effectiveTranscript !== (note.generatedFromTranscript ?? '') ||
-    JSON.stringify(currentModifiers) !== JSON.stringify(note.modifiers ?? { emphasis: [] })
+  // True when a note exists but none of the generation inputs have changed.
+  // Regeneration is still allowed, but requires the user to explain what to improve.
+  const inputsUnchanged = !!note && (
+    effectiveTranscript === (note.generatedFromTranscript ?? '') &&
+    JSON.stringify(currentModifiers) === JSON.stringify(note.modifiers ?? emptyModifiers) &&
+    (session.templateId ?? '') === (note.templateId ?? '')
   );
 
   function handleModifiersChange(next: import('@/types').SessionModifiers) {
@@ -649,7 +655,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   templates={templates}
                   hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
                   canGenerate={canGenerate}
-                  canRegenerate={canRegenerate}
+                  requiresFeedback={inputsUnchanged}
                   isGenerating={busy === 'generating'}
                   noteExists={!!note}
                   modifiers={currentModifiers}

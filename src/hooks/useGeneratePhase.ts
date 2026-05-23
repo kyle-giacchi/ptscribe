@@ -36,7 +36,7 @@ export interface UseGeneratePhaseParams {
 export type GenerateMode = 'replace' | 'append';
 
 export interface GeneratePhaseResult {
-  run: (mode?: GenerateMode) => Promise<void>;
+  run: (mode?: GenerateMode, feedback?: string) => Promise<void>;
   finalize: () => void;
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;
@@ -113,7 +113,7 @@ export function useGeneratePhase({
     [note, template, session, patient, addNote, patchSession],
   );
 
-  const run = useCallback(async (mode: GenerateMode = 'replace') => {
+  const run = useCallback(async (mode: GenerateMode = 'replace', feedback?: string) => {
     if (isGeneratingRef.current) return;
     isGeneratingRef.current = true;
     try {
@@ -150,6 +150,8 @@ export function useGeneratePhase({
           sessionType: session!.type,
           modifiers: session!.modifiers,
           activeTranscriptTier: session!.activeTranscriptTier,
+          regenerationDraft: note,
+          regenerationFeedback: feedback,
           signal: controller.signal,
           onRetry: (info) =>
             dispatch({
