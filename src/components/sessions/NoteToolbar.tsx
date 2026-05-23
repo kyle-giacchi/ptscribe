@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Copy, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Copy, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { TemplateDropdown } from './TemplateDropdown';
 import { ModifierPopover } from './ModifierPopover';
@@ -22,7 +22,15 @@ interface NoteToolbarProps {
 }
 
 function countActiveModifiers(m: SessionModifiers): number {
-  return (m.tone ? 1 : 0) + m.emphasis.length + (m.customInstruction?.trim() ? 1 : 0);
+  return (
+    (m.voice ? 1 : 0) +
+    (m.length ? 1 : 0) +
+    (m.language ? 1 : 0) +
+    m.clinicalDetail.length +
+    m.codingBilling.length +
+    m.beyondNote.length +
+    m.customInstructions.filter((c) => c.active).length
+  );
 }
 
 export function NoteToolbar({
@@ -35,6 +43,7 @@ export function NoteToolbar({
   const modifierBtnRef = useRef<HTMLButtonElement>(null);
 
   const activeCount = countActiveModifiers(modifiers);
+  const hasCustomActive = modifiers.customInstructions.some((c) => c.active);
 
   const generateDisabled = !canGenerate || isGenerating || (noteExists && !canRegenerate);
   const generateTitle = noteExists && !canRegenerate
@@ -75,19 +84,35 @@ export function NoteToolbar({
         ref={modifierBtnRef}
         type="button"
         onClick={() => setPopoverOpen((o) => !o)}
-        className="inline-flex items-center"
         style={{
-          gap: 8, height: 34, padding: '0 12px', borderRadius: 7,
-          border: '1px solid var(--color-pt-border)',
+          display: 'inline-flex', alignItems: 'center',
+          gap: 6, height: 34, padding: '0 10px', borderRadius: 7,
+          border: `1px solid ${popoverOpen ? 'var(--color-pt-text-2)' : 'var(--color-pt-border)'}`,
           background: popoverOpen ? 'var(--color-pt-border)' : 'var(--color-pt-surface)',
-          color: activeCount > 0 ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
+          color: 'var(--color-pt-text)',
           fontSize: 12.5, fontWeight: 500,
           cursor: 'pointer',
         }}
         title="Prompt modifiers"
       >
         <SlidersHorizontal size={13} strokeWidth={2} />
-        {activeCount > 0 ? `Modifier · ${activeCount}` : 'Modifier'}
+        Modifier
+        {activeCount > 0 && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center',
+            height: 18, padding: '0 6px', borderRadius: 999,
+            border: '1px solid var(--color-pt-border)',
+            background: 'var(--color-pt-bg, var(--color-pt-surface))',
+            color: 'var(--color-pt-text-2)',
+            fontSize: 10, fontWeight: 600,
+          }}>
+            {activeCount}
+          </span>
+        )}
+        {hasCustomActive && (
+          <Sparkles size={11} style={{ color: '#5e7e62', marginLeft: -2 }} />
+        )}
+        <ChevronDown size={12} style={{ color: 'var(--color-pt-text-2)' }} />
       </button>
 
       {popoverOpen && (
@@ -95,7 +120,10 @@ export function NoteToolbar({
           modifiers={modifiers}
           anchorRef={modifierBtnRef}
           onClose={() => setPopoverOpen(false)}
-          onChange={onModifiersChange}
+          onApply={(next) => {
+            onModifiersChange(next);
+            setPopoverOpen(false);
+          }}
         />
       )}
 

@@ -418,11 +418,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     settings.ai.generation.provider === 'anthropic' &&
     generateUsed < MAX_GENERATES_PER_SESSION;
 
-  const currentModifiers = session.modifiers ?? { emphasis: [] };
+  const emptyModifiers = { clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] };
+  const currentModifiers = session.modifiers ?? emptyModifiers;
 
   const canRegenerate = !note || (
     effectiveTranscript !== (note.generatedFromTranscript ?? '') ||
-    JSON.stringify(currentModifiers) !== JSON.stringify(note.modifiers ?? { emphasis: [] })
+    JSON.stringify(currentModifiers) !== JSON.stringify(note.modifiers ?? emptyModifiers)
   );
 
   function handleModifiersChange(next: import('@/types').SessionModifiers) {
