@@ -96,3 +96,17 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 - **Console calls are DEV-only.** All `console.error/warn` calls are wrapped in `if (import.meta.env.DEV)` — Vite tree-shakes them out of production builds. Never add bare console calls.
 - **Vault is tab-lifetime only — no idle-lock.** Clinicians mid-visit are never interrupted by a vault prompt. If you introduce an idle relock, it must define WAL-chunk behavior during the locked window. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))
 - **Cloud transcription is hard-disabled in demo mode.** The "Improve with AI" action and the T2-failure dialog's cloud option must both be unavailable when `VITE_DEMO_MODE=true`. T2 local Whisper and Anthropic generation remain enabled.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live as local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles using default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Multi-context layout — `CONTEXT-MAP.md` at root pointing to per-context `CONTEXT.md` files. See `docs/agents/domain.md`.
