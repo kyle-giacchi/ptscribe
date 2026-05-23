@@ -515,6 +515,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         missingRequiredLabels={missingRequiredLabels}
         onFinalize={handleFinalizeWrapped}
         onUnfinalize={handleUnfinalize}
+        showNoteActions={activeTab === 'review'}
       />
 
       {/* Collapsed transcript: a zero-height sticky bar pins the reopen pill to the top of

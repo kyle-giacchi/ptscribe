@@ -114,41 +114,22 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
   const isEmpty = !transcript.trim();
   const effectiveEditMode = editMode || (isEmpty && !transcribing);
 
-  const showActionStrip = transcript.trim() && (canImproveWithAI || onOpenPIIScrub);
-
   return (
     <div className="space-y-3">
-      {pendingOverwrite ? (
+      {pendingOverwrite && (
         <ConfirmBanner
           message="This will replace your edited transcript."
           confirmLabel="Yes, replace"
           onCancel={() => setPendingOverwrite(false)}
           onConfirm={() => { setPendingOverwrite(false); onCreateTranscript(); }}
         />
-      ) : (
-        (hasEditedTranscript || hasT2Transcript) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {hasEditedTranscript && onRevertEdits && (
-              <button type="button" className="btn btn-ghost" onClick={onRevertEdits}
-                title="Clear your edits and show the original transcript.">
-                <RotateCcw size={14} strokeWidth={2} /> Revert edits
-              </button>
-            )}
-            {hasT2Transcript && (
-              <button type="button" className="btn btn-ghost" onClick={onRevertToLocal}
-                title="Restore the on-device draft transcript captured while you were recording.">
-                <RotateCcw size={14} strokeWidth={2} /> Revert to draft transcript
-              </button>
-            )}
-          </div>
-        )
       )}
 
       <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--color-pt-border)' }}>
 
         {/* Header — Row 1 (tier + actions) */}
         <div
-          className="flex items-center gap-2"
+          className="flex flex-wrap items-center gap-2"
           style={{ padding: '12px 20px 8px', background: 'var(--color-pt-surface-alt)' }}
         >
           <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: 'var(--color-fg-muted)' }}>
@@ -162,6 +143,33 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
           )}
 
           <div style={{ flex: 1 }} />
+
+          {hasEditedTranscript && onRevertEdits && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onRevertEdits}
+              title="Clear your edits and show the original transcript.">
+              <RotateCcw size={13} strokeWidth={2} /> Revert edits
+            </button>
+          )}
+          {hasT2Transcript && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onRevertToLocal}
+              title="Restore the on-device draft transcript captured while you were recording.">
+              <RotateCcw size={13} strokeWidth={2} /> Revert to draft transcript
+            </button>
+          )}
+          {canImproveWithAI && transcript.trim() && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }}
+              disabled={transcribing} onClick={handleCreateClick}
+              title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result.">
+              {transcribing
+                ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
+                : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
+            </button>
+          )}
+          {onOpenPIIScrub && transcript.trim() && (
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }} onClick={onOpenPIIScrub}>
+              <EyeOff size={13} strokeWidth={2} /> Scrub PII
+            </button>
+          )}
 
           {onCopyTranscript && transcript.trim() && (
             <button type="button" className="btn btn-ghost p-1.5" onClick={onCopyTranscript} title="Copy transcript" aria-label="Copy transcript">
@@ -228,38 +236,6 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
 
         {/* Body */}
         <div>
-          {showActionStrip && (
-            <div
-              className="flex items-center gap-1 px-3 py-2"
-              style={{ borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface-alt)' }}
-            >
-              {canImproveWithAI && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ fontSize: 12 }}
-                  disabled={transcribing}
-                  onClick={handleCreateClick}
-                  title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result."
-                >
-                  {transcribing
-                    ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
-                    : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}
-                </button>
-              )}
-              {onOpenPIIScrub && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ fontSize: 12 }}
-                  onClick={onOpenPIIScrub}
-                >
-                  <EyeOff size={13} strokeWidth={2} /> Scrub PII
-                </button>
-              )}
-            </div>
-          )}
-
           {effectiveEditMode ? (
             <>
               {!isEmpty && (
