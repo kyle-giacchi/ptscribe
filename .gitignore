@@ -6,6 +6,9 @@ groupfinanceapp.xlsx
 # Brainstorm artifacts
 .superpowers/
 
+# Local-markdown issue tracker (see docs/agents/issue-tracker.md) — kept local-only
+.scratch/
+
 # Internal planning / analysis docs (not for public repo)
 docs/superpowers/
 docs/analysis/
