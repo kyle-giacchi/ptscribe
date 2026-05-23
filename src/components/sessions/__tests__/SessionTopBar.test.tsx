@@ -22,6 +22,7 @@ describe('SessionTopBar', () => {
         onToggleClips={() => {}} onRecord={() => {}} onUpload={() => {}}
         missingRequiredLabels={[]}
         onFinalize={() => {}} onUnfinalize={() => {}}
+        showNoteActions
       />
     </MemoryRouter>);
     expect(screen.getByText(/Jane Doe/)).toBeInTheDocument();
@@ -37,6 +38,7 @@ describe('SessionTopBar', () => {
         onToggleClips={onToggleClips} onRecord={() => {}} onUpload={() => {}}
         missingRequiredLabels={[]}
         onFinalize={() => {}} onUnfinalize={() => {}}
+        showNoteActions
       />
     </MemoryRouter>);
     fireEvent.click(screen.getByText('Audio clips').closest('button')!);
@@ -52,6 +54,7 @@ describe('SessionTopBar', () => {
         onToggleClips={() => {}} onRecord={() => {}} onUpload={() => {}}
         missingRequiredLabels={['Assessment']}
         onFinalize={() => {}} onUnfinalize={() => {}}
+        showNoteActions
       />
     </MemoryRouter>);
     const btn = screen.getByText(/Sign & export/).closest('button')!;
