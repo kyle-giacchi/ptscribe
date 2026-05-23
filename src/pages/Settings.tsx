@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { Copy, Download, Upload, Eraser, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Activity, Copy, Download, Upload, Eraser, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
@@ -75,6 +76,7 @@ function bucketUsageByMonth(sessions: Session[], notes: Note[]): UsageBucket[] {
 }
 
 export function Settings() {
+  const navigate = useNavigate();
   const { clinician, setClinician } = useClinician();
   const {
     settings,
@@ -684,6 +686,25 @@ export function Settings() {
                 if (importRef.current) importRef.current.value = '';
               }}
             />
+          </div>
+        </div>
+      </SurfaceCard>
+
+      <SurfaceCard padding={18}>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <Eyebrow>Diagnostics</Eyebrow>
+          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            Re-run the pre-flight setup checks — browser support, microphone, on-device model, and
+            storage. Useful when audio capture or transcription isn&apos;t working.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <PtButton
+              variant="ghost"
+              iconLeft={<Activity size={14} strokeWidth={2} />}
+              onClick={() => navigate('/setup-check?return=/settings')}
+            >
+              Run diagnostics
+            </PtButton>
           </div>
         </div>
       </SurfaceCard>

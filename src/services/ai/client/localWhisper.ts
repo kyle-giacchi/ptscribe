@@ -11,6 +11,8 @@ type PendingEntry = {
   resolve: (text: string) => void;
   reject: (err: Error) => void;
   onProgress?: (msg: string) => void;
+  /** Raw download/load progress, used by the preload path to drive a progress bar. */
+  onRawProgress?: (status: string, loaded?: number, total?: number) => void;
   timer?: ReturnType<typeof setTimeout>;
 };
 
@@ -42,6 +44,7 @@ function wireWorker(w: Worker): Worker {
     const entry = _pending.get(msg.id);
     if (!entry) return;
     if (msg.type === 'progress') {
+      entry.onRawProgress?.(msg.status, msg.loaded, msg.total);
       if (msg.status === 'downloading' && msg.loaded != null && msg.total != null) {
         const pct = Math.round((msg.loaded / msg.total) * 100);
         entry.onProgress?.(`Downloading model (${pct}%)`);
@@ -96,12 +99,23 @@ export class WhisperExhaustedError extends Error {
 
 export type WhisperLoadStatus = 'idle' | 'loading' | 'ready' | 'exhausted';
 
+/** Coarse preload progress for UI (the "Checking your setup" gate). */
+export interface WhisperPreloadProgress {
+  phase: 'downloading' | 'loading' | 'ready';
+  /** 0–100 while downloading; undefined otherwise. */
+  pct?: number;
+  loadedBytes?: number;
+  totalBytes?: number;
+}
+
 class WhisperLoader {
   private _status: WhisperLoadStatus = 'idle';
   // Null until the first ensureReady() call; non-null while loading or after settling.
   private _promise: Promise<void> | null = null;
   private readonly _model: string;
   private readonly _maxAttempts: number;
+  private readonly _listeners = new Set<(p: WhisperPreloadProgress) => void>();
+  private _lastProgress: WhisperPreloadProgress | null = null;
 
   constructor(model: string, maxAttempts: number) {
     this._model = model;
@@ -110,6 +124,35 @@ class WhisperLoader {
 
   get status(): WhisperLoadStatus {
     return this._status;
+  }
+
+  /**
+   * Subscribe to preload progress. Fires immediately with the last known
+   * progress (or a synthetic `ready` if already loaded). Returns an unsubscribe.
+   */
+  onProgress(cb: (p: WhisperPreloadProgress) => void): () => void {
+    this._listeners.add(cb);
+    if (this._status === 'ready') cb({ phase: 'ready' });
+    else if (this._lastProgress) cb(this._lastProgress);
+    return () => {
+      this._listeners.delete(cb);
+    };
+  }
+
+  private _emit(p: WhisperPreloadProgress): void {
+    this._lastProgress = p;
+    for (const cb of [...this._listeners]) cb(p);
+  }
+
+  /**
+   * Allow a fresh load attempt after the loader has exhausted its retries.
+   * No-op while a load is in flight so we never interrupt an active download.
+   */
+  reset(): void {
+    if (this._status === 'loading') return;
+    this._status = 'idle';
+    this._promise = null;
+    this._lastProgress = null;
   }
 
   /**
@@ -132,6 +175,7 @@ class WhisperLoader {
     try {
       await this._doLoad();
       this._status = 'ready';
+      this._emit({ phase: 'ready' });
     } catch (err) {
       if (attempt < this._maxAttempts) {
         return this._loadWithRetry(attempt + 1);
@@ -148,6 +192,18 @@ class WhisperLoader {
       _pending.set(id, {
         resolve: () => resolve(),
         reject,
+        onRawProgress: (status, loaded, total) => {
+          if (status === 'downloading' && loaded != null && total != null) {
+            this._emit({
+              phase: 'downloading',
+              pct: Math.round((loaded / total) * 100),
+              loadedBytes: loaded,
+              totalBytes: total,
+            });
+          } else if (status === 'loading') {
+            this._emit({ phase: 'loading' });
+          }
+        },
       });
       worker.postMessage({ id, type: 'preload', model: this._model });
     });

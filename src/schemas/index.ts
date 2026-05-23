@@ -288,6 +288,7 @@ const SettingsSchema = z.object({
     onboardingDoneAt: z.number().int().optional(),
     disclosureVersion: z.number().int().optional(),
     onboardingUrlConsumed: z.boolean().optional(),
+    setupCheckDoneAt: z.number().int().optional(),
   }),
   ui: z.object({
     sidebarCollapsed: z.boolean(),

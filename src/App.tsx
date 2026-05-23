@@ -21,6 +21,7 @@ import { AppShell } from '@/components/common/AppShell';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { isDemoMode } from '@/lib/demoMode';
 import { Setup } from '@/pages/Setup';
+import { CheckingRequirements } from '@/pages/CheckingRequirements';
 import { Landing } from '@/pages/Landing';
 import { Login } from '@/pages/Login';
 import { AuthCallback } from '@/pages/AuthCallback';
@@ -70,6 +71,7 @@ function AppProviders() {
                             <Suspense fallback={<PageLoader />}>
                                 <Routes>
                                   <Route path="/setup" element={<Setup />} />
+                                  <Route path="/setup-check" element={<CheckingRequirements />} />
                                   <Route element={<AppShell />}>
                                     <Route path="/today" element={<Dashboard />} />
                                     <Route path="/patients" element={<Patients />} />
