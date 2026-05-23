@@ -10,13 +10,13 @@ interface NoteToolbarProps {
   templates: NoteTemplate[];
   hasDraftContent: boolean;
   canGenerate: boolean;
-  canRegenerate: boolean;
+  requiresFeedback: boolean;
   isGenerating: boolean;
   noteExists: boolean;
   modifiers: SessionModifiers;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
-  onGenerate: (mode: 'replace' | 'append') => void;
+  onGenerate: (mode: 'replace' | 'append', feedback?: string) => void;
   onCopyNote: () => void;
   onModifiersChange: (next: SessionModifiers) => void;
 }
@@ -35,23 +35,24 @@ function countActiveModifiers(m: SessionModifiers): number {
 
 export function NoteToolbar({
   template, templates,
-  hasDraftContent, canGenerate, canRegenerate, isGenerating, noteExists,
+  hasDraftContent, canGenerate, requiresFeedback, isGenerating, noteExists,
   modifiers, onTemplateChange, onManageTemplates, onGenerate, onCopyNote, onModifiersChange,
 }: NoteToolbarProps) {
   const [overwriteOpen, setOverwriteOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
   const modifierBtnRef = useRef<HTMLButtonElement>(null);
 
   const activeCount = countActiveModifiers(modifiers);
   const hasCustomActive = modifiers.customInstructions.some((c) => c.active);
 
-  const generateDisabled = !canGenerate || isGenerating || (noteExists && !canRegenerate);
-  const generateTitle = noteExists && !canRegenerate
-    ? 'No changes to transcript or modifiers since last generation'
-    : undefined;
+  const generateDisabled = !canGenerate || isGenerating;
 
   function handleRegenerate() {
-    if (hasDraftContent) {
+    if (requiresFeedback) {
+      setFeedbackOpen(true);
+    } else if (hasDraftContent) {
       setOverwriteOpen(true);
     } else {
       onGenerate('replace');
@@ -148,7 +149,6 @@ export function NoteToolbar({
         style={{ height: 34, padding: '0 14px', fontSize: 12.5 }}
         disabled={generateDisabled}
         aria-busy={isGenerating}
-        title={generateTitle}
         onClick={handleRegenerate}
       >
         {isGenerating ? (
@@ -196,6 +196,51 @@ export function NoteToolbar({
             }}
           >
             <RotateCw size={13} strokeWidth={2} /> Replace
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={feedbackOpen}
+        onClose={() => { setFeedbackOpen(false); setFeedbackText(''); }}
+        title="What would you like improved?"
+        size="sm"
+      >
+        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5, marginBottom: 10 }}>
+          The transcript and settings haven't changed. Tell the AI what to fix.
+        </p>
+        <textarea
+          value={feedbackText}
+          onChange={(e) => setFeedbackText(e.target.value)}
+          placeholder="e.g. The assessment was too vague — expand functional limitations"
+          autoFocus
+          style={{
+            width: '100%', minHeight: 80, padding: '8px 10px', borderRadius: 6,
+            border: '1px solid var(--color-pt-border)',
+            background: 'var(--color-pt-surface)', color: 'var(--color-pt-text)',
+            fontSize: 13.5, lineHeight: 1.5, resize: 'vertical', boxSizing: 'border-box',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => { setFeedbackOpen(false); setFeedbackText(''); }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!feedbackText.trim() || generateDisabled}
+            onClick={() => {
+              const fb = feedbackText.trim();
+              setFeedbackOpen(false);
+              setFeedbackText('');
+              onGenerate('replace', fb);
+            }}
+          >
+            <RotateCw size={13} strokeWidth={2} /> Regenerate
           </button>
         </div>
       </Modal>
