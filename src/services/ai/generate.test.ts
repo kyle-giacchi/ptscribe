@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { extractJson, generateNote } from './generate';
+import { buildKeyReport, extractJson, generateNote } from './generate';
 import type { GenerateNoteArgs } from './generate';
 import { callAnthropic } from './client/anthropic';
 import type { NoteTemplate, Patient } from '@/types';
@@ -74,6 +74,36 @@ describe('extractJson', () => {
 
   it('throws on an empty string', () => {
     expect(() => extractJson('')).toThrow('AI response did not contain a JSON object');
+  });
+});
+
+describe('buildKeyReport', () => {
+  it('reports a full match when returned keys equal template keys', () => {
+    const report = buildKeyReport(mockTemplate, { subjective: 'a', plan: 'b' });
+    expect(report.matched).toEqual(['subjective', 'plan']);
+    expect(report.missing).toEqual([]);
+    expect(report.unexpected).toEqual([]);
+    expect(report.emptyMatched).toEqual([]);
+  });
+
+  it('flags a total key mismatch (returned keys, zero matched)', () => {
+    const report = buildKeyReport(mockTemplate, { soap: 'x', notes: 'y' });
+    expect(report.matched).toEqual([]);
+    expect(report.returned).toEqual(['soap', 'notes']);
+    expect(report.missing).toEqual(['subjective', 'plan']);
+    expect(report.unexpected).toEqual(['soap', 'notes']);
+  });
+
+  it('reports missing and unexpected keys on a partial match', () => {
+    const report = buildKeyReport(mockTemplate, { subjective: 'a', extra: 'z' });
+    expect(report.matched).toEqual(['subjective']);
+    expect(report.missing).toEqual(['plan']);
+    expect(report.unexpected).toEqual(['extra']);
+  });
+
+  it('flags matched keys whose value is blank or not a string', () => {
+    const report = buildKeyReport(mockTemplate, { subjective: '  ', plan: 42 });
+    expect(report.emptyMatched).toEqual(['subjective', 'plan']);
   });
 });
 
