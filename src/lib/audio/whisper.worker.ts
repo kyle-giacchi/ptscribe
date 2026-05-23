@@ -1,4 +1,5 @@
 import { pipeline, env } from '@huggingface/transformers';
+import { cacheGet, cachePut, ensureCacheVersion } from './modelCache';
 
 // ── Model source routing ─────────────────────────────────────────────────────
 // In both dev (wrangler dev proxies R2 at /api/model/*) and production the
@@ -16,54 +17,14 @@ env.useBrowserCache = false;
 env.allowLocalModels = false;
 
 // ── IDB model cache ──────────────────────────────────────────────────────────
-// Caches downloaded model files across page loads and browser-cache evictions.
-// Errors are always swallowed — a cache failure must never block model loading.
+// The shared cache module (./modelCache) is the sole layer for model weights,
+// used by both this worker and the main thread. Errors are always swallowed —
+// a cache failure must never block model loading. See ADR-0002.
 
-const IDB_NAME = 'ptscribe-model-cache';
-const IDB_STORE = 'files';
-
-type CacheEntry = { buffer: ArrayBuffer; contentType: string };
-
-let _db: IDBDatabase | null = null;
-
-async function openModelCacheDB(): Promise<IDBDatabase> {
-  if (_db) return _db;
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
-    req.onsuccess = () => {
-      _db = req.result;
-      resolve(req.result);
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function cacheGet(key: string): Promise<CacheEntry | null> {
-  try {
-    const db = await openModelCacheDB();
-    return await new Promise((resolve) => {
-      const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
-      req.onsuccess = () => resolve((req.result as CacheEntry) ?? null);
-      req.onerror = () => resolve(null);
-    });
-  } catch {
-    return null;
-  }
-}
-
-async function cachePut(key: string, entry: CacheEntry): Promise<void> {
-  try {
-    const db = await openModelCacheDB();
-    await new Promise<void>((resolve) => {
-      const req = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(entry, key);
-      req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
-    });
-  } catch {
-    // best-effort
-  }
-}
+// Evict-on-version-mismatch must complete before we serve anything cached, or a
+// stale weight from an old CACHE_VERSION could be returned. Run it once at module
+// load and gate every cache read on it.
+const _cacheReady = ensureCacheVersion();
 
 // ── Fetch interceptor (dev + production) ────────────────────────────────────
 // Sits in front of all fetches made by transformers.js inside this worker.
@@ -88,6 +49,7 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
       return _originalFetch(input, init);
     }
 
+    await _cacheReady;
     const cached = await cacheGet(url);
     if (cached) {
       return new Response(cached.buffer, {
@@ -104,14 +66,26 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
       response = await _originalFetch(`${HF_HOST}/${hfPath}`, init);
     }
 
-    if (response.ok) {
-      const contentType =
-        response.headers.get('Content-Type') ?? 'application/octet-stream';
-      const buffer = await response.arrayBuffer();
-      cachePut(url, { buffer, contentType });
-      return new Response(buffer, {
-        status: 200,
-        headers: { 'Content-Type': contentType },
+    // Split the body so transformers.js can stream the real network download
+    // (driving its progress_callback) while a second branch fills the IDB cache
+    // in the background. Buffering up front instead would hide all download
+    // progress — the bytes would already be in memory before transformers reads.
+    if (response.ok && response.body) {
+      const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
+      const [forModel, forCache] = response.body.tee();
+
+      // Best-effort cache write; never blocks or fails the model load.
+      void new Response(forCache)
+        .arrayBuffer()
+        .then((buffer) => cachePut(url, { buffer, contentType }))
+        .catch(() => {});
+
+      // Preserve the original headers (notably Content-Length) so transformers
+      // knows the total size and can compute a real percentage as bytes arrive.
+      return new Response(forModel, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
       });
     }
     return response;

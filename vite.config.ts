@@ -82,12 +82,16 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            // ML assets: cache after first load, reuse across sessions
+            // ML assets: cache after first load, reuse across sessions.
+            // No maxAgeSeconds — the runtime must never time-expire (Workbox's
+            // expiration plugin purges proactively, independent of storage
+            // pressure). Files are content-hashed, so a stale entry is benign;
+            // maxEntries LRU bounds the store. See ADR-0002.
             urlPattern: /\.(onnx|wasm)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'ml-assets',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              expiration: { maxEntries: 10 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
@@ -97,7 +101,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'ml-assets',
-              expiration: { maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              expiration: { maxEntries: 5 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
