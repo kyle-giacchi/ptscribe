@@ -6,6 +6,10 @@ export interface WhisperLoadingState {
   exhausted: boolean;
 }
 
+// How long to wait before showing the "loading" UI — prevents a flash when the
+// model loads from IDB cache in under this threshold (common for returning users).
+const LOADING_UI_DEBOUNCE_MS = 200;
+
 /**
  * Tracks the local Whisper preload state.
  *
@@ -22,6 +26,21 @@ export function useWhisperLoading(): WhisperLoadingState {
     return 'loading';
   });
 
+  // Debounce the loading indicator so a fast IDB cache hit doesn't flash the
+  // button between disabled→enabled states. Only show the spinner/gate after
+  // LOADING_UI_DEBOUNCE_MS ms of sustained loading.
+  const [showLoadingUI, setShowLoadingUI] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'loading') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowLoadingUI(false);
+      return;
+    }
+    const t = setTimeout(() => setShowLoadingUI(true), LOADING_UI_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [status]);
+
   useEffect(() => {
     const s = whisperLoader.status;
     if (s === 'ready' || s === 'exhausted') return;
@@ -31,5 +50,5 @@ export function useWhisperLoading(): WhisperLoadingState {
       .catch(() => setStatus('exhausted'));
   }, []);
 
-  return { loading: status === 'loading', exhausted: status === 'exhausted' };
+  return { loading: status === 'loading' && showLoadingUI, exhausted: status === 'exhausted' };
 }
