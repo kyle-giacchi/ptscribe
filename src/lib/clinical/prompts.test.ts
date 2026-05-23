@@ -29,58 +29,118 @@ const baseTemplate: NoteTemplate = {
 
 const baseTranscript = 'Patient reports left knee pain rated 6 out of 10.';
 
+const emptyModifiers: SessionModifiers = {
+  clinicalDetail: [],
+  codingBilling: [],
+  beyondNote: [],
+  customInstructions: [],
+};
+
 describe('buildModifierBlock', () => {
-  const empty: SessionModifiers = { emphasis: [] };
-
   it('returns empty string when no modifiers are active', () => {
-    expect(buildModifierBlock(empty)).toBe('');
+    expect(buildModifierBlock(emptyModifiers)).toBe('');
   });
 
-  it('includes tone block for narrative', () => {
-    const result = buildModifierBlock({ emphasis: [], tone: 'narrative' });
-    expect(result).toContain('# Tone & style');
-    expect(result).toContain('flowing professional prose');
+  it('includes Voice section for 1st_person', () => {
+    const result = buildModifierBlock({ ...emptyModifiers, voice: '1st_person' });
+    expect(result).toContain('# Voice');
+    expect(result).toContain('first-person');
   });
 
-  it('includes tone block for terse', () => {
-    const result = buildModifierBlock({ emphasis: [], tone: 'terse' });
-    expect(result).toContain('bullet-point shorthand');
-    expect(result).toContain('PROM');
+  it('includes Voice section for 3rd_person', () => {
+    const result = buildModifierBlock({ ...emptyModifiers, voice: '3rd_person' });
+    expect(result).toContain('third-person voice');
   });
 
-  it('includes tone block for clinical', () => {
-    const result = buildModifierBlock({ emphasis: [], tone: 'clinical' });
-    expect(result).toContain('formal clinical documentation style');
-    expect(result).toContain('anatomical');
+  it('includes Length section for concise', () => {
+    const result = buildModifierBlock({ ...emptyModifiers, length: 'concise' });
+    expect(result).toContain('# Length');
+    expect(result).toContain('tight clinical prose');
   });
 
-  it('includes emphasis block with active chips', () => {
-    const result = buildModifierBlock({ emphasis: ['more_detail', 'patient_progress'] });
-    expect(result).toContain('# Emphasis');
-    expect(result).toContain('more clinical detail');
-    expect(result).toContain('patient progress');
+  it('includes Length section for detailed', () => {
+    const result = buildModifierBlock({ ...emptyModifiers, length: 'detailed' });
+    expect(result).toContain('full detail');
   });
 
-  it('includes custom instruction when provided', () => {
-    const result = buildModifierBlock({ emphasis: [], customInstruction: 'Focus on gait.' });
-    expect(result).toContain('# Additional instruction');
-    expect(result).toContain('Focus on gait.');
+  it('includes Language section for plain_language', () => {
+    const result = buildModifierBlock({ ...emptyModifiers, language: 'plain_language' });
+    expect(result).toContain('# Language');
+    expect(result).toContain('7th-grade');
   });
 
-  it('omits custom instruction when blank', () => {
-    const result = buildModifierBlock({ emphasis: [], customInstruction: '   ' });
-    expect(result).not.toContain('# Additional instruction');
-  });
-
-  it('combines tone + emphasis + custom in one block', () => {
+  it('includes Clinical detail section with active items', () => {
     const result = buildModifierBlock({
-      tone: 'terse',
-      emphasis: ['functional_outcomes'],
-      customInstruction: 'Mention home exercise compliance.',
+      ...emptyModifiers,
+      clinicalDetail: ['pertinent_negatives', 'include_ros'],
     });
-    expect(result).toContain('# Tone & style');
-    expect(result).toContain('# Emphasis');
-    expect(result).toContain('# Additional instruction');
+    expect(result).toContain('# Clinical detail');
+    expect(result).toContain('pertinent negatives');
+    expect(result).toContain('Review of Systems');
+  });
+
+  it('includes Coding & billing section', () => {
+    const result = buildModifierBlock({ ...emptyModifiers, codingBilling: ['icd10_suggestions'] });
+    expect(result).toContain('# Coding & billing');
+    expect(result).toContain('ICD-10');
+  });
+
+  it('includes Beyond the note section', () => {
+    const result = buildModifierBlock({
+      ...emptyModifiers,
+      beyondNote: ['patient_education', 'suggested_orders'],
+    });
+    expect(result).toContain('# Beyond the note');
+    expect(result).toContain('patient education');
+    expect(result).toContain('suggested orders');
+  });
+
+  it('includes active custom instructions', () => {
+    const result = buildModifierBlock({
+      ...emptyModifiers,
+      customInstructions: [
+        { id: '1', text: 'Focus on gait.', active: true },
+        { id: '2', text: 'Ignored rule.', active: false },
+      ],
+    });
+    expect(result).toContain('# Custom instructions');
+    expect(result).toContain('Focus on gait.');
+    expect(result).not.toContain('Ignored rule.');
+  });
+
+  it('omits custom instructions when all inactive', () => {
+    const result = buildModifierBlock({
+      ...emptyModifiers,
+      customInstructions: [{ id: '1', text: 'Skip me.', active: false }],
+    });
+    expect(result).not.toContain('# Custom instructions');
+  });
+
+  it('omits custom instruction when text is blank', () => {
+    const result = buildModifierBlock({
+      ...emptyModifiers,
+      customInstructions: [{ id: '1', text: '   ', active: true }],
+    });
+    expect(result).not.toContain('# Custom instructions');
+  });
+
+  it('combines multiple sections in one block', () => {
+    const result = buildModifierBlock({
+      voice: '2nd_person',
+      length: 'concise',
+      language: 'medical_terminology',
+      clinicalDetail: ['differential_diagnosis'],
+      codingBilling: ['em_level'],
+      beyondNote: ['transcript_timestamps'],
+      customInstructions: [{ id: '1', text: 'Always note A1c.', active: true }],
+    });
+    expect(result).toContain('# Voice');
+    expect(result).toContain('# Length');
+    expect(result).toContain('# Language');
+    expect(result).toContain('# Clinical detail');
+    expect(result).toContain('# Coding & billing');
+    expect(result).toContain('# Beyond the note');
+    expect(result).toContain('# Custom instructions');
   });
 });
 
