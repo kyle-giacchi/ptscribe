@@ -1,4 +1,5 @@
 import type { TranscribeResult } from '../transcribe';
+import { clearModelCache } from '@/lib/audio/modelCache';
 
 export const LOCAL_WHISPER_DEFAULT_MODEL = 'Xenova/whisper-tiny.en';
 
@@ -45,10 +46,12 @@ function wireWorker(w: Worker): Worker {
     if (!entry) return;
     if (msg.type === 'progress') {
       entry.onRawProgress?.(msg.status, msg.loaded, msg.total);
-      if (msg.status === 'downloading' && msg.loaded != null && msg.total != null) {
+      // transformers.js emits 'progress' (with loaded/total) while a file streams
+      // in, and 'initiate'/'download' as it queues up — never 'downloading'/'loading'.
+      if (msg.status === 'progress' && msg.loaded != null && msg.total != null) {
         const pct = Math.round((msg.loaded / msg.total) * 100);
         entry.onProgress?.(`Downloading model (${pct}%)`);
-      } else if (msg.status === 'loading') {
+      } else if (msg.status === 'initiate' || msg.status === 'download') {
         entry.onProgress?.('Loading model…');
       }
     } else if (msg.type === 'result') {
@@ -86,6 +89,25 @@ function getWorker(): Worker {
   if (_worker) return _worker;
   _worker = createWorker();
   return _worker;
+}
+
+/**
+ * Terminate every worker (singleton + pool) and reject any in-flight requests.
+ * Used only by the self-heal path — a worker that loaded a corrupt model holds
+ * the broken pipeline in memory, so the next attempt must start from a fresh
+ * worker after the cache is cleared. NOT part of any reset path; the model cache
+ * itself is app-global and must survive resets (see ADR-0002).
+ */
+function teardownWorkers(): void {
+  for (const [id, entry] of _pending) {
+    clearTimeout(entry.timer);
+    entry.reject(new Error('Whisper worker torn down'));
+    _pending.delete(id);
+  }
+  for (const w of _pool) w.terminate();
+  _pool.length = 0;
+  _worker?.terminate();
+  _worker = null;
 }
 
 // ── WhisperLoader ─────────────────────────────────────────────────────────────
@@ -156,6 +178,20 @@ class WhisperLoader {
   }
 
   /**
+   * Hard reset for the Settings "Clear & re-download model" control: tear down
+   * the workers and force the loader back to idle even from a 'ready' state, so
+   * the next ensureReady() re-downloads. Caller is responsible for clearing the
+   * model cache first. No-op while a load is in flight.
+   */
+  forceReset(): void {
+    if (this._status === 'loading') return;
+    teardownWorkers();
+    this._status = 'idle';
+    this._promise = null;
+    this._lastProgress = null;
+  }
+
+  /**
    * Returns a Promise that resolves when the Whisper pipeline is ready.
    * Idempotent — multiple callers get the same in-flight promise.
    * On first failure the loader auto-retries once; only rejects after both
@@ -180,7 +216,14 @@ class WhisperLoader {
       if (attempt < this._maxAttempts) {
         return this._loadWithRetry(attempt + 1);
       }
+      // Both auto-attempts failed — treat as a corrupt cache rather than a
+      // transient blip. Tear down the worker holding the broken pipeline and
+      // evict the cache so the next manual retry re-downloads clean. Clearing an
+      // empty cache (a first-download network failure) is a harmless no-op, so
+      // this stays well-targeted to genuine corruption. See ADR-0002.
       this._status = 'exhausted';
+      teardownWorkers();
+      await clearModelCache();
       throw err;
     }
   }
@@ -193,14 +236,17 @@ class WhisperLoader {
         resolve: () => resolve(),
         reject,
         onRawProgress: (status, loaded, total) => {
-          if (status === 'downloading' && loaded != null && total != null) {
+          // transformers.js statuses: 'initiate' → 'download' → 'progress'
+          // (carries loaded/total) → 'done'. The big .onnx weights dominate, so
+          // the latest file's loaded/total drives the bar.
+          if (status === 'progress' && loaded != null && total != null) {
             this._emit({
               phase: 'downloading',
               pct: Math.round((loaded / total) * 100),
               loadedBytes: loaded,
               totalBytes: total,
             });
-          } else if (status === 'loading') {
+          } else if (status === 'initiate' || status === 'download') {
             this._emit({ phase: 'loading' });
           }
         },
@@ -211,6 +257,22 @@ class WhisperLoader {
 }
 
 export const whisperLoader = new WhisperLoader(LOCAL_WHISPER_DEFAULT_MODEL, 2);
+
+/**
+ * Clear & re-download the Whisper model (Settings control). Tears down workers,
+ * evicts the IDB cache, resets the loader, then kicks off a fresh download.
+ * No-op (rejects) while a load is in flight — the caller (Settings) gates this
+ * behind a "no active recording/transcription" guard. Resolves when the fresh
+ * model is ready, or rejects if the re-download fails.
+ */
+export async function clearWhisperModelCache(): Promise<void> {
+  if (whisperLoader.status === 'loading') {
+    throw new Error('Model is currently loading — try again in a moment.');
+  }
+  whisperLoader.forceReset();
+  await clearModelCache();
+  return whisperLoader.ensureReady();
+}
 
 // ── Audio utilities ───────────────────────────────────────────────────────────
 

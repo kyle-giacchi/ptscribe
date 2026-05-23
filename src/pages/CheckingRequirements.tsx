@@ -47,17 +47,57 @@ function fmtMb(bytes: number): string {
   return `${Math.round(bytes / MB)} MB`;
 }
 
-function browserLabel(): string {
-  const uaData = (navigator as { userAgentData?: { brands?: { brand: string; version: string }[] } })
-    .userAgentData;
-  const brand = uaData?.brands?.find((b) => !/not.?a.?brand/i.test(b.brand));
-  if (brand) return `${brand.brand} ${brand.version}`;
-  const m = navigator.userAgent.match(/(Edg|OPR|Chrome|Firefox|Safari)\/(\d+)/);
-  if (m) {
-    const name = m[1] === 'Edg' ? 'Edge' : m[1] === 'OPR' ? 'Opera' : m[1];
-    return `${name} ${m[2]}`;
+// Rendering engines the local Whisper + MediaRecorder pipeline is tested against.
+// Anything outside this set still runs if it passes feature detection, but the
+// gate flags it as untested (warn) rather than green (pass).
+type BrowserFamily = 'chromium' | 'firefox' | 'webkit' | 'unknown';
+const TESTED_FAMILIES: ReadonlySet<BrowserFamily> = new Set(['chromium']);
+
+interface BrowserInfo {
+  name: string;
+  version: string;
+  family: BrowserFamily;
+}
+
+/**
+ * Identify the browser name, major version, and engine family.
+ *
+ * Detection is order-sensitive: Edge, Opera, and Brave all carry a `Chrome/`
+ * token in their UA, so the more specific signals must be tested first.
+ * `String.match` returns the *leftmost* hit, not the first alternation branch,
+ * so a single alternation regex would mislabel Edge/Opera as Chrome.
+ */
+async function detectBrowser(): Promise<BrowserInfo> {
+  const ua = navigator.userAgent;
+
+  // Brave deliberately reports Chromium brands and no Brave token — the only
+  // reliable signal is this async probe.
+  const braveApi = (navigator as { brave?: { isBrave?: () => Promise<boolean> } }).brave;
+  let isBrave = false;
+  try {
+    isBrave = (await braveApi?.isBrave?.()) ?? false;
+  } catch {
+    // Probe threw — treat as non-Brave (isBrave stays false).
   }
-  return 'Browser';
+  if (isBrave) {
+    return { name: 'Brave', version: ua.match(/Chrome\/(\d+)/)?.[1] ?? '', family: 'chromium' };
+  }
+
+  let m: RegExpMatchArray | null;
+  if ((m = ua.match(/Edg\/(\d+)/))) return { name: 'Edge', version: m[1], family: 'chromium' };
+  if ((m = ua.match(/OPR\/(\d+)/))) return { name: 'Opera', version: m[1], family: 'chromium' };
+  if ((m = ua.match(/Firefox\/(\d+)/))) return { name: 'Firefox', version: m[1], family: 'firefox' };
+  if ((m = ua.match(/Chrome\/(\d+)/))) return { name: 'Chrome', version: m[1], family: 'chromium' };
+  // Safari keeps its real version in `Version/x`; the `Safari/` token is the
+  // WebKit build number (e.g. 605), not the Safari release.
+  if (/Safari\//.test(ua)) {
+    return { name: 'Safari', version: ua.match(/Version\/(\d+)/)?.[1] ?? '', family: 'webkit' };
+  }
+  return { name: 'Browser', version: '', family: 'unknown' };
+}
+
+function browserLabel(info: BrowserInfo): string {
+  return info.version ? `${info.name} ${info.version}` : info.name;
 }
 
 // ── Status pip ──────────────────────────────────────────────────────────────────
@@ -310,7 +350,7 @@ export function CheckingRequirements() {
   // Kick off every check on mount. The model download starts immediately here
   // even though it reads as a later step in the list.
   useEffect(() => {
-    runBrowserCheck(update);
+    void runBrowserCheck(update);
     void runStorageCheck(update);
     void runMicCheck();
     runWhisperCheck();
@@ -440,28 +480,47 @@ export function CheckingRequirements() {
 
 type UpdateFn = (id: CheckId, patch: Partial<CheckResult>) => void;
 
-function runBrowserCheck(update: UpdateFn) {
+async function runBrowserCheck(update: UpdateFn) {
   update('browser', { status: 'active', detail: 'Detecting capabilities…' });
-  const hasAudio =
-    typeof AudioContext !== 'undefined' ||
-    typeof (window as { webkitAudioContext?: unknown }).webkitAudioContext !== 'undefined';
-  const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
-  const hasStorageMgr =
-    typeof navigator.storage !== 'undefined' && typeof navigator.storage.estimate === 'function';
-  const hasWasm = typeof WebAssembly !== 'undefined' && typeof WebAssembly.compile === 'function';
 
-  if (hasAudio && hasMediaRecorder && hasStorageMgr && hasWasm) {
-    update('browser', { status: 'pass', detail: `${browserLabel()} · all APIs supported` });
-  } else {
+  // Required capabilities — a missing one hard-blocks recording.
+  const missing: string[] = [];
+  if (
+    typeof AudioContext === 'undefined' &&
+    typeof (window as { webkitAudioContext?: unknown }).webkitAudioContext === 'undefined'
+  )
+    missing.push('audio capture');
+  if (typeof MediaRecorder === 'undefined') missing.push('audio recording');
+  if (typeof navigator.storage === 'undefined' || typeof navigator.storage.estimate !== 'function')
+    missing.push('storage estimation');
+  if (typeof WebAssembly === 'undefined' || typeof WebAssembly.compile !== 'function')
+    missing.push('on-device transcription (WebAssembly)');
+
+  const info = await detectBrowser();
+  const label = browserLabel(info);
+
+  if (missing.length > 0) {
     update('browser', {
       status: 'fail',
-      detail: 'Unsupported browser — use Chrome, Edge or Brave',
+      detail: `${label} is missing ${missing.join(', ')} — use Chrome, Edge or Brave`,
       fix: {
         label: 'Copy this page’s URL',
         onClick: () => void navigator.clipboard?.writeText(window.location.href),
       },
     });
+    return;
   }
+
+  // Capabilities present but engine outside the tested set: allow, but flag.
+  if (!TESTED_FAMILIES.has(info.family)) {
+    update('browser', {
+      status: 'warn',
+      detail: `${label} · all APIs present, but untested — Chrome, Edge or Brave recommended`,
+    });
+    return;
+  }
+
+  update('browser', { status: 'pass', detail: `${label} · all APIs supported` });
 }
 
 async function runStorageCheck(update: UpdateFn) {
