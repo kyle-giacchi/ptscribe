@@ -4,12 +4,14 @@ import { useClinician } from '@/contexts/ClinicianProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { isDemoMode, DEMO_PATIENT_ID, DEMO_SESSION_ID } from '@/lib/demoMode';
 import type { Patient, Session } from '@/types';
 
 const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;
+const SETUP_CHECK_PATH = '/setup-check';
 
 type PromptState = 'checking' | 'show' | 'done';
 
@@ -20,7 +22,9 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
   const { sessions, addSession, removeSession } = useSessions();
   const { forSession, removeNote } = useNotes();
   const { templates } = useTemplates();
+  const { settings } = useSettings();
   const navigate = useNavigate();
+  const setupCheckDone = Boolean(settings.firstRun.setupCheckDoneAt);
   const { pathname } = useLocation();
 
   const [promptState, setPromptState] = useState<PromptState>('checking');
@@ -79,6 +83,11 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
           };
           addSession(next);
         }
+        // First-ever demo entry runs the "Checking your setup" pre-flight gate
+        // before dropping the user into the session. Subsequent visits skip it.
+        if (!setupCheckDone) {
+          navigate(SETUP_CHECK_PATH, { replace: true });
+        }
         setPromptState('done');
       }
       return;
@@ -87,9 +96,11 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     if (promptState === 'show') return;
 
     // promptState === 'done' — keep the demo user locked to the session page.
-    // Exception: allow /account so the profile dropdown link works. (The Debug
-    // Menu is a drawer now — it opens over any route, no navigation needed.)
-    if (pathname !== DEMO_SESSION_PATH && pathname !== '/account') {
+    // Exceptions: /account so the profile dropdown link works, and /setup-check
+    // until the first-run gate has been completed. (The Debug Menu is a drawer
+    // now — it opens over any route, no navigation needed.)
+    const onPendingSetupCheck = pathname === SETUP_CHECK_PATH && !setupCheckDone;
+    if (pathname !== DEMO_SESSION_PATH && pathname !== '/account' && !onPendingSetupCheck) {
       navigate(DEMO_SESSION_PATH, { replace: true });
     }
   }, [
@@ -99,6 +110,7 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     sessions,
     templates,
     promptState,
+    setupCheckDone,
     setClinician,
     addPatient,
     addSession,
