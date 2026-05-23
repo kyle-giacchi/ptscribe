@@ -18,6 +18,8 @@ export interface BuildPromptArgs {
   patient: Patient;
   priorNote?: Note;
   sessionType?: SessionType;
+  regenerationDraft?: Note;
+  regenerationFeedback?: string;
 }
 
 const VOICE_INSTRUCTIONS: Record<ModifierVoice, string> = {
@@ -120,6 +122,8 @@ export function buildUserPrompt({
   patient,
   priorNote,
   sessionType,
+  regenerationDraft,
+  regenerationFeedback,
 }: BuildPromptArgs): string {
   const lines: string[] = [];
 
@@ -151,6 +155,21 @@ export function buildUserPrompt({
       lines.push(`## ${section.label}`);
       lines.push(section.body || '(empty)');
     }
+  }
+
+  if (regenerationDraft) {
+    lines.push('');
+    lines.push('# Previously generated note');
+    for (const section of regenerationDraft.sections) {
+      lines.push(`## ${section.label}`);
+      lines.push(section.body || '(empty)');
+    }
+  }
+
+  if (regenerationFeedback?.trim()) {
+    lines.push('');
+    lines.push('# What to improve');
+    lines.push(regenerationFeedback.trim());
   }
 
   lines.push('');

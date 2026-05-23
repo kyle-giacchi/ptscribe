@@ -72,6 +72,8 @@ export interface GenerateNoteArgs {
   sessionType?: SessionType;
   modifiers?: SessionModifiers;
   activeTranscriptTier?: TranscriptTier;
+  regenerationDraft?: Note;
+  regenerationFeedback?: string;
   signal?: AbortSignal;
   onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
@@ -93,6 +95,8 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       patient: args.patient,
       priorNote: args.priorNote,
       sessionType: args.sessionType,
+      regenerationDraft: args.regenerationDraft,
+      regenerationFeedback: args.regenerationFeedback,
     });
 
     // Only the cloud path (Nova-3 / T3) produces a diarized transcript with

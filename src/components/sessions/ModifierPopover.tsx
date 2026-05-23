@@ -335,7 +335,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
           justifyContent: 'space-between',
           padding: '10px 14px',
           borderBottom: '1px solid var(--color-pt-border)',
-          background: 'var(--color-pt-bg, var(--color-pt-surface))',
+          background: 'var(--color-pt-surface)',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -560,7 +560,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
           justifyContent: 'space-between',
           padding: '10px 14px',
           borderTop: '1px solid var(--color-pt-border)',
-          background: 'var(--color-pt-bg, var(--color-pt-surface))',
+          background: 'var(--color-pt-surface)',
         }}
       >
         <button
