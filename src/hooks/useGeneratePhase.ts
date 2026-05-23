@@ -173,12 +173,25 @@ export function useGeneratePhase({
           });
         }
         recordAction('generate');
-        dispatch({ type: 'generate/success', rawText: result.rawText, prompts: result.debugPrompts });
+        dispatch({
+          type: 'generate/success',
+          rawText: result.rawText,
+          prompts: result.debugPrompts,
+          keyReport: result.keyReport,
+        });
         patchSession({ status: 'ready' });
 
         const hasContent = result.sections.some((s) => s.body.trim().length > 0);
+        const { matched, returned } = result.keyReport;
         if (hasContent) {
           toast.success('Draft note generated');
+        } else if (returned.length > 0 && matched.length === 0) {
+          // The model replied with a JSON object, but none of its keys match
+          // the template's section keys — so every section fell back to "".
+          // This is a template/response mismatch, not an empty transcript.
+          toast.error(
+            `Note couldn't be filled: the AI returned sections (${returned.join(', ')}) that don't match this template (${result.keyReport.expected.join(', ')}). See Debug → Section mapping.`,
+          );
         } else {
           toast.warning(
             'Note generated, but all sections are empty — try using a more detailed transcript.',

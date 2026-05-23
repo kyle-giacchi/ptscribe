@@ -1,5 +1,6 @@
 import type {
   AiDebugPrompts,
+  GenerateKeyReport,
   GenerationProvider,
   NoteSection,
   NoteTemplate,
@@ -39,6 +40,7 @@ export interface GenerateNoteResult {
   sections: NoteSection[];
   rawText: string;
   debugPrompts: AiDebugPrompts;
+  keyReport: GenerateKeyReport;
 }
 
 type GenerateBackend = (args: GenerateNoteArgs) => Promise<GenerateNoteResult>;
@@ -60,9 +62,10 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
       : args.template.systemPrompt.trimEnd() + NO_DIARIZATION_NOTE;
 
     const modifierBlock = args.modifiers ? buildModifierBlock(args.modifiers) : '';
+    const model = args.model || 'claude-sonnet-4-6';
 
     const result = await callAnthropic({
-      model: args.model || 'claude-sonnet-4-6',
+      model,
       system,
       modifierBlock,
       user: userPrompt,
@@ -79,7 +82,8 @@ const generateBackends: Record<GenerationProvider, GenerateBackend> = {
     return {
       sections,
       rawText: result.text,
-      debugPrompts: { system, modifierBlock, user: userPrompt },
+      debugPrompts: { model, system, modifierBlock, user: userPrompt },
+      keyReport: buildKeyReport(args.template, parsed),
     };
   },
   none: () => {
@@ -98,6 +102,32 @@ export async function generateNote(args: GenerateNoteArgs): Promise<GenerateNote
     throw new Error(`Unknown generation provider: ${args.provider}`);
   }
   return backend(args);
+}
+
+/**
+ * Compare the keys the model returned against the keys the template expects.
+ * Drives the precise "blank note" diagnostics (key mismatch vs. empty result)
+ * in both the generate toast and the debug drawer.
+ */
+export function buildKeyReport(
+  template: NoteTemplate,
+  parsed: Record<string, unknown>,
+): GenerateKeyReport {
+  const expected = template.sections.map((s) => s.key);
+  const returned = Object.keys(parsed);
+  const expectedSet = new Set(expected);
+  const returnedSet = new Set(returned);
+  const matched = expected.filter((k) => returnedSet.has(k));
+  return {
+    expected,
+    returned,
+    matched,
+    missing: expected.filter((k) => !returnedSet.has(k)),
+    unexpected: returned.filter((k) => !expectedSet.has(k)),
+    emptyMatched: matched.filter(
+      (k) => typeof parsed[k] !== 'string' || (parsed[k] as string).trim() === '',
+    ),
+  };
 }
 
 /**
