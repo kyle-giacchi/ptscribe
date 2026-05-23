@@ -8,6 +8,7 @@ import { useDismissable } from '@/hooks/useDismissable';
 import { AudioFileInput, type AudioFileInputHandle } from '@/components/common/AudioFileInput';
 import type { T2Phase } from '@/hooks/useBackgroundTranscription';
 import type { SessionClip } from '@/types';
+import { formatDuration } from '@/utils/format';
 
 interface ClipsDrawerProps {
   open: boolean;
@@ -19,13 +20,6 @@ interface ClipsDrawerProps {
   onUpload: (file: File) => void;
   t2Phase: T2Phase;
   t2Label: string;
-}
-
-function formatDuration(sec: number): string {
-  const s = Math.max(0, Math.floor(sec));
-  const mm = Math.floor(s / 60).toString().padStart(2, '0');
-  const ss = (s % 60).toString().padStart(2, '0');
-  return `${mm}:${ss}`;
 }
 
 interface InnerProps {
