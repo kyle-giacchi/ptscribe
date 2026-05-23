@@ -8,11 +8,11 @@ const tpl: NoteTemplate = {
   format: 'soap', systemPrompt: '',
 } as NoteTemplate;
 
-const emptyModifiers: SessionModifiers = { emphasis: [] };
+const emptyModifiers: SessionModifiers = { clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] };
 
 const baseProps = {
   template: tpl, templates: [tpl],
-  hasDraftContent: false, canGenerate: true, canRegenerate: true,
+  hasDraftContent: false, canGenerate: true, requiresFeedback: false,
   noteExists: false, isGenerating: false,
   modifiers: emptyModifiers,
   onTemplateChange: () => {}, onManageTemplates: () => {},
@@ -29,9 +29,9 @@ describe('NoteToolbar', () => {
   it('shows active count badge when modifiers are set', () => {
     render(<NoteToolbar
       {...baseProps}
-      modifiers={{ tone: 'terse', emphasis: ['more_detail'] }}
+      modifiers={{ voice: '1st_person', clinicalDetail: ['pertinent_negatives'], codingBilling: [], beyondNote: [], customInstructions: [] }}
     />);
-    expect(screen.getByText(/Modifier · 2/)).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('Generate fires onGenerate when no draft content', () => {
@@ -80,14 +80,47 @@ describe('NoteToolbar', () => {
     expect(onGenerate).toHaveBeenCalledWith('append');
   });
 
-  it('Regenerate button is disabled when canRegenerate is false', () => {
+  it('Regenerate opens feedback modal when requiresFeedback is true', () => {
+    const onGenerate = vi.fn();
     render(<NoteToolbar
       {...baseProps}
-      hasDraftContent canGenerate noteExists={true} canRegenerate={false}
+      hasDraftContent canGenerate noteExists={true} requiresFeedback={true}
+      onGenerate={onGenerate}
     />);
-    const btn = screen.getByText(/Regenerate/).closest('button')!;
-    expect(btn).toBeDisabled();
-    expect(btn).toHaveAttribute('title', 'No changes to transcript or modifiers since last generation');
+    fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
+    expect(screen.getByText("What would you like improved?")).toBeInTheDocument();
+    expect(onGenerate).not.toHaveBeenCalled();
+  });
+
+  it('feedback modal Regenerate button stays disabled until text is entered', () => {
+    render(<NoteToolbar
+      {...baseProps}
+      hasDraftContent canGenerate noteExists={true} requiresFeedback={true}
+    />);
+    fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
+    const regenBtn = screen.getAllByRole('button', { name: /Regenerate/ }).find(
+      (b) => b.closest('[role="dialog"]'),
+    )!;
+    expect(regenBtn).toBeDisabled();
+  });
+
+  it('feedback modal fires onGenerate with replace mode and feedback text', () => {
+    const onGenerate = vi.fn();
+    render(<NoteToolbar
+      {...baseProps}
+      hasDraftContent canGenerate noteExists={true} requiresFeedback={true}
+      onGenerate={onGenerate}
+    />);
+    fireEvent.click(screen.getByText(/Regenerate/).closest('button')!);
+    fireEvent.change(screen.getByPlaceholderText(/assessment was too vague/i), {
+      target: { value: 'Expand functional limitations' },
+    });
+    const regenBtn = screen.getAllByRole('button', { name: /Regenerate/ }).find(
+      (b) => b.closest('[role="dialog"]'),
+    )!;
+    fireEvent.click(regenBtn);
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+    expect(onGenerate).toHaveBeenCalledWith('replace', 'Expand functional limitations');
   });
 
   it('Copy note calls onCopyNote when noteExists', () => {

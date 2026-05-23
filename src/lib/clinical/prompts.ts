@@ -1,4 +1,16 @@
-import type { NoteTemplate, Patient, Note, SessionType, SessionModifiers } from '@/types';
+import type {
+  NoteTemplate,
+  Patient,
+  Note,
+  SessionType,
+  SessionModifiers,
+  ModifierVoice,
+  ModifierLength,
+  ModifierLanguage,
+  ModifierClinicalDetail,
+  ModifierCodingBilling,
+  ModifierBeyondNote,
+} from '@/types';
 
 export interface BuildPromptArgs {
   template: NoteTemplate;
@@ -6,36 +18,95 @@ export interface BuildPromptArgs {
   patient: Patient;
   priorNote?: Note;
   sessionType?: SessionType;
+  regenerationDraft?: Note;
+  regenerationFeedback?: string;
 }
 
-const TONE_INSTRUCTIONS: Record<NonNullable<SessionModifiers['tone']>, string> = {
-  narrative: 'Write in flowing professional prose. Full sentences. Clinical but readable.',
-  terse:
-    'Write in bullet-point shorthand. Phrases over sentences. Skip articles where ambiguity is low. Prefer abbreviations a PT will recognize (PROM, AROM, MMT, WBAT, NWB, etc.).',
-  clinical:
-    'Write in formal clinical documentation style. Third-person passive where natural. Use precise anatomical and biomechanical terminology. Cite specific measurements when transcript supplies them.',
+const VOICE_INSTRUCTIONS: Record<ModifierVoice, string> = {
+  '1st_person':
+    'Write the note in first-person voice ("I assessed…", "I observed…", "I instructed the patient to…").',
+  '2nd_person':
+    'Write the note in second-person voice directed at the patient ("You reported…", "Your assessment showed…", "You demonstrated…").',
+  '3rd_person':
+    'Write the note in third-person voice ("Patient reports…", "The patient demonstrated…"). This is the standard clinical documentation style.',
 };
 
-const EMPHASIS_INSTRUCTIONS: Record<NonNullable<SessionModifiers['emphasis'][number]>, string> = {
-  more_detail: 'Include more clinical detail and specificity throughout.',
-  functional_outcomes: 'Emphasize functional outcomes and their impact on the patient\'s daily activities.',
-  patient_progress: 'Highlight patient progress, improvements, and response to treatment.',
+const LENGTH_INSTRUCTIONS: Record<ModifierLength, string> = {
+  concise:
+    'Write in tight clinical prose. Prefer phrases over full sentences where unambiguous. Omit preamble and filler.',
+  balanced:
+    'Write at standard clinical note length. Full sentences where clarity requires it; otherwise concise.',
+  detailed:
+    'Write in full detail. HPI in complete narrative sentences. Document exam findings system by system. Do not abbreviate observations.',
+};
+
+const LANGUAGE_INSTRUCTIONS: Record<ModifierLanguage, string> = {
+  medical_terminology:
+    'Use precise medical and anatomical terminology throughout. Use ICD-10-friendly phrasing.',
+  plain_language:
+    'Write at approximately a 7th-grade reading level. Spell out abbreviations. Avoid jargon.',
+  spanish_output:
+    'Write the Plan section and any patient-facing summary in Spanish. Keep all other clinical documentation sections in English.',
+};
+
+const CLINICAL_DETAIL_INSTRUCTIONS: Record<ModifierClinicalDetail, string> = {
+  pertinent_negatives: 'Include pertinent negatives ("Denies…") for each system reviewed.',
+  include_ros: 'Include a Review of Systems (ROS) section in the note.',
+  quote_verbatim: 'Preserve key patient phrases verbatim in the HPI, in quotation marks.',
+  differential_diagnosis: 'Append a differential diagnosis list for any new or unresolved problems.',
+  risk_scores:
+    'Calculate and include relevant risk scores (e.g., ASCVD, CHA₂DS₂-VASc) when the transcript supplies sufficient data.',
+};
+
+const CODING_BILLING_INSTRUCTIONS: Record<ModifierCodingBilling, string> = {
+  icd10_suggestions: 'Include inline ICD-10 code hints in the Assessment section.',
+  em_level:
+    'Recommend an E/M level (e.g., 99213 or 99214) based on complexity, with a brief rationale.',
+  hcc_flags: 'Flag chronic conditions relevant for HCC risk adjustment.',
+};
+
+const BEYOND_NOTE_INSTRUCTIONS: Record<ModifierBeyondNote, string> = {
+  suggested_orders:
+    'Append a suggested orders section (labs, imaging, referrals) based on the Plan.',
+  med_rec_check:
+    'Flag potential drug interactions, dosing concerns, or medication gaps based on the transcript.',
+  patient_education: 'Append a patient education paragraph in plain language after the Plan.',
+  transcript_timestamps:
+    'Include inline [mm:ss] timestamp references from the transcript where relevant.',
 };
 
 export function buildModifierBlock(modifiers: SessionModifiers): string {
   const lines: string[] = [];
 
-  if (modifiers.tone) {
-    lines.push(`# Tone & style\n${TONE_INSTRUCTIONS[modifiers.tone]}`);
+  if (modifiers.voice) {
+    lines.push(`# Voice\n${VOICE_INSTRUCTIONS[modifiers.voice]}`);
+  }
+  if (modifiers.length) {
+    lines.push(`# Length\n${LENGTH_INSTRUCTIONS[modifiers.length]}`);
+  }
+  if (modifiers.language) {
+    lines.push(`# Language\n${LANGUAGE_INSTRUCTIONS[modifiers.language]}`);
   }
 
-  if (modifiers.emphasis.length > 0) {
-    const emphasisLines = modifiers.emphasis.map((e) => `- ${EMPHASIS_INSTRUCTIONS[e]}`);
-    lines.push(`# Emphasis\n${emphasisLines.join('\n')}`);
+  if (modifiers.clinicalDetail.length > 0) {
+    const items = modifiers.clinicalDetail.map((d) => `- ${CLINICAL_DETAIL_INSTRUCTIONS[d]}`);
+    lines.push(`# Clinical detail\n${items.join('\n')}`);
   }
 
-  if (modifiers.customInstruction?.trim()) {
-    lines.push(`# Additional instruction\n${modifiers.customInstruction.trim()}`);
+  if (modifiers.codingBilling.length > 0) {
+    const items = modifiers.codingBilling.map((d) => `- ${CODING_BILLING_INSTRUCTIONS[d]}`);
+    lines.push(`# Coding & billing\n${items.join('\n')}`);
+  }
+
+  if (modifiers.beyondNote.length > 0) {
+    const items = modifiers.beyondNote.map((d) => `- ${BEYOND_NOTE_INSTRUCTIONS[d]}`);
+    lines.push(`# Beyond the note\n${items.join('\n')}`);
+  }
+
+  const activeCustom = modifiers.customInstructions.filter((c) => c.active && c.text.trim());
+  if (activeCustom.length > 0) {
+    const items = activeCustom.map((c) => `- ${c.text.trim()}`);
+    lines.push(`# Custom instructions\n${items.join('\n')}`);
   }
 
   return lines.join('\n\n');
@@ -51,6 +122,8 @@ export function buildUserPrompt({
   patient,
   priorNote,
   sessionType,
+  regenerationDraft,
+  regenerationFeedback,
 }: BuildPromptArgs): string {
   const lines: string[] = [];
 
@@ -82,6 +155,21 @@ export function buildUserPrompt({
       lines.push(`## ${section.label}`);
       lines.push(section.body || '(empty)');
     }
+  }
+
+  if (regenerationDraft) {
+    lines.push('');
+    lines.push('# Previously generated note');
+    for (const section of regenerationDraft.sections) {
+      lines.push(`## ${section.label}`);
+      lines.push(section.body || '(empty)');
+    }
+  }
+
+  if (regenerationFeedback?.trim()) {
+    lines.push('');
+    lines.push('# What to improve');
+    lines.push(regenerationFeedback.trim());
   }
 
   lines.push('');
