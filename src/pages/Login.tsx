@@ -25,7 +25,8 @@ export function Login() {
 
   const from = (location.state as { from?: Location })?.from?.pathname ?? '/';
 
-  useEffect(() => { void whisperLoader.ensureReady(); }, []);
+  // Best-effort model warm-up — swallow rejections so it never leaks an unhandled rejection.
+  useEffect(() => { void whisperLoader.ensureReady().catch(() => {}); }, []);
 
   async function handlePasskey() {
     setError(null);

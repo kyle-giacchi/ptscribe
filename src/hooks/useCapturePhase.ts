@@ -114,9 +114,12 @@ export function useCapturePhase({
     return () => window.clearTimeout(t);
   }, [uploadStatus.phase, dispatch]);
 
-  // Warm up the Whisper worker + model as soon as the session mounts.
+  // Warm up the Whisper worker + model as soon as the session mounts. This is a
+  // best-effort preload — swallow rejections (e.g. WhisperExhaustedError) so a
+  // failed warm-up never surfaces as an unhandled rejection. The record/transcribe
+  // flow surfaces model unavailability through its own UI (WhisperUnavailableDialog).
   useEffect(() => {
-    void whisperLoader.ensureReady();
+    void whisperLoader.ensureReady().catch(() => {});
   }, []);
 
   // Re-arm the dismiss flag every time a new recording starts.
