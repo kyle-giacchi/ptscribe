@@ -454,9 +454,32 @@ export type PageKey =
 // ─── AI debug ───────────────────────────────────────────────────────────────
 
 export interface AiDebugPrompts {
+  /** Model id sent to the Worker (resolved, after the default fallback). */
+  model: string;
   system: string;
   modifierBlock: string;
   user: string;
+}
+
+/**
+ * Diagnostic comparison of the JSON keys the model returned against the keys
+ * the active template expects. Lets us explain a blank note precisely:
+ * `matched: []` with a non-empty `returned` means a key mismatch, not an
+ * empty-transcript result.
+ */
+export interface GenerateKeyReport {
+  /** Section keys the template expects (`template.sections[*].key`). */
+  expected: string[];
+  /** Top-level keys present in the model's parsed JSON. */
+  returned: string[];
+  /** Expected keys the model actually returned. */
+  matched: string[];
+  /** Expected keys the model omitted. */
+  missing: string[];
+  /** Keys the model returned that the template does not use. */
+  unexpected: string[];
+  /** Matched keys whose value was blank or not a string. */
+  emptyMatched: string[];
 }
 
 // ─── AppData root ───────────────────────────────────────────────────────────

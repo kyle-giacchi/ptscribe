@@ -1,5 +1,5 @@
 import type { AiCallError } from '@/services/ai/errors';
-import type { AiDebugPrompts } from '@/types';
+import type { AiDebugPrompts, GenerateKeyReport } from '@/types';
 
 // ── Shared ────────────────────────────────────────────────────────────────
 
@@ -17,6 +17,7 @@ export interface GenerateState {
   phase: GeneratePhase;
   lastRawPayload: string | null;
   lastAiPrompts: AiDebugPrompts | null;
+  lastKeyReport: GenerateKeyReport | null;
   aiError: AiCallError | null;
   retryStatus: RetryStatus | null;
 }
@@ -74,7 +75,12 @@ export type SessionMachineAction =
   // generate
   | { type: 'generate/start' }
   | { type: 'generate/retry'; status: RetryStatus }
-  | { type: 'generate/success'; rawText: string; prompts: AiDebugPrompts }
+  | {
+      type: 'generate/success';
+      rawText: string;
+      prompts: AiDebugPrompts;
+      keyReport: GenerateKeyReport;
+    }
   | { type: 'generate/error'; aiError: AiCallError | null }
   | { type: 'generate/clearAiError' }
   // transcribe (T3 cloud Nova)
@@ -97,6 +103,7 @@ export const initialSessionMachineState: SessionMachineState = {
     phase: 'idle',
     lastRawPayload: null,
     lastAiPrompts: null,
+    lastKeyReport: null,
     aiError: null,
     retryStatus: null,
   },

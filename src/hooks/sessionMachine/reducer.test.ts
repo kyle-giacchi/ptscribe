@@ -95,7 +95,15 @@ describe('sessionMachineReducer — generate slice', () => {
       const next = sessionMachineReducer(dirty, {
         type: 'generate/success',
         rawText: '{"a":1}',
-        prompts: { system: 'sys', modifierBlock: '', user: 'usr' },
+        prompts: { model: 'claude-sonnet-4-6', system: 'sys', modifierBlock: '', user: 'usr' },
+        keyReport: {
+          expected: ['subjective'],
+          returned: ['subjective'],
+          matched: ['subjective'],
+          missing: [],
+          unexpected: [],
+          emptyMatched: [],
+        },
       });
       expect(next.generate.phase).toBe('idle');
       expect(next.generate.lastRawPayload).toBe('{"a":1}');
