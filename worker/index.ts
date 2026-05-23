@@ -61,6 +61,17 @@ const ALLOWED_GENERATE_MODELS = new Set([
 // Keep aligned with src/lib/audioLimits.ts MAX_AUDIO_BYTES
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
+// The only model repos the app ever loads in-browser via /api/model/*.
+// Whisper-tiny + bert-base-NER are seeded by scripts/seed-r2-models.ts;
+// privacy-filter by convert-privacy-filter.py. Anything else is rejected
+// before the R2 lookup or HuggingFace fallback so the Worker can't be used
+// as an open proxy to fetch arbitrary huggingface.co paths.
+const ALLOWED_MODEL_REPOS = [
+  'Xenova/whisper-tiny.en/',
+  'Xenova/bert-base-NER/',
+  'openai/privacy-filter/',
+];
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -194,6 +205,11 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
   if (!key || key.includes('..') || key.startsWith('/')) {
     return new Response('Not found', { status: 404 });
   }
+  // Restrict to known model repos — applies to both the R2 lookup and the
+  // HuggingFace fallback below, so this route can't proxy arbitrary keys.
+  if (!ALLOWED_MODEL_REPOS.some((repo) => key.startsWith(repo))) {
+    return new Response('Not found', { status: 404 });
+  }
 
   const object = await env.MODELS.get(key);
   if (object) {
@@ -244,8 +260,12 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     return apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
   }
 
+  // AI routes are always POST from browser `fetch`, which the Fetch spec
+  // requires to carry an Origin header even same-origin. A *missing* Origin
+  // therefore means a non-browser client (curl/script) — deny it here rather
+  // than skip the check, closing the server-side abuse path the gate can't.
   const origin = request.headers.get('Origin');
-  if (origin && !isOriginAllowed(origin, request.url, env)) {
+  if (!origin || !isOriginAllowed(origin, request.url, env)) {
     return apiError('FORBIDDEN', 'Origin not allowed', 403);
   }
 
@@ -511,10 +531,13 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   });
 
   if (!upstream.ok) {
-    const errBody = (await safeText(upstream)).slice(0, 200);
+    // Keep the upstream detail in operator logs only; the client gets a
+    // generic message + status so we don't leak Anthropic account/quota text.
+    const detail = (await safeText(upstream)).slice(0, 200);
+    console.error(`[generate] Anthropic upstream ${upstream.status}: ${detail || upstream.statusText}`);
     return apiError(
       'UPSTREAM_FAILED',
-      `Anthropic request failed (${upstream.status}): ${errBody || upstream.statusText}`,
+      `Note generation failed upstream (${upstream.status})`,
       upstream.status >= 500 ? 502 : upstream.status,
     );
   }
