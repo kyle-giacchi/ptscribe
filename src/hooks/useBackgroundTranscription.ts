@@ -4,6 +4,7 @@ import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, 
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
 import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
+import { appendAiError } from '@/lib/debug/aiErrorLog';
 import type { Session, TranscriptChunk } from '@/types';
 
 const LOCAL_CHUNK_SEC = 120; // 2-minute segments — each maps to a real audio timestamp
@@ -167,6 +168,13 @@ export function useBackgroundTranscription({
             'warning',
             'Automatic transcription found no usable audio. Use Improve with AI to retry with cloud.',
           );
+          patchSession({
+            aiErrors: appendAiError(sessionRef.current?.aiErrors, {
+              call: 'transcribe-local',
+              kind: 'empty',
+              detail: `Local Whisper produced no usable transcript: ${result.error}`,
+            }),
+          });
           setPhase('done');
         } else {
           setPhase('done');
@@ -176,6 +184,15 @@ export function useBackgroundTranscription({
         if (err instanceof WhisperExhaustedError) {
           setPhase('error');
           setProgressLabel('');
+          // WhisperExhaustedError == the local model failed to load (R2→HF
+          // fetch + worker init exhausted), so this is a model-fetch failure.
+          patchSession({
+            aiErrors: appendAiError(sessionRef.current?.aiErrors, {
+              call: 'model-fetch',
+              kind: 'network',
+              detail: 'Local Whisper model failed to load (R2→HuggingFace fetch exhausted).',
+            }),
+          });
           return;
         }
         const retries = retryCountRef.current + 1;
@@ -188,6 +205,13 @@ export function useBackgroundTranscription({
         } else {
           setPhase('error');
           setProgressLabel('');
+          patchSession({
+            aiErrors: appendAiError(sessionRef.current?.aiErrors, {
+              call: 'transcribe-local',
+              kind: 'parse',
+              detail: `Local Whisper failed after auto-retry: ${(err as Error).message}`,
+            }),
+          });
         }
       });
 
