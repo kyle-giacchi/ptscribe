@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
+import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -176,9 +177,14 @@ export function Landing({ onSignIn }: LandingProps) {
   }, []);
 
   function handleDemo() {
-    void whisperLoader.ensureReady();
+    void whisperLoader.ensureReady().catch(() => {});
     if (!onSignIn) {
-      navigate('/today', { state: { showCode: true } });
+      // Deep-link target after the gate unlocks. In demo mode this must be the
+      // demo session — not /today — so DemoBootstrap drops the user straight into
+      // the session (and its "Welcome back" prompt) rather than flashing the
+      // logged-in dashboard behind the prompt while its redirect is suspended.
+      const target = isDemoMode() ? `/sessions/${DEMO_SESSION_ID}` : '/today';
+      navigate(target, { state: { showCode: true } });
       return;
     }
     setShowCode(true);
@@ -188,7 +194,7 @@ export function Landing({ onSignIn }: LandingProps) {
   }
 
   function handleLogin() {
-    void whisperLoader.ensureReady();
+    void whisperLoader.ensureReady().catch(() => {});
     navigate('/login');
   }
 
