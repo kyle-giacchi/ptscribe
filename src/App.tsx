@@ -10,6 +10,8 @@ import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { NotificationsProvider } from '@/contexts/NotificationsProvider';
+import { DebugDrawerProvider } from '@/contexts/DebugDrawerProvider';
+import { GlobalDebugDrawer } from '@/components/sessions/GlobalDebugDrawer';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
@@ -37,7 +39,6 @@ const Notes = lazy(() => import('@/pages/Notes').then((m) => ({ default: m.Notes
 const Templates = lazy(() => import('@/pages/Templates').then((m) => ({ default: m.Templates })));
 const Exercises = lazy(() => import('@/pages/Exercises').then((m) => ({ default: m.Exercises })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
-const AdminPage = lazy(() => import('@/pages/Admin').then((m) => ({ default: m.AdminPage })));
 const UserSettings = lazy(() =>
   import('@/pages/UserSettings').then((m) => ({ default: m.UserSettings })),
 );
@@ -63,6 +64,7 @@ function AppProviders() {
                   <ExercisesProvider>
                     <PlansProvider>
                       <SettingsProvider>
+                        <DebugDrawerProvider>
                         <DemoBootstrap>
                           <FirstRunGuard>
                             <Suspense fallback={<PageLoader />}>
@@ -79,7 +81,6 @@ function AppProviders() {
                                     <Route path="/exercises" element={<Exercises />} />
                                     <Route path="/settings" element={<Settings />} />
                                     <Route path="/account" element={<UserSettings />} />
-                                    <Route path="/debug" element={<AdminPage />} />
                                   </Route>
                                   <Route
                                     path="*"
@@ -111,6 +112,8 @@ function AppProviders() {
                             </Suspense>
                           </FirstRunGuard>
                         </DemoBootstrap>
+                        <GlobalDebugDrawer />
+                        </DebugDrawerProvider>
                       </SettingsProvider>
                     </PlansProvider>
                   </ExercisesProvider>

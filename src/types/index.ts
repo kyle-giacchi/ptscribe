@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 20;
+export const APP_DATA_VERSION = 21;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -122,8 +122,65 @@ export interface Session {
   noteId?: ID;
   templateId?: ID;
   modifiers?: SessionModifiers;
+  /**
+   * Capped ring buffer (~20, newest last) of recent AI-call failures for this
+   * session — generation, transcription, PII, and model-fetch. Persisted so a
+   * silent/transient failure (e.g. a blank note from a key mismatch) can be
+   * diagnosed from the Debug Menu after the fact, surviving reload. Encrypted
+   * at rest with the rest of the Session. See {@link AiErrorEntry}.
+   */
+  aiErrors?: AiErrorEntry[];
   createdAt: number;
   updatedAt: number;
+}
+
+/** Which AI call produced an {@link AiErrorEntry}. */
+export type AiErrorCall =
+  | 'generate'
+  | 'transcribe-cloud'
+  | 'transcribe-local'
+  | 'pii'
+  | 'model-fetch';
+
+/**
+ * Failure kind for an {@link AiErrorEntry}. The first five mirror the transport
+ * `AiErrorKind` (services/ai/errors.ts); the last three are app-level outcomes
+ * that look "successful" at the network layer but yield an unusable note.
+ */
+export type AiErrorEntryKind =
+  | 'network'
+  | 'rate_limit'
+  | 'auth'
+  | 'empty'
+  | 'timeout'
+  | 'parse' // 200 OK but the JSON could not be parsed
+  | 'key_mismatch' // parsed, but returned keys don't match the template
+  | 'blank'; // parsed + keys matched, but every section came back empty
+
+/**
+ * One persisted AI-call failure. Transport failures store lean metadata only;
+ * content failures (parse/key_mismatch/blank) additionally carry a bounded
+ * `rawSnippet` and the `keyReport` so a blank note can be explained offline.
+ */
+export interface AiErrorEntry {
+  id: ID;
+  ts: number;
+  call: AiErrorCall;
+  /** e.g. 'anthropic' | 'nova' | 'whisper-local' | 'r2' | 'huggingface'. */
+  provider?: string;
+  kind: AiErrorEntryKind;
+  /** HTTP status, when the failure came from a fetch. */
+  status?: number;
+  /** End-to-end duration of the failed call in ms. */
+  latencyMs?: number;
+  /** Attempts made before giving up (retry-aware calls). */
+  attempts?: number;
+  /** Short, non-content description (status text, error message). */
+  detail?: string;
+  /** Content failures only: bounded slice of the raw response (~2k chars). */
+  rawSnippet?: string;
+  /** Content failures on the generate path only: key-mapping diagnosis. */
+  keyReport?: GenerateKeyReport;
 }
 
 // ─── Note ───────────────────────────────────────────────────────────────────
