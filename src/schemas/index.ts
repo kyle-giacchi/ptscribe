@@ -75,6 +75,38 @@ const SessionClipSchema = z.object({
   updatedAt: z.number().int(),
 });
 
+const GenerateKeyReportSchema = z.object({
+  expected: z.array(z.string()),
+  returned: z.array(z.string()),
+  matched: z.array(z.string()),
+  missing: z.array(z.string()),
+  unexpected: z.array(z.string()),
+  emptyMatched: z.array(z.string()),
+});
+
+const AiErrorEntrySchema = z.object({
+  id: z.string().min(1),
+  ts: z.number().int(),
+  call: z.enum(['generate', 'transcribe-cloud', 'transcribe-local', 'pii', 'model-fetch']),
+  provider: z.string().optional(),
+  kind: z.enum([
+    'network',
+    'rate_limit',
+    'auth',
+    'empty',
+    'timeout',
+    'parse',
+    'key_mismatch',
+    'blank',
+  ]),
+  status: z.number().int().optional(),
+  latencyMs: z.number().min(0).optional(),
+  attempts: z.number().int().min(0).optional(),
+  detail: z.string().optional(),
+  rawSnippet: z.string().optional(),
+  keyReport: GenerateKeyReportSchema.optional(),
+});
+
 const SessionSchema = z.object({
   id: z.string().min(1),
   patientId: z.string().min(1),
@@ -92,6 +124,7 @@ const SessionSchema = z.object({
   noteId: z.string().optional(),
   templateId: z.string().optional(),
   modifiers: SessionModifiersSchema.optional(),
+  aiErrors: z.array(AiErrorEntrySchema).optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });

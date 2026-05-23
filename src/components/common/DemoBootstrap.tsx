@@ -87,8 +87,9 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     if (promptState === 'show') return;
 
     // promptState === 'done' — keep the demo user locked to the session page.
-    // Exception: allow /debug and /account so the profile dropdown links work.
-    if (pathname !== DEMO_SESSION_PATH && pathname !== '/debug' && pathname !== '/account') {
+    // Exception: allow /account so the profile dropdown link works. (The Debug
+    // Menu is a drawer now — it opens over any route, no navigation needed.)
+    if (pathname !== DEMO_SESSION_PATH && pathname !== '/account') {
       navigate(DEMO_SESSION_PATH, { replace: true });
     }
   }, [
