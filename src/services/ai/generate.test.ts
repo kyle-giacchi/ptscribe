@@ -144,7 +144,7 @@ describe('generateNote', () => {
     expect(mockCallAnthropic).toHaveBeenCalledWith(
       expect.objectContaining({
         model: 'claude-sonnet-4-6',
-        system: mockTemplate.systemPrompt,
+        system: expect.stringContaining(mockTemplate.systemPrompt),
       }),
     );
   });
@@ -171,15 +171,41 @@ describe('generateNote', () => {
     expect(call.system).toContain('without speaker diarization');
   });
 
-  it('does not append speaker-context section when activeTranscriptTier is t2 or t3', async () => {
+  it('appends the no-diarization note for t2 (local Whisper is not diarized)', async () => {
     mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
 
     await generateNote({ ...baseArgs, activeTranscriptTier: 't2' });
 
-    expect(mockCallAnthropic).toHaveBeenCalledWith(
-      expect.objectContaining({ system: mockTemplate.systemPrompt }),
-    );
+    const call = mockCallAnthropic.mock.calls[0][0];
+    expect(call.system).toContain(mockTemplate.systemPrompt);
+    expect(call.system).toContain('does not split up the different speakers');
+    expect(call.system).not.toContain('identify turns from a');
   });
+
+  it('appends the diarization rule for t3 (Nova is diarized)', async () => {
+    mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+    await generateNote({ ...baseArgs, activeTranscriptTier: 't3' });
+
+    const call = mockCallAnthropic.mock.calls[0][0];
+    expect(call.system).toContain(mockTemplate.systemPrompt);
+    expect(call.system).toContain('Speaker labels');
+    expect(call.system).toContain('identify turns from a');
+    expect(call.system).not.toContain('does not split up the different speakers');
+  });
+
+  it.each(['t1', 't2', 't3'] as const)(
+    'always appends the PII/PHI privacy rule (tier %s)',
+    async (tier) => {
+      mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+      await generateNote({ ...baseArgs, activeTranscriptTier: tier });
+
+      const call = mockCallAnthropic.mock.calls[0][0];
+      expect(call.system).toContain('never return personal identifiers (PII / PHI)');
+      expect(call.system).toContain('The note must be de-identified.');
+    },
+  );
 
   it('throws for the "none" provider', async () => {
     await expect(generateNote({ ...baseArgs, provider: 'none' })).rejects.toThrow(

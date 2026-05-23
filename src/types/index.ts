@@ -466,6 +466,11 @@ export interface FirstRunState {
   onboardingDoneAt?: number;
   disclosureVersion?: number;
   onboardingUrlConsumed?: boolean;
+  /**
+   * Set once the "Checking your setup" pre-flight gate has been completed (demo
+   * first-run). Presence skips the gate on subsequent demo entries.
+   */
+  setupCheckDoneAt?: number;
 }
 
 export interface Settings {
