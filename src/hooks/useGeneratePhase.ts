@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useNotes } from '@/contexts/NotesProvider';
 import { generateNote } from '@/services/ai/generate';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
+import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { newId } from '@/utils/ids';
 import type { useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
@@ -83,7 +84,7 @@ export function useGeneratePhase({
   const isGeneratingRef = useRef(false);
 
   const ensureNote = useCallback(
-    (initialSections?: NoteSection[]): Note => {
+    (initialSections?: NoteSection[], extraFields?: Partial<Note>): Note => {
       if (note) return note;
       const now = Date.now();
       const sections =
@@ -100,7 +101,11 @@ export function useGeneratePhase({
         finalized: false,
         createdAt: now,
         updatedAt: now,
+        ...extraFields,
       };
+      // Single write only: `addNote` and a follow-up `updateNote` would both
+      // close over the same stale `notes` snapshot, so the second write would
+      // clobber the first and drop this note entirely. Bake every field in here.
       addNote(created);
       patchSession({ noteId: created.id });
       return created;
@@ -166,8 +171,7 @@ export function useGeneratePhase({
             generatedFromTranscript: transcriptSnapshot,
           });
         } else {
-          const created = ensureNote(result.sections);
-          updateNote(created.id, {
+          ensureNote(result.sections, {
             modifiers: modifierSnapshot,
             generatedFromTranscript: transcriptSnapshot,
           });
@@ -179,10 +183,13 @@ export function useGeneratePhase({
           prompts: result.debugPrompts,
           keyReport: result.keyReport,
         });
-        patchSession({ status: 'ready' });
-
         const hasContent = result.sections.some((s) => s.body.trim().length > 0);
         const { matched, returned } = result.keyReport;
+        // A successful HTTP call can still produce a blank note. Record those
+        // content failures to the per-session error log, folded into the SAME
+        // status patch (a second patchSession would clobber it — see
+        // appendAiError docs / the makeListMutators double-write footgun).
+        let errorPatch: Partial<Session> = {};
         if (hasContent) {
           toast.success('Draft note generated');
         } else if (returned.length > 0 && matched.length === 0) {
@@ -192,20 +199,60 @@ export function useGeneratePhase({
           toast.error(
             `Note couldn't be filled: the AI returned sections (${returned.join(', ')}) that don't match this template (${result.keyReport.expected.join(', ')}). See Debug → Section mapping.`,
           );
+          errorPatch = {
+            aiErrors: appendAiError(session!.aiErrors, {
+              call: 'generate',
+              provider: 'anthropic',
+              kind: 'key_mismatch',
+              detail: `Returned [${returned.join(', ')}] vs expected [${result.keyReport.expected.join(', ')}]`,
+              rawSnippet: result.rawText ?? undefined,
+              keyReport: result.keyReport,
+            }),
+          };
         } else {
           toast.warning(
             'Note generated, but all sections are empty — try using a more detailed transcript.',
           );
+          errorPatch = {
+            aiErrors: appendAiError(session!.aiErrors, {
+              call: 'generate',
+              provider: 'anthropic',
+              kind: 'blank',
+              detail: 'All sections empty after generation.',
+              rawSnippet: result.rawText ?? undefined,
+              keyReport: result.keyReport,
+            }),
+          };
         }
+        patchSession({ status: 'ready', ...errorPatch });
       } catch (e) {
+        let errorPatch: Partial<Session> = {};
         if (e instanceof AiCallError) {
           dispatch({ type: 'generate/error', aiError: e });
           toast.error(friendlyAiError(e).title);
+          errorPatch = {
+            aiErrors: appendAiError(session?.aiErrors, {
+              call: 'generate',
+              provider: e.provider,
+              kind: e.kind,
+              status: e.status,
+              attempts: e.attemptsMade,
+              detail: e.message,
+              rawSnippet: e.rawDetail,
+            }),
+          };
         } else {
           dispatch({ type: 'generate/error', aiError: null });
           setError((e as Error).message);
+          errorPatch = {
+            aiErrors: appendAiError(session?.aiErrors, {
+              call: 'generate',
+              kind: 'parse',
+              detail: (e as Error).message,
+            }),
+          };
         }
-        patchSession({ status: 'draft' });
+        patchSession({ status: 'draft', ...errorPatch });
       } finally {
         clearTimeout(abortTimer);
         setBusy(null);
