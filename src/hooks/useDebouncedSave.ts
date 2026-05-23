@@ -5,7 +5,9 @@ export function useDebouncedSave<T>(
   delayMs = 300,
 ): (next: T) => void {
   const saveRef = useRef(save);
-  saveRef.current = save;
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const schedule = useCallback(
