@@ -2,7 +2,11 @@ import { Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import type { AiDebugPrompts, GenerateKeyReport } from '@/types';
+import type { AiDebugPrompts, AiErrorEntry, GenerateKeyReport, Session } from '@/types';
+import type { PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
+import { EnvironmentPanel, FeaturesPanel, StoragePanel } from './debug/EnvPanels';
+import { SessionAudioPanel } from './debug/SessionAudioPanel';
+import { TranscriptPanel } from './debug/TranscriptPanel';
 
 export interface DebugDrawerStats {
   droppedSec: number;
@@ -13,38 +17,55 @@ export interface DebugDrawerStats {
 
 export interface DebugDrawerProps {
   onClose: () => void;
-  silenceDebugOn: boolean;
-  setSilenceDebugOn: (v: boolean) => void;
-  speedDebugOn: boolean;
-  setSpeedDebugOn: (v: boolean) => void;
+  /** Session id whose panels are shown, or null when opened off-session. */
+  activeSessionId?: string | null;
+  /** Full active session entity, for the audio/transcript inspection panels. */
+  activeSession?: Session | null;
   debugStats: DebugDrawerStats | null;
   speedFactor: number;
   lastRawPayload?: string | null;
   lastAiPrompts?: AiDebugPrompts | null;
   lastKeyReport?: GenerateKeyReport | null;
+  /** Most recent on-device PII scrub run in the active session. */
+  lastPiiScrub?: PiiScrubDebug | null;
+  /** Persisted per-session AI-call error log (newest rendered first). */
+  aiErrors?: AiErrorEntry[];
+  /** Clears the active session's error log; omit to hide the action. */
+  onClearErrors?: () => void;
 }
 
 /**
- * Right-side debug drawer surfaced from the Session page's gear icon. Shows
- * silence-trim and speed-up stats from the most recent cloud transcription
- * pass; both panels render placeholder copy until `debugStats` is populated.
+ * App-global right-side debug drawer, opened from Settings → Debug Menu. Shows
+ * silence-trim and speed-up stats plus AI prompt/payload/response inspection for
+ * the active session; session-scoped panels render placeholder copy when opened
+ * off-session or before data is populated.
  */
 export function DebugDrawer({
   onClose,
-  silenceDebugOn,
-  setSilenceDebugOn,
-  speedDebugOn,
-  setSpeedDebugOn,
+  activeSessionId,
+  activeSession,
   debugStats,
   speedFactor,
   lastRawPayload,
   lastAiPrompts,
   lastKeyReport,
+  lastPiiScrub,
+  aiErrors,
+  onClearErrors,
 }: DebugDrawerProps) {
+  const [silenceDebugOn, setSilenceDebugOn] = useState(false);
+  const [speedDebugOn, setSpeedDebugOn] = useState(false);
   const [rawPayloadOpen, setRawPayloadOpen] = useState(false);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [requestPayloadOpen, setRequestPayloadOpen] = useState(false);
   const [keyMapOpen, setKeyMapOpen] = useState(false);
+  const [piiOpen, setPiiOpen] = useState(false);
+  const [errorLogOpen, setErrorLogOpen] = useState(false);
+  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+  const hasSession = Boolean(activeSessionId);
+
+  // Newest first; the ring buffer stores oldest→newest.
+  const errorsNewestFirst = aiErrors ? [...aiErrors].reverse() : [];
 
   // Classify the section-key comparison so the panel header signals the
   // verdict at a glance, matching the toast logic in useGeneratePhase.
@@ -120,7 +141,7 @@ export function DebugDrawer({
           }}
         >
           <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-pt-text)', flex: 1 }}>
-            Debug Tools
+            Debug Menu
           </span>
           <button type="button" className="btn btn-ghost p-1.5" onClick={onClose}>
             <X size={16} strokeWidth={2} />
@@ -138,6 +159,195 @@ export function DebugDrawer({
             gap: 12,
           }}
         >
+          {!hasSession && (
+            <div
+              style={{
+                borderRadius: 10,
+                border: '1px dashed var(--color-pt-border)',
+                padding: '12px 14px',
+                fontSize: 12,
+                color: 'var(--color-fg-subtle)',
+                background: 'var(--color-pt-surface-alt)',
+              }}
+            >
+              No active session — open one to inspect its transcription, prompts, and AI response.
+              Global panels still work.
+            </div>
+          )}
+
+          {/* ── Error log (persisted per-session AI failures) ── */}
+          <div
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--color-pt-border)',
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                width: '100%',
+                background: 'var(--color-pt-surface-alt)',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onClick={() => setErrorLogOpen((v) => !v)}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+                Error log
+              </span>
+              {errorsNewestFirst.length > 0 && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#fff',
+                    background: 'var(--color-pt-danger, #c0392b)',
+                    borderRadius: 999,
+                    padding: '1px 7px',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {errorsNewestFirst.length}
+                </span>
+              )}
+              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                {errorLogOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {errorLogOpen && (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {errorsNewestFirst.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                    {hasSession
+                      ? 'No AI-call errors recorded for this session.'
+                      : 'Open a session to see its recorded AI-call errors.'}
+                  </div>
+                ) : (
+                  <>
+                    {onClearErrors && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ alignSelf: 'flex-end', fontSize: 11 }}
+                        onClick={onClearErrors}
+                      >
+                        Clear errors
+                      </button>
+                    )}
+                    {errorsNewestFirst.map((entry) => {
+                      const expanded = expandedErrorId === entry.id;
+                      return (
+                        <div
+                          key={entry.id}
+                          style={{
+                            borderRadius: 8,
+                            border: '1px solid var(--color-pt-border)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%',
+                              padding: '8px 10px',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                            onClick={() => setExpandedErrorId(expanded ? null : entry.id)}
+                          >
+                            <span
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                color: 'var(--color-pt-danger, #c0392b)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              {entry.kind}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--color-fg)', flex: 1 }}>
+                              {entry.call}
+                              {entry.provider ? ` · ${entry.provider}` : ''}
+                            </span>
+                            <span style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', fontVariantNumeric: 'tabular-nums' }}>
+                              {new Date(entry.ts).toLocaleTimeString()}
+                            </span>
+                          </button>
+                          {expanded && (
+                            <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <div style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                {entry.status !== undefined && <span>status {entry.status}</span>}
+                                {entry.latencyMs !== undefined && <span>{entry.latencyMs}ms</span>}
+                                {entry.attempts !== undefined && <span>{entry.attempts} attempt(s)</span>}
+                                <span>{new Date(entry.ts).toLocaleString()}</span>
+                              </div>
+                              {entry.detail && (
+                                <div style={{ fontSize: 11.5, color: 'var(--color-fg)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                  {entry.detail}
+                                </div>
+                              )}
+                              {entry.rawSnippet && (
+                                <pre
+                                  style={{
+                                    fontSize: 10,
+                                    color: 'var(--color-fg-subtle)',
+                                    background: 'var(--color-pt-surface)',
+                                    border: '1px solid var(--color-pt-border)',
+                                    borderRadius: 6,
+                                    padding: '6px 8px',
+                                    maxHeight: 160,
+                                    overflowY: 'auto',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-all',
+                                    margin: 0,
+                                  }}
+                                >
+                                  {entry.rawSnippet}
+                                </pre>
+                              )}
+                              {entry.keyReport && (
+                                <div style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)' }}>
+                                  expected [{entry.keyReport.expected.join(', ') || '—'}] · returned [
+                                  {entry.keyReport.returned.join(', ') || '—'}]
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                                onClick={() => {
+                                  void navigator.clipboard.writeText(JSON.stringify(entry, null, 2)).then(
+                                    () => toast.success('Copied'),
+                                    () => toast.error('Copy failed'),
+                                  );
+                                }}
+                              >
+                                <Copy size={11} strokeWidth={2} />
+                                Copy entry
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* ── Silence visibility ──────────────────────── */}
           <div
             style={{
@@ -595,6 +805,118 @@ export function DebugDrawer({
               </div>
             )}
           </div>
+
+          {/* ── PII scrub (last on-device redaction run) ── */}
+          <div
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--color-pt-border)',
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                width: '100%',
+                background: 'var(--color-pt-surface-alt)',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onClick={() => setPiiOpen((v) => !v)}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+                PII scrub
+              </span>
+              {lastPiiScrub?.error ? (
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-pt-danger, #c0392b)' }}>
+                  Failed
+                </span>
+              ) : lastPiiScrub ? (
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)' }}>
+                  {lastPiiScrub.entityTotal} flagged
+                </span>
+              ) : null}
+              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                {piiOpen ? '▲' : '▼'}
+              </span>
+            </button>
+            {piiOpen && (
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {lastPiiScrub ? (
+                  <>
+                    <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                      Last scrub in this session. Regex matches structured identifiers instantly;
+                      the deep scan adds names/places via the on-device NER model.
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--color-fg)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div className="flex items-center justify-between">
+                        <span style={{ color: 'var(--color-fg-subtle)' }}>Mode</span>
+                        <span>{lastPiiScrub.mode === 'deep' ? 'Deep scan (regex + model)' : 'Regex only'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span style={{ color: 'var(--color-fg-subtle)' }}>Regex matches</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{lastPiiScrub.regexCount}</span>
+                      </div>
+                      {lastPiiScrub.mode === 'deep' && (
+                        <div className="flex items-center justify-between">
+                          <span style={{ color: 'var(--color-fg-subtle)' }}>Model added</span>
+                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>+{lastPiiScrub.modelAdded}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span style={{ color: 'var(--color-fg-subtle)' }}>Total flagged</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{lastPiiScrub.entityTotal}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span style={{ color: 'var(--color-fg-subtle)' }}>Model loaded</span>
+                        <span>{lastPiiScrub.modelLoaded ? 'Yes' : 'No (first scan fetches it)'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span style={{ color: 'var(--color-fg-subtle)' }}>Model</span>
+                        <code style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', wordBreak: 'break-all', textAlign: 'right' }}>
+                          {lastPiiScrub.model}
+                        </code>
+                      </div>
+                    </div>
+                    {lastPiiScrub.error && (
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: 'var(--color-pt-danger, #c0392b)',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {lastPiiScrub.error}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                    Open Scrub PII on a transcript to see the redaction breakdown.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Session audio + transcripts (active session only) ── */}
+          {activeSession && (
+            <>
+              <SessionAudioPanel session={activeSession} />
+              <TranscriptPanel session={activeSession} />
+            </>
+          )}
+
+          {/* ── Environment diagnostics (global, work off-session) ── */}
+          <EnvironmentPanel />
+          <StoragePanel />
+          <FeaturesPanel />
         </div>
       </motion.div>
     </div>

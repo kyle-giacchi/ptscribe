@@ -31,7 +31,8 @@ import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailab
 import { AiCallError } from '@/components/ai/AiCallError';
 import { AiCallRetryStatus } from '@/components/ai/AiCallRetryStatus';
 import { useWhisperLoading } from '@/hooks/useWhisperLoading';
-import { DebugDrawer } from '@/components/sessions/DebugDrawer';
+import { useDebugDrawer, type PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
+import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
 import { DemoCompleteModal } from '@/components/common/DemoCompleteModal';
@@ -114,11 +115,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     document.body.style.userSelect = 'none';
   }
   const [piiScrubOpen, setPiiScrubOpen] = useState(false);
+  const [piiScrub, setPiiScrub] = useState<PiiScrubDebug | null>(null);
   const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
   const [clipsOpen, setClipsOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [silenceDebugOn, setSilenceDebugOn] = useState(false);
-  const [speedDebugOn, setSpeedDebugOn] = useState(false);
+  const { setActiveSessionId, setSessionDebug } = useDebugDrawer();
   const [sectionCache, setSectionCache] = useState<Map<string, NoteSection[]>>(new Map());
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
@@ -234,6 +234,29 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     sessionMachine.state.generate;
   const clearGenerationAiError = sessionMachine.generate.clearAiError;
 
+  // ── Register this session with the app-global Debug drawer ──────────────
+  // The drawer lives at the app shell, so we push the session id (for panel
+  // scoping) and the live debug payload up to the provider. Clear both on
+  // unmount so off-session opens show the "no active session" placeholder.
+  const speedFactor = settings.audio.speedUp.speed;
+  useEffect(() => {
+    setActiveSessionId(sessionId);
+    return () => {
+      setActiveSessionId(null);
+      setSessionDebug(null);
+    };
+  }, [sessionId, setActiveSessionId, setSessionDebug]);
+  useEffect(() => {
+    setSessionDebug({
+      debugStats,
+      speedFactor,
+      lastRawPayload,
+      lastAiPrompts,
+      lastKeyReport,
+      lastPiiScrub: piiScrub,
+    });
+  }, [debugStats, speedFactor, lastRawPayload, lastAiPrompts, lastKeyReport, piiScrub, setSessionDebug]);
+
   // ── PHI confirmation gate before generation ─────────────────────────────
   // Always shown (regardless of PII filter state) unless user has dismissed it
   // via the "Don't show this again" checkbox.
@@ -337,6 +360,21 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   function handleApplyScrub(scrubbed: string) {
     setEditedTranscript(scrubbed);
     patchSession({ editedTranscript: scrubbed, activeTranscriptTier: 'edited' });
+  }
+
+  // Mirror PII scrub runs into the Debug Menu (live) and, on a deep-scan
+  // failure, persist it to the session's error log so it survives reload.
+  function handleScrubDebug(debug: PiiScrubDebug) {
+    setPiiScrub(debug);
+    if (debug.error && session) {
+      patchSession({
+        aiErrors: appendAiError(session.aiErrors, {
+          call: 'pii',
+          kind: 'parse',
+          detail: `PII deep scan failed (${debug.model}): ${debug.error}`,
+        }),
+      });
+    }
   }
 
   function handleRevertEdits() {
@@ -757,6 +795,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         transcript={effectiveTranscript}
         onApply={handleApplyScrub}
         onClose={() => setPiiScrubOpen(false)}
+        onScrubDebug={handleScrubDebug}
       />
 
       {/* ── Manage templates modal ────────────────────────── */}
@@ -795,21 +834,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         </div>
       </Modal>
 
-      {/* ── Debug drawer ──────────────────────────────────── */}
-      {drawerOpen && (
-        <DebugDrawer
-          onClose={() => setDrawerOpen(false)}
-          silenceDebugOn={silenceDebugOn}
-          setSilenceDebugOn={setSilenceDebugOn}
-          speedDebugOn={speedDebugOn}
-          setSpeedDebugOn={setSpeedDebugOn}
-          debugStats={debugStats}
-          speedFactor={settings.audio.speedUp.speed}
-          lastRawPayload={lastRawPayload}
-          lastAiPrompts={lastAiPrompts}
-          lastKeyReport={lastKeyReport}
-        />
-      )}
+      {/* Debug drawer is rendered app-globally (GlobalDebugDrawer); this page
+          only registers its session id + live debug data with the provider. */}
 
       {/* ── Reset session confirmation ────────────────────── */}
       <ResetSessionModal

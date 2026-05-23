@@ -134,6 +134,9 @@ export function migrate(data: unknown): AppData {
   if ((working as { version?: number }).version === 19) {
     working = migrateV19ToV20(working);
   }
+  if ((working as { version?: number }).version === 20) {
+    working = migrateV20ToV21(working);
+  }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
     throw new Error(`migrate: no migration registered for version ${version}`);
@@ -440,6 +443,12 @@ function migrateV16ToV17(input: Record<string, unknown>): Record<string, unknown
   // (aiTranscript) all default to absent. TranscriptSource gains 'nova'. No structural
   // transformation needed — existing data passes the updated schema as-is.
   return { ...input, version: 17 };
+}
+
+function migrateV20ToV21(input: Record<string, unknown>): Record<string, unknown> {
+  // Additive optional field: Session.aiErrors (persisted AI-call failure log).
+  // Existing sessions simply have no errors yet — nothing to backfill.
+  return { ...input, version: 21 };
 }
 
 function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {

@@ -3,6 +3,7 @@ import type { Dispatch } from 'react';
 import { toast } from 'sonner';
 import { transcribe } from '@/services/ai/transcribe';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
+import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { useBackgroundTranscription } from './useBackgroundTranscription';
 import type { BackgroundT2State } from './useBackgroundTranscription';
@@ -145,21 +146,58 @@ export function useTranscriptSource({
           });
           toast.success('Transcription complete.');
         } else {
-          patchSession({ status: 'draft' });
           dispatch({ type: 'transcribe/empty' });
           toast.error('Transcription returned no text. Try again or check your audio.');
+          // Single write: fold the error-log append into the same status patch.
+          patchSession({
+            status: 'draft',
+            aiErrors: appendAiError(session.aiErrors, {
+              call: 'transcribe-cloud',
+              provider: 'nova',
+              kind: 'empty',
+              detail: 'Cloud transcription returned no text.',
+            }),
+          });
         }
       } catch (e) {
-        patchSession({ status: 'draft' });
+        let errorPatch: Partial<Session>;
         if ((e as Error).name === 'AbortError') {
           dispatch({ type: 'transcribe/abort' });
+          errorPatch = {
+            aiErrors: appendAiError(session.aiErrors, {
+              call: 'transcribe-cloud',
+              provider: 'nova',
+              kind: 'timeout',
+              detail: 'Cloud transcription aborted after the 180s timeout.',
+            }),
+          };
         } else if (e instanceof AiCallError) {
           dispatch({ type: 'transcribe/error', aiError: e });
           toast.error(friendlyAiError(e).title);
+          errorPatch = {
+            aiErrors: appendAiError(session.aiErrors, {
+              call: 'transcribe-cloud',
+              provider: e.provider,
+              kind: e.kind,
+              status: e.status,
+              attempts: e.attemptsMade,
+              detail: e.message,
+              rawSnippet: e.rawDetail,
+            }),
+          };
         } else {
           dispatch({ type: 'transcribe/error', aiError: null });
           toast.error(`Transcription failed: ${(e as Error).message}`);
+          errorPatch = {
+            aiErrors: appendAiError(session.aiErrors, {
+              call: 'transcribe-cloud',
+              provider: 'nova',
+              kind: 'parse',
+              detail: (e as Error).message,
+            }),
+          };
         }
+        patchSession({ status: 'draft', ...errorPatch });
       } finally {
         clearTimeout(abortTimer);
         setBusy(null);

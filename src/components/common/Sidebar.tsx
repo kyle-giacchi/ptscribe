@@ -17,6 +17,8 @@ import {
 import { useNotes } from '@/contexts/NotesProvider';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useGate } from '@/contexts/GateContext';
+import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
+import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';
 
 interface NavEntry {
   to: string;
@@ -36,6 +38,7 @@ export function Sidebar({ onClose, className }: SidebarProps) {
   const { notes } = useNotes();
   const { clinician } = useClinician();
   const { logout } = useGate();
+  const { openDebug } = useDebugDrawer();
   const pendingReviewCount = notes.filter((n) => !n.finalized).length;
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -191,24 +194,30 @@ export function Sidebar({ onClose, className }: SidebarProps) {
                   <UserCircle size={13} strokeWidth={1.75} />
                   <span>User settings</span>
                 </NavLink>
-                <NavLink
-                  to="/debug"
-                  onClick={() => {
-                    setProfileOpen(false);
-                    onClose?.();
-                  }}
-                  className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
-                  style={{
-                    padding: '7px 12px',
-                    fontSize: 12.5,
-                    fontWeight: 500,
-                    color: 'var(--color-pt-text-2)',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <Terminal size={13} strokeWidth={1.75} />
-                  <span>Debug</span>
-                </NavLink>
+                {DEBUG_TOOLS_ENABLED && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      onClose?.();
+                      openDebug();
+                    }}
+                    className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+                    style={{
+                      padding: '7px 12px',
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: 'var(--color-pt-text-2)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Terminal size={13} strokeWidth={1.75} />
+                    <span>Debug Menu</span>
+                  </button>
+                )}
                 <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
                 <button
                   type="button"

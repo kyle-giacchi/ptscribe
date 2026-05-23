@@ -577,6 +577,68 @@ describe('migrate v12 → v13', () => {
   });
 });
 
+describe('migrate v20 → v21: Session.aiErrors', () => {
+  function v20WithSession(sessionOverrides: Record<string, unknown> = {}): Record<string, unknown> {
+    const seed = defaultAppData();
+    const now = Date.now();
+    const session: Record<string, unknown> = {
+      id: 'sess-1',
+      patientId: 'pat-1',
+      type: 'follow_up',
+      date: now,
+      status: 'ready',
+      clips: [],
+      createdAt: now,
+      updatedAt: now,
+      ...sessionOverrides,
+    };
+    return { ...seed, version: 20, sessions: [session] };
+  }
+
+  it('bumps a v20 session to CURRENT_VERSION without touching it', () => {
+    const result = migrate(v20WithSession());
+    expect(result.version).toBe(CURRENT_VERSION);
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].aiErrors).toBeUndefined();
+  });
+
+  it('round-trips a populated aiErrors array through AppDataSchema', () => {
+    const result = migrate(
+      v20WithSession({
+        aiErrors: [
+          {
+            id: 'err-1',
+            ts: 1700000000000,
+            call: 'generate',
+            provider: 'anthropic',
+            kind: 'key_mismatch',
+            status: 200,
+            latencyMs: 1234,
+            attempts: 1,
+            detail: 'returned sections did not match template keys',
+            rawSnippet: '{"foo":"bar"}',
+            keyReport: {
+              expected: ['subjective', 'objective'],
+              returned: ['foo'],
+              matched: [],
+              missing: ['subjective', 'objective'],
+              unexpected: ['foo'],
+              emptyMatched: [],
+            },
+          },
+        ],
+      }),
+    );
+    const parsed = AppDataSchema.safeParse(result);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('produces output that passes AppDataSchema.safeParse', () => {
+    const result = migrate(v20WithSession());
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
 // ─── Migration robustness: missing-fields at boundary ───────────────────────
 
 /**

@@ -39,6 +39,12 @@ vi.mock('@/hooks/useStorageEstimate', () => ({
 vi.mock('@/lib/vault/vault', () => ({
   vault: { isInitialized: () => false, isUnlocked: () => false },
 }));
+vi.mock('@/contexts/DebugDrawerProvider', () => ({
+  useDebugDrawer: () => ({ openDebug: () => {} }),
+}));
+vi.mock('@/lib/debug/flags', () => ({
+  DEBUG_TOOLS_ENABLED: true,
+}));
 
 describe('GlobalTopNav', () => {
   it('renders the primary nav items', () => {

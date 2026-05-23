@@ -1,13 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, EyeOff, AlertCircle, Sparkles } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { usePrivacyFilter, type ScrubResult } from '@/hooks/usePrivacyFilter';
+import { isPIIModelLoaded, PRIVACY_FILTER_MODEL } from '@/services/ai/client/privacyFilter';
+import { useSettings } from '@/contexts/SettingsProvider';
+import type { PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
 
 interface Props {
   open: boolean;
   transcript: string;
   onApply: (scrubbed: string) => void;
   onClose: () => void;
+  /** Reports each scrub run to the Debug Menu (regex pass, deep scan, errors). */
+  onScrubDebug?: (debug: PiiScrubDebug) => void;
 }
 
 type ScanState = 'ready' | 'scanning' | 'error';
@@ -61,14 +66,16 @@ function computeWordDiff(original: string, scrubbed: string): DiffPart[] {
   return parts;
 }
 
-export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
+export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug }: Props) {
   const { scrubProgress, scrubbing, scrubRegex, scrubModel } = usePrivacyFilter();
+  const { settings } = useSettings();
   const [scanState, setScanState] = useState<ScanState>('ready');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Deep-scan (NER) result, when the user opts in. Null until then.
   const [deepResult, setDeepResult] = useState<ScrubResult | null>(null);
 
   const hasText = transcript.trim().length > 0;
+  const piiModel = settings.session.piiModel ?? PRIVACY_FILTER_MODEL;
 
   // Instant regex pass — pure + synchronous, so derive it during render.
   const regexResult = useMemo<ScrubResult>(
@@ -79,6 +86,24 @@ export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
   const deepScanned = deepResult !== null;
   const active = deepResult ?? regexResult;
   const { entityCount, scrubbed: scrubbedText } = active;
+
+  // Mirror each meaningful scrub state into the Debug Menu. Keyed on stable
+  // primitives (not the result object, which is recreated each render) so it
+  // fires on real transitions: open, regex recount, and deep-scan completion.
+  useEffect(() => {
+    if (!open || !hasText) return;
+    onScrubDebug?.({
+      ts: Date.now(),
+      mode: deepScanned ? 'deep' : 'regex',
+      regexCount: regexResult.entityCount,
+      modelAdded: deepScanned ? Math.max(0, entityCount - regexResult.entityCount) : 0,
+      entityTotal: entityCount,
+      modelLoaded: isPIIModelLoaded(),
+      model: piiModel,
+    });
+    // onScrubDebug is a stable setter from the parent; deliberately omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hasText, deepScanned, entityCount, regexResult.entityCount, piiModel]);
 
   const diffParts = useMemo<DiffPart[]>(
     () => computeWordDiff(transcript, scrubbedText),
@@ -100,8 +125,19 @@ export function PIIScrubModal({ open, transcript, onApply, onClose }: Props) {
       setDeepResult(result);
       setScanState('ready');
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'PII scan failed — try again');
+      const message = err instanceof Error ? err.message : 'PII scan failed — try again';
+      setErrorMsg(message);
       setScanState('error');
+      onScrubDebug?.({
+        ts: Date.now(),
+        mode: 'deep',
+        regexCount: regexResult.entityCount,
+        modelAdded: 0,
+        entityTotal: regexResult.entityCount,
+        modelLoaded: isPIIModelLoaded(),
+        model: piiModel,
+        error: message,
+      });
     }
   }
 

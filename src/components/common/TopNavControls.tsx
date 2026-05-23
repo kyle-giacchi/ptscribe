@@ -8,6 +8,8 @@ import { useNotifications } from '@/contexts/NotificationsProvider';
 import { useSessionReset } from '@/contexts/SessionResetContext';
 import { useGate } from '@/contexts/GateContext';
 import { useDismissable } from '@/hooks/useDismissable';
+import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
+import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';
 
 function useVaultState(): { initialized: boolean; unlocked: boolean } {
   const [state, setState] = useState(() => ({
@@ -258,6 +260,7 @@ export function ProfileButton() {
   const { clinician } = useClinician();
   const { onResetSession } = useSessionReset();
   const { logout } = useGate();
+  const { openDebug } = useDebugDrawer();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -367,21 +370,26 @@ export function ProfileButton() {
               </button>
             </>
           )}
-          <NavLink
-            to="/debug"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
-            style={{
-              padding: '7px 12px',
-              fontSize: 12.5,
-              fontWeight: 500,
-              color: 'var(--color-pt-text-2)',
-              textDecoration: 'none',
-            }}
-          >
-            <Terminal size={13} strokeWidth={1.75} />
-            <span>Debug</span>
-          </NavLink>
+          {DEBUG_TOOLS_ENABLED && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); openDebug(); }}
+              className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+              style={{
+                padding: '7px 12px',
+                fontSize: 12.5,
+                fontWeight: 500,
+                color: 'var(--color-pt-text-2)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <Terminal size={13} strokeWidth={1.75} />
+              <span>Debug Menu</span>
+            </button>
+          )}
           <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
           <button
             type="button"
