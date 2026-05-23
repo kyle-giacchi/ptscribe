@@ -230,7 +230,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const handleUnfinalize = sessionMachine.generate.unfinalize;
   const handleCopyNoteMarkdown = sessionMachine.generate.copyMarkdown;
   const { missingRequiredLabels } = sessionMachine.generate;
-  const { lastRawPayload, lastAiPrompts, aiError: generationAiError, retryStatus: generationRetryStatus } =
+  const { lastRawPayload, lastAiPrompts, lastKeyReport, aiError: generationAiError, retryStatus: generationRetryStatus } =
     sessionMachine.state.generate;
   const clearGenerationAiError = sessionMachine.generate.clearAiError;
 
@@ -807,6 +807,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           speedFactor={settings.audio.speedUp.speed}
           lastRawPayload={lastRawPayload}
           lastAiPrompts={lastAiPrompts}
+          lastKeyReport={lastKeyReport}
         />
       )}
 
