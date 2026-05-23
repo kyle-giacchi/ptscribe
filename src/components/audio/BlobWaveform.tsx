@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Play, Pause } from 'lucide-react';
+import { formatDuration } from '@/utils/format';
 
 export function BlobWaveform({ blob }: { blob: Blob }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -77,7 +78,7 @@ export function BlobWaveform({ blob }: { blob: Blob }) {
           className="font-mono text-xs tabular-nums"
           style={{ color: 'var(--color-fg-subtle)' }}
         >
-          {formatTime(current)} / {formatTime(duration)}
+          {formatDuration(current)} / {formatDuration(duration)}
         </span>
       </div>
       {error && (
@@ -87,13 +88,6 @@ export function BlobWaveform({ blob }: { blob: Blob }) {
       )}
     </div>
   );
-}
-
-function formatTime(sec: number): string {
-  if (!Number.isFinite(sec) || sec < 0) return '00:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function getCssVar(name: string): string {
