@@ -16,6 +16,9 @@ export interface SessionTopBarProps {
   missingRequiredLabels: string[];
   onFinalize: () => void;
   onUnfinalize: () => void;
+  /** Note actions (New recording, Audio clips, Sign & export) are contextual to
+   *  the Review screen — they animate out on the fresh-start Record screen. */
+  showNoteActions: boolean;
 }
 
 const SESSION_TYPE_LABEL: Record<string, string> = {
@@ -31,6 +34,7 @@ export function SessionTopBar({
   onToggleClips, onRecord, onUpload,
   missingRequiredLabels,
   onFinalize, onUnfinalize,
+  showNoteActions,
 }: SessionTopBarProps) {
   const sessionDate = new Date(session.date);
   const dayLabel = sessionDate.toLocaleDateString(undefined, { weekday: 'short' });
@@ -88,8 +92,20 @@ export function SessionTopBar({
         </div>
       </div>
 
-      {/* Right cluster */}
-      <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
+      {/* Right cluster — note actions animate out on the fresh-start Record screen */}
+      <div
+        className="flex items-center"
+        style={{
+          gap: 8,
+          flexShrink: 0,
+          opacity: showNoteActions ? 1 : 0,
+          transform: showNoteActions ? 'translateX(0)' : 'translateX(8px)',
+          pointerEvents: showNoteActions ? 'auto' : 'none',
+          transition: 'opacity 220ms ease, transform 220ms ease',
+        }}
+        aria-hidden={!showNoteActions}
+        inert={!showNoteActions}
+      >
           <AddClipButton onRecord={onRecord} onUpload={onUpload} />
 
           <button
