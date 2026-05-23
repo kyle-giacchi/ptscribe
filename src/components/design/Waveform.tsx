@@ -20,6 +20,7 @@ export function Waveform({ micState, height = 48, analyser }: WaveformProps) {
   const stateRef = useRef<MicState>(micState);
   const analyserRef = useRef<AnalyserNode | null>(analyser ?? null);
   const tdDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const smoothedRef = useRef<Float32Array | null>(null);
 
   useEffect(() => {
     stateRef.current = micState;
@@ -69,6 +70,11 @@ export function Waveform({ micState, height = 48, analyser }: WaveformProps) {
       const a = analyserRef.current;
       const d = tdDataRef.current;
 
+      if (!smoothedRef.current || smoothedRef.current.length !== barCount) {
+        smoothedRef.current = new Float32Array(barCount);
+      }
+      const smooth = smoothedRef.current;
+
       if (s === 'connected' && a && d) {
         // Real audio: sample peak amplitude per bar from time-domain data
         a.getByteTimeDomainData(d);
@@ -82,10 +88,14 @@ export function Waveform({ micState, height = 48, analyser }: WaveformProps) {
             const v = Math.abs(d[j] - 128);
             if (v > peak) peak = v;
           }
-          const amp = Math.max(2, (peak / 128) * (cy - 4));
-          ctx.fillRect(x, cy - amp, 2, amp * 2);
+          // Power curve amplifies quiet signals; 0.45 exponent spreads low/loud apart
+          const target = Math.max(2, Math.pow(peak / 128, 0.45) * (cy - 4));
+          // Instant attack, fluid exponential decay at ~0.85/frame (60fps)
+          smooth[i] = target > smooth[i] ? target : smooth[i] * 0.85 + target * 0.15;
+          ctx.fillRect(x, cy - smooth[i], 2, smooth[i] * 2);
         }
       } else {
+        smooth.fill(0);
         // Synthetic fallback (no analyser, paused, weak, disconnected, idle)
         for (let i = 0; i < barCount; i++) {
           const x = i * 4;
