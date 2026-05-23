@@ -50,13 +50,41 @@ export interface Patient {
 
 // ─── Modifiers ──────────────────────────────────────────────────────────────
 
-export type ModifierTone = 'narrative' | 'terse' | 'clinical';
-export type ModifierEmphasis = 'more_detail' | 'functional_outcomes' | 'patient_progress';
+// Radio groups (single-select per group)
+export type ModifierVoice = '1st_person' | '2nd_person' | '3rd_person';
+export type ModifierLength = 'concise' | 'balanced' | 'detailed';
+export type ModifierLanguage = 'medical_terminology' | 'plain_language' | 'spanish_output';
+
+// Checkbox groups (multi-select)
+export type ModifierClinicalDetail =
+  | 'pertinent_negatives'
+  | 'include_ros'
+  | 'quote_verbatim'
+  | 'differential_diagnosis'
+  | 'risk_scores';
+
+export type ModifierCodingBilling = 'icd10_suggestions' | 'em_level' | 'hcc_flags';
+
+export type ModifierBeyondNote =
+  | 'suggested_orders'
+  | 'med_rec_check'
+  | 'patient_education'
+  | 'transcript_timestamps';
+
+export interface CustomInstruction {
+  id: string;
+  text: string;
+  active: boolean;
+}
 
 export interface SessionModifiers {
-  tone?: ModifierTone;
-  emphasis: ModifierEmphasis[];
-  customInstruction?: string;
+  voice?: ModifierVoice;
+  length?: ModifierLength;
+  language?: ModifierLanguage;
+  clinicalDetail: ModifierClinicalDetail[];
+  codingBilling: ModifierCodingBilling[];
+  beyondNote: ModifierBeyondNote[];
+  customInstructions: CustomInstruction[];
 }
 
 // ─── Session ────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import type { NoteTemplate, Patient } from '@/types';
 vi.mock('./client/anthropic');
 vi.mock('@/lib/clinical/prompts', () => ({
   buildUserPrompt: vi.fn().mockReturnValue('mock user prompt'),
-  buildModifierBlock: vi.fn().mockReturnValue('# Tone & style\nbullet-point shorthand'),
+  buildModifierBlock: vi.fn().mockReturnValue('# Length\ntight clinical prose'),
 }));
 
 const mockCallAnthropic = vi.mocked(callAnthropic);
@@ -152,11 +152,11 @@ describe('generateNote', () => {
   it('passes modifier block to callAnthropic when modifiers are set', async () => {
     mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
 
-    await generateNote({ ...baseArgs, modifiers: { tone: 'terse', emphasis: [] } });
+    await generateNote({ ...baseArgs, modifiers: { length: 'concise', clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] } });
 
     expect(mockCallAnthropic).toHaveBeenCalledWith(
       expect.objectContaining({
-        modifierBlock: expect.stringContaining('bullet-point shorthand'),
+        modifierBlock: expect.stringContaining('tight clinical prose'),
       }),
     );
   });

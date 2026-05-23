@@ -8,7 +8,7 @@ const tpl: NoteTemplate = {
   format: 'soap', systemPrompt: '',
 } as NoteTemplate;
 
-const emptyModifiers: SessionModifiers = { emphasis: [] };
+const emptyModifiers: SessionModifiers = { clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] };
 
 const baseProps = {
   template: tpl, templates: [tpl],
@@ -29,9 +29,9 @@ describe('NoteToolbar', () => {
   it('shows active count badge when modifiers are set', () => {
     render(<NoteToolbar
       {...baseProps}
-      modifiers={{ tone: 'terse', emphasis: ['more_detail'] }}
+      modifiers={{ voice: '1st_person', clinicalDetail: ['pertinent_negatives'], codingBilling: [], beyondNote: [], customInstructions: [] }}
     />);
-    expect(screen.getByText(/Modifier · 2/)).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('Generate fires onGenerate when no draft content', () => {
