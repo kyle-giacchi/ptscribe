@@ -10,6 +10,7 @@ import { useGate } from '@/contexts/GateContext';
 import { useDismissable } from '@/hooks/useDismissable';
 import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
 import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';
+import { relativeFromNow } from '@/utils/dates';
 
 function useVaultState(): { initialized: boolean; unlocked: boolean } {
   const [state, setState] = useState(() => ({
@@ -62,13 +63,6 @@ export function VaultPill() {
       <span>Vault: {label}</span>
     </span>
   );
-}
-
-function formatRelativeTime(ts: number): string {
-  const min = Math.floor((Date.now() - ts) / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
-  return `${Math.floor(min / 60)}h ago`;
 }
 
 export function AlertsButton() {
@@ -243,7 +237,7 @@ export function AlertsButton() {
                       {n.message}
                     </p>
                     <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)', marginTop: 2, display: 'block' }}>
-                      {formatRelativeTime(n.timestamp)}
+                      {relativeFromNow(n.timestamp)}
                     </span>
                   </div>
                 </li>
