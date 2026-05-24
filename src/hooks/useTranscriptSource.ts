@@ -5,9 +5,10 @@ import { transcribe } from '@/services/ai/transcribe';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
+import { isDemoMode } from '@/lib/demoMode';
 import { useBackgroundTranscription } from './useBackgroundTranscription';
 import type { BackgroundT2State } from './useBackgroundTranscription';
-import type { useActionGuard } from './useActionGuard';
+import { MAX_TRANSCRIBES_PER_SESSION, type useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
 import type { Session, Settings } from '@/types';
 
@@ -72,12 +73,26 @@ export function useTranscriptSource({
 
   const runT3 = useCallback(
     async (_clipId?: string) => {
+      // Demo-mode hard rule: cloud Nova is unreachable. This guard wins before any
+      // session/blob check so a demo build can never bill Nova. See CLAUDE.md hard rules.
+      if (isDemoMode()) {
+        toast.error('Cloud transcription is disabled in demo mode.');
+        return;
+      }
       if (!session) return;
       if (!silencedMergedBlob) {
         toast.error('No audio to transcribe yet. Record or upload audio first.');
         return;
       }
 
+      // Lifetime cap is session-backed (persisted) so it survives reload, Revert,
+      // and Unlock. CONTEXT.md §Cloud-transcription cap. Absent count reads as 0.
+      const spent = session.cloudTranscribeCount ?? 0;
+      if (spent >= MAX_TRANSCRIBES_PER_SESSION) {
+        toast.error('Cloud transcription was already used for this session.');
+        return;
+      }
+      // checkActionGuard now enforces only the 3-second cooldown for transcription.
       const guard = checkActionGuard('transcribe');
       if (!guard.allowed) {
         toast.error(guard.reason);
@@ -133,6 +148,7 @@ export function useTranscriptSource({
             activeTranscriptTier: 't3',
             status: 'draft',
             editedTranscript: undefined,
+            cloudTranscribeCount: spent + 1,
           });
           recordAction('transcribe');
           dispatch({
