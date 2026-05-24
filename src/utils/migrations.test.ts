@@ -639,6 +639,38 @@ describe('migrate v20 → v21: Session.aiErrors', () => {
   });
 });
 
+describe('migrate v21 → v22: Session.cloudTranscribeCount', () => {
+  function v21WithSession(sessionOverrides: Record<string, unknown> = {}): Record<string, unknown> {
+    const seed = defaultAppData();
+    const now = Date.now();
+    const session: Record<string, unknown> = {
+      id: 'sess-1',
+      patientId: 'pat-1',
+      type: 'follow_up',
+      date: now,
+      status: 'ready',
+      clips: [],
+      createdAt: now,
+      updatedAt: now,
+      ...sessionOverrides,
+    };
+    return { ...seed, version: 21, sessions: [session] };
+  }
+
+  it('bumps a v21 session to v22, leaving cloudTranscribeCount undefined', () => {
+    const result = migrate(v21WithSession());
+    expect(result.version).toBe(22);
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].cloudTranscribeCount).toBeUndefined();
+  });
+
+  it('round-trips a populated cloudTranscribeCount through AppDataSchema', () => {
+    const result = migrate(v21WithSession({ cloudTranscribeCount: 1 }));
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+    expect(result.sessions[0].cloudTranscribeCount).toBe(1);
+  });
+});
+
 // ─── Migration robustness: missing-fields at boundary ───────────────────────
 
 /**

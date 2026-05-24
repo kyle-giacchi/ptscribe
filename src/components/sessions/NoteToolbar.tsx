@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { ChevronDown, Copy, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { TemplateDropdown } from './TemplateDropdown';
 import { ModifierPopover } from './ModifierPopover';
-import type { NoteTemplate, SessionModifiers } from '@/types';
+import { NoteExportMenu } from './NoteExportMenu';
+import type { Note, NoteTemplate, Patient, SessionModifiers } from '@/types';
 
 interface NoteToolbarProps {
   template: NoteTemplate | undefined;
@@ -12,12 +13,12 @@ interface NoteToolbarProps {
   canGenerate: boolean;
   requiresFeedback: boolean;
   isGenerating: boolean;
-  noteExists: boolean;
+  note: Note | undefined;
+  patient: Patient;
   modifiers: SessionModifiers;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
   onGenerate: (mode: 'replace' | 'append', feedback?: string) => void;
-  onCopyNote: () => void;
   onModifiersChange: (next: SessionModifiers) => void;
 }
 
@@ -35,8 +36,8 @@ function countActiveModifiers(m: SessionModifiers): number {
 
 export function NoteToolbar({
   template, templates,
-  hasDraftContent, canGenerate, requiresFeedback, isGenerating, noteExists,
-  modifiers, onTemplateChange, onManageTemplates, onGenerate, onCopyNote, onModifiersChange,
+  hasDraftContent, canGenerate, requiresFeedback, isGenerating, note, patient,
+  modifiers, onTemplateChange, onManageTemplates, onGenerate, onModifiersChange,
 }: NoteToolbarProps) {
   const [overwriteOpen, setOverwriteOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -131,16 +132,8 @@ export function NoteToolbar({
       <div style={{ flex: 1 }} />
 
       {/* Right cluster */}
-      {noteExists && (
-        <button
-          type="button"
-          onClick={onCopyNote}
-          className="btn btn-ghost"
-          style={{ height: 34, padding: '0 12px', fontSize: 12.5 }}
-          title="Copy entire note"
-        >
-          <Copy size={13} strokeWidth={2} /> Copy note
-        </button>
+      {note && template && (
+        <NoteExportMenu note={note} template={template} patient={patient} />
       )}
 
       <button

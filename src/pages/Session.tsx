@@ -19,14 +19,13 @@ import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
-import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
+import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useActionGuard';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
-import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
 import { AiCallError } from '@/components/ai/AiCallError';
@@ -229,7 +228,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const handleReplaceSections = sessionMachine.generate.replaceSections;
   const handleFinalize = sessionMachine.generate.finalize;
   const handleUnfinalize = sessionMachine.generate.unfinalize;
-  const handleCopyNoteMarkdown = sessionMachine.generate.copyMarkdown;
   const { missingRequiredLabels } = sessionMachine.generate;
   const { lastRawPayload, lastAiPrompts, lastKeyReport, aiError: generationAiError, retryStatus: generationRetryStatus } =
     sessionMachine.state.generate;
@@ -278,13 +276,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
     handleGenerateRaw(pendingGenerateMode.current, pendingFeedback.current);
   }
-
-  function handleCopyNote() {
-    if (!note || !template) return;
-    const md = renderNoteMarkdown(note, template, patient!);
-    handleCopyNoteMarkdown(md);
-  }
-
 
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
 
@@ -658,12 +649,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   canGenerate={canGenerate}
                   requiresFeedback={inputsUnchanged}
                   isGenerating={busy === 'generating'}
-                  noteExists={!!note}
+                  note={note}
+                  patient={patient!}
                   modifiers={currentModifiers}
                   onTemplateChange={handleTemplateChange}
                   onManageTemplates={() => setManageTemplatesOpen(true)}
                   onGenerate={handleGenerate}
-                  onCopyNote={handleCopyNote}
                   onModifiersChange={handleModifiersChange}
                 />
 
@@ -731,7 +722,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         }
                       }}
                       onCreateTranscript={handleCreateTranscript}
-                      canImproveWithAI={!isDemoMode() && !session.t3Transcript}
+                      canImproveWithAI={!session.t3Transcript}
+                      cloudDisabledReason={
+                        isDemoMode()
+                          ? 'Cloud transcription is disabled in demo mode.'
+                          : (session.cloudTranscribeCount ?? 0) >= MAX_TRANSCRIBES_PER_SESSION
+                            ? 'Cloud transcription was already used for this session.'
+                            : undefined
+                      }
                       onRevertToLocal={handleRevertToLocal}
                       onCopyTranscript={handleCopyTranscript}
                       onOpenPIIScrub={() => setPiiScrubOpen(true)}

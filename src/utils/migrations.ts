@@ -60,6 +60,8 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   optional field added (no structural transform needed — defaults to absent).
  * - v19 → v20: Removes `Settings.orgPolicy.toneStyle` — tone is now a Modifier chip on
  *   each Session. Zod strips the stale field automatically; migration just bumps version.
+ * - v21 → v22: Adds optional `Session.cloudTranscribeCount` (persisted Nova cap counter).
+ *   Existing sessions have consumed no cloud pass yet — leave undefined (read as 0).
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -136,6 +138,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 20) {
     working = migrateV20ToV21(working);
+  }
+  if ((working as { version?: number }).version === 21) {
+    working = migrateV21ToV22(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -449,6 +454,12 @@ function migrateV20ToV21(input: Record<string, unknown>): Record<string, unknown
   // Additive optional field: Session.aiErrors (persisted AI-call failure log).
   // Existing sessions simply have no errors yet — nothing to backfill.
   return { ...input, version: 21 };
+}
+
+function migrateV21ToV22(input: Record<string, unknown>): Record<string, unknown> {
+  // Additive optional field: Session.cloudTranscribeCount. Existing sessions have
+  // not consumed any cloud pass yet — leave undefined (treated as 0 at read time).
+  return { ...input, version: 22 };
 }
 
 function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {
