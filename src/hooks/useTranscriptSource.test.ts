@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
 import * as demo from '@/lib/demoMode';
 import { useTranscriptSource, type UseTranscriptSourceParams } from './useTranscriptSource';
+import { MAX_TRANSCRIBES_PER_SESSION } from './useActionGuard';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/services/ai/transcribe', () => ({ transcribe: vi.fn() }));
@@ -39,5 +40,40 @@ describe('runT3 demo-mode guard', () => {
     expect(transcribe).not.toHaveBeenCalled();
     expect(params.checkActionGuard).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith('Cloud transcription is disabled in demo mode.');
+  });
+});
+
+describe('runT3 session-backed cap', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('blocks Nova when session.cloudTranscribeCount already equals the cap', async () => {
+    vi.spyOn(demo, 'isDemoMode').mockReturnValue(false);
+    const { transcribe } = await import('@/services/ai/transcribe');
+    const params = makeParams({
+      session: {
+        id: 's1', type: 'evaluation', clips: [], status: 'draft',
+        cloudTranscribeCount: MAX_TRANSCRIBES_PER_SESSION,
+      } as never,
+    });
+    const { result } = renderHook(() => useTranscriptSource(params));
+    await result.current.runT3();
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Cloud transcription was already used for this session.');
+  });
+
+  it('increments cloudTranscribeCount on a successful Nova pass', async () => {
+    vi.spyOn(demo, 'isDemoMode').mockReturnValue(false);
+    const { transcribe } = await import('@/services/ai/transcribe');
+    (transcribe as Mock).mockResolvedValue({ text: 'final transcript' });
+    const params = makeParams({
+      session: {
+        id: 's1', type: 'evaluation', clips: [], status: 'draft', cloudTranscribeCount: 0,
+      } as never,
+    });
+    const { result } = renderHook(() => useTranscriptSource(params));
+    await result.current.runT3();
+    expect(params.patchSession).toHaveBeenCalledWith(
+      expect.objectContaining({ cloudTranscribeCount: 1 }),
+    );
   });
 });

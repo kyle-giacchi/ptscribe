@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 21;
+export const APP_DATA_VERSION = 22;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -158,6 +158,13 @@ export interface Session {
    * at rest with the rest of the Session. See {@link AiErrorEntry}.
    */
   aiErrors?: AiErrorEntry[];
+  /**
+   * Lifetime count of cloud (Nova) transcription runs for this session. Capped at
+   * MAX_TRANSCRIBES_PER_SESSION. Persisted so the cap survives reload, Revert, and
+   * Unlock — never reset by any client action. Absent is treated as 0 at read time.
+   * See CONTEXT.md §Cloud-transcription cap.
+   */
+  cloudTranscribeCount?: number;
   createdAt: number;
   updatedAt: number;
 }
