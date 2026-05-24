@@ -209,8 +209,12 @@ function SignatureBlock({ clinician }: { clinician: NotePDFProps['clinician'] })
   );
 }
 
+async function buildNotePDFBlob(props: NotePDFProps): Promise<Blob> {
+  return pdf(<NotePDF {...props} />).toBlob();
+}
+
 export async function downloadNotePDF(props: NotePDFProps, fileName: string): Promise<void> {
-  const blob = await pdf(<NotePDF {...props} />).toBlob();
+  const blob = await buildNotePDFBlob(props);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -219,4 +223,24 @@ export async function downloadNotePDF(props: NotePDFProps, fileName: string): Pr
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Open the rendered PDF in a new tab so the clinician can print it from the
+ * browser's native PDF viewer (Ctrl/Cmd+P). Reuses the same @react-pdf
+ * document as the download path. Returns false if the tab was blocked by a
+ * popup blocker so the caller can surface a hint.
+ */
+export async function printNotePDF(props: NotePDFProps): Promise<boolean> {
+  const blob = await buildNotePDFBlob(props);
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank', 'noopener');
+  if (!win) {
+    URL.revokeObjectURL(url);
+    return false;
+  }
+  // Keep the object URL alive long enough for the new tab to load it, then
+  // release it. Revoking immediately would break the opened document.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return true;
 }

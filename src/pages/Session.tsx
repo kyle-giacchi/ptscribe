@@ -26,7 +26,6 @@ import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
-import { renderNoteMarkdown } from '@/lib/clinical/noteFormat';
 import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
 import { AiCallError } from '@/components/ai/AiCallError';
@@ -229,7 +228,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const handleReplaceSections = sessionMachine.generate.replaceSections;
   const handleFinalize = sessionMachine.generate.finalize;
   const handleUnfinalize = sessionMachine.generate.unfinalize;
-  const handleCopyNoteMarkdown = sessionMachine.generate.copyMarkdown;
   const { missingRequiredLabels } = sessionMachine.generate;
   const { lastRawPayload, lastAiPrompts, lastKeyReport, aiError: generationAiError, retryStatus: generationRetryStatus } =
     sessionMachine.state.generate;
@@ -278,13 +276,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
     handleGenerateRaw(pendingGenerateMode.current, pendingFeedback.current);
   }
-
-  function handleCopyNote() {
-    if (!note || !template) return;
-    const md = renderNoteMarkdown(note, template, patient!);
-    handleCopyNoteMarkdown(md);
-  }
-
 
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
 
@@ -658,12 +649,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   canGenerate={canGenerate}
                   requiresFeedback={inputsUnchanged}
                   isGenerating={busy === 'generating'}
-                  noteExists={!!note}
+                  note={note}
+                  patient={patient!}
                   modifiers={currentModifiers}
                   onTemplateChange={handleTemplateChange}
                   onManageTemplates={() => setManageTemplatesOpen(true)}
                   onGenerate={handleGenerate}
-                  onCopyNote={handleCopyNote}
                   onModifiersChange={handleModifiersChange}
                 />
 
