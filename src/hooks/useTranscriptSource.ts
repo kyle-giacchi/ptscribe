@@ -8,7 +8,7 @@ import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { isDemoMode } from '@/lib/demoMode';
 import { useBackgroundTranscription } from './useBackgroundTranscription';
 import type { BackgroundT2State } from './useBackgroundTranscription';
-import type { useActionGuard } from './useActionGuard';
+import { MAX_TRANSCRIBES_PER_SESSION, type useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
 import type { Session, Settings } from '@/types';
 
@@ -85,6 +85,14 @@ export function useTranscriptSource({
         return;
       }
 
+      // Lifetime cap is session-backed (persisted) so it survives reload, Revert,
+      // and Unlock. CONTEXT.md §Cloud-transcription cap. Absent count reads as 0.
+      const spent = session.cloudTranscribeCount ?? 0;
+      if (spent >= MAX_TRANSCRIBES_PER_SESSION) {
+        toast.error('Cloud transcription was already used for this session.');
+        return;
+      }
+      // checkActionGuard now enforces only the 3-second cooldown for transcription.
       const guard = checkActionGuard('transcribe');
       if (!guard.allowed) {
         toast.error(guard.reason);
@@ -140,6 +148,7 @@ export function useTranscriptSource({
             activeTranscriptTier: 't3',
             status: 'draft',
             editedTranscript: undefined,
+            cloudTranscribeCount: spent + 1,
           });
           recordAction('transcribe');
           dispatch({

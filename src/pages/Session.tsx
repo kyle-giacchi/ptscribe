@@ -19,7 +19,7 @@ import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
-import { MAX_GENERATES_PER_SESSION } from '@/hooks/useActionGuard';
+import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useActionGuard';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
@@ -733,7 +733,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       onCreateTranscript={handleCreateTranscript}
                       canImproveWithAI={!session.t3Transcript}
                       cloudDisabledReason={
-                        isDemoMode() ? 'Cloud transcription is disabled in demo mode.' : undefined
+                        isDemoMode()
+                          ? 'Cloud transcription is disabled in demo mode.'
+                          : (session.cloudTranscribeCount ?? 0) >= MAX_TRANSCRIBES_PER_SESSION
+                            ? 'Cloud transcription was already used for this session.'
+                            : undefined
                       }
                       onRevertToLocal={handleRevertToLocal}
                       onCopyTranscript={handleCopyTranscript}
