@@ -20,6 +20,7 @@ import {
 } from '@/components/design';
 import { shortLabelForType } from '@/utils/labels';
 import { newId } from '@/utils/ids';
+import { relativeFromNow } from '@/utils/dates';
 import {
   UNASSIGNED_PATIENT_ID,
   type Note,
@@ -282,7 +283,7 @@ export function Dashboard() {
           >
             <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: 'var(--color-pt-accent-fg)', lineHeight: 1.4 }}>
               <strong>Session in progress</strong> — unfinished session for{' '}
-              <strong>{resumePatientName}</strong> from {relativeTime(resumeModal.updatedAt)}.
+              <strong>{resumePatientName}</strong> from {relativeFromNow(resumeModal.updatedAt)}.
             </div>
             <div className="flex gap-2">
               <PtButton
@@ -346,16 +347,6 @@ export function Dashboard() {
 // ─── Pending Sign-Off Rail ───────────────────────────────────────────────────
 
 const PENDING_RAIL_MAX = 5;
-
-function relativeTime(ms: number): string {
-  const diff = Date.now() - ms;
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return mins <= 1 ? 'just now' : `${mins} minutes ago`;
-  const hours = Math.floor(diff / 3_600_000);
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-  const days = Math.floor(diff / 86_400_000);
-  return days === 1 ? '1 day ago' : `${days} days ago`;
-}
 
 function PendingSignOffRail({
   sessions,
@@ -476,7 +467,7 @@ function PendingSignOffRail({
                       month: 'short',
                       day: 'numeric',
                     })}{' '}
-                    · {relativeTime(s.createdAt)}
+                    · {relativeFromNow(s.createdAt)}
                   </div>
                 </div>
                 <StatusBadge tone={ageTone} label={ageLabel(ageHours)} />
