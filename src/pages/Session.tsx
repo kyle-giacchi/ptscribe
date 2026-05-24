@@ -15,6 +15,7 @@ import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import { useSessionPatcher } from '@/hooks/useSessionPatcher';
 import type { NoteSection } from '@/types';
+import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
 import { useSessionMachine } from '@/hooks/useSessionMachine';
@@ -645,7 +646,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
                       {busy === 'generating'
                         ? 'Generating…'
-                        : `last generated ${relativeTime(note.updatedAt)}`}
+                        : `last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
                     </span>
                   )}
                 </div>
@@ -854,15 +855,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     </div>
     </SessionResetContext.Provider>
   );
-}
-
-function relativeTime(ts: number | undefined): string {
-  if (!ts) return '';
-  const min = Math.floor((Date.now() - ts) / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
-  if (min < 24 * 60) return `${Math.floor(min / 60)}h ago`;
-  return `${Math.floor(min / (60 * 24))}d ago`;
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
