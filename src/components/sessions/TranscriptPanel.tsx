@@ -25,6 +25,8 @@ interface TranscriptPanelProps {
   onCommit: () => void;
   onCreateTranscript: (clipId?: string) => void;
   canImproveWithAI?: boolean;
+  /** When set, the Improve-with-AI button renders disabled with this string as its tooltip (e.g. demo mode, cap spent). */
+  cloudDisabledReason?: string;
   onRevertToLocal: () => void;
   onCopyTranscript?: () => void;
   onOpenPIIScrub?: () => void;
@@ -40,7 +42,7 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
     totalDurationSec, collapsed, onCollapse,
     onChange, onCommit, onCreateTranscript, onRevertToLocal,
     onCopyTranscript, onOpenPIIScrub,
-    hasEditedTranscript, onRevertEdits, canImproveWithAI = true,
+    hasEditedTranscript, onRevertEdits, canImproveWithAI = true, cloudDisabledReason,
     seekSignal,
   } = props;
 
@@ -159,8 +161,9 @@ export function TranscriptPanel(props: TranscriptPanelProps) {
           )}
           {canImproveWithAI && transcript.trim() && (
             <button type="button" className="btn btn-ghost" style={{ fontSize: 12 }}
-              disabled={transcribing} onClick={handleCreateClick}
-              title="Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result.">
+              disabled={transcribing || Boolean(cloudDisabledReason)} onClick={handleCreateClick}
+              title={cloudDisabledReason ??
+                'Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result.'}>
               {transcribing
                 ? <><Loader2 size={13} className="animate-spin" /> Transcribing…</>
                 : <><Wand2 size={13} strokeWidth={2} /> Improve with AI</>}

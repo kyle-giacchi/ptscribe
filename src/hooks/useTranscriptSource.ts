@@ -5,6 +5,7 @@ import { transcribe } from '@/services/ai/transcribe';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
+import { isDemoMode } from '@/lib/demoMode';
 import { useBackgroundTranscription } from './useBackgroundTranscription';
 import type { BackgroundT2State } from './useBackgroundTranscription';
 import type { useActionGuard } from './useActionGuard';
@@ -72,6 +73,12 @@ export function useTranscriptSource({
 
   const runT3 = useCallback(
     async (_clipId?: string) => {
+      // Demo-mode hard rule: cloud Nova is unreachable. This guard wins before any
+      // session/blob check so a demo build can never bill Nova. See CLAUDE.md hard rules.
+      if (isDemoMode()) {
+        toast.error('Cloud transcription is disabled in demo mode.');
+        return;
+      }
       if (!session) return;
       if (!silencedMergedBlob) {
         toast.error('No audio to transcribe yet. Record or upload audio first.');

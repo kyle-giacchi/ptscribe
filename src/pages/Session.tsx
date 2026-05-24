@@ -731,7 +731,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         }
                       }}
                       onCreateTranscript={handleCreateTranscript}
-                      canImproveWithAI={!isDemoMode() && !session.t3Transcript}
+                      canImproveWithAI={!session.t3Transcript}
+                      cloudDisabledReason={
+                        isDemoMode() ? 'Cloud transcription is disabled in demo mode.' : undefined
+                      }
                       onRevertToLocal={handleRevertToLocal}
                       onCopyTranscript={handleCopyTranscript}
                       onOpenPIIScrub={() => setPiiScrubOpen(true)}

@@ -30,6 +30,8 @@ export interface Env {
   /** Comma-separated list of allowed request Origins. Defaults to same-origin
    *  plus localhost dev ports when unset. */
   ALLOWED_ORIGINS?: string;
+  /** When "true", /api/transcribe (Nova) is rejected. Set on the demo deployment only. */
+  DEMO_MODE?: string;
 }
 
 interface GenerateBody {
@@ -297,6 +299,11 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 }
 
 async function handleTranscribe(request: Request, env: Env): Promise<Response> {
+  // Server-side belt-and-suspenders for the demo Nova hard-disable: even a tampered
+  // client cannot bill Nova on the demo deployment. The var is set only there.
+  if (env.DEMO_MODE === 'true') {
+    return apiError('DEMO_DISABLED', 'Cloud transcription is disabled in demo mode', 403);
+  }
   const language = request.headers.get('x-ptscribe-language') || undefined;
   const model = request.headers.get('x-ptscribe-model')?.trim() || DEFAULT_TRANSCRIBE_MODEL;
   const contentType = request.headers.get('Content-Type') || 'audio/webm';
@@ -632,6 +639,7 @@ type ErrorCode =
   | 'MISSING_FIELDS'
   | 'MISSING_API_KEY'
   | 'EMPTY_TEXT'
+  | 'DEMO_DISABLED'
   | 'UPSTREAM_FAILED';
 
 function apiError(code: ErrorCode, error: string, status: number): Response {
