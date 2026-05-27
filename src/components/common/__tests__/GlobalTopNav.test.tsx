@@ -1,7 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GlobalTopNav } from '../GlobalTopNav';
+
+// Mutable auth stub — orgId drives whether the Organization nav item appears.
+let mockOrgId: string | null = null;
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    currentUser: { id: 'u1', email: 'me@example.com', orgId: mockOrgId },
+  }),
+}));
 
 // Stub providers used by the nav (they reach into AppDataProvider in real use).
 vi.mock('@/contexts/NotesProvider', () => ({
@@ -47,6 +55,10 @@ vi.mock('@/lib/debug/flags', () => ({
 }));
 
 describe('GlobalTopNav', () => {
+  beforeEach(() => {
+    mockOrgId = null;
+  });
+
   it('renders the primary nav items', () => {
     render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
     expect(screen.getByText('My Chart')).toBeInTheDocument();
@@ -65,5 +77,18 @@ describe('GlobalTopNav', () => {
     render(<MemoryRouter initialEntries={['/patients']}><GlobalTopNav /></MemoryRouter>);
     const patientsLink = screen.getByText('Patients').closest('a');
     expect(patientsLink?.className).toContain('active');
+  });
+
+  it('hides the Organization link for personal/demo accounts (no orgId)', () => {
+    mockOrgId = null;
+    render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
+    expect(screen.queryByText('Organization')).not.toBeInTheDocument();
+  });
+
+  it('shows the Organization link when the user belongs to an org', () => {
+    mockOrgId = 'org-123';
+    render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
+    // Appears twice (horizontal nav + hidden dropdown), so use getAllByText.
+    expect(screen.getAllByText('Organization').length).toBeGreaterThan(0);
   });
 });

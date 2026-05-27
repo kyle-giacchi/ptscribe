@@ -6,6 +6,7 @@ export const DEMO_USER: AppUser = {
   displayName: 'Demo Clinician',
   planTier: 'demo',
   tenantId: 'local',
+  orgId: null,
   role: 'owner',
   createdAt: 0,
 };

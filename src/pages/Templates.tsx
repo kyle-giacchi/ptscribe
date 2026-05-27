@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
-import { Copy, Pencil, Trash2, Lock, Plus, Star } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { Copy, Pencil, Trash2, Lock, Plus, Star, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { newId } from '@/utils/ids';
 import { useToggle } from '@/hooks/useToggle';
@@ -23,10 +24,36 @@ const SELECTABLE_FORMATS: NoteFormat[] = ['evaluation', 'soap', 'progress', 'dis
 
 export function Templates() {
   const { templates, addTemplate, updateTemplate, cloneTemplate, removeTemplate } = useTemplates();
+  const { sharedTemplates } = useOrgConfig();
   const { settings, updateOrgPolicy } = useSettings();
   const orgDefaultId = settings.orgPolicy.activeTemplateId;
   const [editing, setEditing] = useState<NoteTemplate | null>(null);
   const [creating, startCreating, stopCreating] = useToggle();
+
+  // Org shared templates are read-only and live only in OrgConfig context (never
+  // in AppData) — like built-ins, but sourced from the org. We merge them into
+  // the list for display; cloning copies them into the user's own library.
+  const orgTemplateIds = useMemo(
+    () => new Set(sharedTemplates.map((t) => t.id)),
+    [sharedTemplates],
+  );
+
+  const cloneFromOrg = useCallback(
+    (src: NoteTemplate): NoteTemplate => {
+      const now = Date.now();
+      const clone: NoteTemplate = {
+        ...src,
+        id: newId(),
+        name: `${src.name} (copy)`,
+        builtin: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      addTemplate(clone);
+      return clone;
+    },
+    [addTemplate],
+  );
 
   const grouped = useMemo(() => {
     const buckets: Record<NoteFormat, NoteTemplate[]> = {
@@ -36,16 +63,20 @@ export function Templates() {
       discharge: [],
       custom: [],
     };
-    for (const t of templates) {
+    const localIds = new Set(templates.map((t) => t.id));
+    const merged = [...templates, ...sharedTemplates.filter((t) => !localIds.has(t.id))];
+    for (const t of merged) {
       buckets[t.format]?.push(t);
     }
     for (const fmt of FORMAT_ORDER) {
-      buckets[fmt].sort(
-        (a, b) => Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name),
-      );
+      // Built-ins first, then org shared, then user templates — each alpha within.
+      buckets[fmt].sort((a, b) => {
+        const rank = (t: NoteTemplate) => (t.builtin ? 0 : orgTemplateIds.has(t.id) ? 1 : 2);
+        return rank(a) - rank(b) || a.name.localeCompare(b.name);
+      });
     }
     return buckets;
-  }, [templates]);
+  }, [templates, sharedTemplates, orgTemplateIds]);
 
   function handleCreate(format: NoteFormat, name: string) {
     const trimmed = name.trim();
@@ -119,7 +150,9 @@ export function Templates() {
                 </span>
               </div>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {items.map((t, i) => (
+                {items.map((t, i) => {
+                  const isOrg = orgTemplateIds.has(t.id);
+                  return (
                   <li
                     key={t.id}
                     style={{
@@ -157,7 +190,26 @@ export function Templates() {
                             <Lock size={10} /> Built-in
                           </span>
                         )}
-                        {!t.builtin && orgDefaultId === t.id && (
+                        {isOrg && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 7px',
+                              borderRadius: 999,
+                              fontSize: 10,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              background: 'var(--color-pt-surface-mut)',
+                              color: 'var(--color-pt-text-3)',
+                              border: '1px solid var(--color-pt-border)',
+                            }}
+                          >
+                            <Building2 size={10} /> Org
+                          </span>
+                        )}
+                        {!t.builtin && !isOrg && orgDefaultId === t.id && (
                           <span
                             style={{
                               display: 'inline-flex',
@@ -184,7 +236,7 @@ export function Templates() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {!t.builtin && (
+                      {!t.builtin && !isOrg && (
                         <PtButton
                           variant="ghost"
                           style={{
@@ -228,7 +280,7 @@ export function Templates() {
                         iconLeft={<Copy size={12} strokeWidth={2} />}
                         style={{ padding: '6px 10px', fontSize: 12 }}
                         onClick={() => {
-                          const clone = cloneTemplate(t.id);
+                          const clone = isOrg ? cloneFromOrg(t) : cloneTemplate(t.id);
                           if (clone) {
                             toast.success('Template cloned');
                             setEditing(clone);
@@ -237,7 +289,7 @@ export function Templates() {
                       >
                         Clone
                       </PtButton>
-                      {!t.builtin && (
+                      {!t.builtin && !isOrg && (
                         <>
                           <PtButton
                             variant="ghost"
@@ -264,7 +316,8 @@ export function Templates() {
                       )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </SurfaceCard>
           );
