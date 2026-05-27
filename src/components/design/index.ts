@@ -13,3 +13,4 @@ export { Waveform } from './Waveform';
 export { DisconnectBanner } from './DisconnectBanner';
 export { SurfaceCard, Eyebrow } from './Card';
 export { PtButton } from './Button';
+export { ComingSoonChip } from './ComingSoonChip';

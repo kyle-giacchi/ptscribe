@@ -209,9 +209,18 @@ Implications for the workflow:
 
 - Cold-open before recording: vault prompt is the first thing the clinician sees. Passkey is the fast path when a patient is already in the room; passphrase is the fallback.
 - WAL chunks, per-clip audio, the combined silenced blob, and the curated transcript all round-trip through the Repository encryption boundary normally — no second persistence path, no unencrypted staging area.
-- Tab close evicts the key. There is no passphrase recovery. The two consequences (existing recordings become unreadable to an attacker; the legitimate clinician must re-unlock on next visit) are intentional.
+- Tab close evicts the key. The two consequences (existing recordings become unreadable to an attacker; the legitimate clinician must re-unlock on next visit) are intentional.
+- **Passphrase recovery** is being introduced via a **Recovery code** (see below and ADR-0003) — until that ships, a forgotten passphrase is permanent loss of all encrypted data. _Note: code below is the planned direction, not yet implemented — verify against the source before assuming it exists._
 
 Idle-timeout vault relocking is **not** a default behavior. If introduced later it would be an opt-in setting and would need to define WAL-chunk behavior during the locked window.
+
+**Recovery code** _(planned — ADR-0003)_:
+A high-entropy code shown once at vault setup that wraps the same DEK as the passphrase, so a forgotten passphrase is not terminal. It is **not** a second passphrase and is **not** a cloud-stored secret — recovery stays entirely on-device.
+_Avoid_: backup password, reset code, recovery key (reserve "key" for the DEK/KEK).
+
+**Portable backup** _(planned — ADR-0003)_:
+A self-contained backup file whose DEK is wrapped by both the passphrase and the recovery code, so it can be restored on **any** device with either secret. The backup **file** (not a server) is the cross-device transport. Distinct from the same-device-only v1 encrypted backup.
+_Avoid_: cloud backup, sync (PTScribe does not sync clinical data to a server).
 
 ## Interruption and recovery
 
