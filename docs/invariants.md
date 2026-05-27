@@ -196,7 +196,7 @@ The guard state (`pendingDelete`, `pendingOverwrite`, `pendingReplace`, etc.) is
 
 **Every session — recorded or uploaded — is automatically transcribed by local Whisper once the combined silence-removed audio blob is ready, regardless of the user's configured transcription provider.**
 
-After the user finishes recording or uploads a clip, `buildMergedAudioForReview` in `useRecordingFlow` silence-trims each individual clip blob, then merges them into a single combined blob (`silencedMergedBlob`). This blob is set in `useTranscriptionFlow` state and flows to `useBackgroundTranscription`.
+After the user finishes recording or uploads a clip, `buildMergedAudioForReview` in `useCapturePhase` silence-trims each individual clip blob, then merges them into a single combined blob (`silencedMergedBlob`). This blob is set in `useTranscriptSource` state and flows to `useBackgroundTranscription`.
 
 The background effect in `useBackgroundTranscription` fires once `silencedMergedBlob` is non-null. It calls `transcribeWithLocalWhisper` (whisper-tiny.en ONNX in-browser via parallel worker pool). The result is stored at session level in `session.t2Transcript` and `session.transcript` so the Review tab populates without any manual action. The effect resets and re-runs whenever `silencedMergedBlob` changes, enabling T2 to update automatically when the user adds another clip.
 
@@ -274,3 +274,36 @@ The script downloads that file plus tokenizer/config files, writes them to `./mo
 `env.useBrowserCache` is always `false` — the IDB interceptor owns all caching; the browser Cache API is not involved.
 
 Do not add an `if (!IS_DEV)` guard around the interceptor. Do not switch to a different model (e.g. `Xenova/bert-base-NER`) to avoid the conversion step — `openai/privacy-filter` covers dates, phone numbers, emails, and MRNs in addition to named entities, which the general NER model misses.
+
+## D1 config sync — clinical exclusion has exactly one chokepoint
+
+Registered (non-demo) users sync **non-clinical** config to D1 so it follows them across devices: the `settings` subtree, the `clinician` profile, and **custom (non-builtin) templates/exercises only**. Orgs carry a policy blob + a shared template/exercise library. Patient data (`patients`, `sessions`, `notes`, `plans`) and audio **never** reach D1 — this is the same hard boundary as the rest of the app, enforced here at two layers:
+
+- **Client (the single source of truth):** `projectUserConfig(appData)` in `src/services/configSync.ts` is the **only** place the sync payload is built. It allowlists the four synced subtrees — it does not blocklist. Adding a new synced field means editing this one function; adding any other field to `AppData` is automatically excluded. Do not construct a config payload anywhere else.
+- **Worker (defense in depth):** `parseConfigBlob` in `worker/configLogic.ts` rejects any blob carrying a forbidden top-level key (`patients`/`sessions`/`notes`/`plans`) and enforces `MAX_CONFIG_BYTES`. `sanitizeCustomEntities` drops anything with `builtin: true` — the server never stores built-ins even if a client sends them.
+
+**Demo / test-user / unauthenticated / no-org sessions make ZERO `/api/config/*` requests.** The isolation gate lives in `ConfigSyncProvider` (and `OrgConfigProvider`, which additionally requires `currentUser.orgId`):
+
+```ts
+if (isDemoMode() || !isAuthenticated || !currentUser || currentUser.id === DEMO_USER.id) return; // ConfigSyncProvider
+// OrgConfigProvider adds: || !currentUser.orgId
+```
+
+A test asserts the zero-fetch property for all four cases — do not weaken it. The demo user shares storage with real data (no namespace split, see [Demo mode](../CONTEXT.md#demo-mode)) so a stray sync call would exfiltrate a clinician's local data to D1 under the demo account. The gate is the safeguard.
+
+**Reconciliation is blob-level last-write-wins.** The config version (`updatedAt`) is tracked in a **per-user** localStorage record `ptscribe-config-sync:<userId>` — deliberately **not** `AppData.lastModified`, which bumps on patient edits that must not trigger a config push. A fresh device has no record ⇒ `localUpdatedAt = 0` ⇒ the server always wins on first pull. Push is debounced (~1.5 s) on change; pull runs on login. The worker PUT rejects a stale write (`incoming.updatedAt < stored.updatedAt`) with `STALE_WRITE` 409.
+
+**Org templates/exercises resolve in-place — never written to AppData.** Shared library entries live only in `OrgConfigProvider` context (read-only, "like built-ins but sourced from the org"). The session-template resolution merges them (`allTemplates = [...local, ...sharedTemplates]`) so an org-template-backed session generates against the right template; cloning is the only path that copies one into local AppData. Do not persist org entries into `AppData` — that would route org-owned data through the user's sync payload.
+
+## Remote D1 migrations — `0002` is destructive; never blindly run `migrations apply --remote`
+
+`migrations/0002_fix_column_casing.sql` **`DROP TABLE`s** `user`, `account`, `passkey`, `session`, and `verification` and recreates them empty. It is safe only as the second step of a from-scratch migration run on a virgin database.
+
+The remote `ptscribe-auth` D1 was provisioned **without a `d1_migrations` tracking table** (the auth tables were created out-of-band). In that state `wrangler d1 migrations apply ptscribe-auth --remote` believes nothing has been applied and will re-run **0001 + 0002**, wiping every registered user and passkey in production.
+
+Rules for remote D1:
+
+- **Always run `wrangler d1 migrations list ptscribe-auth --remote` first** and read what it proposes. If it lists `0001`/`0002` against a database that already has populated auth tables, **stop** — the tracking table is missing or out of sync. Do not proceed with `migrations apply`.
+- To add genuinely-missing additive tables, apply the specific files directly: `wrangler d1 execute ptscribe-auth --remote --file migrations/000N_*.sql -y`. Every migration from `0003` on is purely `CREATE TABLE/INDEX IF NOT EXISTS` (idempotent), so direct execution is safe and repeatable.
+- The tracking table has been bootstrapped (2026-05-27): `d1_migrations` now exists remotely with all five migration names recorded, so `migrations list --remote` reports "No migrations to apply" and a future `0006+` migration works through the normal command again. If you ever recreate the remote DB, re-bootstrap it the same way before trusting `migrations apply`.
+- Local dev (`--local`) already has an intact tracking table; `wrangler d1 migrations apply ptscribe-auth` (no `--remote`) is the normal local flow.
