@@ -1,5 +1,11 @@
 import { Mic, Pencil, Calendar, MessageSquare } from 'lucide-react';
-import { Avatar, PtButton, StatusBadge, type StatusTone } from '@/components/design';
+import {
+  Avatar,
+  ComingSoonChip,
+  PtButton,
+  StatusBadge,
+  type StatusTone,
+} from '@/components/design';
 import { labelForSex } from '@/utils/patientMetrics';
 import type { Patient } from '@/types';
 
@@ -93,10 +99,22 @@ export function PatientHeader({
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <PtButton variant="ghost" iconLeft={<MessageSquare size={14} strokeWidth={2} />}>
+          <PtButton
+            variant="ghost"
+            iconLeft={<MessageSquare size={14} strokeWidth={2} />}
+            iconRight={<ComingSoonChip />}
+            disabled
+            title="Coming soon"
+          >
             Message
           </PtButton>
-          <PtButton variant="ghost" iconLeft={<Calendar size={14} strokeWidth={2} />}>
+          <PtButton
+            variant="ghost"
+            iconLeft={<Calendar size={14} strokeWidth={2} />}
+            iconRight={<ComingSoonChip />}
+            disabled
+            title="Coming soon"
+          >
             Schedule
           </PtButton>
           <PtButton
@@ -117,7 +135,7 @@ export function PatientHeader({
       </div>
 
       <div
-        className="[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         style={{ display: 'flex', gap: 22, marginTop: 18, overflowX: 'auto' }}
       >
         {TABS.map((t) => {

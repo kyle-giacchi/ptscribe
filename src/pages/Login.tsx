@@ -10,7 +10,11 @@ type View = 'default' | 'magic-form' | 'magic-sent';
 const errorMessages: Record<string, string> = {
   'missing-token': 'The magic link was incomplete. Please request a new one.',
   'invalid-link': 'This magic link is invalid or has expired. Please request a new one.',
+  network: 'We couldn’t reach the server to verify your link. Check your connection and try the link again — it hasn’t been used up.',
 };
+
+const PASSKEY_NO_CREDENTIAL =
+  'No passkey was found on this device, or the prompt was dismissed. If you’re new here or on a new device, use the email link below — passkeys don’t transfer between devices automatically.';
 
 export function Login() {
   const navigate = useNavigate();
@@ -34,12 +38,19 @@ export function Login() {
     try {
       const result = await authClient.signIn.passkey();
       if (result?.error) {
-        setError(result.error.message ?? 'Passkey sign-in failed. Try again or use a magic link.');
+        // No registered credential is a normal "new device" case, not a failure.
+        setError(result.error.message ?? PASSKEY_NO_CREDENTIAL);
       } else {
         navigate(from, { replace: true });
       }
-    } catch {
-      setError('Passkey sign-in failed. Try again or use a magic link.');
+    } catch (err) {
+      // WebAuthn throws NotAllowedError when the user dismisses the prompt or no
+      // matching passkey exists on this device — guide them to the email path.
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+        setError(PASSKEY_NO_CREDENTIAL);
+      } else {
+        setError('Passkey sign-in failed. Try again or use a magic link.');
+      }
     } finally {
       setLoading(false);
     }
@@ -160,7 +171,8 @@ export function Login() {
             <p
               style={{ margin: '0 0 28px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
             >
-              Sign in with your device passkey, or use a magic link sent to your email.
+              Use your device passkey for the fastest sign-in. New here, or on a new device? Email
+              yourself a link to get in, then add a passkey once you&apos;re signed in.
             </p>
 
             <button
@@ -201,7 +213,7 @@ export function Login() {
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              Use magic link instead
+              Email me a link instead
             </button>
 
             <div

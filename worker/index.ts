@@ -32,6 +32,12 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
   /** When "true", /api/transcribe (Nova) is rejected. Set on the demo deployment only. */
   DEMO_MODE?: string;
+  /** Resend API key (secret). When absent, transactional email falls back to a
+   *  console.log so local dev works without a provider. See worker/email.ts. */
+  RESEND_API_KEY?: string;
+  /** From-address for transactional email, e.g. "PTScribe <login@ptscribe.app>".
+   *  Must be a domain verified in Resend (DKIM/SPF). Defaults to a ptscribe.app sender. */
+  EMAIL_FROM?: string;
 }
 
 interface GenerateBody {
@@ -252,7 +258,11 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
 function isOriginAllowed(origin: string, requestUrl: string, env: Env): boolean {
   const workerOrigin = new URL(requestUrl).origin;
   const allowed = env.ALLOWED_ORIGINS
-    ? new Set(env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean))
+    ? new Set(
+        env.ALLOWED_ORIGINS.split(',')
+          .map((o) => o.trim())
+          .filter(Boolean),
+      )
     : new Set([workerOrigin, 'http://localhost:8080', 'http://localhost:8787']);
   return allowed.has(origin);
 }
@@ -541,7 +551,9 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     // Keep the upstream detail in operator logs only; the client gets a
     // generic message + status so we don't leak Anthropic account/quota text.
     const detail = (await safeText(upstream)).slice(0, 200);
-    console.error(`[generate] Anthropic upstream ${upstream.status}: ${detail || upstream.statusText}`);
+    console.error(
+      `[generate] Anthropic upstream ${upstream.status}: ${detail || upstream.statusText}`,
+    );
     return apiError(
       'UPSTREAM_FAILED',
       `Note generation failed upstream (${upstream.status})`,
