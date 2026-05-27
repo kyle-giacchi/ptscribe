@@ -6,6 +6,7 @@ import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { newId } from '@/utils/ids';
 import { isSameDay } from '@/utils/dates';
@@ -37,14 +38,20 @@ export function NewSession() {
   const { patients, addPatient } = usePatients();
   const { forPatient: sessionsForPatient, addSession } = useSessions();
   const { templates, addTemplate } = useTemplates();
+  const { sharedTemplates, policy } = useOrgConfig();
   const { settings } = useSettings();
-  const orgDefaultTemplateId = settings.orgPolicy.activeTemplateId;
+  // Org-recommended default (from D1 policy) wins; otherwise the local pin.
+  const orgDefaultTemplateId = policy.defaultTemplateId ?? settings.orgPolicy.activeTemplateId;
+  const orgTemplateIds = useMemo(
+    () => new Set(sharedTemplates.map((t) => t.id)),
+    [sharedTemplates],
+  );
 
   const [patientId, setPatientId] = useState(params.get('patientId') ?? '');
   const [sessionType, setSessionType] = useState<SessionType>('follow_up');
   const [templateId, setTemplateId] = useState<string>(() => {
     if (!orgDefaultTemplateId) return '';
-    const tpl = templates.find((t) => t.id === orgDefaultTemplateId);
+    const tpl = [...templates, ...sharedTemplates].find((t) => t.id === orgDefaultTemplateId);
     if (!tpl) return '';
     return tpl.format === TYPE_TO_FORMAT['follow_up'] ? tpl.id : '';
   });
@@ -77,10 +84,16 @@ export function NewSession() {
 
   const visitTemplates = useMemo(() => {
     const fmt = TYPE_TO_FORMAT[sessionType];
-    return templates
+    const localIds = new Set(templates.map((t) => t.id));
+    const merged = [...templates, ...sharedTemplates.filter((t) => !localIds.has(t.id))];
+    return merged
       .filter((t) => t.format === fmt)
-      .sort((a, b) => Number(b.builtin) - Number(a.builtin) || a.name.localeCompare(b.name));
-  }, [templates, sessionType]);
+      .sort((a, b) => {
+        // Built-ins first, then org shared, then user templates — alpha within.
+        const rank = (t: NoteTemplate) => (t.builtin ? 0 : orgTemplateIds.has(t.id) ? 1 : 2);
+        return rank(a) - rank(b) || a.name.localeCompare(b.name);
+      });
+  }, [templates, sharedTemplates, orgTemplateIds, sessionType]);
 
   const orgDefaultMatch =
     (orgDefaultTemplateId && visitTemplates.find((t) => t.id === orgDefaultTemplateId)?.id) || '';
@@ -418,6 +431,7 @@ export function NewSession() {
                 visitTemplates={visitTemplates}
                 effectiveTemplateId={effectiveTemplateId}
                 orgDefaultTemplateId={orgDefaultTemplateId}
+                orgTemplateIds={orgTemplateIds}
                 showAllTemplates={showAllTemplates}
                 onPickTemplate={setTemplateId}
                 onShowAll={showAllTemplatesOn}

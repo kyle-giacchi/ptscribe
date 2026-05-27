@@ -9,6 +9,8 @@ import { TemplatesProvider } from '@/contexts/TemplatesProvider';
 import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
+import { ConfigSyncProvider } from '@/contexts/ConfigSyncProvider';
+import { OrgConfigProvider } from '@/contexts/OrgConfigProvider';
 import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { DebugDrawerProvider } from '@/contexts/DebugDrawerProvider';
 import { GlobalDebugDrawer } from '@/components/sessions/GlobalDebugDrawer';
@@ -43,6 +45,9 @@ const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m
 const UserSettings = lazy(() =>
   import('@/pages/UserSettings').then((m) => ({ default: m.UserSettings })),
 );
+const OrgSettings = lazy(() =>
+  import('@/pages/OrgSettings').then((m) => ({ default: m.OrgSettings })),
+);
 
 function PageLoader() {
   return (
@@ -57,6 +62,8 @@ function AppProviders() {
     <NotificationsProvider>
     <VaultGate>
       <AppDataProvider>
+        <ConfigSyncProvider>
+        <OrgConfigProvider>
         <ClinicianProvider>
           <PatientsProvider>
             <SessionsProvider>
@@ -83,6 +90,7 @@ function AppProviders() {
                                     <Route path="/exercises" element={<Exercises />} />
                                     <Route path="/settings" element={<Settings />} />
                                     <Route path="/account" element={<UserSettings />} />
+                                    <Route path="/org" element={<OrgSettings />} />
                                   </Route>
                                   <Route
                                     path="*"
@@ -124,6 +132,8 @@ function AppProviders() {
             </SessionsProvider>
           </PatientsProvider>
         </ClinicianProvider>
+        </OrgConfigProvider>
+        </ConfigSyncProvider>
       </AppDataProvider>
     </VaultGate>
     </NotificationsProvider>

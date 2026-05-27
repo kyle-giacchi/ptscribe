@@ -8,6 +8,12 @@ export type RecorderStatus = 'idle' | 'recording' | 'paused' | 'stopped' | 'erro
 
 export interface UseRecorderOptions {
   limits?: RecordingLimitsSettings;
+  /**
+   * Preferred microphone `deviceId` (from the AudioCheck pre-flight). Passed to
+   * `getUserMedia` as `{ deviceId: { ideal } }` — the browser falls back to the
+   * default device if it's unavailable. Undefined = system default.
+   */
+  inputDeviceId?: string;
 }
 
 export interface UseRecorder {
@@ -126,6 +132,13 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   useEffect(() => {
     limitsRef.current = options.limits;
   }, [options.limits]);
+
+  // Read the preferred mic at start() time (not closure-captured) so a device
+  // change between renders takes effect on the next recording.
+  const inputDeviceIdRef = useRef<string | undefined>(options.inputDeviceId);
+  useEffect(() => {
+    inputDeviceIdRef.current = options.inputDeviceId;
+  }, [options.inputDeviceId]);
 
   // Exposed so callers can subscribe to accumulated-audio callbacks without re-creating the recorder.
   const onChunkRef = useRef<((blob: Blob, mimeType: string) => void) | null>(null);
@@ -369,7 +382,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           /* best-effort; recording can still proceed */
         });
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const preferredId = inputDeviceIdRef.current;
+        const audioConstraints: MediaTrackConstraints | true = preferredId
+          ? { deviceId: { ideal: preferredId } }
+          : true;
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
         streamRef.current = stream;
 
         // Wire a track-ended listener on every audio track. The 'ended' event fires

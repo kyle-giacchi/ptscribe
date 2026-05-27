@@ -62,6 +62,9 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   each Session. Zod strips the stale field automatically; migration just bumps version.
  * - v21 → v22: Adds optional `Session.cloudTranscribeCount` (persisted Nova cap counter).
  *   Existing sessions have consumed no cloud pass yet — leave undefined (read as 0).
+ * - v22 → v23: Adds optional `Settings.audio.inputDeviceId` (microphone chosen in the
+ *   AudioCheck pre-flight). Existing users have made no choice — leave undefined so
+ *   recording keeps using the system default device.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -141,6 +144,9 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 21) {
     working = migrateV21ToV22(working);
+  }
+  if ((working as { version?: number }).version === 22) {
+    working = migrateV22ToV23(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -460,6 +466,12 @@ function migrateV21ToV22(input: Record<string, unknown>): Record<string, unknown
   // Additive optional field: Session.cloudTranscribeCount. Existing sessions have
   // not consumed any cloud pass yet — leave undefined (treated as 0 at read time).
   return { ...input, version: 22 };
+}
+
+function migrateV22ToV23(input: Record<string, unknown>): Record<string, unknown> {
+  // Additive optional field: Settings.audio.inputDeviceId. Existing users have made
+  // no AudioCheck mic selection — leave undefined so recording uses the default device.
+  return { ...input, version: 23 };
 }
 
 function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {

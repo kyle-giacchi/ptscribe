@@ -5,6 +5,7 @@ import { magicLink } from 'better-auth/plugins/magic-link';
 import { Kysely } from 'kysely';
 import { D1Dialect } from 'kysely-d1';
 import { sendMagicLinkEmail } from './email';
+import { reconcileInvite } from './org';
 import type { Env } from './index';
 
 export function createAuth(env: Env, ctx: ExecutionContext) {
@@ -32,6 +33,21 @@ export function createAuth(env: Env, ctx: ExecutionContext) {
         planTier: { type: 'string', defaultValue: 'personal-free', input: false },
         tenantId: { type: 'string', required: false, input: false },
         role: { type: 'string', defaultValue: 'owner', input: false },
+      },
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          // On every sign-in, join the user to a pending org invite for their
+          // email (if any) before the session is usable, so role/tenantId are
+          // correct on the first getSession. Idempotent and never throws.
+          after: async (session) => {
+            await reconcileInvite(
+              db as Parameters<typeof reconcileInvite>[0],
+              session.userId,
+            );
+          },
+        },
       },
     },
     plugins: [

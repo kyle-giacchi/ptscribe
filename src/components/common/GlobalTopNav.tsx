@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { useDismissable } from '@/hooks/useDismissable';
 import { AlertsButton, ProfileButton, VaultPill } from './TopNavControls';
 import { PatientQuickSearch } from './PatientQuickSearch';
@@ -12,13 +13,17 @@ interface NavItemDef {
   end?: boolean;
 }
 
-const NAV_ITEMS: NavItemDef[] = [
+const BASE_NAV_ITEMS: NavItemDef[] = [
   { to: '/today', label: 'My Chart' },
   { to: '/notes', label: 'Review queue' },
   { to: '/patients', label: 'Patients' },
   { to: '/templates', label: 'Templates' },
   { to: '/settings', label: 'Settings' },
 ];
+
+// The Organization link appears only for members of a real org (hidden in
+// demo/personal accounts, where orgId is null).
+const ORG_NAV_ITEM: NavItemDef = { to: '/org', label: 'Organization' };
 
 function PendingBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -96,8 +101,14 @@ function NavItem({ item, variant, pendingCount, onNavigate }: NavItemProps) {
 
 export function GlobalTopNav() {
   const { notes } = useNotes();
+  const { currentUser } = useAuth();
   const pendingCount = notes.filter((n) => !n.finalized).length;
   const navigate = useNavigate();
+
+  const navItems = useMemo(
+    () => (currentUser?.orgId ? [...BASE_NAV_ITEMS, ORG_NAV_ITEM] : BASE_NAV_ITEMS),
+    [currentUser?.orgId],
+  );
   const [overflowOpen, setOverflowOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -157,7 +168,7 @@ export function GlobalTopNav() {
             flexDirection: 'column',
           }}
         >
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavItem
               key={item.to}
               item={item}
@@ -201,7 +212,7 @@ export function GlobalTopNav() {
 
       {/* Primary nav */}
       <nav className="flex items-center" style={{ gap: 4 }} aria-label="Primary">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavItem key={item.to} item={item} variant="horizontal" pendingCount={pendingCount} />
         ))}
       </nav>

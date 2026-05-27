@@ -295,6 +295,7 @@ const SettingsSchema = z.object({
       enabled: z.boolean(),
       speed: z.union([z.literal(1.25), z.literal(1.5), z.literal(1.75)]),
     }),
+    inputDeviceId: z.string().optional(),
   }),
   security: z.object({
     idleLockMinutes: z.number().int().min(0).max(120),

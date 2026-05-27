@@ -28,15 +28,24 @@ function OrgDefaultPill() {
   );
 }
 
+/** Origin label shown on the right of a template option. */
+function originLabel(template: NoteTemplate, isOrg: boolean): string {
+  if (template.builtin) return 'Built-in';
+  if (isOrg) return 'Org';
+  return 'Custom';
+}
+
 function TemplateOption({
   template,
   selected,
   isOrgDefault,
+  isOrg,
   onSelect,
 }: {
   template: NoteTemplate;
   selected: boolean;
   isOrgDefault: boolean;
+  isOrg: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -99,7 +108,7 @@ function TemplateOption({
             color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
           }}
         >
-          {template.builtin ? 'Built-in' : 'Custom'} · {template.sections.length} sections
+          {originLabel(template, isOrg)} · {template.sections.length} sections
         </span>
       </button>
     </li>
@@ -110,11 +119,13 @@ function CompactTemplate({
   template,
   hasMore,
   isOrgDefault,
+  isOrg,
   onChange,
 }: {
   template: NoteTemplate | undefined;
   hasMore: boolean;
   isOrgDefault: boolean;
+  isOrg: boolean;
   onChange: () => void;
 }) {
   if (!template) return null;
@@ -158,7 +169,7 @@ function CompactTemplate({
               color: 'var(--color-pt-accent-fg)',
             }}
           >
-            {template.builtin ? 'Built-in' : 'Custom'}
+            {originLabel(template, isOrg)}
           </span>
           {isOrgDefault && <OrgDefaultPill />}
         </div>
@@ -180,6 +191,7 @@ export function TemplateSection({
   visitTemplates,
   effectiveTemplateId,
   orgDefaultTemplateId,
+  orgTemplateIds,
   showAllTemplates,
   onPickTemplate,
   onShowAll,
@@ -189,6 +201,7 @@ export function TemplateSection({
   visitTemplates: NoteTemplate[];
   effectiveTemplateId: string;
   orgDefaultTemplateId?: string;
+  orgTemplateIds?: Set<string>;
   showAllTemplates: boolean;
   onPickTemplate: (id: string) => void;
   onShowAll: () => void;
@@ -200,6 +213,7 @@ export function TemplateSection({
     visitTemplates.find((t) => t.id === effectiveTemplateId) ?? visitTemplates[0];
   const isOrgDefault = (id: string | undefined) =>
     !!orgDefaultTemplateId && !!id && orgDefaultTemplateId === id;
+  const isOrg = (id: string | undefined) => !!id && !!orgTemplateIds?.has(id);
   return (
     <div style={{ borderTop: '1px solid var(--color-pt-border)', paddingTop: 16 }}>
       <AnimatePresence mode="wait">
@@ -253,6 +267,7 @@ export function TemplateSection({
               template={compactTemplate}
               hasMore={visitTemplates.length > 1}
               isOrgDefault={isOrgDefault(compactTemplate?.id)}
+              isOrg={isOrg(compactTemplate?.id)}
               onChange={onShowAll}
             />
           )}
@@ -265,6 +280,7 @@ export function TemplateSection({
                   template={t}
                   selected={t.id === effectiveTemplateId}
                   isOrgDefault={isOrgDefault(t.id)}
+                  isOrg={isOrg(t.id)}
                   onSelect={() => onPickTemplate(t.id)}
                 />
               ))}
