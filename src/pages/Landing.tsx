@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock } from 'lucide-react';
+import { Lock, ArrowUpRight, Scale, Network } from 'lucide-react';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
 import { CompareModal } from '@/components/landing/CompareModal';
@@ -28,6 +28,16 @@ const NOTE_SECTIONS = [
   { label: 'Objective', body: 'ROM: shoulder flexion 165° (↑ from 150°). MMT: deltoid 4/5. No compensation patterns observed.' },
   { label: 'Assessment', body: 'Patient progressing toward discharge goals. Pain and ROM improving.' },
   { label: 'Plan', body: 'Continue HEP with theraband series. Follow-up in 1 week.' },
+];
+
+// Raw, unpolished transcript — what the AI reads before drafting the note.
+// Conversational, with filler words and speaker labels (Nova-3 diarization).
+const RAW_TRANSCRIPT: { speaker: 'Clinician' | 'Patient'; text: string }[] = [
+  { speaker: 'Clinician', text: "Okay, so how's the shoulder been feeling since last week?" },
+  { speaker: 'Patient', text: "Uh, better I think — the pain's maybe a four now? It was like a six before." },
+  { speaker: 'Clinician', text: "Good. And you're managing longer on your feet at work?" },
+  { speaker: 'Patient', text: "Yeah, I can do the whole shift now without, um, having to sit down." },
+  { speaker: 'Clinician', text: "Let's check the range — go ahead and raise it up for me... okay, that's about one sixty-five, nice." },
 ];
 
 function BrowserChrome({ url }: { url: string }) {
@@ -58,6 +68,34 @@ function NoteRows({ darkBg }: { darkBg?: boolean }) {
   );
 }
 
+function TranscriptRows() {
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#8893a5', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>
+        Transcript
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {RAW_TRANSCRIPT.map(({ speaker, text }, i) => (
+          <div key={i} style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flexShrink: 0, width: 58, fontSize: 11, fontWeight: 700, color: speaker === 'Clinician' ? '#0a6d70' : '#6f5acc' }}>
+              {speaker}
+            </div>
+            <div style={{ fontSize: 12.5, color: '#5a6577', lineHeight: 1.55 }}>{text}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GithubMark({ size = 22, color = '#ffffff' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden focusable="false">
+      <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.16-.02-2.1-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.07.78 2.16 0 1.56-.01 2.82-.01 3.2 0 .31.21.68.8.56A11.51 11.51 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5z" />
+    </svg>
+  );
+}
+
 export function Landing({ onSignIn }: LandingProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,6 +106,7 @@ export function Landing({ onSignIn }: LandingProps) {
   const [workflowStep, setWorkflowStep] = useState(0);
   const [cardsVisible, setCardsVisible] = useState(false);
   const [section6Visible, setSection6Visible] = useState(false);
+  const [whyVisible, setWhyVisible] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +115,7 @@ export function Landing({ onSignIn }: LandingProps) {
   const sentinel3 = useRef<HTMLDivElement>(null);
   const cards5Ref = useRef<HTMLDivElement>(null);
   const section6Ref = useRef<HTMLDivElement>(null);
+  const whyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const existing = document.getElementById('ldg-styles');
@@ -175,6 +215,16 @@ export function Landing({ onSignIn }: LandingProps) {
       { threshold: 0.5 }
     );
     obs.observe(section6Ref.current);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!whyRef.current) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setWhyVisible(true); },
+      { threshold: 0.2 }
+    );
+    obs.observe(whyRef.current);
     return () => obs.disconnect();
   }, []);
 
@@ -335,23 +385,8 @@ export function Landing({ onSignIn }: LandingProps) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8893a5' }}>
               <Lock size={11} color="#8893a5" strokeWidth={2} />
-              <span style={{ fontSize: 12 }}>Encrypted at rest · AI calls sent over TLS</span>
+              <span style={{ fontSize: 12 }}>Stored encrypted on your device · sent securely when AI is used</span>
             </div>
-            <button
-              onClick={() => setCompareOpen(true)}
-              style={{
-                all: 'unset', cursor: 'pointer',
-                fontSize: 13, color: '#8893a5',
-                borderBottom: '1px dashed rgba(136,147,165,0.5)',
-                lineHeight: 1.4, paddingBottom: 1,
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                transition: 'color 150ms',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#1a2030')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#8893a5')}
-            >
-              How does PTScribe compare to Heidi Clinician? →
-            </button>
           </div>
         ) : (
           <form
@@ -494,10 +529,10 @@ export function Landing({ onSignIn }: LandingProps) {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6f5acc" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'ldg-spin 1s linear infinite', flexShrink: 0 }}>
                       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
-                    <span style={{ fontSize: 13, color: '#6f5acc', fontWeight: 600 }}>Generating note...</span>
+                    <span style={{ fontSize: 13, color: '#6f5acc', fontWeight: 600 }}>Generating note from transcript...</span>
                   </div>
                   <div style={{ marginTop: 16 }}>
-                    <NoteRows />
+                    <TranscriptRows />
                   </div>
                 </div>
 
@@ -538,64 +573,177 @@ export function Landing({ onSignIn }: LandingProps) {
           </div>
 
         </div>
-      </div>
 
-      {/* ── SECTION 3: The Clinical Compass ──────────────────── */}
-      <div style={{ maxWidth: 1040, margin: '0 auto', padding: '80px 48px', boxSizing: 'border-box', width: '100%' }}>
-        <h2 style={{
-          fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 700, color: '#1a2030',
-          letterSpacing: '-0.02em', margin: '0 0 12px',
-        }}>
-          Every visit type, covered.
-        </h2>
-        <p style={{ fontSize: 18, color: '#5a6577', lineHeight: 1.55, maxWidth: 560, margin: '0 0 40px' }}>
-          From initial evaluations to discharge summaries — PTScribe handles them all.
-        </p>
-
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Evaluation', bg: '#6f5acc' },
-            { label: 'SOAP', bg: '#0ea5a8' },
-            { label: 'Progress', bg: '#c47a09' },
-            { label: 'Discharge', bg: '#7c8699' },
-          ].map(({ label, bg }) => (
-            <div key={label} style={{
-              borderRadius: 999, padding: '10px 22px',
-              background: bg, color: 'white', fontSize: 15, fontWeight: 700, cursor: 'default',
-            }}>
-              {label}
-            </div>
-          ))}
-        </div>
-
-        {/* Dark note card */}
-        <div style={{
-          marginTop: 60, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto',
-          background: '#1a2030', borderRadius: 20, padding: 32,
-          boxShadow: '0 4px 16px rgba(26,32,48,0.10)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'white' }}>SOAP Note — Follow-up</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-              <div style={{ width: 8, height: 8, borderRadius: 999, background: '#0ea5a8' }} />
-              <span style={{ fontSize: 11, color: '#0ea5a8', fontWeight: 600 }}>Ready</span>
-            </div>
-          </div>
-          <div style={{ marginTop: 20 }}>
-            <NoteRows darkBg />
-          </div>
-          <button style={{
-            padding: '10px 16px', background: '#0ea5a8', borderRadius: 8,
-            color: 'white', fontSize: 13, fontWeight: 600, width: '100%',
-            textAlign: 'center', border: 'none', cursor: 'pointer', marginTop: 20, display: 'block',
-          }}>
-            Finalize Note →
+        <div style={{ marginTop: 40, textAlign: 'center' }}>
+          <button
+            onClick={() => setCompareOpen(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '14px 28px', borderRadius: 12, fontFamily: 'inherit',
+              border: '1.5px solid #d6dce5', background: '#ffffff',
+              color: '#1a2030', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              transition: 'border-color 150ms ease-out, box-shadow 150ms ease-out',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#0ea5a8'; e.currentTarget.style.boxShadow = '0 8px 22px rgba(14,165,168,0.12)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#d6dce5'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            How does PTScribe compare to leading SaaS scribes?
+            <span style={{ color: '#0ea5a8' }}>→</span>
           </button>
         </div>
+      </div>
 
-        <h3 style={{ fontSize: 22, fontWeight: 700, color: '#1a2030', textAlign: 'center', margin: '32px 0 0' }}>
-          Every section, editable.
-        </h3>
+      {/* ── SECTION 3: Why I Built This ──────────────────────── */}
+      <div
+        ref={whyRef}
+        style={{ maxWidth: 1040, margin: '0 auto', padding: '80px 48px', boxSizing: 'border-box', width: '100%' }}
+      >
+        <div style={{ maxWidth: 680 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
+            textTransform: 'uppercase', color: '#0a6d70', marginBottom: 20,
+            opacity: whyVisible ? 1 : 0,
+            transform: whyVisible ? 'none' : 'translateY(18px)',
+            transition: 'opacity 600ms cubic-bezier(0.22,1,0.36,1), transform 600ms cubic-bezier(0.22,1,0.36,1)',
+          }}>
+            Why I built this
+          </div>
+          <h2 style={{
+            fontSize: 'clamp(28px, 4.4vw, 46px)', fontWeight: 800, color: '#1a2030',
+            letterSpacing: '-0.03em', lineHeight: 1.08, margin: '0 0 22px',
+            opacity: whyVisible ? 1 : 0,
+            transform: whyVisible ? 'none' : 'translateY(18px)',
+            transition: 'opacity 600ms cubic-bezier(0.22,1,0.36,1) 60ms, transform 600ms cubic-bezier(0.22,1,0.36,1) 60ms',
+          }}>
+            Better notes shouldn't cost an $1,800 subscription, or your patients' privacy.
+          </h2>
+          <p style={{
+            fontSize: 18, color: '#5a6577', lineHeight: 1.65, margin: 0, maxWidth: 600,
+            opacity: whyVisible ? 1 : 0,
+            transform: whyVisible ? 'none' : 'translateY(18px)',
+            transition: 'opacity 600ms cubic-bezier(0.22,1,0.36,1) 120ms, transform 600ms cubic-bezier(0.22,1,0.36,1) 120ms',
+          }}>
+            PTScribe is an independent, open-source clinical scribe. It runs local-first, so every
+            recording and note stays encrypted on your own device while the AI runs through a thin
+            proxy that stores nothing. I built it in the open, so you can read the code, weigh it
+            honestly against the paid tools, and see exactly how it works.
+          </p>
+        </div>
+
+        {/* Three doors — source, comparison, architecture */}
+        <div style={{
+          marginTop: 44,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(248px, 1fr))',
+          gap: 16,
+          opacity: whyVisible ? 1 : 0,
+          transform: whyVisible ? 'none' : 'translateY(18px)',
+          transition: 'opacity 600ms cubic-bezier(0.22,1,0.36,1) 180ms, transform 600ms cubic-bezier(0.22,1,0.36,1) 180ms',
+        }}>
+
+          {/* Read the source — external GitHub link */}
+          <a
+            href="https://github.com/kyle-giacchi/ptscribe"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: 14,
+              background: '#1a2030', borderRadius: 16, padding: '24px 24px 22px',
+              border: '1px solid #1a2030',
+              transition: 'transform 220ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms cubic-bezier(0.22,1,0.36,1)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 16px 34px rgba(26,32,48,0.24)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <GithubMark size={22} color="#ffffff" />
+              <ArrowUpRight size={18} color="rgba(255,255,255,0.5)" strokeWidth={2} />
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', marginBottom: 6 }}>
+                Read the source
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.5 }}>
+                Every line is public. Audit the encryption, the proxy, all of it.
+              </div>
+            </div>
+            <div style={{
+              marginTop: 'auto', paddingTop: 4, fontSize: 11.5, color: '#0ea5a8', fontWeight: 600,
+              fontFamily: "'JetBrains Mono', ui-monospace, monospace", letterSpacing: '-0.01em',
+            }}>
+              github.com/kyle-giacchi/ptscribe
+            </div>
+          </a>
+
+          {/* Compare to leading SaaS — opens CompareModal */}
+          <button
+            onClick={() => setCompareOpen(true)}
+            style={{
+              textAlign: 'left', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', gap: 14,
+              background: '#ffffff', borderRadius: 16, padding: '24px 24px 22px',
+              border: '1px solid #e4e8ee', cursor: 'pointer',
+              transition: 'transform 220ms cubic-bezier(0.22,1,0.36,1), border-color 220ms, box-shadow 220ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#0ea5a8'; e.currentTarget.style.boxShadow = '0 16px 34px rgba(14,165,168,0.15)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = '#e4e8ee'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Scale size={22} color="#0ea5a8" strokeWidth={1.75} />
+              <span style={{ fontSize: 16, color: '#8893a5', fontWeight: 600, lineHeight: 1 }}>→</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#1a2030', letterSpacing: '-0.01em', marginBottom: 6 }}>
+                Compare to leading SaaS
+              </div>
+              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+                An honest, feature-by-feature scorecard against the leading SaaS scribes.
+              </div>
+            </div>
+            <div style={{
+              marginTop: 'auto', paddingTop: 4, display: 'flex', alignItems: 'baseline', gap: 8,
+              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#0a6d70' }}>~$15/yr</span>
+              <span style={{ fontSize: 12, color: '#8893a5' }}>vs</span>
+              <span style={{
+                fontSize: 13, color: '#8893a5',
+                textDecoration: 'line-through', textDecorationColor: 'rgba(136,147,165,0.55)',
+              }}>$1,800/yr</span>
+            </div>
+          </button>
+
+          {/* Architecture, explained — coming soon */}
+          <div
+            aria-disabled="true"
+            style={{
+              display: 'flex', flexDirection: 'column', gap: 14,
+              background: '#f4f6f9', borderRadius: 16, padding: '24px 24px 22px',
+              border: '1px dashed #d6dce5', cursor: 'default',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Network size={22} color="#8893a5" strokeWidth={1.75} />
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                color: '#8893a5', background: '#ffffff', border: '1px solid #e4e8ee',
+                borderRadius: 999, padding: '3px 9px',
+              }}>
+                Coming soon
+              </span>
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#5a6577', letterSpacing: '-0.01em', marginBottom: 6 }}>
+                Architecture, explained
+              </div>
+              <div style={{ fontSize: 13, color: '#8893a5', lineHeight: 1.5 }}>
+                How local-first storage, the encrypted vault, and the AI proxy fit together.
+              </div>
+            </div>
+            <div style={{ marginTop: 'auto', paddingTop: 4, fontSize: 11.5, color: '#a4adbd' }}>
+              A visual walkthrough is in the works.
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── SECTION 4: The Practice at a Glance ──────────────── */}
@@ -769,10 +917,6 @@ export function Landing({ onSignIn }: LandingProps) {
               Sign in
             </button>
           </span>
-          <span style={{ color: '#e4e8ee' }}>·</span>
-          <a href="mailto:support@ptscribe.app" style={{ color: '#0ea5a8', fontWeight: 600, textDecoration: 'none', fontSize: 13 }}>
-            support@ptscribe.app
-          </a>
         </div>
       </footer>
 
