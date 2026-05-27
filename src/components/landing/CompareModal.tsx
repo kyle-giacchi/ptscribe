@@ -104,7 +104,7 @@ const BADGE_CSS = `
     white;
   border-color: #dc2942; border-style: dashed;
 }
-/* Heidi: Included — teal tint with check */
+/* Competitor: Included — teal tint with check */
 .cmp-badge--yes { color: #5a6577; }
 .cmp-badge--yes::before {
   background-color: #e6f7f6;
@@ -188,7 +188,10 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
     <AnimatePresence>
       {open && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 50 }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="cmp-title"
@@ -205,8 +208,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
           {/* Panel — 4-row grid: head / col-headers / body / footer */}
           <motion.div
             style={{
-              position: 'absolute', left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
+              position: 'relative',
               width: 'min(1180px, calc(100vw - 48px))',
               height: 'min(780px, calc(100vh - 48px))',
               background: 'white',
@@ -244,7 +246,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   fontWeight: 700, lineHeight: 1.2,
                   letterSpacing: '-0.025em', color: '#1a2030',
                 }}>
-                  How does PTScribe stack up against Heidi&nbsp;Health&nbsp;·&nbsp;Clinician?
+                  How does PTScribe stack up against a leading&nbsp;SaaS&nbsp;scribe?
                 </h2>
                 <p style={{ margin: 0, fontSize: 13.5, color: '#5a6577', lineHeight: 1.55, maxWidth: 620 }}>
                   PTScribe is purpose-built for physical therapists. Here's our honest scorecard —
@@ -294,9 +296,9 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     background: 'white', color: '#5a6577', border: '1px solid #e4e8ee',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     fontFamily: MONO, fontWeight: 600, fontSize: 13,
-                  }}>H</span>
+                  }}>S</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>Heidi · Clinician</div>
+                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>Leading SaaS scribe</div>
                     <div style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}>paid SaaS · $150/user/mo</div>
                   </div>
                 </div>
@@ -394,13 +396,13 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
 
                 <div style={gapRow()}>
                   <Feat
-                    name='Post-generation AI chat ("Ask Heidi")'
+                    name="Post-generation AI chat"
                     desc="Prompt the AI to generate referral letters, patient summaries, or make structural edits after the note is already drafted."
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
                     <CmpBadge v="planned" label="Planned" />
                   </div>
-                  <CmpBadge v="yes" label="Ask Heidi" />
+                  <CmpBadge v="yes" label="Included" />
                 </div>
               </section>
 
@@ -496,7 +498,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     <div style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO, letterSpacing: '0.02em' }}>pay-per-AI-call · cents per note</div>
                   </div>
 
-                  {/* Heidi cost */}
+                  {/* Competitor cost */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
                       <span style={{
