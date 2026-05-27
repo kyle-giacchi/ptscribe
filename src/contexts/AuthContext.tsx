@@ -3,8 +3,16 @@ import { isDemoMode } from '@/lib/demoMode';
 import { DEMO_USER } from '@/lib/auth/demo';
 import { authClient, type AuthSession } from '@/lib/auth/client';
 import { vault } from '@/lib/vault/vault';
-import type { AppUser } from '@/lib/auth/types';
+import type { AppUser, OrgRole } from '@/lib/auth/types';
 import type { PlanTier } from '@/types/plans';
+
+const ORG_ROLES: ReadonlySet<string> = new Set([
+  'owner',
+  'admin',
+  'manager',
+  'standard',
+  'student',
+]);
 
 interface AuthContextValue {
   currentUser: AppUser | null;
@@ -19,14 +27,19 @@ function mapSession(session: AuthSession): AppUser {
   const u = session.user as AuthSession['user'] & {
     planTier?: string;
     tenantId?: string;
+    role?: string;
   };
+  const orgId = u.tenantId ?? null;
+  const role: OrgRole = ORG_ROLES.has(u.role ?? '') ? (u.role as OrgRole) : 'owner';
   return {
     id: u.id,
     email: u.email,
     displayName: u.name,
     planTier: ((u.planTier as PlanTier) ?? 'personal-free') as PlanTier,
-    tenantId: u.tenantId ?? u.id,
-    role: 'owner',
+    // Namespacing fallback: personal accounts (no org) partition AppData by user id.
+    tenantId: orgId ?? u.id,
+    orgId,
+    role,
     createdAt: new Date(u.createdAt).getTime(),
   };
 }

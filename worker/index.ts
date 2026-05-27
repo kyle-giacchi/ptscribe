@@ -7,6 +7,7 @@
  * Routes:
  *   POST /api/auth/**      → Better Auth handler (no gate required)
  *   POST /api/org/**       → Org management handler (no gate required, session auth)
+ *   GET|PUT /api/config/** → User/org config sync (no gate required, session auth)
  *   POST /api/transcribe   body = audio/* (the actual MIME, e.g. audio/webm) → { text }
  *   POST /api/generate     body = JSON {model, system, user, ...}            → { text }
  *
@@ -15,6 +16,7 @@
 
 import { createAuth } from './auth';
 import { handleOrgRoute } from './org';
+import { handleConfigRoute } from './config';
 
 export interface Env {
   AI: Ai;
@@ -107,6 +109,18 @@ export default {
           res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
         } else {
           res = await handleOrgRoute(request, env, ctx, url.pathname);
+        }
+      }
+    } else if (url.pathname.startsWith('/api/config/')) {
+      const origin = request.headers.get('Origin');
+      if (origin && !isOriginAllowed(origin, request.url, env)) {
+        res = apiError('FORBIDDEN', 'Origin not allowed', 403);
+      } else {
+        const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+        if (!(await checkPreGateLimit(env, ip)).allowed) {
+          res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+        } else {
+          res = await handleConfigRoute(request, env, ctx, url.pathname);
         }
       }
     } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
