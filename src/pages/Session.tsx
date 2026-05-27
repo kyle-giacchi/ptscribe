@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { SessionResetContext } from '@/contexts/SessionResetContext';
 import { audioRepository } from '@/services/AudioRepository';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
@@ -56,15 +57,29 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getPatient, updatePatient } = usePatients();
   const { forSession, removeNote } = useNotes();
   const { templates, getTemplate } = useTemplates();
+  const { sharedTemplates } = useOrgConfig();
   const { settings, updateSession } = useSettings();
   const { patchSession, patchClips, patchClip } = useSessionPatcher(sessionId);
+
+  // Org shared templates resolve here just like local ones (read-only, sourced
+  // from the org) so a session pointing at an org template generates correctly.
+  const allTemplates = useMemo(() => {
+    const localIds = new Set(templates.map((t) => t.id));
+    return [...templates, ...sharedTemplates.filter((t) => !localIds.has(t.id))];
+  }, [templates, sharedTemplates]);
 
   const session = getSession(sessionId);
   const patient = session ? getPatient(session.patientId) : undefined;
   const note = session ? forSession(session.id) : undefined;
-  const template = getTemplate(session?.templateId ?? '') ?? templates[0];
+  const template =
+    getTemplate(session?.templateId ?? '') ??
+    allTemplates.find((t) => t.id === session?.templateId) ??
+    templates[0];
 
-  const recorder = useRecorder({ limits: settings.recordingLimits });
+  const recorder = useRecorder({
+    limits: settings.recordingLimits,
+    inputDeviceId: settings.audio.inputDeviceId,
+  });
   const webSpeech = useWebSpeechTranscript();
 
   // ── URL params — read before first render so initial tab/mode are correct ──
@@ -388,7 +403,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   function applyTemplateChange(newTemplateId: string) {
-    const newTpl = templates.find((t) => t.id === newTemplateId);
+    const newTpl = allTemplates.find((t) => t.id === newTemplateId);
     if (!newTpl) return;
     // Snapshot sections for the template we're leaving
     if (note?.sections && session?.templateId) {
@@ -644,7 +659,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
                 <NoteToolbar
                   template={template}
-                  templates={templates}
+                  templates={allTemplates}
                   hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
                   canGenerate={canGenerate}
                   requiresFeedback={inputsUnchanged}
@@ -820,7 +835,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       >
         <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
           Switching to{' '}
-          <strong>{templates.find((t) => t.id === pendingTemplateId)?.name ?? 'another template'}</strong>{' '}
+          <strong>{allTemplates.find((t) => t.id === pendingTemplateId)?.name ?? 'another template'}</strong>{' '}
           will clear the text you've written in this note.
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>

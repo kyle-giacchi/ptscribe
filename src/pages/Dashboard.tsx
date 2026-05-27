@@ -8,6 +8,8 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { useClinician } from '@/contexts/ClinicianProvider';
+import { useSettings } from '@/contexts/SettingsProvider';
+import { AudioCheck } from '@/components/audio/AudioCheck';
 import {
   Avatar,
   Eyebrow,
@@ -708,8 +710,40 @@ function ageLabel(hours: number): string {
 }
 
 function AudioCheckRail() {
+  const { settings } = useSettings();
+  const [checkOpen, setCheckOpen] = useState(false);
+  const [micLabel, setMicLabel] = useState<string | null>(null);
+
+  const preferredId = settings.audio.inputDeviceId;
+
+  // Resolve a friendly label for the chosen mic. Labels are only available once
+  // mic permission has been granted at least once; otherwise we show a generic name.
+  useEffect(() => {
+    // No stored device → micDetail shows "System default" and never reads micLabel,
+    // so a stale label here is harmless (and resetting it synchronously trips the
+    // no-setState-in-effect rule).
+    if (!preferredId) return;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+    let cancelled = false;
+    navigator.mediaDevices
+      .enumerateDevices()
+      .then((all) => {
+        if (cancelled) return;
+        const match = all.find((d) => d.kind === 'audioinput' && d.deviceId === preferredId);
+        setMicLabel(match?.label?.trim() || 'Selected microphone');
+      })
+      .catch(() => {
+        /* permission not granted yet — keep the generic label */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preferredId]);
+
+  const micDetail = preferredId ? (micLabel ?? 'Selected microphone') : 'System default device';
+
   const items = [
-    { label: 'Microphone', detail: 'Default device · 48 kHz', ok: true },
+    { label: 'Microphone', detail: micDetail, ok: true },
     { label: 'Backup recorder', detail: 'Browser fallback ready', ok: true },
     { label: 'Cloud sync', detail: 'Local-only — disabled', ok: true },
   ];
@@ -748,6 +782,15 @@ function AudioCheckRail() {
           </li>
         ))}
       </ul>
+      <PtButton
+        variant="ghost"
+        onClick={() => setCheckOpen(true)}
+        iconLeft={<Mic size={14} />}
+        style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}
+      >
+        Test microphone
+      </PtButton>
+      <AudioCheck open={checkOpen} onClose={() => setCheckOpen(false)} />
     </SurfaceCard>
   );
 }
