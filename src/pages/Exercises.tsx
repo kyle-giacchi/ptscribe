@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useToggle } from '@/hooks/useToggle';
-import { Lock, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Building2, Copy, Lock, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useExercises } from '@/contexts/ExercisesProvider';
+import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { newId } from '@/utils/ids';
 import {
   BODY_REGIONS,
@@ -19,20 +20,47 @@ import {
 
 export function Exercises() {
   const { exercises, addExercise, updateExercise, removeExercise } = useExercises();
+  const { sharedExercises } = useOrgConfig();
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState<'all' | BodyRegion>('all');
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [creating, startCreating, stopCreating] = useToggle();
 
+  // Org shared exercises are read-only and live only in OrgConfig context (never
+  // in AppData). We merge them in for display; cloning copies one into the
+  // user's own library so it can be edited or prescribed.
+  const orgExerciseIds = useMemo(
+    () => new Set(sharedExercises.map((e) => e.id)),
+    [sharedExercises],
+  );
+
+  const cloneFromOrg = useCallback(
+    (src: Exercise) => {
+      const now = Date.now();
+      addExercise({
+        ...src,
+        id: newId(),
+        name: `${src.name} (copy)`,
+        builtin: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      toast.success('Exercise cloned');
+    },
+    [addExercise],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return exercises
+    const localIds = new Set(exercises.map((e) => e.id));
+    const merged = [...exercises, ...sharedExercises.filter((e) => !localIds.has(e.id))];
+    return merged
       .filter((e) => (region === 'all' ? true : e.region === region))
       .filter((e) =>
         q ? `${e.name} ${e.instructions} ${e.cues ?? ''}`.toLowerCase().includes(q) : true,
       )
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [exercises, query, region]);
+  }, [exercises, sharedExercises, query, region]);
 
   return (
     <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
@@ -110,7 +138,9 @@ export function Exercises() {
           gap: 12,
         }}
       >
-        {filtered.map((e) => (
+        {filtered.map((e) => {
+          const isOrg = orgExerciseIds.has(e.id);
+          return (
           <SurfaceCard key={e.id} padding={14}>
             <div style={{ display: 'grid', gap: 8 }}>
               <div
@@ -162,6 +192,34 @@ export function Exercises() {
                   >
                     <Lock size={10} /> Built-in
                   </span>
+                ) : isOrg ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 7px',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        background: 'var(--color-pt-surface-mut)',
+                        color: 'var(--color-pt-text-3)',
+                        border: '1px solid var(--color-pt-border)',
+                      }}
+                    >
+                      <Building2 size={10} /> Org
+                    </span>
+                    <PtButton
+                      variant="ghost"
+                      iconLeft={<Copy size={12} strokeWidth={2} />}
+                      style={{ padding: '4px 8px', fontSize: 11 }}
+                      onClick={() => cloneFromOrg(e)}
+                    >
+                      Clone
+                    </PtButton>
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                     <PtButton
@@ -215,7 +273,8 @@ export function Exercises() {
               )}
             </div>
           </SurfaceCard>
-        ))}
+          );
+        })}
         {filtered.length === 0 && (
           <SurfaceCard padding={20}>
             <p
