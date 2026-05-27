@@ -54,13 +54,19 @@ export function PtButton({
   children,
   style,
   className,
+  disabled,
   ...rest
 }: PtButtonProps) {
   const v = VARIANT_STYLES[variant];
   return (
     <button
+      disabled={disabled}
       className={`inline-flex items-center justify-center gap-2 transition-colors ${className ?? ''}`}
-      style={{ ...v, ...style }}
+      style={{
+        ...v,
+        ...(disabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
+        ...style,
+      }}
       {...rest}
     >
       {iconLeft}

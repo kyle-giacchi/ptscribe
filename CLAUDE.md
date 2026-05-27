@@ -60,7 +60,7 @@ npx tsx scripts/seed-r2-models.ts   Pre-populate R2 with Whisper model files (ru
 See [README.md](README.md) for the full stack overview. Key agent-relevant details:
 - AI calls go through our Cloudflare Worker proxy (`/api/transcribe`, `/api/generate`) — provider credentials are server-side secrets; the browser never sees them.
 - Local Whisper transcription runs entirely in the browser via a Web Worker (`src/lib/audio/whisper.worker.ts`). Model files are served from R2 at `/api/model/*`, with a HuggingFace fallback. The fetch interceptor in the worker caches files in IDB after first download.
-- Auth (BetterAuth with passkey + magic link) is served by the Worker at `/api/auth`. **Magic-link email (`worker/email.ts`) is currently a `console.log` stub** — wire a real email provider before enabling auth in production.
+- Auth (BetterAuth with passkey + magic link) is served by the Worker at `/api/auth`. Transactional email (`worker/email.ts`) sends via **Resend**; it requires the `RESEND_API_KEY` secret + an `EMAIL_FROM` on a Resend-verified domain (DKIM/SPF). **Without `RESEND_API_KEY` set it falls back to `console.warn`** (the link is logged, not emailed) — fine for local dev, but the secret must be set before enabling auth in production. See ADR-0004.
 - Org management (create org, validate invite token) is handled at `/api/org/**`.
 
 ## Documentation
