@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import {
   Avatar,
+  ComingSoonChip,
   Eyebrow,
   PtButton,
   SegmentedControl,
@@ -254,7 +255,13 @@ function Toolbar({
       </div>
       <SegmentedControl items={STATUS_FILTERS} value={filter} onChange={onFilter} size="sm" />
       <div style={{ flex: 1 }} />
-      <PtButton variant="ghost" iconLeft={<Upload size={14} strokeWidth={2} />}>
+      <PtButton
+        variant="ghost"
+        iconLeft={<Upload size={14} strokeWidth={2} />}
+        iconRight={<ComingSoonChip />}
+        disabled
+        title="Coming soon"
+      >
         Import patient
       </PtButton>
       <PtButton variant="primary" iconLeft={<Plus size={14} strokeWidth={2.4} />} onClick={onAdd}>

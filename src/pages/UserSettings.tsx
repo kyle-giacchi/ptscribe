@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { usePlan } from '@/hooks/usePlan';
+import { isDemoMode } from '@/lib/demoMode';
+import { PasskeySecurityPanel } from '@/components/settings/PasskeySecurityPanel';
 import type { PlanTier } from '@/types/plans';
 
 const TIER_LABELS: Record<PlanTier, string> = {
@@ -321,6 +323,14 @@ export function UserSettings() {
                 </p>
               </div>
             </div>
+
+            {/* Security — passkeys (real auth only; demo mode auto-unlocks) */}
+            {!isDemoMode() && (
+              <div>
+                <SectionHeading>Security</SectionHeading>
+                <PasskeySecurityPanel />
+              </div>
+            )}
 
             {/* Timezone */}
             <div>
