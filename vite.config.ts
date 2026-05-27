@@ -147,16 +147,12 @@ export default defineConfig({
           dest: '.',
           rename: 'ort-wasm-simd-threaded.mjs',
         },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
-          dest: '.',
-          rename: 'ort-wasm-simd-threaded.jsep.wasm',
-        },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
-          dest: '.',
-          rename: 'ort-wasm-simd-threaded.jsep.mjs',
-        },
+        // NOTE: the JSEP (WebGPU) variant — ort-wasm-simd-threaded.jsep.{wasm,mjs}
+        // — is intentionally NOT copied into the build. Every onnxruntime consumer
+        // (whisper.worker.ts, vadML.ts, privacyFilter worker) forces the plain WASM
+        // backend (device:'wasm'), so the JSEP file is never requested at runtime.
+        // It is 26 MiB, which exceeds Cloudflare Workers' 25 MiB per-asset limit and
+        // fails the deploy. Keep it out unless a worker actually opts into WebGPU.
       ],
     }),
   ],
