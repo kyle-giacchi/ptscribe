@@ -27,7 +27,7 @@ export function BackupRestoreCard() {
       void auditLog.append('backup:exported');
       toast.success(
         vault.isUnlocked()
-          ? 'Encrypted backup downloaded — restoring it requires this vault passphrase.'
+          ? 'Encrypted backup downloaded — restore it on any device with this vault passphrase.'
           : 'Backup downloaded (unencrypted — set up a vault passphrase to encrypt future backups).',
       );
     } catch (e) {
@@ -38,7 +38,17 @@ export function BackupRestoreCard() {
   async function handleImport(file: File) {
     try {
       const text = await file.text();
-      const result = await importBackup(text);
+      let result = await importBackup(text);
+      // Portable backup from another device: the local vault can't decrypt it,
+      // so ask for the passphrase it was created with and retry once.
+      if (!result.ok && result.error.code === 'PASSPHRASE_REQUIRED') {
+        const secret = window.prompt(
+          'This backup was created on another device. Enter the vault passphrase (or recovery code) it was created with to restore it:',
+        );
+        if (!secret) return;
+        // The entered secret may be either — try it as both.
+        result = await importBackup(text, { passphrase: secret, recoveryCode: secret });
+      }
       if (!result.ok) {
         toast.error(result.error.message);
         return;

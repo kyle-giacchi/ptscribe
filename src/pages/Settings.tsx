@@ -11,6 +11,7 @@ import { RecordingWorkflowCard } from '@/components/settings/RecordingWorkflowCa
 import { AudioProcessingCard } from '@/components/settings/AudioProcessingCard';
 import { LocalUsageCard } from '@/components/settings/LocalUsageCard';
 import { BackupRestoreCard } from '@/components/settings/BackupRestoreCard';
+import { RecoveryCodeCard } from '@/components/settings/RecoveryCodeCard';
 import { OnDeviceModelCard } from '@/components/settings/OnDeviceModelCard';
 import { DiagnosticsCard } from '@/components/settings/DiagnosticsCard';
 import { ResetCard } from '@/components/settings/ResetCard';
@@ -46,6 +47,7 @@ export function Settings() {
       <RecordingWorkflowCard />
       <AudioProcessingCard />
       <LocalUsageCard />
+      <RecoveryCodeCard />
       <BackupRestoreCard />
       <OnDeviceModelCard />
       <DiagnosticsCard />

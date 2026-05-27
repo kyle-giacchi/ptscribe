@@ -18,17 +18,35 @@ import {
   VAULT_VERSION,
   wrapDek,
 } from './crypto';
+import { generateRecoveryCode, normalizeRecoveryCode } from './recoveryCode';
 
-interface VaultEnvelope {
+interface KdfDescriptor {
+  name: 'Argon2id';
+  memoryKib: number;
+  iterations: number;
+  parallelism: number;
+  salt: string;
+}
+
+interface WrappedDekJson {
+  iv: string;
+  ciphertext: string;
+}
+
+export interface VaultEnvelope {
   v: 1;
-  kdf: {
-    name: 'Argon2id';
-    memoryKib: number;
-    iterations: number;
-    parallelism: number;
-    salt: string;
+  kdf: KdfDescriptor;
+  wrappedDek: WrappedDekJson;
+  /**
+   * Optional second wrapping of the *same* DEK under a recovery-code-derived KEK
+   * (ADR-0003). Present once a recovery code has been generated; absent on vaults
+   * created before that step or where the user never set one up. Survives
+   * passphrase changes because it wraps the DEK, not the passphrase.
+   */
+  recovery?: {
+    kdf: KdfDescriptor;
+    wrappedDek: WrappedDekJson;
   };
-  wrappedDek: { iv: string; ciphertext: string };
 }
 
 interface DataEnvelope {
@@ -102,6 +120,16 @@ function writeEnvelope(env: VaultEnvelope): void {
   localStorage.setItem(STORAGE_KEYS.vault, JSON.stringify(env));
 }
 
+function kdfDescriptor(salt: Uint8Array): KdfDescriptor {
+  return {
+    name: 'Argon2id',
+    memoryKib: ARGON2_MEMORY_KIB,
+    iterations: ARGON2_ITERATIONS,
+    parallelism: ARGON2_PARALLELISM,
+    salt: bytesToBase64(salt),
+  };
+}
+
 function ensureUnlocked(): CryptoKey {
   if (!dek) throw new Error('vault: locked');
   return dek;
@@ -114,6 +142,84 @@ export const vault = {
 
   isUnlocked(): boolean {
     return dek !== null;
+  },
+
+  /**
+   * The stored KDF parameters + passphrase-wrapped DEK from the on-disk vault
+   * envelope. Used by the portable (v2) backup codec to embed a self-contained,
+   * cross-device-restorable copy of the wrapped DEK. Returns null when no vault
+   * is initialized. The bytes returned are already in localStorage — exposing
+   * them in a user-controlled backup file adds no new at-rest exposure.
+   */
+  getKeyMaterial(): {
+    kdf: VaultEnvelope['kdf'];
+    wrappedDek: VaultEnvelope['wrappedDek'];
+    recovery?: NonNullable<VaultEnvelope['recovery']>;
+  } | null {
+    const env = readEnvelope();
+    if (!env) return null;
+    return { kdf: env.kdf, wrappedDek: env.wrappedDek, recovery: env.recovery };
+  },
+
+  /** True once a recovery code has been generated for this vault. */
+  hasRecoveryCode(): boolean {
+    return readEnvelope()?.recovery != null;
+  },
+
+  /**
+   * Generate (or regenerate) a recovery code. Requires the vault to be unlocked
+   * so the in-memory DEK can be wrapped under a fresh recovery-KEK. Returns the
+   * code in display form — show it once; it is never stored in plaintext.
+   * Regenerating overwrites the prior recovery envelope, invalidating the old code.
+   */
+  async setupRecoveryCode(): Promise<string> {
+    const liveDek = ensureUnlocked();
+    const env = readEnvelope();
+    if (!env) throw new Error('vault: not initialized');
+
+    const code = generateRecoveryCode();
+    const salt = randomBytes(SALT_BYTES);
+    const recoveryKek = await deriveKek(normalizeRecoveryCode(code), salt);
+    const wrapped = await wrapDek(liveDek, recoveryKek);
+
+    writeEnvelope({
+      ...env,
+      recovery: {
+        kdf: kdfDescriptor(salt),
+        wrappedDek: {
+          iv: bytesToBase64(wrapped.iv),
+          ciphertext: bytesToBase64(wrapped.ciphertext),
+        },
+      },
+    });
+    void auditLog.append('vault:recovery_code_set');
+    return code;
+  },
+
+  /** Unlock using the recovery code instead of the passphrase (same device). */
+  async unlockWithRecoveryCode(code: string): Promise<UnlockResult> {
+    const env = readEnvelope();
+    if (!env?.recovery) return { ok: false, reason: 'corrupt' };
+    let salt: Uint8Array;
+    let iv: Uint8Array;
+    let ciphertext: Uint8Array;
+    try {
+      salt = base64ToBytes(env.recovery.kdf.salt);
+      iv = base64ToBytes(env.recovery.wrappedDek.iv);
+      ciphertext = base64ToBytes(env.recovery.wrappedDek.ciphertext);
+    } catch {
+      return { ok: false, reason: 'corrupt' };
+    }
+    try {
+      const recoveryKek = await deriveKek(normalizeRecoveryCode(code), salt);
+      dek = await unwrapDek({ iv, ciphertext }, recoveryKek);
+      bc?.postMessage({ type: 'vault:unlocked' });
+      void auditLog.append('vault:unlocked_with_recovery_code');
+      return { ok: true };
+    } catch {
+      dek = null;
+      return { ok: false, reason: 'bad_passphrase' };
+    }
   },
 
   async setup(passphrase: string): Promise<void> {
@@ -216,17 +322,14 @@ export const vault = {
 
     writeEnvelope({
       v: VAULT_VERSION,
-      kdf: {
-        name: 'Argon2id',
-        memoryKib: ARGON2_MEMORY_KIB,
-        iterations: ARGON2_ITERATIONS,
-        parallelism: ARGON2_PARALLELISM,
-        salt: bytesToBase64(newSalt),
-      },
+      kdf: kdfDescriptor(newSalt),
       wrappedDek: {
         iv: bytesToBase64(wrapped.iv),
         ciphertext: bytesToBase64(wrapped.ciphertext),
       },
+      // The recovery code wraps the DEK independently, so it survives a passphrase
+      // change untouched — preserve it rather than dropping it.
+      recovery: env.recovery,
     });
 
     void auditLog.append('vault:passphrase_changed');
