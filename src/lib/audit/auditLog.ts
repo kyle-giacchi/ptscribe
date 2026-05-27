@@ -22,6 +22,8 @@ export type AuditAction =
   | 'vault:unlocked'
   | 'vault:locked'
   | 'vault:passphrase_changed'
+  | 'vault:recovery_code_set'
+  | 'vault:unlocked_with_recovery_code'
   | 'backup:exported'
   | 'backup:imported'
   | 'data:reset';
