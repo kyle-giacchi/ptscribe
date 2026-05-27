@@ -41,7 +41,22 @@ export function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-export async function deriveKek(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+/**
+ * Argon2id cost parameters. Omitted fields fall back to the module defaults.
+ * Portable v2 backups carry the parameters they were created with so a KEK can
+ * be re-derived correctly even if the module defaults change in a later release.
+ */
+export interface KdfParams {
+  memoryKib?: number;
+  iterations?: number;
+  parallelism?: number;
+}
+
+export async function deriveKek(
+  passphrase: string,
+  salt: Uint8Array,
+  params?: KdfParams,
+): Promise<CryptoKey> {
   // Convert to Uint8Array so we can zero the bytes after KDF.
   // The original string is immutable in JS and cannot be zeroed, but minimizing
   // how long a secondary copy lives in a typed buffer is still worthwhile.
@@ -50,9 +65,9 @@ export async function deriveKek(passphrase: string, salt: Uint8Array): Promise<C
     const raw = await argon2id({
       password: passphraseBytes,
       salt,
-      parallelism: ARGON2_PARALLELISM,
-      iterations: ARGON2_ITERATIONS,
-      memorySize: ARGON2_MEMORY_KIB,
+      parallelism: params?.parallelism ?? ARGON2_PARALLELISM,
+      iterations: params?.iterations ?? ARGON2_ITERATIONS,
+      memorySize: params?.memoryKib ?? ARGON2_MEMORY_KIB,
       hashLength: ARGON2_HASH_LENGTH,
       outputType: 'binary',
     });
@@ -96,7 +111,11 @@ export async function unwrapDek(envelope: WrappedDek, kek: CryptoKey): Promise<C
     kek,
     { name: 'AES-GCM', iv: envelope.iv as BufferSource },
     { name: 'AES-GCM', length: AES_KEY_BITS },
-    false,
+    // Extractable: the in-memory DEK must be re-wrappable so the same key can be
+    // re-protected under a new passphrase-KEK (changePassphrase) or a recovery-KEK
+    // (recovery code). This does not weaken the at-rest model: any code running in
+    // an unlocked tab already holds full encrypt/decrypt power over the data.
+    true,
     ['encrypt', 'decrypt'],
   );
 }
