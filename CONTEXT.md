@@ -287,6 +287,16 @@ Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** 
 
 `VITE_DEMO_MODE=false` is required for production builds (existing hard rule).
 
+## Account config & sync
+
+Vocabulary for the cross-device persistence of a registered user's **non-clinical** account data. This is account infrastructure, not part of the clinician workflow — but the terms appear in code, UI, and PRs. (Implementation lives in [architecture.md — Cross-device config sync](docs/architecture.md#cross-device-config-sync-d1) and [invariants.md — D1 config sync](docs/invariants.md#d1-config-sync--clinical-exclusion-has-exactly-one-chokepoint).)
+
+- **User config** — the per-user bundle that syncs to the cloud for a signed-in (non-demo) user: the `settings` subtree, the `clinician` profile, and the clinician's **custom** (non-built-in) templates and exercises. Nothing else. Patient data, sessions, notes, plans, and audio are **never** part of user config.
+- **Org config** — an organization's shared, owner/manager-editable settings: an org **policy** blob (e.g. default template) plus a **shared library**. Members inherit it read-only.
+- **Shared library** — the org-owned set of templates/exercises every member sees. They behave **like built-ins but sourced from the org**: badged "Org", read-only, offered as **Clone** (not Edit). They are never copied into the user's own data unless the clinician clones one.
+- **Config sync** — the local-first mirror that keeps user/org config in step across a clinician's devices: **last-write-wins** (newer wins), push-on-change, pull-on-login. It is **not** clinical-data sync — PTScribe never syncs patient records or audio to a server. The demo user is fully isolated and never syncs.
+  - _Avoid_: "cloud backup" or "sync" as a blanket term — reserve "config sync" for this non-clinical path so it is never confused with clinical data leaving the device.
+
 ## Primary success criterion
 
 **Quality of the final Note**, where "quality" is **defined by the clinician, not the system**. The workflow is optimized so the clinician arrives at a Note they personally judge to be defensible — even at the cost of additional time, network calls, or clinician effort. The system does not enforce a quality standard.
