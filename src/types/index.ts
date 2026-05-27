@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 22;
+export const APP_DATA_VERSION = 23;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -426,6 +426,13 @@ export interface SpeedUpSettings {
 export interface AudioSettings {
   silenceDetection: SilenceDetectionSettings;
   speedUp: SpeedUpSettings;
+  /**
+   * `deviceId` of the microphone chosen in the AudioCheck pre-flight. Passed to
+   * `getUserMedia` as `{ deviceId: { ideal } }` so a real recording reuses it,
+   * falling back to the system default if the device is gone. Undefined = default
+   * device. Device IDs are origin-scoped and rotate when permissions reset.
+   */
+  inputDeviceId?: string;
 }
 
 export interface SecuritySettings {

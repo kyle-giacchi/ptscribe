@@ -64,7 +64,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const note = session ? forSession(session.id) : undefined;
   const template = getTemplate(session?.templateId ?? '') ?? templates[0];
 
-  const recorder = useRecorder({ limits: settings.recordingLimits });
+  const recorder = useRecorder({
+    limits: settings.recordingLimits,
+    inputDeviceId: settings.audio.inputDeviceId,
+  });
   const webSpeech = useWebSpeechTranscript();
 
   // ── URL params — read before first render so initial tab/mode are correct ──
