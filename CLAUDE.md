@@ -5,8 +5,7 @@
 ## Before editing
 
 1. **Read [CONTEXT.md](CONTEXT.md) for the shared vocabulary.** It is the glossary for the core workflow (Capture → Curate → Generate → Finalize) and the canonical names for clinician-facing concepts (curated transcript, locked transcript, Improve with AI, Scrub PII, Modifiers, audio retention, demo mode, etc.). Use these terms in code, UI, and PRs. If you find code or docs using older names, treat CONTEXT.md as the source of truth for *vocabulary*. Note: CONTEXT.md describes the intended workflow — some sections (locked transcript, 14-day audio sweep, Modifiers, demo namespace) are not yet implemented; check the code before assuming they exist.
-2. **Open [docs/INDEX.md](docs/INDEX.md) to navigate docs by section** — read targeted ranges instead of whole files.
-3. **Read [docs/invariants.md](docs/invariants.md) first.** It lists the non-obvious rules (single-write-path persistence, provider nesting, slice mutator pattern, schema validation at boundaries, built-in template/exercise guards, Worker-proxied AI calls, vault encryption boundary, recorder lifecycle, etc.).
+2. **Read [docs/invariants.md](docs/invariants.md) first.** It lists the non-obvious rules (single-write-path persistence, provider nesting, slice mutator pattern, schema validation at boundaries, built-in template/exercise guards, Worker-proxied AI calls, vault encryption boundary, recorder lifecycle, etc.). The Quick lookup table below and the [Documentation](#documentation) section are the nav hub — read targeted section ranges instead of whole files.
 4. Run `npm run dev` (http://localhost:8080) and try the feature in a browser before reporting a task as complete.
 
 ## Quick lookup
@@ -24,7 +23,7 @@
 | Default cloud transcription model?       | `@cf/deepgram/nova-3` (Cloudflare Workers AI, speaker diarization) via `/api/transcribe`. Allowlisted Whisper variants available in Settings.                                                                                                                       |
 | Default local transcription model?       | `Xenova/whisper-tiny.en` — see `src/services/ai/client/localWhisper.ts`. Model files served from R2 at `/api/model/*`; falls back to HuggingFace if R2 is empty. Pre-populate with `npx tsx scripts/seed-r2-models.ts`.                                            |
 | Default note generation model?           | `claude-sonnet-4-6` (Anthropic) via `/api/generate`; the browser never sees provider credentials.                                                                                                                                                                  |
-| All models, caching strategy, R2 seeding | [docs/models.md](docs/models.md) — catalog, download/IDB/R2 layers, `dtype: 'q8'` requirement for privacy filter, seeding runbook |
+| All models, caching strategy, R2 seeding | [architecture.md — AI model catalog](docs/architecture.md#ai-model-catalog) — catalog, download/IDB/R2 layers, `dtype: 'q8'` requirement for privacy filter, seeding runbook |
 | ID generation?                           | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                                                                                                                                   |
 | Where is data encrypted?                 | Inside `DataRepository` (AppData) and `AudioRepository` (audio Blobs + chunks). AES-GCM via `src/lib/vault/`. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))                                                                            |
 | Who owns the wake lock during recording? | `useRecorder` — released on stop/reset/error/unmount. ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))                                                                                                           |
@@ -65,17 +64,25 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 
 ## Documentation
 
-[docs/INDEX.md](docs/INDEX.md) is the nav hub — every doc mapped to section headings. Pinpoint-read; don't pull whole files.
+`CONTEXT.md` (glossary) + this file's [Quick lookup](#quick-lookup) table are the nav hub — there is no separate index file. The maintained doc set is deliberately small; branch out sparingly. Pinpoint-read by section; don't pull whole files. See [ADR-0005](docs/adr/0005-documentation-taxonomy.md) for the taxonomy rationale.
 
-- [CONTEXT.md](CONTEXT.md) — shared vocabulary for the core workflow; the glossary, not a spec. Read first for naming.
+**Glossary (read first for naming)**
+- [CONTEXT.md](CONTEXT.md) — shared vocabulary for the core workflow; the glossary, not a spec.
+
+**Technical reference**
 - [docs/invariants.md](docs/invariants.md) — non-obvious rules; read before any cross-cutting edit
-- [docs/architecture.md](docs/architecture.md) — provider tree, data flow, storage, AI services, units
-- [docs/models.md](docs/models.md) — AI model catalog, R2/IDB caching architecture, `dtype` requirements, seeding runbook
-- [docs/clinical-model.md](docs/clinical-model.md) — domain entities, session state machine, AI prompt shape
-- [docs/transcription.md](docs/transcription.md) — transcription pipeline: cloud vs local paths, VAD, chunking, T1/T2 sources
-- [docs/workflows.md](docs/workflows.md) — end-to-end user workflows
+- [docs/architecture.md](docs/architecture.md) — provider tree, data flow, storage, AI services + model catalog, security/local-first boundaries, units
+- [docs/workflows.md](docs/workflows.md) — domain model (entities, AI prompt shape) + end-to-end workflows and state machines
+- [docs/transcription.md](docs/transcription.md) — transcription pipeline: cloud vs local paths, VAD, chunking, T1/T2/T3 tiers
 - [docs/style-guide.md](docs/style-guide.md) — UI conventions
-- [docs/superpowers/specs/](docs/superpowers/specs/) — design specs
+
+**Product strategy**
+- [PRODUCT.md](PRODUCT.md) — purpose, brand, design principles, and the two anchor personas (Dana, Marcus)
+
+**Decisions & other**
+- [docs/adr/](docs/adr/) — Architecture Decision Records (hard-to-reverse, surprising-without-context choices)
+- [docs/analysis/](docs/analysis/) — isolated one-off, point-in-time work (reviews, cost studies, content drafts); date-stamped, **not** maintained reference — see its README
+- [docs/superpowers/specs/](docs/superpowers/specs/) — design specs (untracked)
 
 ## Git workflow
 

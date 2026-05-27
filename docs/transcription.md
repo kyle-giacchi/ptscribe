@@ -32,9 +32,9 @@ t1Transcript present     → activeTranscriptTier: 't1'
 
 | Field | Tier | Written by | Notes |
 |-------|------|-----------|-------|
-| `t1Transcript?` | T1 | `useRecordingFlow` continuous effect + pause/stop flush | Persisted on every Whisper VAD segment during recording (or every Web Speech segment when `webSpeechEnabled`) |
+| `t1Transcript?` | T1 | `useCapturePhase` continuous effect + pause/stop flush | Persisted on every Whisper VAD segment during recording (or every Web Speech segment when `webSpeechEnabled`) |
 | `t2Transcript?` | T2 | `useBackgroundTranscription` auto-pass | Frozen after Whisper finishes; **never overwritten by T3** |
-| `t3Transcript?` | T3 | `useTranscriptionFlow.handleCreateTranscript` | Written by explicit Nova pass |
+| `t3Transcript?` | T3 | `useTranscriptSource.runT3` | Written by explicit Nova pass |
 | `editedTranscript?` | Edited | `Session.handleApplyScrub` (PII scrub) or `TranscriptPanel.onCommit` (manual edit) | Written by PII scrub or direct user edit; cleared automatically when a T2 or T3 write lands |
 | `transcript?` | active | All write paths | Denormalized mirror of active tier; used by note generation |
 | `activeTranscriptTier?` | provenance | All write paths | `'t1'` / `'t2'` / `'t3'` / `'edited'` |
@@ -43,7 +43,7 @@ t1Transcript present     → activeTranscriptTier: 't1'
 
 | Field | Tier | Written by | Notes |
 |-------|------|-----------|-------|
-| `t1Transcript?` | T1 | `useRecordingFlow` — continuous effect + pause/stop flush | Written on each Whisper VAD segment during recording; final flush on pause or stop |
+| `t1Transcript?` | T1 | `useCapturePhase` — continuous effect + pause/stop flush | Written on each Whisper VAD segment during recording; final flush on pause or stop |
 | `t2Transcript?` | T2 | *(legacy — not written by current pipeline)* | Field exists in schema for backward compat with pre-v2 data; T2 now writes session-level only |
 | `t3Transcript?` | T3 | *(legacy — not written by current pipeline)* | Field exists in schema for backward compat; T3 now writes session-level only |
 | `transcript?` | active | T1 write path | Per-clip T1 transcript; populated during recording |
@@ -95,7 +95,7 @@ On speech-not-found → warning notification (not an error; no retry needed)
 On Whisper error    → retry up to 8× with 3s backoff → error notification on exhaustion
 ```
 
-### T3 — Explicit Nova pass (`useTranscriptionFlow.handleCreateTranscript`)
+### T3 — Explicit Nova pass (`useTranscriptSource.runT3`)
 
 Only fires when the user explicitly triggers "Improve with AI."
 
@@ -141,7 +141,7 @@ In both cases `session.transcript` is **not** directly updated by the edited wri
 
 **T2 (Local Whisper) is never overwritten by T3 (Nova).** `session.t2Transcript` and `clip.t2Transcript` are written exclusively by `useBackgroundTranscription`. The T3 write path skips those fields entirely, making "Revert to Draft" reliable even after multiple Nova runs.
 
-**T2 and T3 writes clear `editedTranscript`.** When `useTranscriptionFlow` completes a T2 auto-pass or a T3 Nova pass it sets `editedTranscript: undefined` in persisted state and resets the `editedTranscript` local state in `Session.tsx`. This prevents manual edits or PII-scrub output from ghosting over a fresh transcription.
+**T2 and T3 writes clear `editedTranscript`.** When `useTranscriptSource` completes a T2 auto-pass or a T3 Nova pass it sets `editedTranscript: undefined` in persisted state and resets the `editedTranscript` local state in `Session.tsx`. This prevents manual edits or PII-scrub output from ghosting over a fresh transcription.
 
 **`activeTranscriptTier` drives note generation behavior.** `generate.ts` uses `activeTranscriptTier === 't2' || 't3'` to decide whether to include speaker-context diarization sections in the AI prompt. T1 and edited tiers do not trigger diarization.
 
@@ -155,7 +155,7 @@ In both cases `session.transcript` is **not** directly updated by the edited wri
 
 There are two independent revert actions in the Transcript tab:
 
-**Revert to Draft (T2):** Visible when `session.t2Transcript` exists (`hasT2Transcript` prop to `TranscriptPanel`). On click, `useTranscriptionFlow` resets `session.transcript` and `session.activeTranscriptTier` to the T2 values without touching `session.t3Transcript` — T3 remains frozen and available. Also clears `editedTranscript`.
+**Revert to Draft (T2):** Visible when `session.t2Transcript` exists (`hasT2Transcript` prop to `TranscriptPanel`). On click, `useTranscriptSource` resets `session.transcript` and `session.activeTranscriptTier` to the T2 values without touching `session.t3Transcript` — T3 remains frozen and available. Also clears `editedTranscript`.
 
 **Revert edits:** Visible when `editedTranscript` is non-empty (`hasUserEdits` prop to `TranscriptPanel`). On click, `handleRevertEdits` in `Session.tsx` runs:
 ```

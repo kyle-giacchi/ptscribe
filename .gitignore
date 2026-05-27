@@ -12,8 +12,6 @@ groupfinanceapp.xlsx
 # Internal planning / analysis docs (not for public repo)
 docs/superpowers/
 docs/analysis/
-docs/personas.md
-docs/future-concerns.md
 
 # Build & deps
 node_modules/
