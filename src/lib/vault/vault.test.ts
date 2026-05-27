@@ -152,4 +152,90 @@ describe('vault.changePassphrase', () => {
     await vault.setup(OLD);
     await expect(vault.changePassphrase(OLD, 'short')).rejects.toThrow(/passphrase/i);
   });
+
+  it('rewraps the DEK after an unlock (not just after setup)', async () => {
+    await vault.setup(OLD);
+    const plaintext = JSON.stringify({ x: 1 });
+    const encrypted = await vault.encryptUtf8(plaintext);
+
+    // Lock + unlock so the in-memory DEK comes from unwrapDek, not generateDek.
+    vault.lock();
+    await vault.unlock(OLD);
+
+    const result = await vault.changePassphrase(OLD, NEW);
+    expect(result).toEqual({ ok: true });
+
+    vault.lock();
+    expect((await vault.unlock(NEW)).ok).toBe(true);
+    expect(await vault.decryptUtf8(encrypted)).toBe(plaintext);
+  });
+});
+
+describe('vault recovery code', () => {
+  const PASS = 'a'.repeat(PASSPHRASE_MIN_CHARS);
+
+  it('has no recovery code until one is generated', async () => {
+    await vault.setup(PASS);
+    expect(vault.hasRecoveryCode()).toBe(false);
+  });
+
+  it('setupRecoveryCode wraps the same DEK and unlocks via the code', async () => {
+    await vault.setup(PASS);
+    const plaintext = JSON.stringify({ secret: 1 });
+    const encrypted = await vault.encryptUtf8(plaintext);
+
+    const code = await vault.setupRecoveryCode();
+    expect(vault.hasRecoveryCode()).toBe(true);
+
+    vault.lock();
+    const result = await vault.unlockWithRecoveryCode(code);
+    expect(result.ok).toBe(true);
+    // Same DEK → data encrypted under the passphrase still decrypts.
+    expect(await vault.decryptUtf8(encrypted)).toBe(plaintext);
+  });
+
+  it('accepts a code retyped without dashes / in lowercase', async () => {
+    await vault.setup(PASS);
+    const code = await vault.setupRecoveryCode();
+    vault.lock();
+    const result = await vault.unlockWithRecoveryCode(code.replace(/-/g, '').toLowerCase());
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a wrong recovery code', async () => {
+    await vault.setup(PASS);
+    await vault.setupRecoveryCode();
+    vault.lock();
+    const result = await vault.unlockWithRecoveryCode('0000-0000-0000-0000-0000-0000-0000-0000');
+    expect(result).toEqual({ ok: false, reason: 'bad_passphrase' });
+    expect(vault.isUnlocked()).toBe(false);
+  });
+
+  it('regenerating invalidates the old code', async () => {
+    await vault.setup(PASS);
+    const first = await vault.setupRecoveryCode();
+    const second = await vault.setupRecoveryCode();
+    expect(second).not.toBe(first);
+
+    vault.lock();
+    expect((await vault.unlockWithRecoveryCode(first)).ok).toBe(false);
+    vault.lock();
+    expect((await vault.unlockWithRecoveryCode(second)).ok).toBe(true);
+  });
+
+  it('survives a passphrase change (wraps the DEK, not the passphrase)', async () => {
+    await vault.setup(PASS);
+    const code = await vault.setupRecoveryCode();
+    const NEW = 'c'.repeat(PASSPHRASE_MIN_CHARS);
+    await vault.changePassphrase(PASS, NEW);
+
+    vault.lock();
+    expect((await vault.unlockWithRecoveryCode(code)).ok).toBe(true);
+  });
+
+  it('requires an unlocked vault to set up a recovery code', async () => {
+    await vault.setup(PASS);
+    vault.lock();
+    await expect(vault.setupRecoveryCode()).rejects.toThrow(/locked/i);
+  });
 });

@@ -210,16 +210,16 @@ Implications for the workflow:
 - Cold-open before recording: vault prompt is the first thing the clinician sees. Passkey is the fast path when a patient is already in the room; passphrase is the fallback.
 - WAL chunks, per-clip audio, the combined silenced blob, and the curated transcript all round-trip through the Repository encryption boundary normally — no second persistence path, no unencrypted staging area.
 - Tab close evicts the key. The two consequences (existing recordings become unreadable to an attacker; the legitimate clinician must re-unlock on next visit) are intentional.
-- **Passphrase recovery** is being introduced via a **Recovery code** (see below and ADR-0003) — until that ships, a forgotten passphrase is permanent loss of all encrypted data. _Note: code below is the planned direction, not yet implemented — verify against the source before assuming it exists._
+- **Passphrase recovery** exists via a **Recovery code** (see below and ADR-0003): a forgotten passphrase is no longer terminal — the recovery code unlocks this device or restores a portable backup elsewhere. (Demo mode does not surface it; the vault auto-unlocks there.)
 
 Idle-timeout vault relocking is **not** a default behavior. If introduced later it would be an opt-in setting and would need to define WAL-chunk behavior during the locked window.
 
-**Recovery code** _(planned — ADR-0003)_:
-A high-entropy code shown once at vault setup that wraps the same DEK as the passphrase, so a forgotten passphrase is not terminal. It is **not** a second passphrase and is **not** a cloud-stored secret — recovery stays entirely on-device.
+**Recovery code** (ADR-0003):
+A high-entropy code (160 bits, shown once at vault setup with a mandatory acknowledgement) that wraps the same DEK as the passphrase, so a forgotten passphrase is not terminal. Regenerable from Settings (invalidates the old one) and survives passphrase changes — it wraps the DEK, not the passphrase. It is **not** a second passphrase and is **not** a cloud-stored secret — recovery stays entirely on-device.
 _Avoid_: backup password, reset code, recovery key (reserve "key" for the DEK/KEK).
 
-**Portable backup** _(planned — ADR-0003)_:
-A self-contained backup file whose DEK is wrapped by both the passphrase and the recovery code, so it can be restored on **any** device with either secret. The backup **file** (not a server) is the cross-device transport. Distinct from the same-device-only v1 encrypted backup.
+**Portable backup** (ADR-0003):
+A self-contained v2 backup file whose DEK is wrapped by both the passphrase and (if set) the recovery code, so it can be restored on **any** device with either secret. The backup **file** (not a server) is the cross-device transport. Distinct from the same-device-only v1 encrypted backup, which is still importable.
 _Avoid_: cloud backup, sync (PTScribe does not sync clinical data to a server).
 
 ## Interruption and recovery

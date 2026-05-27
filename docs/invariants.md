@@ -141,8 +141,8 @@ When the vault is unlocked, **everything persisted goes through AES-GCM**. The e
 
 Key lifecycle (see `src/lib/vault/`):
 
-- KEK = PBKDF2-SHA-256 over the clinician's passphrase (16-byte salt, 600k iters). DEK = random AES-GCM-256 key, wrapped under KEK and persisted at `ptnotes.vault`.
-- The unwrapped DEK lives in memory only. Tab close evicts it; the next mount requires the passphrase again. There is no recovery — losing the passphrase wipes access to all encrypted data. **No idle-timeout relock exists** — a recording in progress is never interrupted by a vault prompt. If idle-locking is ever reintroduced, it must define WAL-chunk behavior during the locked window.
+- KEK = Argon2id over the clinician's passphrase (16-byte salt, 64 MiB / t=3 / p=1). DEK = random AES-GCM-256 key, wrapped under KEK and persisted at `ptnotes.vault`.
+- The unwrapped DEK lives in memory only. Tab close evicts it; the next mount requires the passphrase (or recovery code) again. A **recovery code** (ADR-0003) wraps the *same* DEK under a second Argon2id-derived KEK, stored as `recovery` in the vault envelope — so a forgotten passphrase is recoverable on-device or via a portable backup. Losing *both* the passphrase and the recovery code still wipes access. The DEK is unwrapped **extractable** so it can be re-wrapped (changePassphrase, recovery-code generation); safe because any code in an unlocked tab already holds full decrypt power. **No idle-timeout relock exists** — a recording in progress is never interrupted by a vault prompt. If idle-locking is ever reintroduced, it must define WAL-chunk behavior during the locked window.
 - `vault.isUnlocked()` is the gate. Repository methods that detect a locked vault while encrypted data exists must return `null` rather than crash, so `AppDataProvider` can fall through to `defaultAppData()` and let `VaultGate` prompt for the passphrase.
 
 Legacy plaintext migration (one-shot):
