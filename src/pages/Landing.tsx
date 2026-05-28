@@ -4,6 +4,7 @@ import { Lock, ArrowUpRight, Scale, Network } from 'lucide-react';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
 import { CompareModal } from '@/components/landing/CompareModal';
+import { HowItWorksModal } from '@/components/landing/HowItWorksModal';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -108,6 +109,7 @@ export function Landing({ onSignIn }: LandingProps) {
   const [section6Visible, setSection6Visible] = useState(false);
   const [whyVisible, setWhyVisible] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [hiwOpen, setHiwOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinel1 = useRef<HTMLDivElement>(null);
@@ -574,7 +576,7 @@ export function Landing({ onSignIn }: LandingProps) {
 
         </div>
 
-        <div style={{ marginTop: 40, textAlign: 'center' }}>
+        <div style={{ marginTop: 40, display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button
             onClick={() => setCompareOpen(true)}
             style={{
@@ -588,6 +590,21 @@ export function Landing({ onSignIn }: LandingProps) {
             onMouseLeave={e => { e.currentTarget.style.borderColor = '#d6dce5'; e.currentTarget.style.boxShadow = 'none'; }}
           >
             How does PTScribe compare to leading SaaS scribes?
+            <span style={{ color: '#0ea5a8' }}>→</span>
+          </button>
+          <button
+            onClick={() => setHiwOpen(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '14px 28px', borderRadius: 12, fontFamily: 'inherit',
+              border: '1.5px solid #d6dce5', background: '#ffffff',
+              color: '#1a2030', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              transition: 'border-color 150ms ease-out, box-shadow 150ms ease-out',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#0ea5a8'; e.currentTarget.style.boxShadow = '0 8px 22px rgba(14,165,168,0.12)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#d6dce5'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            Why I built this
             <span style={{ color: '#0ea5a8' }}>→</span>
           </button>
         </div>
@@ -712,37 +729,37 @@ export function Landing({ onSignIn }: LandingProps) {
             </div>
           </button>
 
-          {/* Architecture, explained — coming soon */}
-          <div
-            aria-disabled="true"
+          {/* Architecture, explained — opens HowItWorksModal */}
+          <button
+            onClick={() => setHiwOpen(true)}
             style={{
-              display: 'flex', flexDirection: 'column', gap: 14,
-              background: '#f4f6f9', borderRadius: 16, padding: '24px 24px 22px',
-              border: '1px dashed #d6dce5', cursor: 'default',
+              textAlign: 'left', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', gap: 14,
+              background: '#ffffff', borderRadius: 16, padding: '24px 24px 22px',
+              border: '1px solid #e4e8ee', cursor: 'pointer',
+              transition: 'transform 220ms cubic-bezier(0.22,1,0.36,1), border-color 220ms, box-shadow 220ms',
             }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = '#0ea5a8'; e.currentTarget.style.boxShadow = '0 16px 34px rgba(14,165,168,0.15)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = '#e4e8ee'; e.currentTarget.style.boxShadow = 'none'; }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Network size={22} color="#8893a5" strokeWidth={1.75} />
-              <span style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-                color: '#8893a5', background: '#ffffff', border: '1px solid #e4e8ee',
-                borderRadius: 999, padding: '3px 9px',
-              }}>
-                Coming soon
-              </span>
+              <Network size={22} color="#0ea5a8" strokeWidth={1.75} />
+              <span style={{ fontSize: 16, color: '#8893a5', fontWeight: 600, lineHeight: 1 }}>→</span>
             </div>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: '#5a6577', letterSpacing: '-0.01em', marginBottom: 6 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#1a2030', letterSpacing: '-0.01em', marginBottom: 6 }}>
                 Architecture, explained
               </div>
-              <div style={{ fontSize: 13, color: '#8893a5', lineHeight: 1.5 }}>
-                How local-first storage, the encrypted vault, and the AI proxy fit together.
+              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+                Why I built this — local-first, encrypted at rest, with the AI on a leash.
               </div>
             </div>
-            <div style={{ marginTop: 'auto', paddingTop: 4, fontSize: 11.5, color: '#a4adbd' }}>
-              A visual walkthrough is in the works.
+            <div style={{
+              marginTop: 'auto', paddingTop: 4, fontSize: 11.5, color: '#0a6d70', fontWeight: 600,
+              fontFamily: "'JetBrains Mono', ui-monospace, monospace", letterSpacing: '-0.01em',
+            }}>
+              A 5-chapter builder's journal
             </div>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -921,6 +938,7 @@ export function Landing({ onSignIn }: LandingProps) {
       </footer>
 
       <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} onTryDemo={handleDemo} />
+      <HowItWorksModal open={hiwOpen} onClose={() => setHiwOpen(false)} />
     </div>
   );
 }
