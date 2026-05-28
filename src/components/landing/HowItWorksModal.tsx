@@ -388,7 +388,11 @@ function SecurityChapter() {
 
       <SectionHead tag="anatomy" title="Where every byte lives, and what's allowed to cross" />
 
-      <div className="flow">
+      <div
+        className="flow"
+        role="group"
+        aria-label="Data flow: the vault key is held only in memory, encrypts every byte into localStorage and IndexedDB at rest, and the only thing that crosses the network is a thin Cloudflare Worker proxy that never stores clinical data."
+      >
         <div className="flow__strip" style={{ ['--cols' as string]: 5 } as CSSProperties}>
           <div className="node node--ink">
             <div className="node__top">
@@ -538,7 +542,7 @@ function VoiceChapter() {
             <span className="cost-bar__label-sub">Raw audio, untouched</span>
           </div>
           <div className="cost-bar__track">
-            <div className="cost-bar__fill" style={{ width: '100%', background: 'linear-gradient(90deg, var(--ink) 0 50%, var(--amber) 50%)' }} />
+            <div className="cost-bar__fill cost-bar__fill--split" style={{ width: '100%' }} />
           </div>
           <div className="cost-bar__value"><strong>32 min</strong> · 100%</div>
         </div>
@@ -571,29 +575,6 @@ function VoiceChapter() {
           <span className="cost-bar__legend-item is-trimmed">speech (sped up)</span>
         </div>
       </div>
-
-      <table className="cost-table">
-        <thead>
-          <tr><th>Optimization</th><th>What it does</th><th>Reduction</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Silence removal</td>
-            <td>Trims sustained silent regions before transcription</td>
-            <td><span className="pct-down">−50%</span></td>
-          </tr>
-          <tr>
-            <td>1.5× speed-up</td>
-            <td>Pitch-preserving time-stretch on the already-trimmed audio</td>
-            <td><span className="pct-down">−33%</span></td>
-          </tr>
-          <tr className="is-emphasis">
-            <td>Both, compounded</td>
-            <td>32 min → 16 min → ~10.7 min sent to Nova</td>
-            <td><span className="pct-down">−67%</span></td>
-          </tr>
-        </tbody>
-      </table>
 
       <div className="stats">
         <div className="stat stat--alarm">
@@ -799,7 +780,12 @@ const body: GenerateRequest = {
 // with a diff modal review before any edit is applied.`}</pre>
       </div>
 
-      <div className="flow" style={{ marginTop: 16 }}>
+      <div
+        className="flow"
+        style={{ marginTop: 16 }}
+        role="group"
+        aria-label="Data flow: the curated transcript is PII-scrubbed on-device with a clinician-reviewed diff, and only the transcript plus formatting modifiers are sent over the network to Anthropic Sonnet. The chart (MRN, ICD-10, prior notes, plan of care) is never sent."
+      >
         <div className="flow__strip" style={{ ['--cols' as string]: 5 } as CSSProperties}>
           <div className="node node--sage">
             <div className="node__top"><span className="node__tag">on-device</span><span className="node__glyph" /></div>
@@ -900,21 +886,21 @@ function FutureChapter() {
           <div className="lan__device">
             <span className="lan__device-glyph" aria-hidden="true" />
             <span>
-              <span className="lan__device-name">Front-desk laptop</span><br />
+              <span className="lan__device-name">Front-desk laptop</span>
               <span className="lan__device-sub mono">cheap · dumb</span>
             </span>
           </div>
           <div className="lan__device">
             <span className="lan__device-glyph lan__device-glyph--tablet" aria-hidden="true" />
             <span>
-              <span className="lan__device-name">Treatment-room tablet</span><br />
+              <span className="lan__device-name">Treatment-room tablet</span>
               <span className="lan__device-sub mono">cheap · dumb</span>
             </span>
           </div>
           <div className="lan__device">
             <span className="lan__device-glyph" aria-hidden="true" />
             <span>
-              <span className="lan__device-name">Clinician laptop</span><br />
+              <span className="lan__device-name">Clinician laptop</span>
               <span className="lan__device-sub mono">cheap · dumb</span>
             </span>
           </div>
@@ -938,7 +924,7 @@ function FutureChapter() {
 
       <div className="roadmap">
         <div className="roadmap__eyebrow">Fog computing · the office becomes its own private cloud</div>
-        <div className="roadmap__title">Suddenly the trade-offs flip in the user's favor.</div>
+        <h3 className="roadmap__title">Suddenly the trade-offs flip in the user’s favor.</h3>
         <div className="roadmap__grid">
           <div className="roadmap__card">
             <span className="roadmap__card-h">↩ data residency</span>
@@ -1039,6 +1025,19 @@ const STYLES = `
 .hiw-root .btn--primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .hiw-root .btn--primary:hover { background: #0f1320; }
 
+/* Keyboard focus — the scoped reset otherwise leaves only the UA default.
+   A clinical-app portfolio piece should be obviously keyboard-navigable. */
+.hiw-root a:focus-visible,
+.hiw-root button:focus-visible,
+.hiw-root summary:focus-visible,
+.hiw-root [data-goto]:focus-visible {
+  outline: 2px solid var(--sage-deep);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.hiw-root .snippet a:focus-visible,
+.hiw-root .node--ink a:focus-visible { outline-color: var(--sage-soft); }
+
 /* ── Panel layout ─────────────────────────────────────────── */
 .hiw-root.hiw__panel {
   width: min(1240px, calc(100vw - 48px));
@@ -1104,8 +1103,9 @@ const STYLES = `
   display: grid; grid-template-columns: 28px 1fr;
   gap: 10px; align-items: baseline;
   padding: 9px 10px; border-radius: 7px;
+  border: 1px solid transparent;
   text-decoration: none; color: var(--ink-2); position: relative;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
   cursor: pointer;
 }
 .hiw__rail .toc__item:hover { background: var(--paper-3); color: var(--ink); }
@@ -1117,7 +1117,7 @@ const STYLES = `
 .hiw__rail .toc__desc { font-size: 11px; color: var(--ink-3); margin-top: 2px; line-height: 1.35; display: block; }
 .hiw__rail .toc__item.is-active {
   background: var(--paper); color: var(--ink);
-  box-shadow: inset 2px 0 0 var(--ink);
+  border-color: var(--line); box-shadow: var(--shadow-soft);
 }
 .hiw__rail .toc__item.is-active .toc__num { color: var(--ink); }
 .hiw__rail-foot {
@@ -1182,8 +1182,15 @@ const STYLES = `
 .ch {
   padding: 28px 48px 8px;
   max-width: 980px;
-  scroll-margin-top: 12px;
+  scroll-margin-top: 28px;
+  --ch-accent: var(--ink);
 }
+/* Per-chapter dominant accent — structure stays identical across chapters,
+   so hue (plus copy) is what gives each one its own identity. */
+#ch-security { --ch-accent: var(--ink); }
+#ch-voice    { --ch-accent: var(--sage-deep); }
+#ch-notes    { --ch-accent: var(--record); }
+#ch-future   { --ch-accent: var(--amber); }
 .ch__head {
   display: grid; grid-template-columns: 72px 1fr;
   gap: 18px; align-items: start; margin-bottom: 18px;
@@ -1192,7 +1199,8 @@ const STYLES = `
   font-family: "JetBrains Mono", monospace;
   font-size: 13px; color: var(--ink);
   font-weight: 600; letter-spacing: -0.02em;
-  background: var(--paper-2); border: 1px solid var(--line);
+  background: var(--paper-2);
+  border: 1px solid color-mix(in oklab, var(--ch-accent) 50%, var(--line));
   border-radius: 10px; padding: 8px 0 10px;
   text-align: center; position: relative;
 }
@@ -1209,7 +1217,7 @@ const STYLES = `
 }
 .ch__eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sage-deep); display: inline-block; }
 .ch__eyebrow.ch__eyebrow--sec .dot { background: var(--ink); }
-.ch__eyebrow.ch__eyebrow--trans .dot { background: var(--amber); }
+.ch__eyebrow.ch__eyebrow--trans .dot { background: var(--sage-deep); }
 .ch__eyebrow.ch__eyebrow--note .dot { background: var(--record); }
 .ch__title {
   font-size: 24px; font-weight: 600;
@@ -1231,7 +1239,7 @@ const STYLES = `
   font-family: "JetBrains Mono", monospace;
   font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.06em;
 }
-.ch__sec-tag::before { content: "§ "; color: var(--ink-4); }
+.ch__sec-tag::before { content: "§ "; color: var(--ch-accent); opacity: 0.7; }
 .ch__sec-title {
   font-size: 14.5px; font-weight: 600;
   letter-spacing: -0.005em; margin: 0; color: var(--ink);
@@ -1817,8 +1825,8 @@ const STYLES = `
 .note {
   margin: 18px 0 8px;
   padding: 14px 18px 14px 22px;
-  background: var(--sage-tint);
-  border: 1px solid rgba(10,109,112,0.18);
+  background: var(--paper-2);
+  border: 1px solid var(--line-2);
   border-radius: 10px;
   font-style: italic; color: var(--ink-2);
   font-size: 14px; line-height: 1.6; text-wrap: pretty;
@@ -1829,7 +1837,7 @@ const STYLES = `
   left: 6px; top: 4px;
   font-family: "JetBrains Mono", monospace;
   font-style: normal; font-size: 22px;
-  color: var(--sage-deep); opacity: 0.6;
+  color: var(--ink-3); opacity: 0.7;
   line-height: 1;
 }
 .note p { margin: 0; }
@@ -1927,6 +1935,9 @@ const STYLES = `
   border-radius: 4px; border: 1px solid var(--line-3); overflow: hidden;
 }
 .cost-bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--sage-deep); border-radius: 3px; }
+/* Baseline split: speech (ink) vs. trimmed silence (neutral, not amber —
+   dead air is neutral, not a warning; amber is reserved for caveat/future). */
+.cost-bar__fill--split { background: linear-gradient(90deg, var(--ink) 0 50%, var(--ink-4) 50%); }
 .cost-bar__value {
   text-align: right;
   font-family: "JetBrains Mono", monospace;
@@ -1943,41 +1954,10 @@ const STYLES = `
   content: ""; width: 10px; height: 10px; border-radius: 2px; background: var(--ink);
 }
 .cost-bar__legend-item.is-speech::before { background: var(--ink); }
-.cost-bar__legend-item.is-silence::before { background: var(--amber); }
+.cost-bar__legend-item.is-silence::before { background: var(--ink-4); }
 .cost-bar__legend-item.is-trimmed::before { background: var(--sage-deep); }
 
-.cost-table {
-  width: 100%; margin: 14px 0 4px;
-  border-collapse: collapse;
-  border: 1px solid var(--line-2);
-  border-radius: 12px; overflow: hidden;
-  font-size: 13px; background: var(--paper);
-}
-.cost-table thead th {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--ink-3);
-  font-weight: 600; text-align: left;
-  padding: 12px 16px; background: var(--paper-2);
-  border-bottom: 1px solid var(--line-2);
-}
-.cost-table tbody td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line-3);
-  vertical-align: top; color: var(--ink-2);
-}
-.cost-table tbody tr:last-child td { border-bottom: none; }
-.cost-table tbody tr.is-emphasis td {
-  background: var(--sage-tint); color: var(--ink); font-weight: 600;
-  border-bottom-color: rgba(10,109,112,0.18);
-}
-.cost-table td:first-child { font-weight: 500; color: var(--ink); }
-.cost-table td:last-child {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12.5px; color: var(--ink);
-  text-align: right; white-space: nowrap;
-}
-.cost-table .pct-down { color: var(--sage-deep); }
+.pct-down { color: var(--sage-deep); font-weight: 600; }
 
 .stats {
   display: grid; grid-template-columns: repeat(3, 1fr);
@@ -2035,8 +2015,8 @@ const STYLES = `
 }
 .lan__device-glyph--tablet { width: 14px; height: 18px; }
 .lan__device-glyph--tablet::after { display: none; }
-.lan__device-name { color: var(--ink); font-weight: 500; }
-.lan__device-sub { color: var(--ink-3); font-size: 10.5px; font-family: "JetBrains Mono", monospace; }
+.lan__device-name { display: block; color: var(--ink); font-weight: 500; }
+.lan__device-sub { display: block; margin-top: 1px; color: var(--ink-3); font-size: 10.5px; font-family: "JetBrains Mono", monospace; }
 .lan__wire {
   position: relative; height: 100%;
   display: flex; align-items: center; justify-content: center;
