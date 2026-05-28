@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, WhisperExhaustedError } from '@/services/ai/client/localWhisper';
+import { promoteTier } from '@/services/transcript/promoteTier';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
 import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
@@ -148,19 +149,16 @@ export function useBackgroundTranscription({
 
     transcribeWithLocalWhisper(silencedMergedBlob!, (msg) => setProgressLabel(msg))
       .then((result) => {
-        // Don't overwrite a cloud (T3) result if Nova ran while Whisper was processing.
-        if (sessionRef.current?.t3Transcript) {
-          setPhase('done');
-          return;
-        }
-
         if (result.ok) {
+          // promoteTier owns the ordering rule: a fresh T2 may not clobber a
+          // higher tier (T3) that produced output while Whisper was processing.
+          const promo = promoteTier(sessionRef.current ?? {}, { tier: 't2', text: result.text });
+          if (!promo) {
+            setPhase('done');
+            return;
+          }
           setTranscript(result.text);
-          patchSession({
-            transcript: result.text,
-            activeTranscriptTier: 't2',
-            t2Transcript: result.text,
-          });
+          patchSession({ ...promo, t2Transcript: result.text });
           setPhase('done');
         } else if (result.error !== 'Aborted.') {
           // Content error (no speech, too short) — notify and treat as done

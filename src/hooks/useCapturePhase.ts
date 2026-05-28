@@ -3,6 +3,7 @@ import type { Dispatch } from 'react';
 import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
+import { promoteTier } from '@/services/transcript/promoteTier';
 import { mergeAudioBlobs } from '@/lib/audio/merge';
 import { trimSilence } from '@/lib/audio/silenceTrim';
 import {
@@ -557,10 +558,16 @@ export function useCapturePhase({
       .filter((t): t is string => Boolean(t));
     if (compiledTexts.length > 0) {
       const merged = compiledTexts.join('\n\n');
-      setTranscript(merged);
-      const patch: Partial<Session> = { transcript: merged, activeTranscriptTier: 't1' };
-      if (t1Texts.length > 0) patch.t1Transcript = t1Texts.join('\n\n');
-      patchSession(patch);
+      // promoteTier guards the baseline (won't clobber a higher tier that already
+      // ran). The frozen t1Transcript is a t1-only join, distinct from the merged
+      // compiled baseline, so the producer still writes it itself.
+      const promo = promoteTier(session ?? {}, { tier: 't1', text: merged });
+      if (promo) {
+        setTranscript(merged);
+        const patch: Partial<Session> = { ...promo };
+        if (t1Texts.length > 0) patch.t1Transcript = t1Texts.join('\n\n');
+        patchSession(patch);
+      }
     }
 
     if (!opts?.skipNav) setActiveTab('review');
