@@ -202,6 +202,17 @@ The background effect in `useBackgroundTranscription` fires once `silencedMerged
 
 Cloud transcription (Nova-3 via the Cloudflare Worker) is a **separate, explicit user action** ("Improve with AI") that upgrades the local result. It does not replace the background pass — it runs on top of it. Speed-up is applied inline to the same `silencedMergedBlob` only at that moment; it is never pre-computed.
 
+### Machine-tier promotion order
+
+**A freshly produced machine tier may become the active baseline only if no strictly-higher tier has already produced output.** The order is fixed: T1 (live Web Speech) < T2 (local Whisper) < T3 (cloud Nova) — cloud beats local beats live. This rule lives in exactly one place: `promoteTier` in `src/services/transcript/promoteTier.ts`. All three producers (`useCapturePhase` T1, `useBackgroundTranscription` T2, `useTranscriptSource` T3) call it before patching the session; none re-implement the comparison.
+
+Non-obvious points a future editor must not "simplify away":
+
+- **The guard reads the frozen `t1/t2/t3Transcript` fields, not `activeTranscriptTier`.** The frozen fields are the durable evidence of which tiers actually ran; `activeTranscriptTier` is a movable pointer (Revert/Unlock/edit can relocate it) and must never be the input to the ordering decision.
+- **`promoteTier` governs the machine baseline only — `transcript` + `activeTranscriptTier`.** It never reads or writes `editedTranscript`; the clinician's edit overlay is a separate entity. (T3's producer still clears `editedTranscript` itself as a non-tier side effect — that is the producer's concern, not `promoteTier`'s.)
+- **Each producer still freezes its own tier field itself.** `promoteTier` does not return the frozen field because a tier's frozen value can differ from the baseline text — T1 freezes a live-only join while the baseline is the compiled per-clip text. Returning it would force one definition for both.
+- A `null` return means "a higher tier already won — do not patch." A same-tier re-run (T2 re-merge) is allowed to replace.
+
 **Do not gate the background pass behind a provider check.** The background pass runs for all provider configurations.
 
 **Do not skip `buildMergedAudioForReview` for uploaded clips.** The `UploadProcessingView` in `Session.tsx` waits for `clip.status === 'ready' | 'transcribed' | 'failed'`, then calls `buildMergedAudioForReview()` which builds `silencedMergedBlob` and kicks off T2. If you bypass this call, the "Processing audio" screen hangs and T2 never fires.

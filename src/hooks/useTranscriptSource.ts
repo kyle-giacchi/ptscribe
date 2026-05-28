@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import type { Dispatch } from 'react';
 import { toast } from 'sonner';
 import { transcribe } from '@/services/ai/transcribe';
+import { promoteTier } from '@/services/transcript/promoteTier';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
@@ -141,11 +142,15 @@ export function useTranscriptSource({
         if (text) {
           setTranscript(text);
           setEditedTranscript?.('');
-          // t3Transcript frozen here — t2 preserved untouched
-          patchSession({
+          // T3 is the top tier — promoteTier never blocks it; the fallback is
+          // defensive only. t3Transcript frozen here; t2 preserved untouched.
+          const promo = promoteTier(session, { tier: 't3', text }) ?? {
             transcript: text,
+            activeTranscriptTier: 't3' as const,
+          };
+          patchSession({
+            ...promo,
             t3Transcript: text,
-            activeTranscriptTier: 't3',
             status: 'draft',
             editedTranscript: undefined,
             cloudTranscribeCount: spent + 1,
