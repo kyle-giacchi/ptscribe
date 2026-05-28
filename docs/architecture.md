@@ -106,16 +106,20 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 | `SettingsProvider`  | `useSettings()`  | `updateSettings`, `updateAi`, `updateAudio`, `updateUi`, `updateSession`, `updateRecordingLimits`, `updateOrgPolicy`, `updateFirstRun`, `setIdleLockMinutes`, `setAutoDeleteAudioAfterDays`, `getPageMode` / `setPageMode` (per-page detail level; persisted directly to `localStorage`, not in `AppData`).                            |
 | `IdleLockProvider`  | —                | No mutators. Reads `settings.security.idleLockMinutes`; calls `vault.lock()` after that many minutes of inactivity. Must be inside `SettingsProvider`.                                                                                                                                                                                  |
 | `AuthProvider`      | `useAuth()`      | Wraps BetterAuth (passkey + magic link, served via Worker at `/api/auth`). Sits at router level, outside the app provider tree. Exposes `isAuthenticated`, `user`, `signOut`.                                                                                                                                                           |
+| `ConfigSyncProvider` | —               | Mounted inside `AppDataProvider`. Pulls non-clinical config from D1 on login and debounce-pushes on change via slice mutators. No mutators of its own. **Zero `/api/config/*` requests for demo/test-user/unauthenticated sessions** (isolation gate). See [Cross-device config sync](#cross-device-config-sync-d1).                       |
+| `OrgConfigProvider` | `useOrgConfig()` | Read-only org policy + shared template/exercise library (`policy`, `sharedTemplates`, `sharedExercises`, `canManage`, `updateOrgConfig`). Loads only when `currentUser.orgId` is set; demo/no-org isolated. Shared library is never written into AppData.                                                                                |
 
 ## Session flow hooks
 
-Session pages consume three dedicated flow hooks orchestrating the recording, transcription, and generation workflows:
+`Session.tsx` drives the visit through one orchestrator hook, `useSessionMachine`, which owns the session reducer (`sessionMachineReducer`) and composes the phase hooks below, re-exposing their handlers to the page:
 
-| Hook                    | Purpose                                                                                                     |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `useRecordingFlow`      | Owns recording lifecycle, clip storage, audio upload, playback state for Review tab. Wires recorder/live hooks to clip/session mutations. |
-| `useTranscriptionFlow`  | Owns background auto-transcription (local Whisper + VAD chunking), explicit cloud transcription, merge/revert helpers for TranscriptPanel. |
-| `useGenerationFlow`     | Owns AI note generation loop, action guard rate-limiting, note CRUD operations wired to Session page controls. |
+| Hook                     | Owns                                                                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useSessionMachine`      | Top-level orchestrator. Reducer-backed session state; composes the phase hooks and surfaces their handlers/flags to `Session.tsx`.                                 |
+| `useCapturePhase`        | Recording + upload lifecycle: `handleStartRecording`, `handleFinishedRecording`, `handleUploadAudio`. Wires `useRecorder` (WAL chunking, wake lock, VAD T1 segment recorder) to clip/session mutations. |
+| `useTranscriptSource`    | Transcript-tier resolution: `backgroundT2` (auto local-Whisper pass via `useBackgroundTranscription`), `runT3` (explicit Nova "Improve with AI", capped 1×/session), `revertToLocal`. |
+| `useGeneratePhase`       | AI note generation loop + `finalize`/`unfinalize` + section edits, wired to NoteToolbar/NotePanel.                                                                 |
+| `useActionGuard`         | Per-session rate-limit guard: `checkActionGuard`, `recordAction`, plus `transcribeUsed` / `generateUsed` counters.                                                 |
 
 `AppDataProvider` owns persistence. Slice providers are thin wrappers that give domain-scoped mutators; they read from `appData` and delegate writes back up via `updateXSlice`.
 
@@ -133,6 +137,7 @@ Without this split, every consumer of a single global context would re-render on
 | `localStorage`              | `ptnotes.vault`                                 | Wrapped DEK + KDF params; tab-scoped key only                       |
 | IndexedDB (`ptnotes-audio`) | object store `recordings`, key = `clipId`       | Final consolidated audio Blob per clip (written on recorder stop)   |
 | IndexedDB (`ptnotes-audio`) | object store `recording_chunks`, key = `clipId` | Per-chunk write-ahead log during recording; cleared after clip save |
+| `localStorage`              | `ptscribe-config-sync:<userId>`                 | Per-user config-sync record `{ hash, localUpdatedAt, serverUpdatedAt }` — LWW version for D1 sync; **not** in `AppData`. Plaintext (no clinical data). |
 
 Defined in `src/lib/storageKeys.ts`.
 
@@ -144,12 +149,12 @@ When the vault is unlocked, every value in `ptnotes.appData` and the `recordings
 
 **Every audio clip is auto-transcribed locally first, regardless of the user's configured transcription provider.**
 
-Pipeline (from `src/hooks/useTranscriptionFlow.ts`):
+Pipeline (from `src/hooks/useBackgroundTranscription.ts`):
 
 1. `blobToFloat32(blob)` — decode audio blob to 16 kHz mono Float32Array via Web Audio API
 2. `findSpeechRangesML(samples)` — Silero ML VAD extracts speech ranges (non-fatal; falls back to full audio on error)
 3. `extractRanges(samples, ranges)` — strip silence between speech ranges
-4. Fixed 3-minute chunking of the speech-only audio
+4. Fixed 2-minute chunking of the speech-only audio (`LOCAL_CHUNK_SEC = 120`; each chunk maps to a real audio timestamp)
 5. `transcribeFloat32Parallel(chunks, model, onProgress)` — dispatch chunks across a device-capability-sized worker pool
 
 This fires as a background auto-transcription effect (`useBackgroundTranscription`) for every clip that reaches `status: 'ready'` with no `t2Transcript`. Result is stored in both `t2Transcript` and `transcript` so the Review tab populates without user action.
@@ -174,6 +179,79 @@ Wire details:
 - Provider value `'none'` short-circuits cloud calls so the workflow stays manual (local Whisper still runs, Web Speech for live transcript, hand-edited notes).
 
 The Worker source lives at `worker/index.ts`; secrets are managed via `wrangler secret put` and surfaced as `env.PTSCRIBE_GATE`, `env.ANTHROPIC_API_KEY`, etc. The Workers AI binding (`env.AI`) handles Nova-3 without an explicit token.
+
+**Defense in depth (all server-side, in `worker/index.ts`):**
+
+- **Origin enforcement** — a *missing* `Origin` header is denied (browsers always send one on `fetch`, so no-Origin implies a script/curl).
+- **Obscurity gate** — `x-ptscribe-key` must equal `sha256(PTSCRIBE_GATE)`, compared in constant time. This is friction, not auth; the real protection is the rate limits below.
+- **Rate limits (KV `env.RATE_LIMIT`)** — pre-gate 20/min/IP, then 10/min and 300/day per IP, plus a 500/day global ceiling (`RATE_LIMIT_PRE_GATE_PER_MIN` / `_PER_MIN` / `_PER_DAY` / `_GLOBAL_PER_DAY`). KV read→increment→write is non-atomic by design (a small over-count at the boundary is acceptable).
+- **Model allowlists** — `ALLOWED_GENERATE_MODELS` and the transcription allowlist reject any model ID before it reaches a provider.
+- **CSP is the local-first boundary** — `connect-src 'self' https://huggingface.co`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`. A single compromised dependency cannot exfiltrate to an attacker server. The model proxy (`/api/model/*`) is allowlisted to specific HuggingFace repos (`ALLOWED_MODEL_REPOS`) so it can't be abused as an open proxy.
+
+**What the AI is allowed to see (the generation bound):** note generation sends only the curated transcript + chosen template + visit type + a small patient-context block (name, derived age, `primaryDiagnosis`). **MRN, ICD-10, prior notes, plan of care, and prior sessions are never injected.** PII scrubbing happens on-device and is clinician-triggered. See [workflows.md — AI prompt shape](workflows.md#ai-prompt-shape) for the exact prompt and the full bound.
+
+### What runs where (local-first map)
+
+What runs on-device vs. over the network determines what is *instant* vs. a *wait* — the single most important fact for pacing any new UI.
+
+| Capability | Where | Network? | UX character |
+|---|---|---|---|
+| Data read/write + encryption | Browser (Repository + vault) | No | Instant |
+| Audio recording, silence-trim, VAD | Browser (Web Audio + Silero ML VAD) | No | Instant / background |
+| **T2 local Whisper** (canonical transcript) | Browser Web Worker pool | No (model fetched once, then IDB-cached) | **Async wait** (seconds–minutes) |
+| PII scrub (NER) | Browser Web Worker | No | Short wait, on demand |
+| Audio playback | Browser (Blob from IndexedDB) | No | Instant |
+| T1 live preview | Worker → Cloudflare Whisper *(or browser Web Speech)* | Yes | Streams during recording |
+| T3 Nova ("Improve with AI") | Worker → Deepgram | Yes | Async wait, **capped 1×/session** |
+| Note generation | Worker → Anthropic | Yes | Async wait, atomic result |
+
+The app is usable **fully offline** except the three explicitly-networked actions (T1 live, T3 Nova, note generation). Design loading/empty states around the two real waits — the **T2 auto-pass** (between Capture and Curate) and **Generate** — not around generic "fetching data" spinners.
+
+### AI model catalog
+
+| Model | Provider | Where it runs | Purpose |
+|---|---|---|---|
+| `@cf/deepgram/nova-3` | Cloudflare Workers AI | Cloudflare edge | Cloud transcription with speaker diarization (default; Whisper variants `@cf/openai/whisper`, `@cf/openai/whisper-large-v3-turbo` also allowlisted) |
+| `Xenova/whisper-tiny.en` | HuggingFace / Transformers.js | Browser Web Worker | Local (on-device) transcription (~40 MB ONNX; default `model.onnx`, no `dtype` needed) |
+| `Xenova/bert-base-NER` (INT8) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing, default (`dtype: 'q8'` → `onnx/model_quantized.onnx`, ~90 MB) |
+| `openai/privacy-filter` (Q4) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing, backup via `settings.session.piiModel` (`dtype: 'q4'`, ~875 MB; practical only after IDB cache) |
+| `claude-sonnet-4-6` | Anthropic | Cloudflare Worker proxy | Structured note generation |
+
+**Model file delivery + caching** — browser worker fetch interceptor checks IndexedDB (`ptscribe-model-cache`) first; on miss it requests `/api/model/{org}/{model}/resolve/main/{file}`. The Worker (`handleModelFile`) serves from the R2 bucket `ptnotes-models` if present, else proxies from HuggingFace and writes back to R2 (fire-and-forget). R2 keys mirror the HuggingFace URL path so the interceptor can derive them directly. The app works without seeding (first user per file pays the HuggingFace cold-download); pre-seed with `npx tsx scripts/seed-r2-models.ts` (Whisper) and `python scripts/convert-privacy-filter.py` (privacy filter). Verify with `wrangler r2 object list ptnotes-models --prefix "<org>/<model>"`.
+
+## Cross-device config sync (D1)
+
+Registered (non-demo) users persist their **non-clinical** config to Cloudflare D1 so it follows them across devices; orgs carry a policy blob + a shared template/exercise library. **Clinical data and audio never leave the device** — see [invariants.md — D1 config sync](invariants.md#d1-config-sync--clinical-exclusion-has-exactly-one-chokepoint) for the hard boundary and the demo/auth isolation gate.
+
+What syncs:
+
+| Data | Source | Synced? | D1 table |
+| --- | --- | --- | --- |
+| `settings` subtree | AppData | ✅ | `user_config` |
+| `clinician` profile | AppData | ✅ | `user_config` |
+| custom (`builtin:false`) templates/exercises | AppData | ✅ | `user_config` |
+| built-in templates/exercises | regenerated locally | ❌ never sent | — |
+| `patients`/`sessions`/`notes`/`plans`, audio | AppData / IndexedDB | ❌ **never** | — |
+| org profile / policy / shared library | D1 | ✅ | `org_config` |
+
+Data flow (client side):
+
+```
+ConfigSyncProvider (mounted inside AppDataProvider)
+  on login   -> GET /api/config/user -> reconcile(local, server) -> apply | push | noop
+  on change  -> projectUserConfig(appData)  [SINGLE clinical-exclusion point]
+                -> hash; if changed, debounce ~1.5s -> PUT /api/config/user
+  apply       -> write server config back through slice mutators
+                 (updateSettingsSlice / updateClinicianSlice /
+                  updateTemplatesSlice / updateExercisesSlice) — single write path,
+                  one full-replacement write per slice (no add→update chaining)
+```
+
+Reconciliation is **blob-level last-write-wins**. The config version (`updatedAt`) lives in a per-user `localStorage` record `ptscribe-config-sync:<userId>`, separate from `AppData.lastModified` (which bumps on patient edits that must not sync). The worker PUT rejects a stale write with `STALE_WRITE` 409.
+
+`OrgConfigProvider` loads `GET /api/config/org` when `currentUser.orgId` is set and exposes `{ policy, sharedTemplates, sharedExercises, canManage, updateOrgConfig() }`. Org templates/exercises stay **in this context, read-only** — they are merged in-place at the consumption surfaces (Templates, Exercises, NewSession, Session) and never written into AppData.
+
+Worker side: `worker/config.ts` handles `GET/PUT /api/config/{user,org}` (org PUT behind `requireManager`); `worker/configLogic.ts` holds the pure validation (size cap, forbidden-key scan, LWW, builtin stripping). The route is session-authenticated like `/api/org/*` — **no `x-ptscribe-key` gate**. Shared worker plumbing (`worker/db.ts` `makeDb`, `worker/caller.ts` `resolveCaller`/`requireManager`/`getSessionUserId`) is reused across org and config routes.
 
 ## Schema validation
 
