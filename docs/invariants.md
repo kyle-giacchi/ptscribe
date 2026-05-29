@@ -105,6 +105,16 @@ UI surfaces this as a Lock badge with a Clone action instead of Edit/Delete. Do 
 - Do not add "bypass" links or `?skip` query params that skip setup — the guard exists to ensure the clinician profile is populated before the app can render notes.
 - The guard runs after the first render (inside `useEffect`), so there is a single frame where children render before the redirect fires. Components must tolerate an empty clinician name.
 
+## Profile-scoped storage (ADR-0007)
+
+All on-device data is partitioned into cryptographically-isolated **Profiles** (CONTEXT.md §Profiles and multi-user devices). Every localStorage key and the audio IndexedDB are suffixed with the active profile id (`ptnotes.appData:<profileId>`, `ptnotes-audio:<profileId>`, etc.).
+
+- **One chokepoint for the active id.** `src/lib/profile/profileId.ts` owns the active profile id. `resolveProfileId()` derives it: demo build → `test-user` (marker set) or `demo`; non-demo build → the authenticated user id, else `local`. Never read the marker or branch on demo/auth to pick a namespace anywhere else.
+- **Keys resolve through `storageKeys.ts`.** `STORAGE_KEYS.*` are **getters** that suffix the base string with `getActiveProfileId()` at access time; `AudioRepository` opens `audioDbName()`. Do not hardcode a `ptnotes.*` string or the bare `ptnotes-audio` DB name — it would escape the profile namespace. (`ptnotes.gate` is the one intentional exception: the demo AppGate code is device-global.)
+- **`ProfileResolver` is the gate.** It sits outermost in `AppProviders` (outside `VaultGate`), waits for the BetterAuth session to resolve in non-demo builds before choosing a namespace, then `commitActiveProfile()`s the id. A profile **change** mid-page-life (login/logout/switch) forces a full `window.location.reload()` — the only safe teardown of the in-memory vault DEK + cached IDB handle. `signOut()` likewise reloads. Do not hot-swap profiles via React state.
+- **`demo` and `test-user` are separate profiles** that share the `DEMO_USER` auth identity but never share storage — this is what stops demo↔test↔real data bleed.
+- The Whisper **model cache (`ptscribe-model-cache`) stays app-global** and un-scoped (non-PHI, see [model-cache rule](#model-cache-is-app-global-and-survives-every-reset-path)). The legacy un-suffixed pre-Profile keys are purged once by `purgeLegacyUnscopedStorage()` (greenfield — no migration).
+
 ## Storage cap and audio offload
 
 `safeLocalStorage.setItem` throws if the serialized JSON of a single object exceeds 5 MB (`MAX_OBJECT_BYTES`). The throw is intentional — it surfaces the problem rather than silently dropping data.

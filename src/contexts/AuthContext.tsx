@@ -3,6 +3,7 @@ import { isDemoMode } from '@/lib/demoMode';
 import { DEMO_USER } from '@/lib/auth/demo';
 import { authClient, type AuthSession } from '@/lib/auth/client';
 import { vault } from '@/lib/vault/vault';
+import { deactivateTestUserSession, isTestUserSession } from '@/lib/profile/profileId';
 import type { AppUser, OrgRole } from '@/lib/auth/types';
 import type { PlanTier } from '@/types/plans';
 
@@ -36,7 +37,10 @@ function mapSession(session: AuthSession): AppUser {
     email: u.email,
     displayName: u.name,
     planTier: ((u.planTier as PlanTier) ?? 'personal-free') as PlanTier,
-    // Namespacing fallback: personal accounts (no org) partition AppData by user id.
+    // Server-side config-sync partition key (D1): org members share the org's
+    // tenantId; personal accounts fall back to their own user id. This is NOT the
+    // on-device data partition — that is the Profile id (ADR-0007), keyed by user
+    // id for authenticated accounts and resolved in `lib/profile/profileId.ts`.
     tenantId: orgId ?? u.id,
     orgId,
     role,
@@ -52,22 +56,6 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {},
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-const TEST_USER_KEY = 'ptscribe-test-user-session';
-
-// Persisted in localStorage (not sessionStorage) so a Test User session behaves
-// like a real login: it survives reloads and new tabs until an explicit Log out.
-export function activateTestUserSession() {
-  localStorage.setItem(TEST_USER_KEY, '1');
-}
-
-export function deactivateTestUserSession() {
-  localStorage.removeItem(TEST_USER_KEY);
-}
-
-export function isTestUserSession(): boolean {
-  return localStorage.getItem(TEST_USER_KEY) === '1';
 }
 
 function RealAuthProvider({ children }: { children: ReactNode }) {

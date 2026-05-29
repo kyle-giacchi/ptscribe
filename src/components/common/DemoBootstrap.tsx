@@ -8,7 +8,7 @@ import { useSettings } from '@/contexts/SettingsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { isDemoMode, DEMO_PATIENT_ID, DEMO_SESSION_ID } from '@/lib/demoMode';
-import { isTestUserSession } from '@/contexts/AuthContext';
+import { isTestUserSession } from '@/lib/profile/profileId';
 import type { Patient, Session } from '@/types';
 
 const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;

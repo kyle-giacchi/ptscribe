@@ -1,4 +1,4 @@
-import { AUDIO_DB } from '@/lib/storageKeys';
+import { AUDIO_DB, audioDbName } from '@/lib/storageKeys';
 import { vault } from '@/lib/vault/vault';
 import { isPlaintextAudio, isPtscEncrypted, PTSC_MAGIC } from '@/lib/audio/sniff';
 
@@ -30,7 +30,7 @@ function openDb(): Promise<IDBDatabase> {
   }
   if (!_dbPromise) {
     _dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-      const req = indexedDB.open(AUDIO_DB.name, AUDIO_DB.version);
+      const req = indexedDB.open(audioDbName(), AUDIO_DB.version);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(AUDIO_DB.store)) {
