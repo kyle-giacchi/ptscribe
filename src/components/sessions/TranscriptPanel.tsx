@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   RotateCcw, Search, ChevronLeft, ChevronRight, Edit3, Wand2,
   Copy, EyeOff, PanelRightClose, Loader2,
@@ -36,7 +36,7 @@ interface TranscriptPanelProps {
   seekSignal?: { seconds: number; id: number } | null;
 }
 
-export function TranscriptPanel(props: TranscriptPanelProps) {
+function TranscriptPanelImpl(props: TranscriptPanelProps) {
   const {
     transcript, clips, transcribing, hasUserEdits, hasT2Transcript, hasT3Transcript,
     totalDurationSec, collapsed, onCollapse,
@@ -444,3 +444,5 @@ function HighlightedText({
   if (cursor < text.length) parts.push(text.slice(cursor));
   return <>{parts}</>;
 }
+
+export const TranscriptPanel = memo(TranscriptPanelImpl);
