@@ -48,6 +48,21 @@ export function clearGateCode(): void {
   }
 }
 
+/**
+ * Unlock the gate without entering the code — writes the known good hash
+ * directly. Used by the demo-only "Login as Test User" action, which needs to
+ * satisfy both AppGate and the Worker's `x-ptscribe-key` header (the stored
+ * hash is the value `apiFetch` sends). Keeps the hash as this module's single
+ * source of truth — no plaintext code duplicated at the call site.
+ */
+export function unlockGateForDemo(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, GATE_HASH);
+  } catch {
+    /* ignore — gate prompts again next reload */
+  }
+}
+
 async function sha256Hex(input: string): Promise<string> {
   const buf = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-256', buf);

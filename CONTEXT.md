@@ -288,6 +288,15 @@ Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** 
 
 `VITE_DEMO_MODE=false` is required for production builds (existing hard rule).
 
+### Test User vs Demo mode
+
+The `VITE_DEMO_MODE` flag currently switches on **two distinct entry experiences** that share the flag *for now* but are conceptually separate:
+
+- **Demo mode** — the *guided showcase*. Entered via **Try Demo**. The user is dropped into a single seeded demo session and **kept there** (navigation is locked to that session); a Demo Patient + sample session are pre-seeded. This is the canned-walkthrough surface.
+- **Test User** — the *full real-app experience*. Entered via **Login as Test User** on the sign-in screen. Navigation is **not** locked — the user roams the whole app (dashboard, patients, notes, templates, etc.) as in the real product. The app starts **clean**: only the clinician is seeded (no demo patient or sample session). The vault still auto-unlocks with the shared demo passphrase and the "DEMO MODE" badge still shows, because the underlying build is still the demo build — but the *behavior* is the unconstrained app, not the locked walkthrough.
+
+Both run as the same `DEMO_USER` identity and both are unavailable when `VITE_DEMO_MODE=false`. The only thing that distinguishes a Test User session from a Demo session at runtime is a **persistent "test user" marker** (localStorage) set by the Login-as-Test-User action and cleared by **Log out** — so a Test User session behaves like a real login: it survives reloads and new tabs until the user explicitly logs out. **Log out** is a full exit: it clears both the test-user marker and the AppGate code, returning to the Landing/sign-in screen.
+
 ## Account config & sync
 
 Vocabulary for the cross-device persistence of a registered user's **non-clinical** account data. This is account infrastructure, not part of the clinician workflow — but the terms appear in code, UI, and PRs. (Implementation lives in [architecture.md — Cross-device config sync](docs/architecture.md#cross-device-config-sync-d1) and [invariants.md — D1 config sync](docs/invariants.md#d1-config-sync--clinical-exclusion-has-exactly-one-chokepoint).)
