@@ -108,48 +108,21 @@ export default {
 
     let res: Response;
     if (url.pathname.startsWith('/api/auth/')) {
-      const origin = request.headers.get('Origin');
-      if (origin && !isOriginAllowed(origin, request.url, env)) {
-        res = apiError('FORBIDDEN', 'Origin not allowed', 403);
-      } else {
-        const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-        if (!(await checkPreGateLimit(env, ip)).allowed) {
-          res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
-        } else {
-          res = await createAuth(env, ctx).handler(request);
-        }
-      }
+      res = await withGate(request, env, { origin: 'lenient' }, () =>
+        createAuth(env, ctx).handler(request),
+      );
     } else if (url.pathname.startsWith('/api/org/')) {
-      const origin = request.headers.get('Origin');
-      if (origin && !isOriginAllowed(origin, request.url, env)) {
-        res = apiError('FORBIDDEN', 'Origin not allowed', 403);
-      } else {
-        const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-        if (!(await checkPreGateLimit(env, ip)).allowed) {
-          res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
-        } else {
-          res = await handleOrgRoute(request, env, ctx, url.pathname);
-        }
-      }
+      res = await withGate(request, env, { origin: 'lenient' }, () =>
+        handleOrgRoute(request, env, ctx, url.pathname),
+      );
     } else if (url.pathname.startsWith('/api/config/')) {
-      const origin = request.headers.get('Origin');
-      if (origin && !isOriginAllowed(origin, request.url, env)) {
-        res = apiError('FORBIDDEN', 'Origin not allowed', 403);
-      } else {
-        const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-        if (!(await checkPreGateLimit(env, ip)).allowed) {
-          res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
-        } else {
-          res = await handleConfigRoute(request, env, ctx, url.pathname);
-        }
-      }
+      res = await withGate(request, env, { origin: 'lenient' }, () =>
+        handleConfigRoute(request, env, ctx, url.pathname),
+      );
     } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
-      const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-      if (!(await checkPreGateLimit(env, ip)).allowed) {
-        res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
-      } else {
-        res = await handleModelFile(request, url, env, ctx);
-      }
+      res = await withGate(request, env, { origin: 'skip' }, () =>
+        handleModelFile(request, url, env, ctx),
+      );
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
     } else {
@@ -345,6 +318,36 @@ function isOriginAllowed(origin: string, requestUrl: string, env: Env): boolean 
   return allowed.has(origin);
 }
 
+interface GateOptions {
+  /** 'strict' denies a missing Origin (AI proxy); 'lenient' allows it
+   *  (browser same-origin sub-routes); 'skip' bypasses the Origin check
+   *  entirely (model file GETs). */
+  origin: 'strict' | 'lenient' | 'skip';
+}
+
+async function withGate(
+  request: Request,
+  env: Env,
+  opts: GateOptions,
+  handler: () => Promise<Response>,
+): Promise<Response> {
+  const origin = request.headers.get('Origin');
+  if (opts.origin === 'strict') {
+    if (!origin || !isOriginAllowed(origin, request.url, env)) {
+      return apiError('FORBIDDEN', 'Origin not allowed', 403);
+    }
+  } else if (opts.origin === 'lenient') {
+    if (origin && !isOriginAllowed(origin, request.url, env)) {
+      return apiError('FORBIDDEN', 'Origin not allowed', 403);
+    }
+  }
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  if (!(await checkPreGateLimit(env, ip)).allowed) {
+    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+  }
+  return handler();
+}
+
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method !== 'POST') {
     return apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
@@ -354,36 +357,29 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   // requires to carry an Origin header even same-origin. A *missing* Origin
   // therefore means a non-browser client (curl/script) — deny it here rather
   // than skip the check, closing the server-side abuse path the gate can't.
-  const origin = request.headers.get('Origin');
-  if (!origin || !isOriginAllowed(origin, request.url, env)) {
-    return apiError('FORBIDDEN', 'Origin not allowed', 403);
-  }
+  return withGate(request, env, { origin: 'strict' }, async () => {
+    const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+    const gate = request.headers.get('x-ptscribe-key') ?? '';
+    const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
+    if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
+      return apiError('UNAUTHORIZED', 'Unauthorized', 401);
+    }
 
-  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  if (!(await checkPreGateLimit(env, ip)).allowed) {
-    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
-  }
+    if (!(await checkRateLimit(env, ip)).allowed) {
+      return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+    }
+    if (!(await checkGlobalDailyLimit(env)).allowed) {
+      return apiError('RATE_LIMITED', 'Service daily limit reached', 429);
+    }
 
-  const gate = request.headers.get('x-ptscribe-key') ?? '';
-  const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
-  if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
-    return apiError('UNAUTHORIZED', 'Unauthorized', 401);
-  }
-
-  if (!(await checkRateLimit(env, ip)).allowed) {
-    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
-  }
-  if (!(await checkGlobalDailyLimit(env)).allowed) {
-    return apiError('RATE_LIMITED', 'Service daily limit reached', 429);
-  }
-
-  if (url.pathname === '/api/transcribe' || url.pathname === '/api/v1/transcribe') {
-    return handleTranscribe(request, env);
-  }
-  if (url.pathname === '/api/generate' || url.pathname === '/api/v1/generate') {
-    return handleGenerate(request, env);
-  }
-  return apiError('NOT_FOUND', 'Not found', 404);
+    if (url.pathname === '/api/transcribe' || url.pathname === '/api/v1/transcribe') {
+      return handleTranscribe(request, env);
+    }
+    if (url.pathname === '/api/generate' || url.pathname === '/api/v1/generate') {
+      return handleGenerate(request, env);
+    }
+    return apiError('NOT_FOUND', 'Not found', 404);
+  });
 }
 
 async function handleTranscribe(request: Request, env: Env): Promise<Response> {
