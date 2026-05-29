@@ -55,7 +55,7 @@ The clinician's primary working surface during Curate. Layout stays close to the
 
 ## Generation input
 
-The set of data sent to the note-generation AI. Bounded to: the curated transcript + the chosen template (structure, section keys, labels, prompt hints, system prompt) + the visit type + the patient context block (first/last name, age derived from `dob`, `primaryDiagnosis`). MRN and ICD-10 are **not** sent. **Prior session content (previous Notes, Plan of Care, prior goals, prior exercises) is never injected.** If a clinician wants any of those in the prompt, they paste it into the curated transcript themselves during Curate.
+The set of data sent to the note-generation AI. Bounded to: the curated transcript + the chosen template (structure, section keys, labels, prompt hints, system prompt) + the visit type + the patient context block (a pseudonym ID `PT-<id-slice>`, age derived from `dob`, `sex`, and the clinician-authored `primaryDiagnosis` label). The patient's name, MRN, **ICD-10 code, and free-text patient notes are *not* sent** — name is replaced by the pseudonym, and the coded/free-text identifiers are withheld entirely (A9; see `buildUserPrompt` in `src/lib/clinical/prompts.ts`). **Prior session content (previous Notes, Plan of Care, prior goals, prior exercises) is never injected.** If a clinician wants any of those in the prompt, they paste it into the curated transcript themselves during Curate.
 
 The clinician is trusted to know what is in the transcript and what is in the template — both are visible in the existing UI (Curate panel + session settings). No separate "Sending to AI" preview surface is required.
 
@@ -80,6 +80,8 @@ Two user-level settings live under Settings → Defaults:
 `progress` and `discharge` sessions default to their matching built-in templates (Progress, Discharge) and can be overridden per-session like any other template choice. The clinician can swap the auto-stamped template freely until Generate fires.
 
 ## Template selection
+
+> **Status: intended — not yet implemented.** The locked-transcript / template-lock-at-Generate / unlock-destroys-Note contract below describes the *designed* integrity model. As of this writing the session machine has no `locked` state and there is no transcript- or template-lock enforcement in code (consistent with the CLAUDE.md Quick-lookup caveat). Enforcement is a sized follow-up; this section documents the target, not current behavior.
 
 A session is stamped with a `templateId` at creation based on visit type and the user's default-template settings (see above). Template is **freely switchable until the first Generate** — pre-Capture and during Curate. Once Generate fires, the template is locked alongside the transcript: changing it requires Unlock (which destroys the Note draft) followed by a new template choice and Regenerate.
 
@@ -151,7 +153,7 @@ Two-stage automatic retention model:
 
 After full purge, the Note and its locked transcript remain intact; Improve with AI is no longer available for the session. The clinician's existing right to delete a session entirely (which deletes everything including transcript and Note) is unchanged.
 
-Implementation note: today the silenced+combined Blob is computed for playback only and not persisted. The Finalize prune step requires it to become persistent — a small storage change.
+**Implementation status (current):** The sweep (`purgeFinalizedAudio`, run at boot when `Settings.retention.autoDeleteAudioAfterDays` is enabled) is **finalize-gated** — it only ever removes audio for sessions whose `status === 'finalized'`, anchored on the persisted `Session.finalizedAt`. Active/draft sessions keep all clip audio regardless of age, so Improve-with-AI and Revert always work mid-visit. The implemented policy is the simplest faithful form: a finalized session's per-clip audio is dropped on the next sweep (the day-count acts as an on/off switch, not a delay), and the silenced+combined Blob is **not** persisted — the "keep combined blob for the window / drop at +14 days" rows above are the *designed* target, not yet built. (The earlier blunt age-sweep keyed off `clip.createdAt` and could delete audio for an active, pre-Finalize session — that bug is fixed.)
 
 ## Note editor
 

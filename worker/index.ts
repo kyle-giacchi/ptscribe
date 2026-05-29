@@ -18,6 +18,16 @@ import { createAuth } from './auth';
 import { handleOrgRoute } from './org';
 import { handleConfigRoute } from './config';
 
+/**
+ * Workers Rate Limiting binding (GA). `limit()` is in-network, per-Cloudflare-
+ * location, and eventually consistent — fast (no KV read/write) but permissive,
+ * which is why the authoritative spend backstop stays on the KV global counter.
+ * Config (limit + 10s/60s period) lives in wrangler.jsonc, not here.
+ */
+interface RateLimitBinding {
+  limit(opts: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   AI: Ai;
   ASSETS: Fetcher;
@@ -27,7 +37,17 @@ export interface Env {
   /** Full origin of the app, e.g. https://ptscribe.app. Used for passkey rpID and cookie security. */
   AUTH_BASE_URL?: string;
   DB: D1Database;
+  /** KV — now the SOLE rate-limit store, used only for the post-gate global
+   *  daily Anthropic-spend counter. Per-IP limits moved to the Rate Limiting
+   *  bindings below. */
   RATE_LIMIT?: KVNamespace;
+  /** Per-IP per-minute limit on billable AI proxy calls (post-gate dispatch).
+   *  Configured via the `ratelimits` block in wrangler.jsonc, not in code.
+   *  Optional so local dev / unconfigured deploys fail open. */
+  API_RATE_LIMITER?: RateLimitBinding;
+  /** Per-IP pre-gate limit on all /api/* and /api/model/* traffic. Configured
+   *  in wrangler.jsonc. Optional → fail open when absent. */
+  PREGATE_RATE_LIMITER?: RateLimitBinding;
   MODELS?: R2Bucket;
   /** Comma-separated list of allowed request Origins. Defaults to same-origin
    *  plus localhost dev ports when unset. */
@@ -128,7 +148,7 @@ export default {
       if (!(await checkPreGateLimit(env, ip)).allowed) {
         res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
       } else {
-        res = await handleModelFile(url, env, ctx);
+        res = await handleModelFile(request, url, env, ctx);
       }
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
@@ -214,7 +234,12 @@ function withSecurityHeaders(res: Response, url: URL): Response {
   });
 }
 
-async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
+async function handleModelFile(
+  request: Request,
+  url: URL,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   if (!env.MODELS) {
     return new Response(JSON.stringify({ error: 'Model storage not configured' }), {
       status: 503,
@@ -233,17 +258,29 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
     return new Response('Not found', { status: 404 });
   }
 
+  // Edge cache: model files are immutable, so a hit serves with no R2 read and
+  // no binding call. Checked after key validation so bad keys can't be cached.
+  // (GET-only route — the caller guards request.method === 'GET'.)
+  const cache = caches.default;
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
   const object = await env.MODELS.get(key);
   if (object) {
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-    return new Response(object.body, { headers });
+    const response = new Response(object.body, { headers });
+    // Fill the edge cache so subsequent shard requests skip R2 entirely.
+    ctx.waitUntil(cache.put(request, response.clone()));
+    return response;
   }
 
   // R2 miss — proxy from HuggingFace so the app works before model files are uploaded.
-  const hfRes = await fetch(`https://huggingface.co/${key}`);
-  if (!hfRes.ok || !hfRes.body) return new Response('Not found', { status: 404 });
+  // This is the *sole* model source until R2 is seeded, so it gets a timeout +
+  // one retry; terminal failure logs for the operator and returns 404 as before.
+  const hfRes = await fetchModelFromHf(key);
+  if (!hfRes || !hfRes.body) return new Response('Not found', { status: 404 });
 
   const hfContentLength = Number(hfRes.headers.get('Content-Length') ?? 0);
   const HF_SIZE_LIMIT = 200 * 1024 * 1024; // 200 MB
@@ -266,7 +303,34 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
   headers.set('Content-Type', contentType);
   headers.set('Cache-Control', cacheControl);
   if (hfContentLength) headers.set('Content-Length', String(hfContentLength));
+  // Not edge-cached here: the body is already tee'd to the client + R2, and a
+  // third clone of ~100 MB weights would add memory pressure. The R2 write above
+  // means the next request is an R2 hit, which *is* cached.
   return new Response(toClient, { status: 200, headers });
+}
+
+/**
+ * Fetch a model file from HuggingFace with a per-attempt timeout and one retry.
+ * Returns a successful (ok, with-body) Response, or null on terminal failure —
+ * in which case the caller returns 404, preserving the existing client contract.
+ * Logs once on terminal failure so an unseeded-R2 outage is visible to operators.
+ */
+async function fetchModelFromHf(key: string, attempts = 2): Promise<Response | null> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const res = await fetch(`https://huggingface.co/${key}`, {
+        signal: AbortSignal.timeout(HF_FETCH_TIMEOUT_MS),
+      });
+      if (res.ok && res.body) return res;
+      // Non-ok / no-body: fall through to retry (or terminal log on last attempt).
+    } catch (err) {
+      if (attempt < attempts) continue;
+      console.error(`[model] HF backfill failed for ${key}: ${(err as Error).message}`);
+      return null;
+    }
+  }
+  console.error(`[model] HF backfill failed for ${key}: exhausted ${attempts} attempts`);
+  return null;
 }
 
 function isOriginAllowed(origin: string, requestUrl: string, env: Env): boolean {
@@ -374,22 +438,28 @@ async function runDeepgram(
     // gives us a `paragraphs.transcript` already shaped as
     // "Speaker 0: ...\n\nSpeaker 1: ..." which is perfect for the prompt.
     const stream = new Response(audio).body;
-    const result = (await env.AI.run(
-      model as keyof AiModels,
-      {
-        audio: { body: stream, contentType },
-        diarize: true,
-        smart_format: true,
-        punctuate: true,
-        paragraphs: true,
-        ...(language ? { language } : { detect_language: true }),
-      } as never,
+    const result = (await withTimeout(
+      env.AI.run(
+        model as keyof AiModels,
+        {
+          audio: { body: stream, contentType },
+          diarize: true,
+          smart_format: true,
+          punctuate: true,
+          paragraphs: true,
+          ...(language ? { language } : { detect_language: true }),
+        } as never,
+      ),
+      WORKERS_AI_TIMEOUT_MS,
     )) as DeepgramResponse;
 
     const text = extractDeepgramText(result);
     if (!text) return apiError('EMPTY_TEXT', 'Nova-3 returned no text', 502);
     return json({ text });
   } catch (err) {
+    if (isTimeoutError(err)) {
+      return apiError('UPSTREAM_TIMEOUT', 'Cloud transcription timed out', 504);
+    }
     return apiError(
       'UPSTREAM_FAILED',
       `Workers AI Nova-3 failed: ${(err as Error).message || 'unknown'}`,
@@ -410,18 +480,24 @@ async function runWhisper(
   const audioInput = isTurbo ? bytesToBase64(audio) : Array.from(audio);
 
   try {
-    const result = (await env.AI.run(
-      model as keyof AiModels,
-      {
-        audio: audioInput,
-        ...(language ? { language } : {}),
-      } as never,
+    const result = (await withTimeout(
+      env.AI.run(
+        model as keyof AiModels,
+        {
+          audio: audioInput,
+          ...(language ? { language } : {}),
+        } as never,
+      ),
+      WORKERS_AI_TIMEOUT_MS,
     )) as { text?: string };
 
     const text = typeof result?.text === 'string' ? result.text : '';
     if (!text) return apiError('EMPTY_TEXT', 'Whisper returned no text', 502);
     return json({ text });
   } catch (err) {
+    if (isTimeoutError(err)) {
+      return apiError('UPSTREAM_TIMEOUT', 'Transcription timed out', 504);
+    }
     return apiError(
       'UPSTREAM_FAILED',
       `Workers AI Whisper failed: ${(err as Error).message || 'unknown'}`,
@@ -545,21 +621,32 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
       : { type: 'text', text: finalSystem },
   ];
 
-  const upstream = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: body.model,
-      max_tokens: body.maxTokens ?? 2048,
-      temperature: body.temperature ?? 0.2,
-      system: systemBlocks,
-      messages: [{ role: 'user', content: [{ type: 'text', text: body.user }] }],
-    }),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: body.model,
+        max_tokens: body.maxTokens ?? 2048,
+        temperature: body.temperature ?? 0.2,
+        system: systemBlocks,
+        messages: [{ role: 'user', content: [{ type: 'text', text: body.user }] }],
+      }),
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (isTimeoutError(err)) {
+      console.error(`[generate] Anthropic upstream timed out after ${ANTHROPIC_TIMEOUT_MS}ms`);
+      return apiError('UPSTREAM_TIMEOUT', 'Note generation timed out', 504);
+    }
+    console.error(`[generate] Anthropic upstream fetch failed: ${(err as Error).message}`);
+    return apiError('UPSTREAM_FAILED', 'Note generation failed upstream', 502);
+  }
 
   if (!upstream.ok) {
     // Keep the upstream detail in operator logs only; the client gets a
@@ -586,22 +673,62 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   return json({ text });
 }
 
-const RATE_LIMIT_PRE_GATE_PER_MIN = 20;
-const RATE_LIMIT_PER_MIN = 10;
-const RATE_LIMIT_PER_DAY = 300;
+// Per-IP per-minute/pre-gate limits now live in the Rate Limiting bindings
+// (configured in wrangler.jsonc). The binding's period is 10s or 60s only, so
+// the former per-IP *daily* cap cannot be expressed by it and is dropped — the
+// KV global daily counter below remains the real spend backstop.
 const RATE_LIMIT_GLOBAL_PER_DAY = 500;
 
-async function checkPreGateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
-  if (!env.RATE_LIMIT) return { allowed: true };
-  const now = Date.now();
-  const key = `rl:pg:${ip}:${Math.floor(now / 60_000)}`;
-  const raw = await env.RATE_LIMIT.get(key);
-  const count = raw ? parseInt(raw, 10) : 0;
-  if (count >= RATE_LIMIT_PRE_GATE_PER_MIN) return { allowed: false };
-  await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: 120 });
-  return { allowed: true };
+// Upstream timeouts. Without these, a slow/hung upstream blocks the request to
+// the Worker wall-clock limit while holding a rate-limit slot. Anthropic is
+// generous (long completions); transcription and per-file model fetches are tighter.
+const ANTHROPIC_TIMEOUT_MS = 60_000; // note generation; long completions
+const WORKERS_AI_TIMEOUT_MS = 45_000; // transcription (Nova / Whisper)
+const HF_FETCH_TIMEOUT_MS = 30_000; // per-attempt model-file fetch
+
+/**
+ * Race a promise against a timeout. Used for `env.AI.run`, whose binding does
+ * not reliably accept an AbortSignal — `fetch`-based calls use
+ * `AbortSignal.timeout` directly instead. The timer is always cleared so it
+ * never dangles past resolution. On timeout the rejection is a `TimeoutError`,
+ * matched by `isTimeoutError` at the call sites.
+ */
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error('Upstream timed out');
+      err.name = 'TimeoutError';
+      reject(err);
+    }, ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
+/** True for both our synthetic `withTimeout` rejection and `AbortSignal.timeout`. */
+function isTimeoutError(err: unknown): boolean {
+  const name = (err as Error | undefined)?.name;
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
+// Pre-gate per-IP limit on all /api/* (and /api/model/*) traffic. Backed by the
+// Rate Limiting binding — no KV reads/writes, so unauthenticated/static/model
+// traffic no longer touches KV. Fail open when the binding is absent (local dev).
+async function checkPreGateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
+  if (!env.PREGATE_RATE_LIMITER) return { allowed: true };
+  const { success } = await env.PREGATE_RATE_LIMITER.limit({ key: ip });
+  return { allowed: success };
+}
+
+// Global daily Anthropic-spend counter. This is the ONLY remaining KV rate-limit
+// user, and it runs strictly post-gate (handleApi, after auth) so config/model/
+// static traffic never writes to KV. The read→write is intentionally non-atomic
+// and permissive: a small overshoot of the cap is acceptable — it is a spend
+// *alarm*, not a hard ledger. KV writes now scale with billable AI calls only.
 async function checkGlobalDailyLimit(env: Env): Promise<{ allowed: boolean }> {
   if (!env.RATE_LIMIT) return { allowed: true };
   const now = Date.now();
@@ -613,32 +740,13 @@ async function checkGlobalDailyLimit(env: Env): Promise<{ allowed: boolean }> {
   return { allowed: true };
 }
 
+// Per-IP per-minute limit on billable AI proxy calls (post-gate). Backed by the
+// Rate Limiting binding. The former per-IP daily cap is dropped (binding period
+// is 10s/60s only); the global daily KV counter is the spend backstop instead.
 async function checkRateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
-  if (!env.RATE_LIMIT) return { allowed: true };
-  // KV read → increment → write is not atomic: two simultaneous requests at the limit
-  // can both pass. Acceptable at this traffic scale; do not assume strong consistency.
-  const now = Date.now();
-  const minuteKey = `rl:min:${ip}:${Math.floor(now / 60_000)}`;
-  const dayKey = `rl:day:${ip}:${Math.floor(now / 86_400_000)}`;
-
-  const [minRaw, dayRaw] = await Promise.all([
-    env.RATE_LIMIT.get(minuteKey),
-    env.RATE_LIMIT.get(dayKey),
-  ]);
-
-  const minCount = minRaw ? parseInt(minRaw, 10) : 0;
-  const dayCount = dayRaw ? parseInt(dayRaw, 10) : 0;
-
-  if (minCount >= RATE_LIMIT_PER_MIN || dayCount >= RATE_LIMIT_PER_DAY) {
-    return { allowed: false };
-  }
-
-  await Promise.all([
-    env.RATE_LIMIT.put(minuteKey, String(minCount + 1), { expirationTtl: 120 }),
-    env.RATE_LIMIT.put(dayKey, String(dayCount + 1), { expirationTtl: 172800 }),
-  ]);
-
-  return { allowed: true };
+  if (!env.API_RATE_LIMITER) return { allowed: true };
+  const { success } = await env.API_RATE_LIMITER.limit({ key: ip });
+  return { allowed: success };
 }
 
 function json(payload: unknown, status = 200): Response {
@@ -666,7 +774,8 @@ type ErrorCode =
   | 'MISSING_API_KEY'
   | 'EMPTY_TEXT'
   | 'DEMO_DISABLED'
-  | 'UPSTREAM_FAILED';
+  | 'UPSTREAM_FAILED'
+  | 'UPSTREAM_TIMEOUT';
 
 function apiError(code: ErrorCode, error: string, status: number): Response {
   return json({ code, error }, status);
