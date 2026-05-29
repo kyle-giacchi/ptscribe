@@ -697,6 +697,38 @@ describe('migrate v22 → v23: Settings.audio.inputDeviceId', () => {
   });
 });
 
+describe('migrate v23 → v24: Session.generateCount', () => {
+  function v23WithSession(sessionOverrides: Record<string, unknown> = {}): Record<string, unknown> {
+    const seed = defaultAppData();
+    const now = Date.now();
+    const session: Record<string, unknown> = {
+      id: 'sess-1',
+      patientId: 'pat-1',
+      type: 'follow_up',
+      date: now,
+      status: 'ready',
+      clips: [],
+      createdAt: now,
+      updatedAt: now,
+      ...sessionOverrides,
+    };
+    return { ...seed, version: 23, sessions: [session] };
+  }
+
+  it('bumps a v23 session through to the current version, leaving generateCount undefined', () => {
+    const result = migrate(v23WithSession());
+    expect(result.version).toBe(CURRENT_VERSION);
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0].generateCount).toBeUndefined();
+  });
+
+  it('round-trips a populated generateCount through AppDataSchema', () => {
+    const result = migrate(v23WithSession({ generateCount: 3 }));
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+    expect(result.sessions[0].generateCount).toBe(3);
+  });
+});
+
 // ─── Migration robustness: missing-fields at boundary ───────────────────────
 
 /**
