@@ -13,9 +13,7 @@ export function OnDeviceModelCard() {
     // Guard: never pull the model out from under an in-flight session. The
     // model cache is app-global (see ADR-0002), so re-downloading mid-transcribe
     // would break the active worker.
-    const inFlight = sessions.some(
-      (s) => s.status === 'recording' || s.status === 'transcribing',
-    );
+    const inFlight = sessions.some((s) => s.status === 'recording' || s.status === 'transcribing');
     if (inFlight) {
       toast.error(
         'Finish or stop the active recording/transcription before re-downloading the model.',

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-export function useDebouncedSave<T>(
-  save: (data: T) => void,
-  delayMs = 300,
-): (next: T) => void {
+export function useDebouncedSave<T>(save: (data: T) => void, delayMs = 300): (next: T) => void {
   const saveRef = useRef(save);
   useEffect(() => {
     saveRef.current = save;

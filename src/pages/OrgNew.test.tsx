@@ -7,7 +7,10 @@ import { OrgNew } from './OrgNew';
 // Mock motion/react to avoid animation issues in jsdom
 vi.mock('motion/react', () => ({
   motion: {
-    div: ({ children, ...rest }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
+    div: ({
+      children,
+      ...rest
+    }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
       <div {...rest}>{children}</div>
     ),
   },
@@ -16,7 +19,11 @@ vi.mock('motion/react', () => ({
 
 // Mock useAuth so we don't need the full provider tree
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ isAuthenticated: true, isLoading: false, currentUser: { email: 'owner@example.com' } }),
+  useAuth: () => ({
+    isAuthenticated: true,
+    isLoading: false,
+    currentUser: { email: 'owner@example.com' },
+  }),
 }));
 
 // Mock sonner toast
@@ -225,9 +232,15 @@ describe('Submission', () => {
       .mockResolvedValueOnce(submitMock);
     renderOrgNew();
     await waitFor(() => screen.getByText('Organization details'));
-    fireEvent.change(screen.getByPlaceholderText('Coastline Physical Therapy'), { target: { value: 'Test Org' } });
-    fireEvent.change(screen.getByPlaceholderText('admin@yourpractice.com'), { target: { value: 'a@b.com' } });
-    fireEvent.change(screen.getByPlaceholderText('(555) 000-0000'), { target: { value: '5550001234' } });
+    fireEvent.change(screen.getByPlaceholderText('Coastline Physical Therapy'), {
+      target: { value: 'Test Org' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('admin@yourpractice.com'), {
+      target: { value: 'a@b.com' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('(555) 000-0000'), {
+      target: { value: '5550001234' },
+    });
     fireEvent.click(screen.getByText('Next'));
     await waitFor(() => screen.getByText('Invite your team'));
     fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
@@ -250,7 +263,10 @@ describe('Submission', () => {
   });
 
   it('shows TOKEN_CONSUMED message on that specific error', async () => {
-    await reachReviewStep({ ok: false, json: async () => ({ code: 'TOKEN_CONSUMED', error: 'Token already used' }) });
+    await reachReviewStep({
+      ok: false,
+      json: async () => ({ code: 'TOKEN_CONSUMED', error: 'Token already used' }),
+    });
     fireEvent.click(screen.getByText('Create Organization'));
     await waitFor(() => {
       expect(screen.getByText(/already used/i)).toBeInTheDocument();

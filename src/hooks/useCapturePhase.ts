@@ -204,8 +204,7 @@ export function useCapturePhase({
     whisperPendingRef.current = null;
     // 'none' override means record-now-transcribe-later: skip the live Whisper
     // preview pipeline so no chunks are sent to the (possibly unavailable) worker.
-    recorder.onChunk.current =
-      transcriptionProviderOverride === 'none' ? null : handleChunk;
+    recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : handleChunk;
 
     const ok = await recorder.start(clipId);
     if (!ok) {
@@ -251,8 +250,7 @@ export function useCapturePhase({
       recorder.resume();
       // Re-wire with the freshest handleChunk closure so post-resume Whisper
       // segments capture the latest patchClip and whisperTextRef state.
-      recorder.onChunk.current =
-        transcriptionProviderOverride === 'none' ? null : handleChunk;
+      recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : handleChunk;
       if (webSpeechEnabled && webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
@@ -510,9 +508,7 @@ export function useCapturePhase({
       toast.error('Could not delete audio — try again');
       return;
     }
-    patchClips((clips) =>
-      clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
-    );
+    patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
   }
 
   // ── Recording complete — merge clips + compile live transcripts ──────────

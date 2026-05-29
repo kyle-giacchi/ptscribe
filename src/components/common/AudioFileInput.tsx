@@ -12,7 +12,9 @@ export const AudioFileInput = forwardRef<AudioFileInputHandle, AudioFileInputPro
   function AudioFileInput({ onPick }, ref) {
     const inputRef = useRef<HTMLInputElement>(null);
     useImperativeHandle(ref, () => ({
-      open() { inputRef.current?.click(); },
+      open() {
+        inputRef.current?.click();
+      },
     }));
     return (
       <input

@@ -6,12 +6,12 @@ How audio becomes text in PTScribe: four independently stored tiers, one active 
 
 Every session accumulates transcription data across up to four tiers. Higher tiers produce better text. `activeTranscriptTier` tracks which tier is active; `session.transcript` is always a denormalized copy of that tier's text.
 
-| Tier | Name | Source | When it fires | Quality | Network |
-|------|------|--------|---------------|---------|---------|
-| **T1** | **Whisper VAD Segments** | VAD-gated segment recorder → POST /api/transcribe (Cloudflare Whisper) | Each VAD-detected speech segment **during** recording; flushed on pause and stop | ~85% — same Whisper model as T2; handles medical vocabulary | PTScribe Worker → Cloudflare Workers AI |
-| **T2** | **Local Whisper** | `whisper-tiny.en` ONNX in a Web Worker | **Automatically after** `buildMergedAudioForReview` produces the combined silence-removed blob (`silencedMergedBlob`) | ~87% — handles medical vocabulary, fully offline | None |
-| **T3** | **Nova AI** | Deepgram Nova-3 via Cloudflare Worker | **Explicit user action** ("Transcribe with AI") only | Best — speaker diarization, accent-robust | PTScribe Worker → Deepgram |
-| **Edited** | **Manual Edit** | Clinician keyboard input | On user save in the Transcript tab | N/A — human-authored | None |
+| Tier       | Name                     | Source                                                                 | When it fires                                                                                                         | Quality                                                     | Network                                 |
+| ---------- | ------------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------- |
+| **T1**     | **Whisper VAD Segments** | VAD-gated segment recorder → POST /api/transcribe (Cloudflare Whisper) | Each VAD-detected speech segment **during** recording; flushed on pause and stop                                      | ~85% — same Whisper model as T2; handles medical vocabulary | PTScribe Worker → Cloudflare Workers AI |
+| **T2**     | **Local Whisper**        | `whisper-tiny.en` ONNX in a Web Worker                                 | **Automatically after** `buildMergedAudioForReview` produces the combined silence-removed blob (`silencedMergedBlob`) | ~87% — handles medical vocabulary, fully offline            | None                                    |
+| **T3**     | **Nova AI**              | Deepgram Nova-3 via Cloudflare Worker                                  | **Explicit user action** ("Transcribe with AI") only                                                                  | Best — speaker diarization, accent-robust                   | PTScribe Worker → Deepgram              |
+| **Edited** | **Manual Edit**          | Clinician keyboard input                                               | On user save in the Transcript tab                                                                                    | N/A — human-authored                                        | None                                    |
 
 **Web Speech API (opt-in alternative for T1):** When the user enables "Web Speech" in Settings → Recording (`webSpeechEnabled: true`), the browser Web Speech API replaces Whisper VAD segments as the T1 source. Quality is lower (~65%) but fires with zero network cost. Disabled by default.
 
@@ -30,24 +30,24 @@ t1Transcript present     → activeTranscriptTier: 't1'
 
 ### Session (merged, session-level)
 
-| Field | Tier | Written by | Notes |
-|-------|------|-----------|-------|
-| `t1Transcript?` | T1 | `useCapturePhase` continuous effect + pause/stop flush | Persisted on every Whisper VAD segment during recording (or every Web Speech segment when `webSpeechEnabled`) |
-| `t2Transcript?` | T2 | `useBackgroundTranscription` auto-pass | Frozen after Whisper finishes; **never overwritten by T3** |
-| `t3Transcript?` | T3 | `useTranscriptSource.runT3` | Written by explicit Nova pass |
-| `editedTranscript?` | Edited | `Session.handleApplyScrub` (PII scrub) or `TranscriptPanel.onCommit` (manual edit) | Written by PII scrub or direct user edit; cleared automatically when a T2 or T3 write lands |
-| `transcript?` | active | All write paths | Denormalized mirror of active tier; used by note generation |
-| `activeTranscriptTier?` | provenance | All write paths | `'t1'` / `'t2'` / `'t3'` / `'edited'` |
+| Field                   | Tier       | Written by                                                                         | Notes                                                                                                         |
+| ----------------------- | ---------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `t1Transcript?`         | T1         | `useCapturePhase` continuous effect + pause/stop flush                             | Persisted on every Whisper VAD segment during recording (or every Web Speech segment when `webSpeechEnabled`) |
+| `t2Transcript?`         | T2         | `useBackgroundTranscription` auto-pass                                             | Frozen after Whisper finishes; **never overwritten by T3**                                                    |
+| `t3Transcript?`         | T3         | `useTranscriptSource.runT3`                                                        | Written by explicit Nova pass                                                                                 |
+| `editedTranscript?`     | Edited     | `Session.handleApplyScrub` (PII scrub) or `TranscriptPanel.onCommit` (manual edit) | Written by PII scrub or direct user edit; cleared automatically when a T2 or T3 write lands                   |
+| `transcript?`           | active     | All write paths                                                                    | Denormalized mirror of active tier; used by note generation                                                   |
+| `activeTranscriptTier?` | provenance | All write paths                                                                    | `'t1'` / `'t2'` / `'t3'` / `'edited'`                                                                         |
 
 ### SessionClip (per recording take)
 
-| Field | Tier | Written by | Notes |
-|-------|------|-----------|-------|
-| `t1Transcript?` | T1 | `useCapturePhase` — continuous effect + pause/stop flush | Written on each Whisper VAD segment during recording; final flush on pause or stop |
-| `t2Transcript?` | T2 | *(legacy — not written by current pipeline)* | Field exists in schema for backward compat with pre-v2 data; T2 now writes session-level only |
-| `t3Transcript?` | T3 | *(legacy — not written by current pipeline)* | Field exists in schema for backward compat; T3 now writes session-level only |
-| `transcript?` | active | T1 write path | Per-clip T1 transcript; populated during recording |
-| `transcriptChunks?` | T2 | *(unused by current pipeline)* | Schema field preserved; T2 no longer stores per-clip chunks |
+| Field               | Tier   | Written by                                               | Notes                                                                                         |
+| ------------------- | ------ | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `t1Transcript?`     | T1     | `useCapturePhase` — continuous effect + pause/stop flush | Written on each Whisper VAD segment during recording; final flush on pause or stop            |
+| `t2Transcript?`     | T2     | _(legacy — not written by current pipeline)_             | Field exists in schema for backward compat with pre-v2 data; T2 now writes session-level only |
+| `t3Transcript?`     | T3     | _(legacy — not written by current pipeline)_             | Field exists in schema for backward compat; T3 now writes session-level only                  |
+| `transcript?`       | active | T1 write path                                            | Per-clip T1 transcript; populated during recording                                            |
+| `transcriptChunks?` | T2     | _(unused by current pipeline)_                           | Schema field preserved; T2 no longer stores per-clip chunks                                   |
 
 ---
 
@@ -119,16 +119,20 @@ silencedMergedBlob (combined silence-removed session audio)
 Two actions in `Session.tsx` write `editedTranscript` and set `activeTranscriptTier: 'edited'`:
 
 **Manual edit:** User edits text directly in `TranscriptPanel`. On `onCommit`:
+
 ```
 patchSession({ editedTranscript: value, activeTranscriptTier: 'edited' })
 ```
+
 If the user clears the field, `editedTranscript` is set to `undefined` (drops back to the previous tier).
 
 **PII scrub:** User clicks "Scrub PII" → `PIIScrubModal` opens showing the current transcript. User clicks "Scan for PII" to trigger the on-device NER model. The modal shows an inline word-level diff (deletions in strikethrough, replacements highlighted). User reviews and clicks "Apply N redactions". `handleApplyScrub(scrubbed)` in `Session.tsx`:
+
 ```
 setEditedTranscript(scrubbed)
 patchSession({ editedTranscript: scrubbed, activeTranscriptTier: 'edited' })
 ```
+
 The scan is lazy — the NER model only runs after the user explicitly clicks "Scan for PII" inside the modal, not on modal open.
 
 In both cases `session.transcript` is **not** directly updated by the edited write path. `Session.tsx` derives `effectiveTranscript = editedTranscript.trim() ? editedTranscript : transcript` for display and note generation.
@@ -158,10 +162,12 @@ There are two independent revert actions in the Transcript tab:
 **Revert to Draft (T2):** Visible when `session.t2Transcript` exists (`hasT2Transcript` prop to `TranscriptPanel`). On click, `useTranscriptSource` resets `session.transcript` and `session.activeTranscriptTier` to the T2 values without touching `session.t3Transcript` — T3 remains frozen and available. Also clears `editedTranscript`.
 
 **Revert edits:** Visible when `editedTranscript` is non-empty (`hasUserEdits` prop to `TranscriptPanel`). On click, `handleRevertEdits` in `Session.tsx` runs:
+
 ```
 setEditedTranscript('')
 patchSession({ editedTranscript: undefined })
 ```
+
 This drops display back to whichever T1/T2/T3 tier was active before the edit or scrub, without modifying any tier field.
 
 ---

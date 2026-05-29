@@ -112,12 +112,26 @@ export function OrgSettings() {
     return (
       <PageFrame>
         <SurfaceCard padding={24}>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-pt-text)', margin: '0 0 8px' }}>
+          <h1
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: 'var(--color-pt-text)',
+              margin: '0 0 8px',
+            }}
+          >
             You're not part of an organization
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55, margin: '0 0 16px' }}>
-            Organizations let a practice manage clinicians and shared settings. If you have an invite
-            link, open it to join. Account-only settings live in{' '}
+          <p
+            style={{
+              fontSize: 13,
+              color: 'var(--color-pt-text-2)',
+              lineHeight: 1.55,
+              margin: '0 0 16px',
+            }}
+          >
+            Organizations let a practice manage clinicians and shared settings. If you have an
+            invite link, open it to join. Account-only settings live in{' '}
             <Link to="/account" style={{ color: 'var(--color-pt-accent-fg)' }}>
               Account Settings
             </Link>
@@ -146,7 +160,13 @@ export function OrgSettings() {
   return <OrgSettingsLoaded data={state.data} reload={load} />;
 }
 
-function OrgSettingsLoaded({ data, reload }: { data: MembersResponse; reload: () => Promise<void> }) {
+function OrgSettingsLoaded({
+  data,
+  reload,
+}: {
+  data: MembersResponse;
+  reload: () => Promise<void>;
+}) {
   const { org, members, invites, canManage } = data;
   const [busy, setBusy] = useState(false);
 
@@ -155,7 +175,10 @@ function OrgSettingsLoaded({ data, reload }: { data: MembersResponse; reload: ()
     async (path: string, body: unknown, successMsg: string) => {
       setBusy(true);
       try {
-        const { ok, data: res } = await orgFetch(path, { method: 'POST', body: JSON.stringify(body) });
+        const { ok, data: res } = await orgFetch(path, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
         if (!ok) {
           toast.error(res.error ?? 'Something went wrong.');
           return false;
@@ -177,7 +200,15 @@ function OrgSettingsLoaded({ data, reload }: { data: MembersResponse; reload: ()
     <PageFrame>
       <div style={{ display: 'grid', gap: 4 }}>
         <Eyebrow>Organization</Eyebrow>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-pt-text)', letterSpacing: '-0.01em', margin: 0 }}>
+        <h1
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--color-pt-text)',
+            letterSpacing: '-0.01em',
+            margin: 0,
+          }}
+        >
           {org.name}
         </h1>
         <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
@@ -190,7 +221,9 @@ function OrgSettingsLoaded({ data, reload }: { data: MembersResponse; reload: ()
         members={members}
         canManage={canManage}
         busy={busy}
-        onChangeRole={(userId, role) => mutate('/api/org/member/role', { userId, role }, 'Role updated.')}
+        onChangeRole={(userId, role) =>
+          mutate('/api/org/member/role', { userId, role }, 'Role updated.')
+        }
         onRemove={(userId) => mutate('/api/org/member/remove', { userId }, 'Member removed.')}
       />
 
@@ -322,7 +355,8 @@ function OrgConfigForm() {
       {/* Shared library summary */}
       <div style={{ fontSize: 13, color: 'var(--color-pt-text-2)', marginBottom: 16 }}>
         Shared library: <strong>{sharedTemplates.length}</strong> template
-        {sharedTemplates.length === 1 ? '' : 's'}, <strong>{sharedExercises.length}</strong> exercise
+        {sharedTemplates.length === 1 ? '' : 's'}, <strong>{sharedExercises.length}</strong>{' '}
+        exercise
         {sharedExercises.length === 1 ? '' : 's'} available to every member.
       </div>
 
@@ -377,17 +411,27 @@ function MembersCard({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)' }}>
                   {m.name || m.email}
-                  {m.isYou && <span style={{ color: 'var(--color-pt-text-3)', fontWeight: 400 }}> (you)</span>}
+                  {m.isYou && (
+                    <span style={{ color: 'var(--color-pt-text-3)', fontWeight: 400 }}> (you)</span>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>{m.email}</div>
               </div>
               {editable ? (
-                <RoleSelect value={m.role} disabled={busy} onChange={(role) => onChangeRole(m.id, role)} />
+                <RoleSelect
+                  value={m.role}
+                  disabled={busy}
+                  onChange={(role) => onChangeRole(m.id, role)}
+                />
               ) : (
                 <RolePill role={m.role} />
               )}
               {editable && (
-                <IconButton label={`Remove ${m.email}`} disabled={busy} onClick={() => onRemove(m.id)}>
+                <IconButton
+                  label={`Remove ${m.email}`}
+                  disabled={busy}
+                  onClick={() => onRemove(m.id)}
+                >
                   <X size={14} />
                 </IconButton>
               )}
@@ -486,17 +530,32 @@ function InvitesCard({
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: 'var(--color-pt-text)' }}>{inv.email}</div>
-                <div style={{ fontSize: 11, color: inv.expired ? 'var(--color-pt-red)' : 'var(--color-pt-text-3)' }}>
-                  {inv.expired ? 'Expired' : `Invited · expires ${new Date(inv.expiresAt).toLocaleDateString()}`}
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: inv.expired ? 'var(--color-pt-red)' : 'var(--color-pt-text-3)',
+                  }}
+                >
+                  {inv.expired
+                    ? 'Expired'
+                    : `Invited · expires ${new Date(inv.expiresAt).toLocaleDateString()}`}
                 </div>
               </div>
               <RolePill role={inv.role} />
               {canManage && (
                 <>
-                  <IconButton label={`Resend invite to ${inv.email}`} disabled={busy} onClick={() => onResend(inv.id)}>
+                  <IconButton
+                    label={`Resend invite to ${inv.email}`}
+                    disabled={busy}
+                    onClick={() => onResend(inv.id)}
+                  >
                     <RefreshCw size={13} />
                   </IconButton>
-                  <IconButton label={`Revoke invite to ${inv.email}`} disabled={busy} onClick={() => onRevoke(inv.id)}>
+                  <IconButton
+                    label={`Revoke invite to ${inv.email}`}
+                    disabled={busy}
+                    onClick={() => onRevoke(inv.id)}
+                  >
                     <X size={14} />
                   </IconButton>
                 </>

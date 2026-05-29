@@ -47,7 +47,9 @@ export function RecoveryCodeCard() {
           />
         ) : (
           <>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+            <p
+              style={{ margin: 0, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}
+            >
               {hasCode
                 ? 'A recovery code is set. Regenerate it if you’ve lost it — this invalidates the old one.'
                 : 'No recovery code yet. Generate one so a forgotten passphrase isn’t the end of your data.'}
@@ -59,7 +61,11 @@ export function RecoveryCodeCard() {
             )}
             <div>
               <PtButton variant="ghost" onClick={handleGenerate} disabled={busy || !unlocked}>
-                {busy ? 'Generating…' : hasCode ? 'Regenerate recovery code' : 'Generate recovery code'}
+                {busy
+                  ? 'Generating…'
+                  : hasCode
+                    ? 'Regenerate recovery code'
+                    : 'Generate recovery code'}
               </PtButton>
             </div>
           </>

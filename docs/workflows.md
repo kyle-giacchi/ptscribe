@@ -2,7 +2,7 @@
 
 The clinical domain (entities a PT cares about) plus the state transitions and data changes for every major user journey in PTScribe. Read when adding a new flow, debugging unexpected state, or understanding what owns a particular side-effect.
 
-For canonical names of the phases (Capture / Curate / Generate / Finalize) and clinician-facing concepts (curated transcript, note staleness, Improve with AI, Modifiers, audio retention), see [CONTEXT.md](../CONTEXT.md). This file documents the *implementation* of that vocabulary.
+For canonical names of the phases (Capture / Curate / Generate / Finalize) and clinician-facing concepts (curated transcript, note staleness, Improve with AI, Modifiers, audio retention), see [CONTEXT.md](../CONTEXT.md). This file documents the _implementation_ of that vocabulary.
 
 Each workflow section names the hook(s) that own the relevant handlers.
 
@@ -16,36 +16,36 @@ The domain a PT cares about: who is being treated, what was said in the room, wh
 
 A person under care. Demographics + a free-text `notes` field for chart context.
 
-| Field                  | Type                                    | Notes                                               |
-| ---------------------- | --------------------------------------- | --------------------------------------------------- |
-| `firstName`/`lastName` | string                                  | Required.                                           |
-| `dob`                  | ms timestamp                            | Optional.                                           |
-| `sex`                  | `'F' \| 'M' \| 'X'`                     | Optional.                                           |
-| `mrn`                  | string                                  | Local chart number — optional, never sent to AI.    |
-| `primaryDiagnosis`     | string                                  | Free text. Plays a role in note generation prompts. |
-| `icd10`                | string                                  | Optional code.                                      |
-| `referringProvider`    | string                                  | Optional.                                           |
+| Field                  | Type                                    | Notes                                                                       |
+| ---------------------- | --------------------------------------- | --------------------------------------------------------------------------- |
+| `firstName`/`lastName` | string                                  | Required.                                                                   |
+| `dob`                  | ms timestamp                            | Optional.                                                                   |
+| `sex`                  | `'F' \| 'M' \| 'X'`                     | Optional.                                                                   |
+| `mrn`                  | string                                  | Local chart number — optional, never sent to AI.                            |
+| `primaryDiagnosis`     | string                                  | Free text. Plays a role in note generation prompts.                         |
+| `icd10`                | string                                  | Optional code.                                                              |
+| `referringProvider`    | string                                  | Optional.                                                                   |
 | `status`               | `'active' \| 'on_hold' \| 'discharged'` | Drives filtering in patient picker (see [Patient status](#patient-status)). |
 
 ### Session
 
 One treatment encounter. Owns the audio + transcript and (eventually) the generated `Note`. Status transitions are documented under [State machines](#session-status).
 
-| Field                   | Type                                                       | Notes                                                           |
-| ----------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- |
-| `patientId`             | id                                                         | FK into `patients`.                                             |
-| `type`                  | `'evaluation' \| 'follow_up' \| 'progress' \| 'discharge'` | Drives the default template selection.                          |
-| `date`                  | ms timestamp                                               | Set when the session is created.                                |
-| `status`                | see [State machines](#session-status)                      | State machine.                                                  |
-| `audioRef`              | sessionId (string)                                         | Key into `AudioRepository` (IndexedDB). Absent if no recording. |
-| `transcript`            | string                                                     | Denormalized mirror of the active tier; used by note generation. |
-| `t1Transcript?`         | string                                                     | Live preview accumulated during recording (Whisper VAD or Web Speech). |
+| Field                   | Type                                                       | Notes                                                                                                  |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `patientId`             | id                                                         | FK into `patients`.                                                                                    |
+| `type`                  | `'evaluation' \| 'follow_up' \| 'progress' \| 'discharge'` | Drives the default template selection.                                                                 |
+| `date`                  | ms timestamp                                               | Set when the session is created.                                                                       |
+| `status`                | see [State machines](#session-status)                      | State machine.                                                                                         |
+| `audioRef`              | sessionId (string)                                         | Key into `AudioRepository` (IndexedDB). Absent if no recording.                                        |
+| `transcript`            | string                                                     | Denormalized mirror of the active tier; used by note generation.                                       |
+| `t1Transcript?`         | string                                                     | Live preview accumulated during recording (Whisper VAD or Web Speech).                                 |
 | `t2Transcript?`         | string                                                     | Post-stop local Whisper pass on the combined silence-removed blob. Frozen — never overwritten by Nova. |
-| `t3Transcript?`         | string                                                     | Explicit cloud (Nova) pass via "Improve with AI". Optional. |
-| `editedTranscript?`     | string                                                     | Manual edit or PII-scrub result. Cleared when T2/T3 writes land. |
-| `activeTranscriptTier?` | `'t1' \| 't2' \| 't3' \| 'edited'`                         | Provenance of `transcript`. See [transcription.md](transcription.md). |
-| `noteId`                | id                                                         | FK into `notes`. Set on first generate or first manual edit.    |
-| `templateId`            | id                                                         | FK into `templates`. Stamped at session start.                  |
+| `t3Transcript?`         | string                                                     | Explicit cloud (Nova) pass via "Improve with AI". Optional.                                            |
+| `editedTranscript?`     | string                                                     | Manual edit or PII-scrub result. Cleared when T2/T3 writes land.                                       |
+| `activeTranscriptTier?` | `'t1' \| 't2' \| 't3' \| 'edited'`                         | Provenance of `transcript`. See [transcription.md](transcription.md).                                  |
+| `noteId`                | id                                                         | FK into `notes`. Set on first generate or first manual edit.                                           |
+| `templateId`            | id                                                         | FK into `templates`. Stamped at session start.                                                         |
 
 A session can skip transcription entirely if the clinician picks the "Skip / Manually type" entry point or dictates straight into the note editor — in either case the active tier is `'edited'`.
 
@@ -141,7 +141,7 @@ Three named ways to start a session, presented at session creation after patient
 2. **Audio Upload** — provide one or more existing audio files; no live preview, T2 runs on the combined silence-removed blob.
 3. **Skip / Manually type** — no audio at all; clinician types/pastes the transcript and proceeds directly to Curate. "Improve with AI" is hidden in this path (no audio to re-transcribe).
 
-All three converge on the same state machine after Capture (Curate → Generate → Finalize). Differences are only in *how the transcript gets into the system*. Entry 3 bypasses [Capture flow](#capture-flow-t2-before-curate) entirely.
+All three converge on the same state machine after Capture (Curate → Generate → Finalize). Differences are only in _how the transcript gets into the system_. Entry 3 bypasses [Capture flow](#capture-flow-t2-before-curate) entirely.
 
 ---
 
@@ -296,12 +296,12 @@ useAudioRecovery (runs once per sessionId)
 
 Four conditions cause the MediaRecorder to stop without explicit user action:
 
-| Condition | Flag | Description |
-|-----------|------|-------------|
-| Hard cap | `recorder.hardCapStopped` | Duration exceeded `settings.recordingLimits.maxMinutes` |
-| Idle auto-stop | `recorder.idleAutoStopped` | No mic input for `idleAutoStopMinutes` continuous minutes |
-| Recorder interrupted | `recorder.recorderInterrupted` | MediaRecorder error or OS-level interruption |
-| Mic disconnected | `recorder.micDisconnected` | `MediaStreamTrack` ended event |
+| Condition            | Flag                           | Description                                               |
+| -------------------- | ------------------------------ | --------------------------------------------------------- |
+| Hard cap             | `recorder.hardCapStopped`      | Duration exceeded `settings.recordingLimits.maxMinutes`   |
+| Idle auto-stop       | `recorder.idleAutoStopped`     | No mic input for `idleAutoStopMinutes` continuous minutes |
+| Recorder interrupted | `recorder.recorderInterrupted` | MediaRecorder error or OS-level interruption              |
+| Mic disconnected     | `recorder.micDisconnected`     | `MediaStreamTrack` ended event                            |
 
 When any of these flags is true and `recorder.status === 'stopped'`, an effect in `useCapturePhase` fires `handleFinishedRecording()` automatically — the same path as a manual stop. The clip lands in `ready` and the Whisper auto-pass picks it up.
 
@@ -450,10 +450,10 @@ DemoCompleteModal — two choices:
 
 Rate-limits expensive AI operations per session to prevent runaway costs:
 
-| Action | Limit |
-|--------|-------|
-| `transcribe` | **1 per session, lifetime** (cloud Nova passes only). The counter is per-Session, persisted with the entity, and is **not** reset by Revert to original, Unlock, page reload, or any other client action. The same counter is consumed by an explicit "Improve with AI" click *and* by a "Re-transcribe with cloud AI" choice from the T2-failure dialog. |
-| `generate` | `MAX_GENERATES_PER_SESSION` |
+| Action       | Limit                                                                                                                                                                                                                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transcribe` | **1 per session, lifetime** (cloud Nova passes only). The counter is per-Session, persisted with the entity, and is **not** reset by Revert to original, Unlock, page reload, or any other client action. The same counter is consumed by an explicit "Improve with AI" click _and_ by a "Re-transcribe with cloud AI" choice from the T2-failure dialog. |
+| `generate`   | `MAX_GENERATES_PER_SESSION`                                                                                                                                                                                                                                                                                                                               |
 
 **Demo mode:** Cloud transcription is **hard-disabled**. "Improve with AI" and the T2-failure dialog's cloud option are both unavailable with an explanatory tooltip ("Cloud transcription is disabled in demo mode."). T2 local Whisper and note generation against the real Anthropic Worker remain enabled — see [CONTEXT.md §Demo mode](../CONTEXT.md#demo-mode).
 

@@ -35,9 +35,19 @@ function countActiveModifiers(m: SessionModifiers): number {
 }
 
 function NoteToolbarImpl({
-  template, templates,
-  hasDraftContent, canGenerate, requiresFeedback, isGenerating, note, patient,
-  modifiers, onTemplateChange, onManageTemplates, onGenerate, onModifiersChange,
+  template,
+  templates,
+  hasDraftContent,
+  canGenerate,
+  requiresFeedback,
+  isGenerating,
+  note,
+  patient,
+  modifiers,
+  onTemplateChange,
+  onManageTemplates,
+  onGenerate,
+  onModifiersChange,
 }: NoteToolbarProps) {
   const [overwriteOpen, setOverwriteOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -87,12 +97,17 @@ function NoteToolbarImpl({
         type="button"
         onClick={() => setPopoverOpen((o) => !o)}
         style={{
-          display: 'inline-flex', alignItems: 'center',
-          gap: 6, height: 34, padding: '0 10px', borderRadius: 7,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          height: 34,
+          padding: '0 10px',
+          borderRadius: 7,
           border: `1px solid ${popoverOpen ? 'var(--color-pt-text-2)' : 'var(--color-pt-border)'}`,
           background: popoverOpen ? 'var(--color-pt-border)' : 'var(--color-pt-surface)',
           color: 'var(--color-pt-text)',
-          fontSize: 12.5, fontWeight: 500,
+          fontSize: 12.5,
+          fontWeight: 500,
           cursor: 'pointer',
         }}
         title="Prompt modifiers"
@@ -100,20 +115,24 @@ function NoteToolbarImpl({
         <SlidersHorizontal size={13} strokeWidth={2} />
         Modifier
         {activeCount > 0 && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            height: 18, padding: '0 6px', borderRadius: 999,
-            border: '1px solid var(--color-pt-border)',
-            background: 'var(--color-pt-bg, var(--color-pt-surface))',
-            color: 'var(--color-pt-text-2)',
-            fontSize: 10, fontWeight: 600,
-          }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              height: 18,
+              padding: '0 6px',
+              borderRadius: 999,
+              border: '1px solid var(--color-pt-border)',
+              background: 'var(--color-pt-bg, var(--color-pt-surface))',
+              color: 'var(--color-pt-text-2)',
+              fontSize: 10,
+              fontWeight: 600,
+            }}
+          >
             {activeCount}
           </span>
         )}
-        {hasCustomActive && (
-          <Sparkles size={11} style={{ color: '#5e7e62', marginLeft: -2 }} />
-        )}
+        {hasCustomActive && <Sparkles size={11} style={{ color: '#5e7e62', marginLeft: -2 }} />}
         <ChevronDown size={12} style={{ color: 'var(--color-pt-text-2)' }} />
       </button>
 
@@ -132,9 +151,7 @@ function NoteToolbarImpl({
       <div style={{ flex: 1 }} />
 
       {/* Right cluster */}
-      {note && template && (
-        <NoteExportMenu note={note} template={template} patient={patient} />
-      )}
+      {note && template && <NoteExportMenu note={note} template={template} patient={patient} />}
 
       <button
         type="button"
@@ -145,11 +162,17 @@ function NoteToolbarImpl({
         onClick={handleRegenerate}
       >
         {isGenerating ? (
-          <><Loader2 size={13} className="animate-spin" /> Generating…</>
+          <>
+            <Loader2 size={13} className="animate-spin" /> Generating…
+          </>
         ) : hasDraftContent ? (
-          <><RotateCw size={13} strokeWidth={2} /> Regenerate</>
+          <>
+            <RotateCw size={13} strokeWidth={2} /> Regenerate
+          </>
         ) : (
-          <><Sparkles size={13} strokeWidth={2} /> Generate</>
+          <>
+            <Sparkles size={13} strokeWidth={2} /> Generate
+          </>
         )}
       </button>
 
@@ -195,11 +218,21 @@ function NoteToolbarImpl({
 
       <Modal
         open={feedbackOpen}
-        onClose={() => { setFeedbackOpen(false); setFeedbackText(''); }}
+        onClose={() => {
+          setFeedbackOpen(false);
+          setFeedbackText('');
+        }}
         title="What would you like improved?"
         size="sm"
       >
-        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5, marginBottom: 10 }}>
+        <p
+          style={{
+            fontSize: 14,
+            color: 'var(--color-pt-text-2)',
+            lineHeight: 1.5,
+            marginBottom: 10,
+          }}
+        >
           The transcript and settings haven't changed. Tell the AI what to fix.
         </p>
         <textarea
@@ -208,17 +241,27 @@ function NoteToolbarImpl({
           placeholder="e.g. The assessment was too vague — expand functional limitations"
           autoFocus
           style={{
-            width: '100%', minHeight: 80, padding: '8px 10px', borderRadius: 6,
+            width: '100%',
+            minHeight: 80,
+            padding: '8px 10px',
+            borderRadius: 6,
             border: '1px solid var(--color-pt-border)',
-            background: 'var(--color-pt-surface)', color: 'var(--color-pt-text)',
-            fontSize: 13.5, lineHeight: 1.5, resize: 'vertical', boxSizing: 'border-box',
+            background: 'var(--color-pt-surface)',
+            color: 'var(--color-pt-text)',
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            resize: 'vertical',
+            boxSizing: 'border-box',
           }}
         />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => { setFeedbackOpen(false); setFeedbackText(''); }}
+            onClick={() => {
+              setFeedbackOpen(false);
+              setFeedbackText('');
+            }}
           >
             Cancel
           </button>

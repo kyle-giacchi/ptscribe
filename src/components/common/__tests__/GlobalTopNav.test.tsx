@@ -60,7 +60,11 @@ describe('GlobalTopNav', () => {
   });
 
   it('renders the primary nav items', () => {
-    render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <GlobalTopNav />
+      </MemoryRouter>,
+    );
     expect(screen.getByText('My Chart')).toBeInTheDocument();
     expect(screen.getByText('Review queue')).toBeInTheDocument();
     expect(screen.getByText('Patients')).toBeInTheDocument();
@@ -69,25 +73,41 @@ describe('GlobalTopNav', () => {
   });
 
   it('shows pending-count badge on Review queue when notes are unfinalized', () => {
-    render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <GlobalTopNav />
+      </MemoryRouter>,
+    );
     expect(screen.getByLabelText('2 pending')).toBeInTheDocument();
   });
 
   it('highlights the active route', () => {
-    render(<MemoryRouter initialEntries={['/patients']}><GlobalTopNav /></MemoryRouter>);
+    render(
+      <MemoryRouter initialEntries={['/patients']}>
+        <GlobalTopNav />
+      </MemoryRouter>,
+    );
     const patientsLink = screen.getByText('Patients').closest('a');
     expect(patientsLink?.className).toContain('active');
   });
 
   it('hides the Organization link for personal/demo accounts (no orgId)', () => {
     mockOrgId = null;
-    render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <GlobalTopNav />
+      </MemoryRouter>,
+    );
     expect(screen.queryByText('Organization')).not.toBeInTheDocument();
   });
 
   it('shows the Organization link when the user belongs to an org', () => {
     mockOrgId = 'org-123';
-    render(<MemoryRouter><GlobalTopNav /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <GlobalTopNav />
+      </MemoryRouter>,
+    );
     // Appears twice (horizontal nav + hidden dropdown), so use getAllByText.
     expect(screen.getAllByText('Organization').length).toBeGreaterThan(0);
   });

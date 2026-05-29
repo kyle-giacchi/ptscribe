@@ -1,6 +1,5 @@
 import type { SessionClip } from '@/types';
 
-
 export interface TranscriptSegment {
   text: string;
   speaker: string | null; // 'Dr' | 'Pt' | 'SPEAKER_0' etc., or null for plain text
@@ -30,7 +29,10 @@ export function parseTranscriptSegments(
       .filter(Boolean);
   } else {
     // Fallback: split by double newlines for paragraph mode
-    paragraphs = transcript.split(/\n{2,}/).map((l) => l.trim()).filter(Boolean);
+    paragraphs = transcript
+      .split(/\n{2,}/)
+      .map((l) => l.trim())
+      .filter(Boolean);
   }
 
   const totalWords = paragraphs.reduce((sum, p) => sum + wordCount(p), 0) || 1;

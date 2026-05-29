@@ -152,10 +152,20 @@ export function NoteExportMenu({ note, template, patient }: NoteExportMenuProps)
             padding: 4,
           }}
         >
-          <MenuItem icon={Clipboard} onClick={() => run(() => copyText(renderNotePlainText(note, template, patient), 'plain text'))}>
+          <MenuItem
+            icon={Clipboard}
+            onClick={() =>
+              run(() => copyText(renderNotePlainText(note, template, patient), 'plain text'))
+            }
+          >
             Copy as text
           </MenuItem>
-          <MenuItem icon={FileType} onClick={() => run(() => copyText(renderNoteMarkdown(note, template, patient), 'Markdown'))}>
+          <MenuItem
+            icon={FileType}
+            onClick={() =>
+              run(() => copyText(renderNoteMarkdown(note, template, patient), 'Markdown'))
+            }
+          >
             Copy as Markdown
           </MenuItem>
 
@@ -171,7 +181,11 @@ export function NoteExportMenu({ note, template, patient }: NoteExportMenuProps)
             icon={FileType}
             onClick={() =>
               run(() =>
-                downloadFile(`${fileBase()}.md`, renderNoteMarkdown(note, template, patient), 'text/markdown'),
+                downloadFile(
+                  `${fileBase()}.md`,
+                  renderNoteMarkdown(note, template, patient),
+                  'text/markdown',
+                ),
               )
             }
           >
@@ -181,7 +195,11 @@ export function NoteExportMenu({ note, template, patient }: NoteExportMenuProps)
             icon={FileText}
             onClick={() =>
               run(() =>
-                downloadFile(`${fileBase()}.txt`, renderNotePlainText(note, template, patient), 'text/plain'),
+                downloadFile(
+                  `${fileBase()}.txt`,
+                  renderNotePlainText(note, template, patient),
+                  'text/plain',
+                ),
               )
             }
           >

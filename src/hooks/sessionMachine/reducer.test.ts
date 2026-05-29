@@ -63,7 +63,9 @@ describe('sessionMachineReducer — generate slice', () => {
 
   describe('generate/retry', () => {
     it('stores retry status without changing phase', () => {
-      const generating = sessionMachineReducer(initialSessionMachineState, { type: 'generate/start' });
+      const generating = sessionMachineReducer(initialSessionMachineState, {
+        type: 'generate/start',
+      });
       const next = sessionMachineReducer(generating, {
         type: 'generate/retry',
         status: { provider: 'anthropic', attempt: 1, max: 3 },
@@ -114,7 +116,9 @@ describe('sessionMachineReducer — generate slice', () => {
 
   describe('generate/error', () => {
     it('transitions to error phase with aiError when provided', () => {
-      const generating = sessionMachineReducer(initialSessionMachineState, { type: 'generate/start' });
+      const generating = sessionMachineReducer(initialSessionMachineState, {
+        type: 'generate/start',
+      });
       const err = makeAiError();
       const next = sessionMachineReducer(generating, { type: 'generate/error', aiError: err });
       expect(next.generate.phase).toBe('error');
@@ -123,7 +127,9 @@ describe('sessionMachineReducer — generate slice', () => {
     });
 
     it('transitions to error phase with null aiError (non-AI error path)', () => {
-      const generating = sessionMachineReducer(initialSessionMachineState, { type: 'generate/start' });
+      const generating = sessionMachineReducer(initialSessionMachineState, {
+        type: 'generate/start',
+      });
       const next = sessionMachineReducer(generating, { type: 'generate/error', aiError: null });
       expect(next.generate.phase).toBe('error');
       expect(next.generate.aiError).toBeNull();

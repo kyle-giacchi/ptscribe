@@ -1,9 +1,9 @@
 export type AiErrorKind =
-  | 'network'      // offline, fetch TypeError, all retries exhausted on 5xx/408
-  | 'rate_limit'   // 429
-  | 'auth'         // 401, 403
-  | 'empty'        // 200 OK but missing/empty text
-  | 'timeout';     // AbortError from our internal timeout (NOT user-initiated cancel)
+  | 'network' // offline, fetch TypeError, all retries exhausted on 5xx/408
+  | 'rate_limit' // 429
+  | 'auth' // 401, 403
+  | 'empty' // 200 OK but missing/empty text
+  | 'timeout'; // AbortError from our internal timeout (NOT user-initiated cancel)
 
 export type AiProvider = 'anthropic' | 'nova';
 
@@ -79,14 +79,16 @@ export function friendlyAiError(err: AiCallError): FriendlyAiError {
     case 'empty':
       return {
         title: `${name} returned an empty result`,
-        description: 'The model gave us no usable text. Try again, or use a longer or more detailed transcript.',
+        description:
+          'The model gave us no usable text. Try again, or use a longer or more detailed transcript.',
         action: 'shorten',
         actionLabel: 'Try again',
       };
     case 'timeout':
       return {
         title: 'Request timed out',
-        description: 'The request took longer than expected and was canceled. Try again, optionally with a shorter transcript.',
+        description:
+          'The request took longer than expected and was canceled. Try again, optionally with a shorter transcript.',
         action: 'retry',
         actionLabel: 'Try again',
       };

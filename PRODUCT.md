@@ -41,7 +41,7 @@ WCAG AA compliance: 4.5:1 minimum contrast ratio on all text, focus-visible outl
 
 ## Personas
 
-Two personas anchor PTScribe product decisions. When a feature, copy choice, or default is ambiguous, ask: *which persona does this serve, and does it serve the other one too — or at least not get in their way?*
+Two personas anchor PTScribe product decisions. When a feature, copy choice, or default is ambiguous, ask: _which persona does this serve, and does it serve the other one too — or at least not get in their way?_
 
 Both personas share a hard constraint: **PHI sensitivity, time scarcity, and a low tolerance for clinical software jank.** Neither will sit through a tutorial. Neither will read a settings page. If the first session doesn't produce a usable note, they don't come back.
 
@@ -53,13 +53,14 @@ Both personas share a hard constraint: **PHI sensitivity, time scarcity, and a l
 
 **What she's trying to do:** Open the app, hit record, treat the patient. Stop, glance at a draft note, fix two things, copy/paste into the EMR. Total app-time per visit: **under 90 seconds of friction**, ideally under 45.
 
-**What she's *not* trying to do:** Configure templates. Manage a patient list (she'll create patients on the fly, or skip them for quick visits). Tune AI models, toggle silence detection, or understand what a "vault" is. Read disclaimers more than once.
+**What she's _not_ trying to do:** Configure templates. Manage a patient list (she'll create patients on the fly, or skip them for quick visits). Tune AI models, toggle silence detection, or understand what a "vault" is. Read disclaimers more than once.
 
 **What kills her trust instantly:** A note that invents a goal, diagnosis, or measurement she didn't say out loud. Losing a recording — even once, even if it was "her browser's fault." A 30-second wait staring at a spinner with no progress signal. Any modal between "stop recording" and "see the draft." Having to re-enter her name, clinic, or settings after a browser update.
 
 **What earns her loyalty:** Recording works the first time, every time — including when she switches tabs mid-visit or her laptop sleeps for 20 seconds. The default template produces a note her supervisor would accept with light edits. "Copy note" is one tap and lands in the EMR cleanly formatted. Costs feel invisible.
 
 **Design implications:**
+
 - **Record/Review is the home screen** for a returning user, not a dashboard.
 - **One-tap record** from anywhere; no patient required to start.
 - **Aggressive recording reliability**: wake lock, visibility resilience, autosave of partial audio, recovery on crash. A bug here is P0.
@@ -76,18 +77,19 @@ Both personas share a hard constraint: **PHI sensitivity, time scarcity, and a l
 
 **What he's trying to do:** Standardize how every clinician documents — same template structure, required sections, tone — so charts survive an audit and new hires ramp fast. Keep PHI handling defensible (a one-paragraph answer if a regulator asks where audio lives and who can decrypt it). Predict cost — no surprise $400 bill because someone left a recorder running over lunch. Onboard a new clinician in under 15 minutes.
 
-**What he's *not* trying to do:** Become an admin (set policy once, expect enforcement). Manage individual clinician accounts (he accepts single-user-per-browser as an MVP constraint, but it's a ceiling on adoption). Customize per-clinician templates — he wants *one* SOAP, *one* eval, *one* progress note across the staff.
+**What he's _not_ trying to do:** Become an admin (set policy once, expect enforcement). Manage individual clinician accounts (he accepts single-user-per-browser as an MVP constraint, but it's a ceiling on adoption). Customize per-clinician templates — he wants _one_ SOAP, _one_ eval, _one_ progress note across the staff.
 
 **What kills his trust instantly:** A clinician overrides the company template and ships an inconsistent note. PHI ends up somewhere he didn't sign off on. A junior staffer can't figure out how to start a session and falls back to handwritten notes. Cost grows faster than visit volume.
 
 **What earns his loyalty:** Built-in templates that don't need editing to be audit-defensible. A clear, short HIPAA story surfaced once in Settings ("Audio and notes are encrypted at rest in the browser. AI calls go through our proxy with no provider credentials in the browser. We don't store PHI on our servers."). Operational guardrails — server-side abuse caps, recording length limits with a soft warning. Consistency by default. A trivial onboarding path.
 
 **Design implications:**
-- **Resist per-user customization.** Every "let users edit the template" feature points a knife at Marcus's consistency goal. When shipping customization, scope it tightly and make the *org default* the strong path.
+
+- **Resist per-user customization.** Every "let users edit the template" feature points a knife at Marcus's consistency goal. When shipping customization, scope it tightly and make the _org default_ the strong path.
 - **Built-in templates are a product, not a default to overwrite.** Keep them read-only, keep Clone visible.
 - **Surface the security model in one place, in one paragraph.** Don't make Marcus piece it together from invariants.md.
 - **Cost ceilings belong server-side** (per-key abuse caps, per-session length caps), surfaced as friendly UX, not silent failures.
-- **Future multi-user thinking:** the unit of policy is the *organization*, not the clinician. Templates, exercises, retention defaults flow down; clinicians can clone but not override the org standard.
+- **Future multi-user thinking:** the unit of policy is the _organization_, not the clinician. Templates, exercises, retention defaults flow down; clinicians can clone but not override the org standard.
 - **When the two personas align, the feature is right.** When they conflict, Dana wins on the recording-and-note-shipping path; Marcus wins on the template-and-policy path.
 
 ### How to use this doc

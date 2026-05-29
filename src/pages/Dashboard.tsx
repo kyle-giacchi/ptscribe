@@ -163,152 +163,165 @@ export function Dashboard() {
 
         <div style={{ padding: 22 }}>
           <div className="mx-auto max-w-[1400px] space-y-[18px]">
-        {/* Hero strip */}
-        <SurfaceCard padding="18px 22px">
-          <div
-            className="grid items-center"
-            style={{ gridTemplateColumns: 'auto 1fr auto', gap: 18 }}
-          >
-            <div
-              className="flex items-center justify-center"
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 14,
-                background: 'var(--color-pt-accent-soft)',
-                border: '1px solid var(--color-pt-accent-border)',
-                color: 'var(--color-pt-accent-fg)',
-              }}
-            >
-              <Sun size={26} strokeWidth={1.75} />
-            </div>
-            <div className="min-w-0">
-              <div style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>{dateStr}</div>
+            {/* Hero strip */}
+            <SurfaceCard padding="18px 22px">
               <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 600,
-                  letterSpacing: '-0.3px',
-                  color: 'var(--color-pt-text)',
-                  marginTop: 2,
-                }}
+                className="grid items-center"
+                style={{ gridTemplateColumns: 'auto 1fr auto', gap: 18 }}
               >
-                Good morning, {greetingName}.
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 14,
+                    background: 'var(--color-pt-accent-soft)',
+                    border: '1px solid var(--color-pt-accent-border)',
+                    color: 'var(--color-pt-accent-fg)',
+                  }}
+                >
+                  <Sun size={26} strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0">
+                  <div style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>{dateStr}</div>
+                  <div
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 600,
+                      letterSpacing: '-0.3px',
+                      color: 'var(--color-pt-text)',
+                      marginTop: 2,
+                    }}
+                  >
+                    Good morning, {greetingName}.
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--color-pt-text-2)',
+                      marginTop: 4,
+                    }}
+                  >
+                    <strong style={{ color: 'var(--color-pt-text)' }}>
+                      {todaysSessions.length}
+                    </strong>{' '}
+                    session{todaysSessions.length === 1 ? '' : 's'} on your schedule ·{' '}
+                    <strong style={{ color: 'var(--color-pt-text)' }}>{draftNotes.length}</strong>{' '}
+                    note
+                    {draftNotes.length === 1 ? '' : 's'} awaiting sign-off
+                  </div>
+                </div>
+                <div className="hidden items-center gap-2.5 md:flex">
+                  <Link to="/notes" style={{ textDecoration: 'none' }}>
+                    <PtButton variant="ghost" iconLeft={<Inbox size={14} strokeWidth={1.75} />}>
+                      Open inbox
+                    </PtButton>
+                  </Link>
+                  <Link to="/sessions/new" style={{ textDecoration: 'none' }}>
+                    <PtButton variant="primary" iconLeft={<Mic size={14} strokeWidth={2} />}>
+                      Start next session
+                    </PtButton>
+                  </Link>
+                </div>
               </div>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: 'var(--color-pt-text-2)',
-                  marginTop: 4,
-                }}
-              >
-                <strong style={{ color: 'var(--color-pt-text)' }}>{todaysSessions.length}</strong>{' '}
-                session{todaysSessions.length === 1 ? '' : 's'} on your schedule ·{' '}
-                <strong style={{ color: 'var(--color-pt-text)' }}>{draftNotes.length}</strong> note
-                {draftNotes.length === 1 ? '' : 's'} awaiting sign-off
+            </SurfaceCard>
+
+            {/* Pending sign-off rail — only shown when there are unfinalized notes */}
+            {pendingSignOff.length > 0 && (
+              <PendingSignOffRail sessions={pendingSignOff} patients={patients} notes={notes} />
+            )}
+
+            {/* Stat row */}
+            <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
+              <StatCard
+                eyebrow="Sessions today"
+                value={todaysSessions.length}
+                trend={`${patients.filter((p) => p.status === 'active').length} active patients`}
+                trendKind="neutral"
+              />
+              <StatCard
+                eyebrow="Avg session length"
+                value={avgDuration ? `${avgDuration}m` : '—'}
+                trend={avgDuration ? 'Across recorded visits' : 'No data yet'}
+                trendKind="neutral"
+              />
+              <StatCard
+                eyebrow="Notes pending sign"
+                value={draftNotes.length}
+                trend={draftNotes.length === 0 ? 'You’re caught up' : 'Review queue'}
+                trendKind={draftNotes.length === 0 ? 'good' : 'warn'}
+              />
+              <StatCard eyebrow="Audio drops (7d)" value={0} trend="Mic stable" trendKind="good" />
+            </div>
+
+            {/* Body */}
+            <div className="grid grid-cols-1 gap-[18px] md:grid-cols-[1fr_360px]">
+              <ScheduleCard sessions={todaysSessions} patients={patients} />
+              <div className="flex flex-col gap-3.5">
+                <SignOffRail notes={draftNotes} patients={patients} />
+                <AudioCheckRail />
+                <QuickCaptureRail onQuickRecord={handleQuickRecord} />
               </div>
             </div>
-            <div className="hidden items-center gap-2.5 md:flex">
-              <Link to="/notes" style={{ textDecoration: 'none' }}>
-                <PtButton variant="ghost" iconLeft={<Inbox size={14} strokeWidth={1.75} />}>
-                  Open inbox
-                </PtButton>
-              </Link>
-              <Link to="/sessions/new" style={{ textDecoration: 'none' }}>
-                <PtButton variant="primary" iconLeft={<Mic size={14} strokeWidth={2} />}>
-                  Start next session
-                </PtButton>
-              </Link>
-            </div>
           </div>
-        </SurfaceCard>
 
-        {/* Pending sign-off rail — only shown when there are unfinalized notes */}
-        {pendingSignOff.length > 0 && (
-          <PendingSignOffRail sessions={pendingSignOff} patients={patients} notes={notes} />
-        )}
-
-        {/* Stat row */}
-        <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
-          <StatCard
-            eyebrow="Sessions today"
-            value={todaysSessions.length}
-            trend={`${patients.filter((p) => p.status === 'active').length} active patients`}
-            trendKind="neutral"
-          />
-          <StatCard
-            eyebrow="Avg session length"
-            value={avgDuration ? `${avgDuration}m` : '—'}
-            trend={avgDuration ? 'Across recorded visits' : 'No data yet'}
-            trendKind="neutral"
-          />
-          <StatCard
-            eyebrow="Notes pending sign"
-            value={draftNotes.length}
-            trend={draftNotes.length === 0 ? 'You’re caught up' : 'Review queue'}
-            trendKind={draftNotes.length === 0 ? 'good' : 'warn'}
-          />
-          <StatCard eyebrow="Audio drops (7d)" value={0} trend="Mic stable" trendKind="good" />
-        </div>
-
-        {/* Body */}
-        <div className="grid grid-cols-1 gap-[18px] md:grid-cols-[1fr_360px]">
-          <ScheduleCard sessions={todaysSessions} patients={patients} />
-          <div className="flex flex-col gap-3.5">
-            <SignOffRail notes={draftNotes} patients={patients} />
-            <AudioCheckRail />
-            <QuickCaptureRail onQuickRecord={handleQuickRecord} />
-          </div>
-        </div>
-      </div>
-
-      {resumeModal && (() => {
-        const resumePatient = patients.find((p) => p.id === resumeModal.patientId);
-        const resumePatientName = resumePatient
-          ? `${resumePatient.firstName} ${resumePatient.lastName}`.trim()
-          : 'Unknown patient';
-        return (
-          <div
-            style={{
-              position: 'sticky',
-              top: 0,
-              zIndex: 10,
-              margin: '-22px -22px 0',
-              padding: '10px 22px',
-              background: 'var(--color-pt-accent-soft)',
-              borderBottom: '1px solid var(--color-pt-accent-border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: 'var(--color-pt-accent-fg)', lineHeight: 1.4 }}>
-              <strong>Session in progress</strong> — unfinished session for{' '}
-              <strong>{resumePatientName}</strong> from {relativeFromNow(resumeModal.updatedAt)}.
-            </div>
-            <div className="flex gap-2">
-              <PtButton
-                variant="primary"
-                style={{ fontSize: 12, padding: '5px 12px' }}
-                onClick={() => {
-                  setResumeDismissed(true);
-                  navigate(`/sessions/${resumeModal.id}?mode=quick`);
-                }}
-              >
-                Continue session
-              </PtButton>
-              <PtButton
-                variant="ghost"
-                style={{ fontSize: 12, padding: '5px 12px' }}
-                onClick={() => setResumeDismissed(true)}
-              >
-                Dismiss
-              </PtButton>
-            </div>
-          </div>
-        );
-      })()}
+          {resumeModal &&
+            (() => {
+              const resumePatient = patients.find((p) => p.id === resumeModal.patientId);
+              const resumePatientName = resumePatient
+                ? `${resumePatient.firstName} ${resumePatient.lastName}`.trim()
+                : 'Unknown patient';
+              return (
+                <div
+                  style={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    margin: '-22px -22px 0',
+                    padding: '10px 22px',
+                    background: 'var(--color-pt-accent-soft)',
+                    borderBottom: '1px solid var(--color-pt-accent-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 13.5,
+                      color: 'var(--color-pt-accent-fg)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <strong>Session in progress</strong> — unfinished session for{' '}
+                    <strong>{resumePatientName}</strong> from{' '}
+                    {relativeFromNow(resumeModal.updatedAt)}.
+                  </div>
+                  <div className="flex gap-2">
+                    <PtButton
+                      variant="primary"
+                      style={{ fontSize: 12, padding: '5px 12px' }}
+                      onClick={() => {
+                        setResumeDismissed(true);
+                        navigate(`/sessions/${resumeModal.id}?mode=quick`);
+                      }}
+                    >
+                      Continue session
+                    </PtButton>
+                    <PtButton
+                      variant="ghost"
+                      style={{ fontSize: 12, padding: '5px 12px' }}
+                      onClick={() => setResumeDismissed(true)}
+                    >
+                      Dismiss
+                    </PtButton>
+                  </div>
+                </div>
+              );
+            })()}
         </div>
       </div>
 
@@ -443,7 +456,8 @@ function PendingSignOffRail({
             : 'Unknown patient';
           const note = noteBySessionId.get(s.id);
           const ageHours = note ? (now - note.updatedAt) / 3_600_000 : 0;
-          const ageTone: StatusTone = ageHours > 48 ? 'flagged' : ageHours > 24 ? 'plateau' : 'on-track';
+          const ageTone: StatusTone =
+            ageHours > 48 ? 'flagged' : ageHours > 24 ? 'plateau' : 'on-track';
 
           return (
             <li key={s.id}>

@@ -49,7 +49,9 @@ export function OrgNew() {
   // validate() call. This keeps setState out of the effect body for the trivial
   // missing-token case.
   const [gate, setGate] = useState<GateState>(() =>
-    token ? { status: 'loading' } : { status: 'invalid', message: 'No invite token found in this URL.' },
+    token
+      ? { status: 'loading' }
+      : { status: 'invalid', message: 'No invite token found in this URL.' },
   );
   const [step, setStep] = useState<Step>('details');
   const [org, setOrg] = useState<OrgDraft>({
@@ -79,12 +81,24 @@ export function OrgNew() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
         });
-        const data = (await res.json()) as { valid: boolean; consumed: boolean; orgName?: string; alreadyInOrg?: boolean };
+        const data = (await res.json()) as {
+          valid: boolean;
+          consumed: boolean;
+          orgName?: string;
+          alreadyInOrg?: boolean;
+        };
         if (cancelled) return;
         if (data.alreadyInOrg) {
-          setGate({ status: 'invalid', message: 'Your account is already associated with an organization.' });
+          setGate({
+            status: 'invalid',
+            message: 'Your account is already associated with an organization.',
+          });
         } else if (!data.valid && data.consumed) {
-          setGate({ status: 'invalid', message: 'This invite link has already been used. Contact support if you believe this is an error.' });
+          setGate({
+            status: 'invalid',
+            message:
+              'This invite link has already been used. Contact support if you believe this is an error.',
+          });
         } else if (!data.valid) {
           setGate({ status: 'invalid', message: 'This invite link is invalid or has expired.' });
         } else {
@@ -96,7 +110,9 @@ export function OrgNew() {
       }
     }
     validate();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [token, isAuthenticated]);
 
   async function handleSubmit() {
@@ -121,7 +137,9 @@ export function OrgNew() {
         } else if (data.code === 'ALREADY_IN_ORG') {
           setSubmitError('Your account is already associated with an organization.');
         } else {
-          setSubmitError('Something went wrong — your invite link is still valid, please try again.');
+          setSubmitError(
+            'Something went wrong — your invite link is still valid, please try again.',
+          );
         }
         setSubmitting(false);
         return;
@@ -160,18 +178,43 @@ export function OrgNew() {
   const stepIndex = STEPS.indexOf(step);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-pt-landing-bg)', padding: '48px 24px' }}>
+    <div
+      style={{ minHeight: '100vh', background: 'var(--color-pt-landing-bg)', padding: '48px 24px' }}
+    >
       <div style={{ maxWidth: 640, margin: '0 auto', display: 'grid', gap: 24 }}>
-
         <header style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 30, height: 30, borderRadius: 8, background: 'var(--color-pt-accent)',
-            color: '#ffffff', fontSize: 14, fontWeight: 800, letterSpacing: '-0.02em', flexShrink: 0,
-          }}>P</div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: 'var(--color-pt-accent)',
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              flexShrink: 0,
+            }}
+          >
+            P
+          </div>
           <div>
-            <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--color-pt-text)', letterSpacing: '-0.02em' }}>PTScribe</div>
-            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>Set up your organization</div>
+            <div
+              style={{
+                fontSize: 15.5,
+                fontWeight: 700,
+                color: 'var(--color-pt-text)',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              PTScribe
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+              Set up your organization
+            </div>
           </div>
         </header>
 
@@ -212,7 +255,6 @@ export function OrgNew() {
             )}
           </motion.div>
         </AnimatePresence>
-
       </div>
     </div>
   );
@@ -230,9 +272,7 @@ function StepOrgDetails({
   onNext: () => void;
 }) {
   const canProceed =
-    org.name.trim().length > 0 &&
-    isValidEmail(org.contactEmail) &&
-    isValidPhone(org.phone);
+    org.name.trim().length > 0 && isValidEmail(org.contactEmail) && isValidPhone(org.phone);
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
@@ -402,9 +442,16 @@ function StepInviteTeam({
                   onClick={() => removeRow(row.id)}
                   aria-label="Remove invite"
                   style={{
-                    all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', width: 32, height: 42, flexShrink: 0,
-                    color: 'var(--color-pt-text-3)', borderRadius: 8,
+                    all: 'unset',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 32,
+                    height: 42,
+                    flexShrink: 0,
+                    color: 'var(--color-pt-text-3)',
+                    borderRadius: 8,
                   }}
                 >
                   <X size={14} />
@@ -419,8 +466,14 @@ function StepInviteTeam({
             type="button"
             onClick={addRow}
             style={{
-              all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--color-pt-accent-fg)',
+              all: 'unset',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--color-pt-accent-fg)',
             }}
           >
             <Plus size={14} />
@@ -431,8 +484,14 @@ function StepInviteTeam({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             style={{
-              all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center',
-              gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-3)',
+              all: 'unset',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--color-pt-text-3)',
             }}
           >
             <Upload size={14} />
@@ -449,7 +508,9 @@ function StepInviteTeam({
       </SurfaceCard>
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-        <PtButton variant="ghost" onClick={onBack}>← Back</PtButton>
+        <PtButton variant="ghost" onClick={onBack}>
+          ← Back
+        </PtButton>
         <PtButton
           variant="primary"
           disabled={!canProceed}
@@ -496,21 +557,49 @@ function StepReview({
           </ReviewSection>
 
           <div style={{ borderTop: '1px solid var(--color-pt-border)', paddingTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-pt-text-3)', marginBottom: 10 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--color-pt-text-3)',
+                marginBottom: 10,
+              }}
+            >
               Team invites ({invites.length})
             </div>
             {invites.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)', fontStyle: 'italic' }}>No invites — you can add team members from Settings.</div>
+              <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)', fontStyle: 'italic' }}>
+                No invites — you can add team members from Settings.
+              </div>
             ) : (
               <div style={{ display: 'grid', gap: 6 }}>
                 {invites.map((row) => (
-                  <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                  <div
+                    key={row.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: 13,
+                    }}
+                  >
                     <span style={{ color: 'var(--color-pt-text)' }}>{row.email}</span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-                      color: 'var(--color-pt-text-3)', background: 'var(--color-pt-surface-mut)',
-                      borderRadius: 999, padding: '2px 8px',
-                    }}>{row.role}</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: 'var(--color-pt-text-3)',
+                        background: 'var(--color-pt-surface-mut)',
+                        borderRadius: 999,
+                        padding: '2px 8px',
+                      }}
+                    >
+                      {row.role}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -520,18 +609,24 @@ function StepReview({
       </SurfaceCard>
 
       {submitError && (
-        <div style={{
-          padding: '12px 16px',
-          background: 'var(--color-pt-amber-soft)',
-          border: '1px solid var(--color-pt-amber-border)',
-          borderRadius: 10, fontSize: 13, color: 'var(--color-pt-amber-fg)',
-        }}>
+        <div
+          style={{
+            padding: '12px 16px',
+            background: 'var(--color-pt-amber-soft)',
+            border: '1px solid var(--color-pt-amber-border)',
+            borderRadius: 10,
+            fontSize: 13,
+            color: 'var(--color-pt-amber-fg)',
+          }}
+        >
           {submitError}
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-        <PtButton variant="ghost" disabled={submitting} onClick={onBack}>← Back</PtButton>
+        <PtButton variant="ghost" disabled={submitting} onClick={onBack}>
+          ← Back
+        </PtButton>
         <PtButton variant="primary" disabled={submitting} onClick={onSubmit}>
           {submitting ? 'Creating…' : 'Create Organization'}
         </PtButton>
@@ -546,7 +641,15 @@ function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div>
       <Eyebrow>Step</Eyebrow>
-      <h1 style={{ marginTop: 4, fontSize: 22, fontWeight: 700, color: 'var(--color-pt-text)', letterSpacing: '-0.01em' }}>
+      <h1
+        style={{
+          marginTop: 4,
+          fontSize: 22,
+          fontWeight: 700,
+          color: 'var(--color-pt-text)',
+          letterSpacing: '-0.01em',
+        }}
+      >
         {title}
       </h1>
       <p style={{ marginTop: 6, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
@@ -558,26 +661,54 @@ function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
 
 function OrgStepper({ labels, current }: { labels: string[]; current: number }) {
   return (
-    <ol style={{ display: 'flex', alignItems: 'center', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
+    <ol
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        listStyle: 'none',
+        margin: 0,
+        padding: 0,
+      }}
+    >
       {labels.map((label, i) => {
         const done = i < current;
         const active = i === current;
         return (
           <li key={label} style={{ display: 'flex', flex: 1, alignItems: 'center', gap: 8 }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 24, height: 24, borderRadius: '50%', fontSize: 12, fontWeight: 600,
-              background: done || active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
-              color: done || active ? '#ffffff' : 'var(--color-pt-text-3)',
-              flexShrink: 0, transition: 'background 120ms ease',
-            }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                fontSize: 12,
+                fontWeight: 600,
+                background:
+                  done || active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
+                color: done || active ? '#ffffff' : 'var(--color-pt-text-3)',
+                flexShrink: 0,
+                transition: 'background 120ms ease',
+              }}
+            >
               {done ? <Check size={12} strokeWidth={2.5} /> : i + 1}
             </span>
-            <span style={{ fontSize: 12, color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-3)', fontWeight: active ? 600 : 400 }}>
+            <span
+              style={{
+                fontSize: 12,
+                color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-3)',
+                fontWeight: active ? 600 : 400,
+              }}
+            >
               {label}
             </span>
             {i < labels.length - 1 && (
-              <span aria-hidden style={{ marginLeft: 4, height: 1, flex: 1, background: 'var(--color-pt-border)' }} />
+              <span
+                aria-hidden
+                style={{ marginLeft: 4, height: 1, flex: 1, background: 'var(--color-pt-border)' }}
+              />
             )}
           </li>
         );
@@ -588,28 +719,92 @@ function OrgStepper({ labels, current }: { labels: string[]; current: number }) 
 
 function PageSpinner() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+      }}
+    >
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-slate-300" />
     </div>
   );
 }
 
-function ErrorGate({ message, actionLabel, onAction }: { message: string; actionLabel: string; onAction: () => void }) {
+function ErrorGate({
+  message,
+  actionLabel,
+  onAction,
+}: {
+  message: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-pt-landing-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
-      <div style={{
-        background: 'var(--color-pt-surface)', borderRadius: 20, border: '1px solid var(--color-pt-border)',
-        padding: '48px 56px', textAlign: 'center', maxWidth: 400, width: '100%',
-        boxShadow: 'var(--shadow-banner)',
-      }}>
-        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-pt-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontSize: 14, fontWeight: 800, margin: '0 auto 20px' }}>P</div>
-        <h1 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 700, color: 'var(--color-pt-text)', letterSpacing: '-0.02em' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'var(--color-pt-landing-bg)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--color-pt-surface)',
+          borderRadius: 20,
+          border: '1px solid var(--color-pt-border)',
+          padding: '48px 56px',
+          textAlign: 'center',
+          maxWidth: 400,
+          width: '100%',
+          boxShadow: 'var(--shadow-banner)',
+        }}
+      >
+        <div
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            background: 'var(--color-pt-accent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            fontSize: 14,
+            fontWeight: 800,
+            margin: '0 auto 20px',
+          }}
+        >
+          P
+        </div>
+        <h1
+          style={{
+            margin: '0 0 12px',
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--color-pt-text)',
+            letterSpacing: '-0.02em',
+          }}
+        >
           Unable to continue
         </h1>
-        <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.6 }}>
+        <p
+          style={{
+            margin: '0 0 24px',
+            fontSize: 14,
+            color: 'var(--color-pt-text-2)',
+            lineHeight: 1.6,
+          }}
+        >
           {message}
         </p>
-        <PtButton variant="primary" onClick={onAction}>{actionLabel}</PtButton>
+        <PtButton variant="primary" onClick={onAction}>
+          {actionLabel}
+        </PtButton>
       </div>
     </div>
   );
@@ -618,7 +813,16 @@ function ErrorGate({ message, actionLabel, onAction }: { message: string; action
 function ReviewSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-pt-text-3)', marginBottom: 8 }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--color-pt-text-3)',
+          marginBottom: 8,
+        }}
+      >
         {label}
       </div>
       <div style={{ display: 'grid', gap: 6 }}>{children}</div>
@@ -628,7 +832,14 @@ function ReviewSection({ label, children }: { label: string; children: React.Rea
 
 function ReviewRow({ field, value }: { field: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13 }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        fontSize: 13,
+      }}
+    >
       <span style={{ color: 'var(--color-pt-text-3)' }}>{field}</span>
       <span style={{ color: 'var(--color-pt-text)', fontWeight: 500 }}>{value}</span>
     </div>

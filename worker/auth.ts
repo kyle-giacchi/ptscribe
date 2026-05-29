@@ -42,10 +42,7 @@ export function createAuth(env: Env, ctx: ExecutionContext) {
           // email (if any) before the session is usable, so role/tenantId are
           // correct on the first getSession. Idempotent and never throws.
           after: async (session) => {
-            await reconcileInvite(
-              db as Parameters<typeof reconcileInvite>[0],
-              session.userId,
-            );
+            await reconcileInvite(db as Parameters<typeof reconcileInvite>[0], session.userId);
           },
         },
       },

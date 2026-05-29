@@ -43,5 +43,8 @@ const CLIP_MARKER_RE = /^--- \[Clip \d+\] ---\n?/gm;
 
 /** Strip display-only clip markers out of a string before storing it. */
 export function stripClipMarkers(text: string): string {
-  return text.replace(CLIP_MARKER_RE, '').replace(/\n{3,}/g, '\n\n').trim();
+  return text
+    .replace(CLIP_MARKER_RE, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
