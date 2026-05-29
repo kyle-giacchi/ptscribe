@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { migrate, CURRENT_VERSION } from './migrations';
+import { migrate, CURRENT_VERSION, __MIGRATIONS_FOR_TEST } from './migrations';
 import { AppDataSchema, defaultAppData } from '@/schemas';
 import { UNASSIGNED_PATIENT_ID } from '@/types';
 
@@ -1003,6 +1003,35 @@ describe('full chain migration from v5', () => {
   it('produces schema-valid output from v5 data', () => {
     const result = migrate(v5Minimal());
     expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+});
+
+describe('MIGRATIONS table contiguity', () => {
+  it('covers every version in 1..CURRENT_VERSION with exactly one to===from+1 step', () => {
+    for (let v = 1; v < CURRENT_VERSION; v++) {
+      const matches = __MIGRATIONS_FOR_TEST.filter((m) => m.from === v);
+      expect(matches, `expected exactly one migration step from v${v}`).toHaveLength(1);
+      expect(matches[0].to, `step from v${v} must advance to v${v + 1}`).toBe(v + 1);
+    }
+  });
+
+  it('has no step that skips or reverses a version', () => {
+    for (const step of __MIGRATIONS_FOR_TEST) {
+      expect(step.to).toBe(step.from + 1);
+    }
+  });
+
+  it('starts at v1 and ends at CURRENT_VERSION', () => {
+    const froms = __MIGRATIONS_FOR_TEST.map((m) => m.from);
+    const tos = __MIGRATIONS_FOR_TEST.map((m) => m.to);
+    expect(Math.min(...froms)).toBe(1);
+    expect(Math.max(...tos)).toBe(CURRENT_VERSION);
+    expect(__MIGRATIONS_FOR_TEST).toHaveLength(CURRENT_VERSION - 1);
+  });
+
+  it('has no duplicate from-versions', () => {
+    const froms = __MIGRATIONS_FOR_TEST.map((m) => m.from);
+    expect(new Set(froms).size).toBe(froms.length);
   });
 });
 
