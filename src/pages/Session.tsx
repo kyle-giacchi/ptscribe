@@ -26,6 +26,7 @@ import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
+import { noteMatchesInputs } from '@/services/note/staleness';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
 import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
@@ -293,13 +294,25 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }
 
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
+  const [staleFinalizeOpen, setStaleFinalizeOpen] = useState(false);
 
-  function handleFinalizeWrapped() {
+  function runFinalize() {
     handleFinalize();
     if (isDemoMode() && patient?.id === DEMO_PATIENT_ID) {
       updatePatient(DEMO_PATIENT_ID, { status: 'discharged', updatedAt: Date.now() });
       setDemoCompleteOpen(true);
     }
+  }
+
+  function handleFinalizeWrapped() {
+    // Block finalizing a note that no longer reflects the current transcript /
+    // template / modifiers (B2 stale-tracking — CONTEXT.md §Note staleness). The
+    // clinician must Regenerate to sync, or explicitly choose to finalize as-is.
+    if (noteIsStale) {
+      setStaleFinalizeOpen(true);
+      return;
+    }
+    runFinalize();
   }
 
   // ── ?autoRecord=1 deep link auto-start ──────────────────────────────────
@@ -430,16 +443,20 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const emptyModifiers = { clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] };
   const currentModifiers = session.modifiers ?? emptyModifiers;
 
-  // True when a note exists but none of the generation inputs have changed.
-  // Regeneration is still allowed, but requires the user to explain what to improve.
-  // The JSON.stringify comparison is gated behind the cheap string/equality checks
-  // (short-circuit &&) so it only runs when the transcript + template already match
-  // and a note exists — not on every unrelated render of this hot component (F2).
-  const inputsUnchanged =
-    !!note &&
-    effectiveTranscript === (note.generatedFromTranscript ?? '') &&
-    (session.templateId ?? '') === (note.templateId ?? '') &&
-    JSON.stringify(currentModifiers) === JSON.stringify(note.modifiers ?? emptyModifiers);
+  // Compare the live generation inputs against the snapshot the note was generated
+  // from (services/note/staleness). `inputsUnchanged` drives the Regenerate soft-gate
+  // (regenerating an unchanged note is a no-op, so it requires feedback). `noteIsStale`
+  // is the inverse for an existing note — it drives the stale banner and the Finalize
+  // gate (the note no longer reflects the current transcript/template/modifiers).
+  // noteMatchesInputs short-circuits the modifier comparison behind the cheap
+  // string/equality checks, so the JSON work only runs when the rest already matches.
+  const noteInputs = {
+    transcript: effectiveTranscript,
+    templateId: session.templateId,
+    modifiers: currentModifiers,
+  };
+  const inputsUnchanged = noteMatchesInputs(note, noteInputs);
+  const noteIsStale = !!note && !inputsUnchanged;
 
   function handleModifiersChange(next: import('@/types').SessionModifiers) {
     patchSession({ modifiers: next });
@@ -680,6 +697,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   patient={patient}
                   note={note}
                   template={template}
+                  isStale={noteIsStale}
                   onSectionChange={handleSectionChange}
                 />
                 {generationRetryStatus ? (
@@ -813,6 +831,45 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
       {/* ── Demo complete modal ──────────────────────────── */}
       <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
+
+      {/* ── Stale-note finalize confirmation (B2 stale-tracking) ── */}
+      <Modal
+        open={staleFinalizeOpen}
+        onClose={() => setStaleFinalizeOpen(false)}
+        title="Finalize an out-of-date note?"
+        size="sm"
+      >
+        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+          This note was generated from an earlier version of the transcript, template, or
+          modifiers. Finalizing now records a note that doesn't match the current transcript —
+          regenerate to sync them, or finalize as-is if the note is already what you want.
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button type="button" className="btn btn-ghost" onClick={() => setStaleFinalizeOpen(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setStaleFinalizeOpen(false);
+              handleGenerate('replace');
+            }}
+          >
+            Regenerate
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setStaleFinalizeOpen(false);
+              runFinalize();
+            }}
+          >
+            Finalize anyway
+          </button>
+        </div>
+      </Modal>
 
       {/* ── PII scrub modal ──────────────────────────────── */}
       <PIIScrubModal
