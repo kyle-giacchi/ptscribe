@@ -2,7 +2,7 @@
 
 The clinical domain (entities a PT cares about) plus the state transitions and data changes for every major user journey in PTScribe. Read when adding a new flow, debugging unexpected state, or understanding what owns a particular side-effect.
 
-For canonical names of the phases (Capture / Curate / Generate / Finalize) and clinician-facing concepts (curated transcript, locked transcript, Improve with AI, Modifiers, audio retention), see [CONTEXT.md](../CONTEXT.md). This file documents the *implementation* of that vocabulary.
+For canonical names of the phases (Capture / Curate / Generate / Finalize) and clinician-facing concepts (curated transcript, note staleness, Improve with AI, Modifiers, audio retention), see [CONTEXT.md](../CONTEXT.md). This file documents the *implementation* of that vocabulary.
 
 Each workflow section names the hook(s) that own the relevant handlers.
 
@@ -461,7 +461,7 @@ The background T2 Whisper pass bypasses the guard — `useBackgroundTranscriptio
 
 ## Audio retention
 
-Two-stage automatic retention model defined in [CONTEXT.md §Audio retention](../CONTEXT.md#audio-retention) — pre-Finalize keeps everything; at-Finalize drops per-clip audio + WAL chunks (keeps silenced+combined blob); +14 days drops the combined blob (keeps transcript + Note). After full purge, Improve with AI is no longer available for the session; the Note and locked transcript remain intact.
+Two-stage automatic retention model defined in [CONTEXT.md §Audio retention](../CONTEXT.md#audio-retention) — pre-Finalize keeps everything; at-Finalize drops per-clip audio + WAL chunks (keeps silenced+combined blob); +14 days drops the combined blob (keeps transcript + Note). After full purge, Improve with AI is no longer available for the session; the Note and transcript remain intact.
 
 Today the silenced+combined Blob is computed for playback only and is not persisted. The Finalize prune step requires it to become persistent — a small storage change still to be made.
 

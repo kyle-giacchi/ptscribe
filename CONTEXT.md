@@ -27,7 +27,7 @@ Three named ways to start a session, presented as primary choices at session cre
 2. **Audio Upload** — provide an existing audio file; no live preview, T2 transcription runs on the uploaded blob.
 3. **Skip / Manually type** — no audio at all; clinician types or pastes the transcript directly and proceeds to Curate.
 
-All three converge on the same state machine after Capture (Curate → Generate → Finalize) with the same Lock-at-Generate semantics. The differences are only in *how the transcript gets into the system*.
+All three converge on the same state machine after Capture (Curate → Generate → Finalize) with the same [note-staleness](#note-staleness) semantics after Generate. The differences are only in *how the transcript gets into the system*.
 
 ## Capture phase
 
@@ -66,7 +66,7 @@ The bound is strict because the curated transcript is the contract: the AI is on
 A session carries two independent fields:
 
 - **Visit type** (`'evaluation' | 'follow_up' | 'progress' | 'discharge'`) — clinical/billing metadata describing the *kind of encounter*. Used for filtering and reporting. Editable at any time including post-Finalize; not locked at Generate. Sent to the AI as one signal.
-- **Template** — the structure + prompt that shapes the Note output. Sent to the AI as a separate signal. Locked at Generate (see [Template selection](#template-selection)).
+- **Template** — the structure + prompt that shapes the Note output. Sent to the AI as a separate signal. Switchable until Finalize; changing it after Generate flags the Note [stale](#note-staleness) (see [Template selection](#template-selection)).
 
 The two are deliberately decoupled so a custom template ("Cash-pay shoulder eval") can be used with any visit type, and filtering by visit type works independently of template choice.
 
@@ -81,27 +81,26 @@ Two user-level settings live under Settings → Defaults:
 
 ## Template selection
 
-> **Status: intended — not yet implemented.** The locked-transcript / template-lock-at-Generate / unlock-destroys-Note contract below describes the *designed* integrity model. As of this writing the session machine has no `locked` state and there is no transcript- or template-lock enforcement in code (consistent with the CLAUDE.md Quick-lookup caveat). Enforcement is a sized follow-up; this section documents the target, not current behavior.
+A session is stamped with a `templateId` at creation based on visit type and the user's default-template settings (see above). The template is **freely switchable at any point before Finalize** — pre-Capture, during Curate, and after Generate. Switching the template while a Note has content shows a confirm ("will clear the text you've written"), because the Note's section blocks are keyed to the *current* template's sections; the clinician then Regenerates against the new template.
 
-A session is stamped with a `templateId` at creation based on visit type and the user's default-template settings (see above). Template is **freely switchable until the first Generate** — pre-Capture and during Curate. Once Generate fires, the template is locked alongside the transcript: changing it requires Unlock (which destroys the Note draft) followed by a new template choice and Regenerate.
+Rationale: the template is part of the [Generation input](#generation-input) bound — its section keys, prompt hints, and systemPrompt all shape what the AI was asked to produce. The audit guarantee — a Note generated against template X never silently claims to be a Note for template Y — is preserved **structurally** rather than by a lock: each Note records its own `templateId` snapshot (alongside the transcript and modifiers it was generated from). If the session's live template later differs from that snapshot, the Note is [stale](#note-staleness) and Finalize is gated.
 
-Rationale: the template is part of the [Generation input](#generation-input) bound — its section keys, prompt hints, and systemPrompt all shape what the AI was asked to produce. A Note generated against template X cannot claim to be a Note for template Y; changing the template after Generate would corrupt the audit trail.
+Post-Finalize template switching is disabled. The Note is the legal artifact and its template is part of its identity. The path is Re-open (unfinalize) → switch template → Regenerate.
 
-Post-Finalize template switching is disabled. The Note is the legal artifact and its template is part of its identity. The path is Re-open → Unlock → switch template → Regenerate.
+## Note staleness
 
-## Locked transcript
+There is **no locked-transcript state**. After Generate, the transcript stays fully editable — edits, Improve with AI, and Scrub PII all remain available. The integrity guarantee instead rides on an **immutable snapshot stored on the Note**: at generation time the Note records the exact `generatedFromTranscript`, `templateId`, and `modifiers` that produced it. That snapshot is what grounds the Note for audit, and it is never mutated by later transcript edits.
 
-The state of the transcript after the clinician hits Generate. Once the transcript is locked:
+A Note is **stale** when a generation input — transcript text, template, or modifiers — has since diverged from that snapshot (`isNoteStale` in `services/note/staleness.ts`, the inverse of the Regenerate soft-gate's `noteMatchesInputs`). While a Note is stale:
 
-- The transcript is read-only — no edits, no Improve with AI, no Scrub PII.
-- The Note draft is the only editable artifact.
-- The locked transcript text is the same text the AI received, preserved verbatim so the clinician (or a reviewer) can see exactly what grounded the Note.
+- A caution banner appears on the Note editor: *"Generated from an earlier version of the transcript — regenerate to sync, or finalize as-is."*
+- **Finalize is gated.** Attempting to finalize a stale Note opens a confirm with three choices: **Cancel**, **Regenerate** (re-run the AI on the current inputs so the Note matches), or **Finalize anyway** (an explicit acknowledgment that the recorded Note is what the clinician wants, even though the live transcript has since changed).
 
-To return to Curate, the clinician must explicitly **Unlock transcript**. Unlocking discards the current Note draft and reopens the transcript for editing, populated with the **last curated text** — verbatim what was sent to the AI. Unlock is a non-destructive reversal of Generate: the clinician resumes editing from where they left off, not from the original machine transcript. ("Revert to original" remains a separate named action inside Curate for clinicians who want to throw out their edits.) Unlocking is a deliberate barrier — it ensures the clinician treats "go back and recurate" as a costly decision (because the Note draft is destroyed), not an accidental click.
+This is the deliberate design choice (see the PRODUCT principle "when a decision trades clinician control for system rigor, default to clinician control"): rather than freezing the transcript and destroying the Note on an "unlock," the clinician keeps both their transcript edits and their Note edits, and the only hard barrier is the explicit acknowledgment at Finalize.
 
 ## Finalize
 
-The clinician's commitment that the Note represents their clinical reasoning. Finalize is always available — the system does not block it on any structural check. If required sections (per the template) are empty, a soft confirmation dialog lists them ("Finalize anyway?") before proceeding. On confirm: the Note is marked finalized with a timestamp, the Note editor becomes read-only, and the transcript stays locked. **Re-open** is freely available; flipping the Note back to editable carries no system penalty. Post-finalize edits are tracked (first-edit timestamp + edit count) and surfaced in the Note metadata as the clinician's own audit trail — informational, not enforced.
+The clinician's commitment that the Note represents their clinical reasoning. Finalize is always available — the system does not block it on any structural check. If required sections (per the template) are empty, a soft confirmation dialog lists them ("Finalize anyway?") before proceeding. On confirm: the Note is marked finalized with a timestamp and the Note editor becomes read-only. **Re-open** is freely available; flipping the Note back to editable carries no system penalty. Post-finalize edits are tracked (first-edit timestamp + edit count) and surfaced in the Note metadata as the clinician's own audit trail — informational, not enforced.
 
 ## Clips
 
@@ -127,7 +126,7 @@ While in Curate (transcript unlocked), the clinician can hit **Add recording** t
 
 Append-only ("just add the new clip's text to the end") is explicitly rejected: silence-removal and chunking operate on the whole combined blob, so re-running T2 on the union is the only way to produce coherent text.
 
-Add recording is **disabled once Generate has fired** (transcript locked). To capture more audio post-Generate the clinician must Unlock first, which already destroys the Note draft — they are explicitly rewinding the workflow.
+Add recording remains available after Generate. Because it re-runs T2 and **replaces** the transcript, the existing "your edits will be replaced" warning applies, and the replaced transcript makes the existing Note [stale](#note-staleness) — surfaced by the stale banner and the Finalize gate. The clinician is not blocked from capturing more audio; they are simply prompted to Regenerate (or finalize as-is) afterward.
 
 ## Audio Upload
 
@@ -151,7 +150,7 @@ Two-stage automatic retention model:
 | At Finalize | Note is finalized | Silenced+combined audio Blob only | Per-clip audio + WAL chunks |
 | Finalize + 14 days | Background sweep | Transcript text + Note only | Silenced+combined audio Blob (full audio purge) |
 
-After full purge, the Note and its locked transcript remain intact; Improve with AI is no longer available for the session. The clinician's existing right to delete a session entirely (which deletes everything including transcript and Note) is unchanged.
+After full purge, the Note and its transcript remain intact; Improve with AI is no longer available for the session. The clinician's existing right to delete a session entirely (which deletes everything including transcript and Note) is unchanged.
 
 **Implementation status (current):** The sweep (`purgeFinalizedAudio`, run at boot when `Settings.retention.autoDeleteAudioAfterDays` is enabled) is **finalize-gated** — it only ever removes audio for sessions whose `status === 'finalized'`, anchored on the persisted `Session.finalizedAt`. Active/draft sessions keep all clip audio regardless of age, so Improve-with-AI and Revert always work mid-visit. The implemented policy is the simplest faithful form: a finalized session's per-clip audio is dropped on the next sweep (the day-count acts as an on/off switch, not a delay), and the silenced+combined Blob is **not** persisted — the "keep combined blob for the window / drop at +14 days" rows above are the *designed* target, not yet built. (The earlier blunt age-sweep keyed off `clip.createdAt` and could delete audio for an active, pre-Finalize session — that bug is fixed.)
 
@@ -159,19 +158,19 @@ After full purge, the Note and its locked transcript remain intact; Improve with
 
 The Note draft is presented as **section blocks** — one editable text block per template section, labeled by the template's section label. Required sections carry a small "Required" tag (informational only). During Generate (or Regenerate), the entire Note draft is produced atomically: the AI returns the full formatted response in one shot, the sections populate together, no progressive streaming reveal. The clinician edits each section freely after the draft lands.
 
-The locked transcript is visible adjacent to the Note (panel or collapsible reference) so the clinician can scan it without context-switching while editing.
+The transcript is visible adjacent to the Note (panel or collapsible reference) so the clinician can scan it without context-switching while editing. It stays editable — see [Note staleness](#note-staleness); editing it after Generate flags the Note stale rather than being blocked.
 
-Top-level actions while editing: **Regenerate** (with Modifier chips), **Unlock transcript**, **Finalize**. No per-section regenerate — Regenerate is always Note-level (entire draft replaced).
+Top-level actions while editing: **Regenerate** (with Modifier chips), **Finalize**. No per-section regenerate — Regenerate is always Note-level (entire draft replaced). When the Note is stale, the editor shows the stale banner and Finalize routes through the stale-confirm.
 
 ## Regeneration
 
-Re-running the AI on the same locked transcript to produce a new Note draft. The transcript stays locked; the existing Note draft is replaced (with a "your edits will be lost" confirmation).
+Re-running the AI on the current transcript to produce a new Note draft, replacing the existing one (with a "your edits will be lost" confirmation). Regenerating also re-stamps the Note's input snapshot, clearing any stale state.
 
 ### Soft-gate
 
 The Regenerate button is **disabled** after a Note exists if neither the transcript nor the active Modifiers have changed since the last generation — re-running would produce an identical result. The button shows a tooltip: *"No changes to transcript or modifiers since last generation."*
 
-Regenerate becomes enabled again the moment either input changes: the clinician edits the transcript (unlock → edit → relock) or adjusts any Modifier chip or Custom instruction.
+Regenerate becomes enabled again the moment either input changes: the clinician edits the transcript or adjusts any Modifier chip or Custom instruction. (The same input-change signal is what marks the Note [stale](#note-staleness).)
 
 ## Modifier
 
@@ -183,7 +182,7 @@ Form: two chip categories plus one free-text slot:
 - **Emphasis** (multi-select, all off by default): More detail · Focus on functional outcomes · Highlight patient progress.
 - **Custom instruction** (optional, length-capped free text, one slot).
 
-Active modifiers are appended to the system prompt by the Worker at generation time. They are persisted with the resulting Note draft for audit (each Note records the exact modifiers that produced it, alongside the transcript snapshot). Modifiers persist on the Session until the clinician clears them or a new session starts — they are **not** reset by Unlock.
+Active modifiers are appended to the system prompt by the Worker at generation time. They are persisted with the resulting Note draft for audit (each Note records the exact modifiers that produced it, alongside the transcript snapshot). Modifiers persist on the Session until the clinician clears them or a new session starts — they are **not** reset by Regenerate.
 
 ## Improve with AI
 
@@ -191,7 +190,7 @@ The single AI-assist action available during Curate. It re-transcribes the origi
 
 ### Cloud-transcription cap
 
-Each session gets **one** Nova run, total. The counter is per-Session, persisted with the entity, and is **not** reset by Revert to original, Unlock, page reload, or any other client action. The same counter is consumed by:
+Each session gets **one** Nova run, total. The counter is per-Session, persisted with the entity, and is **not** reset by Revert to original, page reload, or any other client action. The same counter is consumed by:
 - An explicit "Improve with AI" click in Curate, and
 - Choosing "Re-transcribe with cloud AI" from the T2-failure dialog at the end of Capture.
 
@@ -250,7 +249,7 @@ If `session.status === 'generating'` but no AI response landed, on return the cl
 > *"Note generation was interrupted. Retry?"*
 > Buttons: **Retry** · **Cancel**
 
-Generate is **not** silently re-fired — provider charges are per request initiated and the clinician must make the choice. On Cancel the session returns to its pre-Generate state (transcript still locked, no Note draft).
+Generate is **not** silently re-fired — provider charges are per request initiated and the clinician must make the choice. On Cancel the session returns to its pre-Generate state (no Note draft; the transcript is unchanged and still editable).
 
 ### Post-Finalize return
 
