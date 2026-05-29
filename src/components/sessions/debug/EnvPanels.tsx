@@ -68,7 +68,12 @@ export function StoragePanel() {
             quota = { usage: est.usage, quota: est.quota };
           }
         }
-        setInfo({ lsItems, idbClipCount: idbKeys.length, idbChunkSessions: chunkIds.length, quota });
+        setInfo({
+          lsItems,
+          idbClipCount: idbKeys.length,
+          idbChunkSessions: chunkIds.length,
+          quota,
+        });
       } catch {
         /* diagnostic panel — show stale data on error */
       } finally {
@@ -149,7 +154,10 @@ export function StoragePanel() {
       )}
 
       {!info ? (
-        <div className="flex items-center gap-2" style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+        <div
+          className="flex items-center gap-2"
+          style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
+        >
           <Loader2 size={12} className="animate-spin" />
           Loading…
         </div>
@@ -187,9 +195,16 @@ export function FeaturesPanel() {
   const hasPersist = Boolean(navigator.storage?.persist);
 
   const allFeatures = [
-    hasWebSpeech, hasSAB, hasWorker,
-    hasMediaRecorder, webmOpus, oggOpus,
-    hasAudioContext, hasIDB, hasSW, hasPersist,
+    hasWebSpeech,
+    hasSAB,
+    hasWorker,
+    hasMediaRecorder,
+    webmOpus,
+    oggOpus,
+    hasAudioContext,
+    hasIDB,
+    hasSW,
+    hasPersist,
   ];
   const passCount = allFeatures.filter(Boolean).length;
   const total = allFeatures.length;

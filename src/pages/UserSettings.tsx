@@ -387,7 +387,9 @@ export function UserSettings() {
             <div>
               <SectionHeading>Notes &amp; Templates Settings</SectionHeading>
               <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>Confirm before sending to Anthropic</p>
+                <p style={{ ...LABEL_STYLE, marginBottom: 2 }}>
+                  Confirm before sending to Anthropic
+                </p>
                 <p style={DESC_STYLE}>
                   Generating a clinical note sends your transcript off of your device to Anthropic.
                   When on, a confirmation prompt warns you each time so you can verify there is no

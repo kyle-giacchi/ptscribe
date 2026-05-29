@@ -19,8 +19,7 @@ const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 // US phone: 10 digits with separators, optional +1 / leading 1, optional
 // parenthesised area code. Requires separators or parens so bare numeric
 // strings (rep counts, measurements) don't match.
-const PHONE =
-  /(?:\+?1[\s.-]?)?(?:\(\d{3}\)[\s.-]?|\d{3}[\s.-])\d{3}[\s.-]\d{4}\b/g;
+const PHONE = /(?:\+?1[\s.-]?)?(?:\(\d{3}\)[\s.-]?|\d{3}[\s.-])\d{3}[\s.-]\d{4}\b/g;
 
 // SSN: ###-##-#### (dashed form only — dashless collides with other IDs).
 const SSN = /\b\d{3}-\d{2}-\d{4}\b/g;

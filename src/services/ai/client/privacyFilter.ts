@@ -35,7 +35,9 @@ let _idCounter = 0;
 const _pending = new Map<number, PendingEntry>();
 let _modelLoaded = false;
 
-export function isPIIModelLoaded(): boolean { return _modelLoaded; }
+export function isPIIModelLoaded(): boolean {
+  return _modelLoaded;
+}
 
 function wireWorker(w: Worker): Worker {
   w.onmessage = (e: MessageEvent<OutMsg>) => {

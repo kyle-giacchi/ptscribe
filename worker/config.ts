@@ -103,7 +103,8 @@ async function putUserConfig(
 
   const raw = await request.text();
   const parsed = parseConfigBlob<UserConfigBody>(raw, MAX_CONFIG_BYTES);
-  if (!parsed.ok) return cfgError(parsed.code, parsed.message, parsed.code === 'TOO_LARGE' ? 413 : 400);
+  if (!parsed.ok)
+    return cfgError(parsed.code, parsed.message, parsed.code === 'TOO_LARGE' ? 413 : 400);
 
   const updatedAt = Number(parsed.value.updatedAt);
   if (!Number.isFinite(updatedAt)) {
@@ -177,7 +178,8 @@ async function putOrgConfig(
 
   const raw = await request.text();
   const parsed = parseConfigBlob<OrgConfigBody>(raw, MAX_CONFIG_BYTES);
-  if (!parsed.ok) return cfgError(parsed.code, parsed.message, parsed.code === 'TOO_LARGE' ? 413 : 400);
+  if (!parsed.ok)
+    return cfgError(parsed.code, parsed.message, parsed.code === 'TOO_LARGE' ? 413 : 400);
 
   const updatedAt = Number(parsed.value.updatedAt);
   if (!Number.isFinite(updatedAt)) {
@@ -201,9 +203,7 @@ async function putOrgConfig(
   await db
     .insertInto('org_config')
     .values({ orgId: caller.orgId, policy, templates, exercises, updatedAt })
-    .onConflict((oc) =>
-      oc.column('orgId').doUpdateSet({ policy, templates, exercises, updatedAt }),
-    )
+    .onConflict((oc) => oc.column('orgId').doUpdateSet({ policy, templates, exercises, updatedAt }))
     .execute();
 
   return cfgJson({ ok: true, updatedAt });

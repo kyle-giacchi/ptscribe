@@ -10,7 +10,12 @@ import type { SessionClip } from '@/types';
 import { StatusBanner } from './recording/StatusBanner';
 import { IdleRecordingCard } from './recording/IdleRecordingCard';
 import { ActiveRecordingCard } from './recording/ActiveRecordingCard';
-import { RecordingSizeHint, RecordingNotices, LiveTranscriptPreview, RecordingElapsedMinutes } from './recording/RecordingNotices';
+import {
+  RecordingSizeHint,
+  RecordingNotices,
+  LiveTranscriptPreview,
+  RecordingElapsedMinutes,
+} from './recording/RecordingNotices';
 import { playAlertChime } from './recording/playAlertChime';
 
 export interface RecordingPanelProps {
@@ -104,7 +109,16 @@ export function RecordingPanel({
   }, [recorder.status]);
 
   if (idle && !wasAutoStopped) {
-    return <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} capabilities={capabilities} />;
+    return (
+      <IdleRecordingCard
+        onStart={onStart}
+        onUpload={onUpload}
+        onSkip={onSkip}
+        uploadStatus={uploadStatus}
+        isAddingClip={clips.length > 0}
+        capabilities={capabilities}
+      />
+    );
   }
 
   return (
@@ -125,7 +139,8 @@ export function RecordingPanel({
           color="negative"
           onDismiss={() => setSilenceWarnDismissed(true)}
         >
-          No audio detected for 30 seconds — microphone may be muted or disconnected. Check your mic and try speaking.
+          No audio detected for 30 seconds — microphone may be muted or disconnected. Check your mic
+          and try speaking.
         </StatusBanner>
       )}
 
@@ -167,7 +182,14 @@ export function RecordingPanel({
           onStopAndFinish={onStopAndFinish}
         />
       ) : (
-        <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} capabilities={capabilities} />
+        <IdleRecordingCard
+          onStart={onStart}
+          onUpload={onUpload}
+          onSkip={onSkip}
+          uploadStatus={uploadStatus}
+          isAddingClip={clips.length > 0}
+          capabilities={capabilities}
+        />
       )}
 
       {recording && (

@@ -6,7 +6,9 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist', 'playwright-report', 'test-results', 'coverage', 'node_modules', '.wrangler'] },
+  {
+    ignores: ['dist', 'playwright-report', 'test-results', 'coverage', 'node_modules', '.wrangler'],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

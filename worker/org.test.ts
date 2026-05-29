@@ -95,9 +95,13 @@ function evalWhere(whereTokens: string[], row: Row, paramIter: Iterator<unknown>
   let i = 0;
   while (i < whereTokens.length) {
     // Skip AND conjunctions
-    if (whereTokens[i].toLowerCase() === 'and') { i++; continue; }
+    if (whereTokens[i].toLowerCase() === 'and') {
+      i++;
+      continue;
+    }
 
-    const col = unquote(whereTokens[i]); i++;
+    const col = unquote(whereTokens[i]);
+    i++;
     if (i >= whereTokens.length) break;
 
     // Detect IS NULL / IS NOT NULL (next token is 'is')
@@ -116,10 +120,12 @@ function evalWhere(whereTokens: string[], row: Row, paramIter: Iterator<unknown>
       continue;
     }
 
-    const op = whereTokens[i]; i++;
+    const op = whereTokens[i];
+    i++;
     // Skip the ? placeholder token
     if (whereTokens[i] === '?') i++;
-    if (!evalCond(col, op, row, { next: () => ({ value: paramIter.next().value, done: false }) })) return false;
+    if (!evalCond(col, op, row, { next: () => ({ value: paramIter.next().value, done: false }) }))
+      return false;
   }
   return true;
 }
@@ -174,7 +180,8 @@ function makeD1Fake(): { db: D1Database; store: Store } {
       // collect columns until FROM
       const cols: string[] = [];
       while (ti < tokens.length && tokens[ti].toLowerCase() !== 'from') {
-        cols.push(unquote(tokens[ti])); ti++;
+        cols.push(unquote(tokens[ti]));
+        ti++;
       }
       ti++; // 'from'
       const tableName = unquote(nextTok());
@@ -185,13 +192,15 @@ function makeD1Fake(): { db: D1Database; store: Store } {
         ti++; // 'where'
         const whereTokens = tokens.slice(ti);
         const paramIter = params[Symbol.iterator]() as Iterator<unknown>;
-        filtered = rows.filter(row => evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>));
+        filtered = rows.filter((row) =>
+          evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>),
+        );
         void paramIter; // satisfy linter
       }
 
       // Project columns (if '*' included, return all)
       const hasAll = cols.includes('*');
-      const results: Row[] = filtered.map(row => {
+      const results: Row[] = filtered.map((row) => {
         if (hasAll) return { ...row };
         const out: Row = {};
         for (const c of cols) out[c] = row[c];
@@ -212,8 +221,13 @@ function makeD1Fake(): { db: D1Database; store: Store } {
       // tokens at this point: "col1", "col2", ... (already tokenised without parens)
       // but parentheses ARE stripped by tokenise regex — just collect until VALUES
       const colNames: string[] = [];
-      while (ti < tokens.length && tokens[ti].toLowerCase() !== 'values' && tokens[ti].toLowerCase() !== 'on') {
-        colNames.push(unquote(tokens[ti])); ti++;
+      while (
+        ti < tokens.length &&
+        tokens[ti].toLowerCase() !== 'values' &&
+        tokens[ti].toLowerCase() !== 'on'
+      ) {
+        colNames.push(unquote(tokens[ti]));
+        ti++;
       }
 
       let isUpsert = false;
@@ -228,13 +242,19 @@ function makeD1Fake(): { db: D1Database; store: Store } {
 
       // Check for ON CONFLICT … DO UPDATE SET
       // After values we may have: on conflict "col" do update set "c"=?, ...
-      const restLower = tokens.slice(ti).map(t => t.toLowerCase()).join(' ');
+      const restLower = tokens
+        .slice(ti)
+        .map((t) => t.toLowerCase())
+        .join(' ');
       if (restLower.includes('on conflict')) {
         isUpsert = true;
         // Find 'do update set' and collect the SET columns
         let atSet = false;
         for (let j = ti; j < tokens.length; j++) {
-          if (tokens[j].toLowerCase() === 'set') { atSet = true; continue; }
+          if (tokens[j].toLowerCase() === 'set') {
+            atSet = true;
+            continue;
+          }
           if (atSet && tokens[j] !== '?' && tokens[j].toLowerCase() !== 'and') {
             // Pattern: "col" = ?
             if (tokens[j + 1] === '=') {
@@ -262,7 +282,7 @@ function makeD1Fake(): { db: D1Database; store: Store } {
           }
         }
 
-        const existingIdx = rows.findIndex(r => r[conflictCol] === newRow[conflictCol]);
+        const existingIdx = rows.findIndex((r) => r[conflictCol] === newRow[conflictCol]);
         if (existingIdx >= 0) {
           // DO UPDATE SET: apply only the upsert cols from params
           // Params layout: VALUES params (colNames.length), then DO UPDATE SET params (upsertCols.length)
@@ -272,7 +292,10 @@ function makeD1Fake(): { db: D1Database; store: Store } {
           let inSet = false;
           let upsertParamIdx = 0;
           for (let j = ti; j < tokens.length; j++) {
-            if (tokens[j].toLowerCase() === 'set') { inSet = true; continue; }
+            if (tokens[j].toLowerCase() === 'set') {
+              inSet = true;
+              continue;
+            }
             if (inSet && j + 2 < tokens.length && tokens[j + 1] === '=' && tokens[j + 2] === '?') {
               const colName = unquote(tokens[j]);
               updated[colName] = upsertParams[upsertParamIdx++];
@@ -351,7 +374,10 @@ function makeD1Fake(): { db: D1Database; store: Store } {
         const paramIter = params[Symbol.iterator]() as Iterator<unknown>;
         void paramIter;
         const before = rows.length;
-        const kept = rows.filter(row => !evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>));
+        const kept = rows.filter(
+          (row) =>
+            !evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>),
+        );
         const changes = before - kept.length;
         store.set(tableName, kept);
         return { meta: { changes, last_row_id: 0, duration: 0 } };
@@ -385,7 +411,7 @@ function makeD1Fake(): { db: D1Database; store: Store } {
       },
       async raw(): Promise<unknown[][]> {
         const res = execSql(sql, boundParams);
-        return (res.results ?? []).map(r => Object.values(r));
+        return (res.results ?? []).map((r) => Object.values(r));
       },
     };
     return stmt;
@@ -446,61 +472,94 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 
 // Seed helpers — insert rows directly into the fake store via Kysely so the
 // fake's insert path is exercised consistently.
-function seedUser(db: ReturnType<typeof makeDb>, row: {
-  id: string; name?: string; email: string; tenantId?: string | null; role?: string;
-}) {
-  return db.insertInto('user').values({
-    id: row.id,
-    name: row.name ?? 'Test User',
-    email: row.email,
-    emailVerified: 1,
-    image: null,
-    planTier: 'personal-free',
-    tenantId: row.tenantId ?? null,
-    role: row.role ?? 'owner',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  }).execute();
+function seedUser(
+  db: ReturnType<typeof makeDb>,
+  row: {
+    id: string;
+    name?: string;
+    email: string;
+    tenantId?: string | null;
+    role?: string;
+  },
+) {
+  return db
+    .insertInto('user')
+    .values({
+      id: row.id,
+      name: row.name ?? 'Test User',
+      email: row.email,
+      emailVerified: 1,
+      image: null,
+      planTier: 'personal-free',
+      tenantId: row.tenantId ?? null,
+      role: row.role ?? 'owner',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+    .execute();
 }
 
 function seedOrg(db: ReturnType<typeof makeDb>, row: { id: string; name?: string }) {
-  return db.insertInto('organization').values({
-    id: row.id,
-    name: row.name ?? 'Test Org',
-    contactEmail: 'admin@testorg.com',
-    phone: '555-0100',
-    createdAt: Date.now(),
-  }).execute();
+  return db
+    .insertInto('organization')
+    .values({
+      id: row.id,
+      name: row.name ?? 'Test Org',
+      contactEmail: 'admin@testorg.com',
+      phone: '555-0100',
+      createdAt: Date.now(),
+    })
+    .execute();
 }
 
-function seedToken(db: ReturnType<typeof makeDb>, row: {
-  token: string; orgName?: string; expiresAt?: number; consumedAt?: number | null;
-}) {
-  return db.insertInto('org_invite_token').values({
-    token: row.token,
-    orgName: row.orgName ?? 'New Org',
-    expiresAt: row.expiresAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000,
-    consumedAt: row.consumedAt ?? null,
-  }).execute();
+function seedToken(
+  db: ReturnType<typeof makeDb>,
+  row: {
+    token: string;
+    orgName?: string;
+    expiresAt?: number;
+    consumedAt?: number | null;
+  },
+) {
+  return db
+    .insertInto('org_invite_token')
+    .values({
+      token: row.token,
+      orgName: row.orgName ?? 'New Org',
+      expiresAt: row.expiresAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000,
+      consumedAt: row.consumedAt ?? null,
+    })
+    .execute();
 }
 
-function seedInvite(db: ReturnType<typeof makeDb>, row: {
-  id: string; orgId: string; email: string; role?: string;
-  expiresAt?: number; acceptedAt?: number | null; revokedAt?: number | null;
-  invitedBy?: string;
-}) {
-  return db.insertInto('org_member_invite').values({
-    id: row.id,
-    orgId: row.orgId,
-    email: row.email,
-    role: row.role ?? 'standard',
-    token: `tok-${row.id}`,
-    invitedBy: row.invitedBy ?? 'owner-id',
-    createdAt: Date.now(),
-    expiresAt: row.expiresAt ?? Date.now() + 14 * 24 * 60 * 60 * 1000,
-    acceptedAt: row.acceptedAt ?? null,
-    revokedAt: row.revokedAt ?? null,
-  }).execute();
+function seedInvite(
+  db: ReturnType<typeof makeDb>,
+  row: {
+    id: string;
+    orgId: string;
+    email: string;
+    role?: string;
+    expiresAt?: number;
+    acceptedAt?: number | null;
+    revokedAt?: number | null;
+    invitedBy?: string;
+  },
+) {
+  return db
+    .insertInto('org_member_invite')
+    .values({
+      id: row.id,
+      orgId: row.orgId,
+      email: row.email,
+      role: row.role ?? 'standard',
+      token: `tok-${row.id}`,
+      invitedBy: row.invitedBy ?? 'owner-id',
+      createdAt: Date.now(),
+      expiresAt: row.expiresAt ?? Date.now() + 14 * 24 * 60 * 60 * 1000,
+      acceptedAt: row.acceptedAt ?? null,
+      revokedAt: row.revokedAt ?? null,
+    })
+    .execute();
 }
 
 // ── Tests: handleValidateToken ───────────────────────────────────────────────
@@ -519,21 +578,36 @@ describe('handleValidateToken', () => {
   });
 
   it('unknown token → { valid:false, consumed:false }', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/validate-token', { token: 'nope' }), env, ctx, '/api/org/validate-token');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/validate-token', { token: 'nope' }),
+      env,
+      ctx,
+      '/api/org/validate-token',
+    );
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ valid: false, consumed: false });
   });
 
   it('consumed token → { valid:false, consumed:true }', async () => {
     await seedToken(db, { token: 'tok1', consumedAt: Date.now() - 1000 });
-    const res = await handleOrgRoute(makeReq('/api/org/validate-token', { token: 'tok1' }), env, ctx, '/api/org/validate-token');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/validate-token', { token: 'tok1' }),
+      env,
+      ctx,
+      '/api/org/validate-token',
+    );
     expect(res.status).toBe(200);
     expect(await json(res)).toMatchObject({ valid: false, consumed: true });
   });
 
   it('expired token → { valid:false, consumed:false }', async () => {
     await seedToken(db, { token: 'tok-exp', expiresAt: Date.now() - 1 });
-    const res = await handleOrgRoute(makeReq('/api/org/validate-token', { token: 'tok-exp' }), env, ctx, '/api/org/validate-token');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/validate-token', { token: 'tok-exp' }),
+      env,
+      ctx,
+      '/api/org/validate-token',
+    );
     expect(res.status).toBe(200);
     expect(await json(res)).toMatchObject({ valid: false, consumed: false });
   });
@@ -541,7 +615,12 @@ describe('handleValidateToken', () => {
   it('valid token + no session → { valid:true, orgName }', async () => {
     await seedToken(db, { token: 'tok-good', orgName: 'Clinic A' });
     mockGetSession.mockResolvedValue(null);
-    const res = await handleOrgRoute(makeReq('/api/org/validate-token', { token: 'tok-good' }), env, ctx, '/api/org/validate-token');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/validate-token', { token: 'tok-good' }),
+      env,
+      ctx,
+      '/api/org/validate-token',
+    );
     expect(res.status).toBe(200);
     expect(await json(res)).toMatchObject({ valid: true, orgName: 'Clinic A' });
   });
@@ -551,7 +630,12 @@ describe('handleValidateToken', () => {
     await seedOrg(db, { id: 'org1' });
     await seedUser(db, { id: 'u1', email: 'u@test.com', tenantId: 'org1', role: 'owner' });
     mockGetSession.mockResolvedValue({ user: { id: 'u1' } });
-    const res = await handleOrgRoute(makeReq('/api/org/validate-token', { token: 'tok-good2' }), env, ctx, '/api/org/validate-token');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/validate-token', { token: 'tok-good2' }),
+      env,
+      ctx,
+      '/api/org/validate-token',
+    );
     expect(res.status).toBe(200);
     expect(await json(res)).toMatchObject({ valid: true, alreadyInOrg: true });
   });
@@ -559,15 +643,29 @@ describe('handleValidateToken', () => {
   it('valid token + session whose tenantId points to deleted org → auto-repairs and returns valid:true without alreadyInOrg', async () => {
     await seedToken(db, { token: 'tok-repair' });
     // User has an orphaned tenantId (org doesn't exist in DB)
-    await seedUser(db, { id: 'u2', email: 'u2@test.com', tenantId: 'deleted-org-id', role: 'owner' });
+    await seedUser(db, {
+      id: 'u2',
+      email: 'u2@test.com',
+      tenantId: 'deleted-org-id',
+      role: 'owner',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'u2' } });
-    const res = await handleOrgRoute(makeReq('/api/org/validate-token', { token: 'tok-repair' }), env, ctx, '/api/org/validate-token');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/validate-token', { token: 'tok-repair' }),
+      env,
+      ctx,
+      '/api/org/validate-token',
+    );
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.valid).toBe(true);
     expect(body.alreadyInOrg).toBeUndefined();
     // Verify tenantId was cleared
-    const updated = await db.selectFrom('user').select(['tenantId']).where('id', '=', 'u2').executeTakeFirst();
+    const updated = await db
+      .selectFrom('user')
+      .select(['tenantId'])
+      .where('id', '=', 'u2')
+      .executeTakeFirst();
     expect(updated?.tenantId).toBeNull();
   });
 });
@@ -597,19 +695,34 @@ describe('handleCreateOrg', () => {
 
   it('unauthenticated → 401 UNAUTHORIZED', async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await handleOrgRoute(makeReq('/api/org/create', validBody), env, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', validBody),
+      env,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(401);
     expect((await json(res)).code).toBe('UNAUTHORIZED');
   });
 
   it('missing fields → 400 MISSING_FIELDS', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/create', { token: 'tok-create', org: { name: 'X' } }), env, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', { token: 'tok-create', org: { name: 'X' } }),
+      env,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('MISSING_FIELDS');
   });
 
   it('unknown token → 400 INVALID_TOKEN', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/create', { ...validBody, token: 'bad' }), env, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', { ...validBody, token: 'bad' }),
+      env,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('INVALID_TOKEN');
   });
@@ -625,24 +738,42 @@ describe('handleCreateOrg', () => {
   it('user already in org → 409 ALREADY_IN_ORG', async () => {
     await seedOrg(db, { id: 'existing-org' });
     await db.updateTable('user').set({ tenantId: 'existing-org' }).where('id', '=', 'u1').execute();
-    const res = await handleOrgRoute(makeReq('/api/org/create', validBody), env, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', validBody),
+      env,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(409);
     expect((await json(res)).code).toBe('ALREADY_IN_ORG');
   });
 
   it('happy path → 200 { ok:true, orgId }; token consumed; user is owner', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/create', validBody), env, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', validBody),
+      env,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.ok).toBe(true);
     expect(typeof body.orgId).toBe('string');
 
     // Token must be consumed
-    const tok = await db.selectFrom('org_invite_token').select(['consumedAt']).where('token', '=', 'tok-create').executeTakeFirst();
+    const tok = await db
+      .selectFrom('org_invite_token')
+      .select(['consumedAt'])
+      .where('token', '=', 'tok-create')
+      .executeTakeFirst();
     expect(tok?.consumedAt).not.toBeNull();
 
     // User must be owner of the new org
-    const user = await db.selectFrom('user').select(['tenantId', 'role']).where('id', '=', 'u1').executeTakeFirst();
+    const user = await db
+      .selectFrom('user')
+      .select(['tenantId', 'role'])
+      .where('id', '=', 'u1')
+      .executeTakeFirst();
     expect(user?.tenantId).toBe(body.orgId as string);
     expect(user?.role).toBe('owner');
   });
@@ -652,7 +783,12 @@ describe('handleCreateOrg', () => {
       ...validBody,
       invites: [{ email: 'alice@clinic.com', role: 'admin' }],
     };
-    const res = await handleOrgRoute(makeReq('/api/org/create', bodyWithInvites), env, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', bodyWithInvites),
+      env,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(200);
     // Invite row persisted
     const invites = await db.selectFrom('org_member_invite').select(['email', 'role']).execute();
@@ -660,7 +796,12 @@ describe('handleCreateOrg', () => {
     expect(invites[0].email).toBe('alice@clinic.com');
     expect(invites[0].role).toBe('admin');
     // Email queued
-    expect(mockSendOrgInviteEmail).toHaveBeenCalledWith(env, 'alice@clinic.com', 'Test Clinic', 'admin');
+    expect(mockSendOrgInviteEmail).toHaveBeenCalledWith(
+      env,
+      'alice@clinic.com',
+      'Test Clinic',
+      'admin',
+    );
   });
 
   it('conditional-update rollback: numUpdatedRows=0 → org deleted, 409 ALREADY_IN_ORG', async () => {
@@ -699,9 +840,11 @@ describe('handleCreateOrg', () => {
     // The conditional update on the user row (WHERE tenantId IS NULL) is the
     // TOCTOU guard. We simulate a concurrent race by making .all() return
     // { meta: { changes: 0 } } exactly once for that statement.
-    const origPrepare = (d1b as unknown as { prepare: (sql: string) => D1Statement }).prepare.bind(d1b);
+    const origPrepare = (d1b as unknown as { prepare: (sql: string) => D1Statement }).prepare.bind(
+      d1b,
+    );
     let patchUsed = false;
-    (d1b as unknown as { prepare: (sql: string) => D1Statement }).prepare = function(sql: string) {
+    (d1b as unknown as { prepare: (sql: string) => D1Statement }).prepare = function (sql: string) {
       const stmt = origPrepare(sql);
       // Match: update "user" set ... where ... "tenantId" is null
       if (!patchUsed && sql.includes('update "user"') && sql.includes('is null')) {
@@ -736,7 +879,12 @@ describe('handleCreateOrg', () => {
     };
 
     mockGetSession.mockResolvedValue({ user: { id: 'u1' } });
-    const res = await handleOrgRoute(makeReq('/api/org/create', bodyTOCTOU), envB, ctx, '/api/org/create');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/create', bodyTOCTOU),
+      envB,
+      ctx,
+      '/api/org/create',
+    );
     expect(res.status).toBe(409);
     expect((await json(res)).code).toBe('ALREADY_IN_ORG');
 
@@ -787,7 +935,12 @@ describe('reconcileInvite', () => {
   it('invite is accepted → { joined:false }', async () => {
     await seedOrg(db, { id: 'org1' });
     await seedUser(db, { id: 'u1', email: 'u@test.com', tenantId: null });
-    await seedInvite(db, { id: 'inv1', orgId: 'org1', email: 'u@test.com', acceptedAt: Date.now() - 1000 });
+    await seedInvite(db, {
+      id: 'inv1',
+      orgId: 'org1',
+      email: 'u@test.com',
+      acceptedAt: Date.now() - 1000,
+    });
     const res = await reconcileInvite(db, 'u1');
     expect(res).toEqual({ joined: false });
   });
@@ -795,7 +948,12 @@ describe('reconcileInvite', () => {
   it('invite is revoked → { joined:false }', async () => {
     await seedOrg(db, { id: 'org1' });
     await seedUser(db, { id: 'u1', email: 'u@test.com', tenantId: null });
-    await seedInvite(db, { id: 'inv1', orgId: 'org1', email: 'u@test.com', revokedAt: Date.now() - 1000 });
+    await seedInvite(db, {
+      id: 'inv1',
+      orgId: 'org1',
+      email: 'u@test.com',
+      revokedAt: Date.now() - 1000,
+    });
     const res = await reconcileInvite(db, 'u1');
     expect(res).toEqual({ joined: false });
   });
@@ -803,7 +961,12 @@ describe('reconcileInvite', () => {
   it('invite is expired → { joined:false }', async () => {
     await seedOrg(db, { id: 'org1' });
     await seedUser(db, { id: 'u1', email: 'u@test.com', tenantId: null });
-    await seedInvite(db, { id: 'inv1', orgId: 'org1', email: 'u@test.com', expiresAt: Date.now() - 1 });
+    await seedInvite(db, {
+      id: 'inv1',
+      orgId: 'org1',
+      email: 'u@test.com',
+      expiresAt: Date.now() - 1,
+    });
     const res = await reconcileInvite(db, 'u1');
     expect(res).toEqual({ joined: false });
   });
@@ -823,11 +986,19 @@ describe('reconcileInvite', () => {
     const res = await reconcileInvite(db, 'u1');
     expect(res).toMatchObject({ joined: true, orgId: 'org1', role: 'admin' });
 
-    const user = await db.selectFrom('user').select(['tenantId', 'role']).where('id', '=', 'u1').executeTakeFirst();
+    const user = await db
+      .selectFrom('user')
+      .select(['tenantId', 'role'])
+      .where('id', '=', 'u1')
+      .executeTakeFirst();
     expect(user?.tenantId).toBe('org1');
     expect(user?.role).toBe('admin');
 
-    const invite = await db.selectFrom('org_member_invite').select(['acceptedAt']).where('id', '=', 'inv1').executeTakeFirst();
+    const invite = await db
+      .selectFrom('org_member_invite')
+      .select(['acceptedAt'])
+      .where('id', '=', 'inv1')
+      .executeTakeFirst();
     expect(invite?.acceptedAt).not.toBeNull();
   });
 
@@ -854,57 +1025,117 @@ describe('handleInvite', () => {
     db = makeDb({ DB: d1 } as unknown as Env);
     env = makeEnv(d1);
     await seedOrg(db, { id: 'org1', name: 'Clinic 1' });
-    await seedUser(db, { id: 'owner1', email: 'owner@clinic.com', tenantId: 'org1', role: 'owner' });
+    await seedUser(db, {
+      id: 'owner1',
+      email: 'owner@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'owner1' } });
   });
 
   it('non-manager (role member/standard) → 403 FORBIDDEN', async () => {
-    await seedUser(db, { id: 'member1', email: 'member@clinic.com', tenantId: 'org1', role: 'standard' });
+    await seedUser(db, {
+      id: 'member1',
+      email: 'member@clinic.com',
+      tenantId: 'org1',
+      role: 'standard',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'member1' } });
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'new@example.com', role: 'standard' }), env, ctx, '/api/org/invite');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'new@example.com', role: 'standard' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(403);
     expect((await json(res)).code).toBe('FORBIDDEN');
   });
 
   it('unauthenticated → 401', async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'a@b.com' }), env, ctx, '/api/org/invite');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'a@b.com' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(401);
   });
 
   it('inviting self → 400 CANNOT_INVITE_SELF', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'owner@clinic.com' }), env, ctx, '/api/org/invite');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'owner@clinic.com' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('CANNOT_INVITE_SELF');
   });
 
   it('invalid email → 400 INVALID_EMAIL', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'not-an-email' }), env, ctx, '/api/org/invite');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'not-an-email' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('INVALID_EMAIL');
   });
 
   it('inviting existing member → 409 ALREADY_MEMBER', async () => {
-    await seedUser(db, { id: 'existing', email: 'existing@clinic.com', tenantId: 'org1', role: 'standard' });
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'existing@clinic.com' }), env, ctx, '/api/org/invite');
+    await seedUser(db, {
+      id: 'existing',
+      email: 'existing@clinic.com',
+      tenantId: 'org1',
+      role: 'standard',
+    });
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'existing@clinic.com' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(409);
     expect((await json(res)).code).toBe('ALREADY_MEMBER');
   });
 
   it('new invite → 200 { ok:true, invite }; email queued', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'new@example.com', role: 'admin' }), env, ctx, '/api/org/invite');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'new@example.com', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(200);
     const body = await json(res);
     expect(body.ok).toBe(true);
     const inv = body.invite as Record<string, unknown>;
     expect(inv.email).toBe('new@example.com');
     expect(inv.role).toBe('admin');
-    expect(mockSendOrgInviteEmail).toHaveBeenCalledWith(env, 'new@example.com', 'Clinic 1', 'admin');
+    expect(mockSendOrgInviteEmail).toHaveBeenCalledWith(
+      env,
+      'new@example.com',
+      'Clinic 1',
+      'admin',
+    );
   });
 
   it('re-inviting a pending email refreshes the existing invite (no duplicate)', async () => {
-    await seedInvite(db, { id: 'inv1', orgId: 'org1', email: 'pending@example.com', role: 'standard' });
-    const res = await handleOrgRoute(makeReq('/api/org/invite', { email: 'pending@example.com', role: 'admin' }), env, ctx, '/api/org/invite');
+    await seedInvite(db, {
+      id: 'inv1',
+      orgId: 'org1',
+      email: 'pending@example.com',
+      role: 'standard',
+    });
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite', { email: 'pending@example.com', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/invite',
+    );
     expect(res.status).toBe(200);
     const invites = await db.selectFrom('org_member_invite').select(['id', 'role']).execute();
     expect(invites).toHaveLength(1); // no duplicate
@@ -926,49 +1157,103 @@ describe('handleChangeRole', () => {
     db = makeDb({ DB: d1 } as unknown as Env);
     env = makeEnv(d1);
     await seedOrg(db, { id: 'org1' });
-    await seedUser(db, { id: 'owner1', email: 'owner@clinic.com', tenantId: 'org1', role: 'owner' });
-    await seedUser(db, { id: 'member1', email: 'member@clinic.com', tenantId: 'org1', role: 'standard' });
+    await seedUser(db, {
+      id: 'owner1',
+      email: 'owner@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
+    await seedUser(db, {
+      id: 'member1',
+      email: 'member@clinic.com',
+      tenantId: 'org1',
+      role: 'standard',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'owner1' } });
   });
 
   it('non-manager → 403 FORBIDDEN', async () => {
     mockGetSession.mockResolvedValue({ user: { id: 'member1' } });
-    const res = await handleOrgRoute(makeReq('/api/org/member/role', { userId: 'member1', role: 'admin' }), env, ctx, '/api/org/member/role');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/role', { userId: 'member1', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/member/role',
+    );
     expect(res.status).toBe(403);
     expect((await json(res)).code).toBe('FORBIDDEN');
   });
 
   it('changing own role → 400 CANNOT_CHANGE_SELF', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/member/role', { userId: 'owner1', role: 'admin' }), env, ctx, '/api/org/member/role');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/role', { userId: 'owner1', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/member/role',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('CANNOT_CHANGE_SELF');
   });
 
   it('invalid role → 400 INVALID_ROLE', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/member/role', { userId: 'member1', role: 'superuser' }), env, ctx, '/api/org/member/role');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/role', { userId: 'member1', role: 'superuser' }),
+      env,
+      ctx,
+      '/api/org/member/role',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('INVALID_ROLE');
   });
 
   it('changing role of non-owner member in same org → ok', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/member/role', { userId: 'member1', role: 'admin' }), env, ctx, '/api/org/member/role');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/role', { userId: 'member1', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/member/role',
+    );
     expect(res.status).toBe(200);
     expect((await json(res)).ok).toBe(true);
-    const user = await db.selectFrom('user').select(['role']).where('id', '=', 'member1').executeTakeFirst();
+    const user = await db
+      .selectFrom('user')
+      .select(['role'])
+      .where('id', '=', 'member1')
+      .executeTakeFirst();
     expect(user?.role).toBe('admin');
   });
 
   it('targeting owner → 404 MEMBER_NOT_FOUND (WHERE role != owner fires)', async () => {
-    await seedUser(db, { id: 'owner2', email: 'owner2@clinic.com', tenantId: 'org1', role: 'owner' });
-    const res = await handleOrgRoute(makeReq('/api/org/member/role', { userId: 'owner2', role: 'admin' }), env, ctx, '/api/org/member/role');
+    await seedUser(db, {
+      id: 'owner2',
+      email: 'owner2@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/role', { userId: 'owner2', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/member/role',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('MEMBER_NOT_FOUND');
   });
 
   it('targeting user outside this org → 404 MEMBER_NOT_FOUND', async () => {
     await seedOrg(db, { id: 'org2' });
-    await seedUser(db, { id: 'other', email: 'other@clinic.com', tenantId: 'org2', role: 'standard' });
-    const res = await handleOrgRoute(makeReq('/api/org/member/role', { userId: 'other', role: 'admin' }), env, ctx, '/api/org/member/role');
+    await seedUser(db, {
+      id: 'other',
+      email: 'other@clinic.com',
+      tenantId: 'org2',
+      role: 'standard',
+    });
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/role', { userId: 'other', role: 'admin' }),
+      env,
+      ctx,
+      '/api/org/member/role',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('MEMBER_NOT_FOUND');
   });
@@ -987,33 +1272,72 @@ describe('handleRemoveMember', () => {
     db = makeDb({ DB: d1 } as unknown as Env);
     env = makeEnv(d1);
     await seedOrg(db, { id: 'org1' });
-    await seedUser(db, { id: 'owner1', email: 'owner@clinic.com', tenantId: 'org1', role: 'owner' });
-    await seedUser(db, { id: 'member1', email: 'member@clinic.com', tenantId: 'org1', role: 'standard' });
+    await seedUser(db, {
+      id: 'owner1',
+      email: 'owner@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
+    await seedUser(db, {
+      id: 'member1',
+      email: 'member@clinic.com',
+      tenantId: 'org1',
+      role: 'standard',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'owner1' } });
   });
 
   it('non-manager → 403 FORBIDDEN', async () => {
     mockGetSession.mockResolvedValue({ user: { id: 'member1' } });
-    const res = await handleOrgRoute(makeReq('/api/org/member/remove', { userId: 'member1' }), env, ctx, '/api/org/member/remove');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/remove', { userId: 'member1' }),
+      env,
+      ctx,
+      '/api/org/member/remove',
+    );
     expect(res.status).toBe(403);
   });
 
   it('removing self → 400 CANNOT_REMOVE_SELF', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/member/remove', { userId: 'owner1' }), env, ctx, '/api/org/member/remove');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/remove', { userId: 'owner1' }),
+      env,
+      ctx,
+      '/api/org/member/remove',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('CANNOT_REMOVE_SELF');
   });
 
   it('removing non-owner member → ok, tenantId nulled', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/member/remove', { userId: 'member1' }), env, ctx, '/api/org/member/remove');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/remove', { userId: 'member1' }),
+      env,
+      ctx,
+      '/api/org/member/remove',
+    );
     expect(res.status).toBe(200);
-    const user = await db.selectFrom('user').select(['tenantId']).where('id', '=', 'member1').executeTakeFirst();
+    const user = await db
+      .selectFrom('user')
+      .select(['tenantId'])
+      .where('id', '=', 'member1')
+      .executeTakeFirst();
     expect(user?.tenantId).toBeNull();
   });
 
   it('removing the owner → 404 MEMBER_NOT_FOUND (WHERE role != owner fires)', async () => {
-    await seedUser(db, { id: 'owner2', email: 'owner2@clinic.com', tenantId: 'org1', role: 'owner' });
-    const res = await handleOrgRoute(makeReq('/api/org/member/remove', { userId: 'owner2' }), env, ctx, '/api/org/member/remove');
+    await seedUser(db, {
+      id: 'owner2',
+      email: 'owner2@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
+    const res = await handleOrgRoute(
+      makeReq('/api/org/member/remove', { userId: 'owner2' }),
+      env,
+      ctx,
+      '/api/org/member/remove',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('MEMBER_NOT_FOUND');
   });
@@ -1032,36 +1356,75 @@ describe('handleRevokeInvite', () => {
     db = makeDb({ DB: d1 } as unknown as Env);
     env = makeEnv(d1);
     await seedOrg(db, { id: 'org1' });
-    await seedUser(db, { id: 'owner1', email: 'owner@clinic.com', tenantId: 'org1', role: 'owner' });
+    await seedUser(db, {
+      id: 'owner1',
+      email: 'owner@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
     await seedInvite(db, { id: 'inv1', orgId: 'org1', email: 'pending@test.com' });
     mockGetSession.mockResolvedValue({ user: { id: 'owner1' } });
   });
 
   it('manager revoking pending invite → ok', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/invite/revoke', { inviteId: 'inv1' }), env, ctx, '/api/org/invite/revoke');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite/revoke', { inviteId: 'inv1' }),
+      env,
+      ctx,
+      '/api/org/invite/revoke',
+    );
     expect(res.status).toBe(200);
     expect((await json(res)).ok).toBe(true);
-    const invite = await db.selectFrom('org_member_invite').select(['revokedAt']).where('id', '=', 'inv1').executeTakeFirst();
+    const invite = await db
+      .selectFrom('org_member_invite')
+      .select(['revokedAt'])
+      .where('id', '=', 'inv1')
+      .executeTakeFirst();
     expect(invite?.revokedAt).not.toBeNull();
   });
 
   it('revoking non-existent invite → 404 (numUpdatedRows=0)', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/invite/revoke', { inviteId: 'does-not-exist' }), env, ctx, '/api/org/invite/revoke');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite/revoke', { inviteId: 'does-not-exist' }),
+      env,
+      ctx,
+      '/api/org/invite/revoke',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('INVITE_NOT_FOUND');
   });
 
   it('revoking already-accepted invite → 404 (conditional WHERE acceptedAt IS NULL fails)', async () => {
-    await seedInvite(db, { id: 'inv-accepted', orgId: 'org1', email: 'accepted@test.com', acceptedAt: Date.now() - 1000 });
-    const res = await handleOrgRoute(makeReq('/api/org/invite/revoke', { inviteId: 'inv-accepted' }), env, ctx, '/api/org/invite/revoke');
+    await seedInvite(db, {
+      id: 'inv-accepted',
+      orgId: 'org1',
+      email: 'accepted@test.com',
+      acceptedAt: Date.now() - 1000,
+    });
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite/revoke', { inviteId: 'inv-accepted' }),
+      env,
+      ctx,
+      '/api/org/invite/revoke',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('INVITE_NOT_FOUND');
   });
 
   it('non-manager → 403', async () => {
-    await seedUser(db, { id: 'member1', email: 'member@clinic.com', tenantId: 'org1', role: 'standard' });
+    await seedUser(db, {
+      id: 'member1',
+      email: 'member@clinic.com',
+      tenantId: 'org1',
+      role: 'standard',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'member1' } });
-    const res = await handleOrgRoute(makeReq('/api/org/invite/revoke', { inviteId: 'inv1' }), env, ctx, '/api/org/invite/revoke');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/invite/revoke', { inviteId: 'inv1' }),
+      env,
+      ctx,
+      '/api/org/invite/revoke',
+    );
     expect(res.status).toBe(403);
   });
 });
@@ -1079,7 +1442,12 @@ describe('handleListMembers', () => {
     db = makeDb({ DB: d1 } as unknown as Env);
     env = makeEnv(d1);
     await seedOrg(db, { id: 'org1', name: 'Clinic 1' });
-    await seedUser(db, { id: 'owner1', email: 'owner@clinic.com', tenantId: 'org1', role: 'owner' });
+    await seedUser(db, {
+      id: 'owner1',
+      email: 'owner@clinic.com',
+      tenantId: 'org1',
+      role: 'owner',
+    });
     mockGetSession.mockResolvedValue({ user: { id: 'owner1' } });
   });
 
@@ -1100,7 +1468,12 @@ describe('handleListMembers', () => {
   });
 
   it('member with org → returns members + invites, isYou set for caller', async () => {
-    await seedUser(db, { id: 'member1', email: 'member@clinic.com', tenantId: 'org1', role: 'standard' });
+    await seedUser(db, {
+      id: 'member1',
+      email: 'member@clinic.com',
+      tenantId: 'org1',
+      role: 'standard',
+    });
     await seedInvite(db, { id: 'inv1', orgId: 'org1', email: 'pending@test.com' });
     const req = new Request('https://ptscribe.app/api/org/members', { method: 'GET' });
     const res = await handleOrgRoute(req, env, ctx, '/api/org/members');
@@ -1109,9 +1482,9 @@ describe('handleListMembers', () => {
     expect(body.yourRole).toBe('owner');
     expect(body.canManage).toBe(true);
     const members = body.members as Array<{ id: string; isYou: boolean }>;
-    const me = members.find(m => m.id === 'owner1');
+    const me = members.find((m) => m.id === 'owner1');
     expect(me?.isYou).toBe(true);
-    const other = members.find(m => m.id === 'member1');
+    const other = members.find((m) => m.id === 'member1');
     expect(other?.isYou).toBe(false);
     const invites = body.invites as Array<{ id: string }>;
     expect(invites).toHaveLength(1);
@@ -1154,7 +1527,12 @@ describe('method and route guards', () => {
   });
 
   it('POST to unknown path → 404 NOT_FOUND', async () => {
-    const res = await handleOrgRoute(makeReq('/api/org/nonexistent', {}), env, ctx, '/api/org/nonexistent');
+    const res = await handleOrgRoute(
+      makeReq('/api/org/nonexistent', {}),
+      env,
+      ctx,
+      '/api/org/nonexistent',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('NOT_FOUND');
   });

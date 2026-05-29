@@ -52,7 +52,13 @@ export interface PortableBackup {
   wrappedDek_passphrase: CipherParts;
   /** The same DEK wrapped by a recovery-code-derived KEK, if a recovery code is set. */
   wrappedDek_recoveryCode?: CipherParts & {
-    kdf: { name: 'Argon2id'; memoryKib: number; iterations: number; parallelism: number; salt: string };
+    kdf: {
+      name: 'Argon2id';
+      memoryKib: number;
+      iterations: number;
+      parallelism: number;
+      salt: string;
+    };
   };
   /** AppData JSON encrypted under the DEK. */
   payload: CipherParts;
@@ -104,7 +110,9 @@ export async function exportBackup(appData: AppData): Promise<string> {
     if (material) {
       // Encrypt under the live DEK, then reuse the on-disk wrapped-DEK so the file
       // is self-contained and restorable on any device with the passphrase.
-      const dataEnvelope = JSON.parse(await vault.encryptUtf8(JSON.stringify(appData))) as CipherParts;
+      const dataEnvelope = JSON.parse(
+        await vault.encryptUtf8(JSON.stringify(appData)),
+      ) as CipherParts;
       const file: PortableBackup = {
         kind: BACKUP_KIND,
         v: PORTABLE_BACKUP_VERSION,

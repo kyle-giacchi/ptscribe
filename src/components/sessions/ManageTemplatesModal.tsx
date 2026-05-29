@@ -30,7 +30,7 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
         role="dialog"
         aria-modal="true"
         aria-label="Manage Templates"
-        className="flex flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl w-full"
+        className="flex w-full flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
         style={{
           maxWidth: 700,
           maxHeight: '90dvh',
@@ -42,7 +42,7 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
       >
         {/* Modal header */}
         <div
-          className="flex items-center justify-between px-5 py-4 shrink-0"
+          className="flex shrink-0 items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid var(--color-pt-border)' }}
         >
           <span className="text-base font-semibold" style={{ color: 'var(--color-pt-text)' }}>
@@ -60,7 +60,7 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
         </div>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1">
+        <div className="flex-1 overflow-y-auto">
           <Templates />
         </div>
       </div>

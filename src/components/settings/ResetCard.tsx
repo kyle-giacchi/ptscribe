@@ -48,7 +48,11 @@ export function ResetCard() {
           >
             Reload app
           </PtButton>
-          <PtButton variant="danger" iconLeft={<Eraser size={14} strokeWidth={2} />} onClick={handleReset}>
+          <PtButton
+            variant="danger"
+            iconLeft={<Eraser size={14} strokeWidth={2} />}
+            onClick={handleReset}
+          >
             Erase everything
           </PtButton>
         </div>

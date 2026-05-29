@@ -26,13 +26,18 @@ function makeFakeAudioBuffer(lengthSamples = 16000, sampleRate = 16000): AudioBu
   } as unknown as AudioBuffer;
 }
 
-function makeFakeCtx(
-  decodeResult: AudioBuffer | Error,
-): { ctx: unknown; factory: () => AudioContext } {
+function makeFakeCtx(decodeResult: AudioBuffer | Error): {
+  ctx: unknown;
+  factory: () => AudioContext;
+} {
   const ctx = {
-    decodeAudioData: vi.fn().mockImplementation(() =>
-      decodeResult instanceof Error ? Promise.reject(decodeResult) : Promise.resolve(decodeResult),
-    ),
+    decodeAudioData: vi
+      .fn()
+      .mockImplementation(() =>
+        decodeResult instanceof Error
+          ? Promise.reject(decodeResult)
+          : Promise.resolve(decodeResult),
+      ),
     close: vi.fn().mockResolvedValue(undefined),
   };
   return { ctx, factory: () => ctx as unknown as AudioContext };

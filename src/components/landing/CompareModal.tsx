@@ -16,20 +16,47 @@ function CmpBadge({ v, label }: { v: BadgeVariant; label: string }) {
   return <span className={`cmp-badge cmp-badge--${v}`}>{label}</span>;
 }
 
-function GrpHeader({ num, title, count, lead }: {
-  num: string; title: string; count: string; lead?: boolean;
+function GrpHeader({
+  num,
+  title,
+  count,
+  lead,
+}: {
+  num: string;
+  title: string;
+  count: string;
+  lead?: boolean;
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, padding: '10px 36px 4px' }}>
-      <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO, letterSpacing: '0.08em' }}>{num}</span>
-      <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, letterSpacing: '-0.005em', color: '#1a2030' }}>{title}</h3>
-      <span style={{
-        marginLeft: 'auto', fontSize: 11, fontFamily: MONO,
-        color: lead ? '#0a6d70' : '#8893a5',
-        background: lead ? '#e6f7f6' : '#f4f6f9',
-        padding: '3px 9px', borderRadius: 999,
-        border: `1px solid ${lead ? 'rgba(10,109,112,0.25)' : '#edf0f4'}`,
-      }}>{count}</span>
+      <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO, letterSpacing: '0.08em' }}>
+        {num}
+      </span>
+      <h3
+        style={{
+          fontSize: 16,
+          fontWeight: 700,
+          margin: 0,
+          letterSpacing: '-0.005em',
+          color: '#1a2030',
+        }}
+      >
+        {title}
+      </h3>
+      <span
+        style={{
+          marginLeft: 'auto',
+          fontSize: 11,
+          fontFamily: MONO,
+          color: lead ? '#0a6d70' : '#8893a5',
+          background: lead ? '#e6f7f6' : '#f4f6f9',
+          padding: '3px 9px',
+          borderRadius: 999,
+          border: `1px solid ${lead ? 'rgba(10,109,112,0.25)' : '#edf0f4'}`,
+        }}
+      >
+        {count}
+      </span>
     </div>
   );
 }
@@ -37,8 +64,16 @@ function GrpHeader({ num, title, count, lead }: {
 function Feat({ name, desc }: { name: string; desc?: string }) {
   return (
     <div>
-      <div style={{ fontWeight: 500, fontSize: 13.5, color: '#1a2030', marginBottom: desc ? 3 : 0 }}>{name}</div>
-      {desc && <div style={{ color: '#8893a5', fontSize: 12, lineHeight: 1.45, maxWidth: '44ch' }}>{desc}</div>}
+      <div
+        style={{ fontWeight: 500, fontSize: 13.5, color: '#1a2030', marginBottom: desc ? 3 : 0 }}
+      >
+        {name}
+      </div>
+      {desc && (
+        <div style={{ color: '#8893a5', fontSize: 12, lineHeight: 1.45, maxWidth: '44ch' }}>
+          {desc}
+        </div>
+      )}
     </div>
   );
 }
@@ -54,11 +89,21 @@ const ROW_GRID: React.CSSProperties = {
 };
 
 function parityRow(): React.CSSProperties {
-  return { ...ROW_GRID, padding: '7px 22px 7px 36px', borderTop: '1px solid rgba(26,32,48,0.05)', alignItems: 'center' };
+  return {
+    ...ROW_GRID,
+    padding: '7px 22px 7px 36px',
+    borderTop: '1px solid rgba(26,32,48,0.05)',
+    alignItems: 'center',
+  };
 }
 
 function gapRow(): React.CSSProperties {
-  return { ...ROW_GRID, padding: '10px 22px 10px 36px', borderTop: '1px solid rgba(26,32,48,0.05)', alignItems: 'flex-start' };
+  return {
+    ...ROW_GRID,
+    padding: '10px 22px 10px 36px',
+    borderTop: '1px solid rgba(26,32,48,0.05)',
+    alignItems: 'flex-start',
+  };
 }
 
 function leadRow(extra?: React.CSSProperties): React.CSSProperties {
@@ -169,17 +214,23 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
     s.id = 'cmp-modal-styles';
     s.textContent = BADGE_CSS;
     document.head.appendChild(s);
-    return () => { document.getElementById('cmp-modal-styles')?.remove(); };
+    return () => {
+      document.getElementById('cmp-modal-styles')?.remove();
+    };
   }, []);
 
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [open, onClose]);
@@ -189,8 +240,12 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
       {open && (
         <div
           style={{
-            position: 'fixed', inset: 0, zIndex: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           role="dialog"
           aria-modal="true"
@@ -198,8 +253,15 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
         >
           {/* Scrim */}
           <motion.div
-            style={{ position: 'absolute', inset: 0, background: 'rgba(26,32,48,0.45)', backdropFilter: 'blur(2px)' }}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(26,32,48,0.45)',
+              backdropFilter: 'blur(2px)',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
             aria-hidden
@@ -226,29 +288,52 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
             {/* ── Head ─────────────────────────────────────────────────── */}
-            <header style={{
-              padding: '22px 36px 16px',
-              borderBottom: '1px solid #f0f2f6',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-              gap: 24,
-            }}>
+            <header
+              style={{
+                padding: '22px 36px 16px',
+                borderBottom: '1px solid #f0f2f6',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 24,
+              }}
+            >
               <div style={{ maxWidth: 700 }}>
-                <div style={{
-                  fontSize: 10.5, fontWeight: 600, letterSpacing: '0.12em',
-                  textTransform: 'uppercase', color: '#8893a5', marginBottom: 8,
-                  fontFamily: MONO,
-                }}>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: '#8893a5',
+                    marginBottom: 8,
+                    fontFamily: MONO,
+                  }}
+                >
                   Honest comparison
                 </div>
-                <h2 id="cmp-title" style={{
-                  margin: '0 0 8px',
-                  fontSize: 'clamp(20px, 2.2vw, 24px)',
-                  fontWeight: 700, lineHeight: 1.2,
-                  letterSpacing: '-0.025em', color: '#1a2030',
-                }}>
+                <h2
+                  id="cmp-title"
+                  style={{
+                    margin: '0 0 8px',
+                    fontSize: 'clamp(20px, 2.2vw, 24px)',
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: '-0.025em',
+                    color: '#1a2030',
+                  }}
+                >
                   How does PTScribe stack up against a leading&nbsp;SaaS&nbsp;scribe?
                 </h2>
-                <p style={{ margin: 0, fontSize: 13.5, color: '#5a6577', lineHeight: 1.55, maxWidth: 620 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13.5,
+                    color: '#5a6577',
+                    lineHeight: 1.55,
+                    maxWidth: 620,
+                  }}
+                >
                   PTScribe is purpose-built for physical therapists. Here's our honest scorecard —
                   what's shipped, what's in active development, and where we already lead.
                 </p>
@@ -257,11 +342,19 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                 onClick={onClose}
                 aria-label="Close comparison"
                 style={{
-                  appearance: 'none', background: '#f4f6f9',
-                  border: '1px solid #e4e8ee', borderRadius: 8,
-                  width: 34, height: 34, cursor: 'pointer', color: '#5a6577',
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, padding: 0,
+                  appearance: 'none',
+                  background: '#f4f6f9',
+                  border: '1px solid #e4e8ee',
+                  borderRadius: 8,
+                  width: 34,
+                  height: 34,
+                  cursor: 'pointer',
+                  color: '#5a6577',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  padding: 0,
                 }}
               >
                 <X size={16} />
@@ -269,37 +362,92 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
             </header>
 
             {/* ── Column headers ───────────────────────────────────────── */}
-            <div style={{ ...ROW_GRID, gap: 0, background: '#f4f6f9', borderBottom: '1px solid #e4e8ee' }}>
-              <div style={{ padding: '14px 22px 14px 36px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#8893a5' }}>
+            <div
+              style={{
+                ...ROW_GRID,
+                gap: 0,
+                background: '#f4f6f9',
+                borderBottom: '1px solid #e4e8ee',
+              }}
+            >
+              <div
+                style={{ padding: '14px 22px 14px 36px', display: 'flex', alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.10em',
+                    textTransform: 'uppercase',
+                    color: '#8893a5',
+                  }}
+                >
                   Feature
                 </span>
               </div>
               <div style={{ padding: '14px 22px', borderLeft: '1px solid #edf0f4' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                    background: '#0ea5a8', color: 'white',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: MONO, fontWeight: 700, fontSize: 11, letterSpacing: '-0.02em',
-                  }}>PT</span>
+                  <span
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 8,
+                      flexShrink: 0,
+                      background: '#0ea5a8',
+                      color: 'white',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: MONO,
+                      fontWeight: 700,
+                      fontSize: 11,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    PT
+                  </span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>PTScribe</div>
-                    <div style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}>PT-focused · pay per AI call</div>
+                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>
+                      PTScribe
+                    </div>
+                    <div
+                      style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}
+                    >
+                      PT-focused · pay per AI call
+                    </div>
                   </div>
                 </div>
               </div>
               <div style={{ padding: '14px 22px', borderLeft: '1px solid #edf0f4' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                    background: 'white', color: '#5a6577', border: '1px solid #e4e8ee',
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: MONO, fontWeight: 600, fontSize: 13,
-                  }}>S</span>
+                  <span
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 8,
+                      flexShrink: 0,
+                      background: 'white',
+                      color: '#5a6577',
+                      border: '1px solid #e4e8ee',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: MONO,
+                      fontWeight: 600,
+                      fontSize: 13,
+                    }}
+                  >
+                    S
+                  </span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>Leading SaaS scribe</div>
-                    <div style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}>paid SaaS · $150/user/mo</div>
+                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>
+                      Leading SaaS scribe
+                    </div>
+                    <div
+                      style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}
+                    >
+                      paid SaaS · $150/user/mo
+                    </div>
                   </div>
                 </div>
               </div>
@@ -307,7 +455,6 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
 
             {/* ── Scrollable body ──────────────────────────────────────── */}
             <div className="cmp-scroll" style={{ overflowY: 'auto', paddingBottom: 12 }}>
-
               {/* ── 01: Transcription & capture ── */}
               <section style={{ paddingBottom: 8 }}>
                 <GrpHeader num="01" title="Transcription & capture" count="3 / 5 at parity" />
@@ -322,7 +469,9 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   <Feat name="Speaker diarization (clinician vs. patient)" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="ok" label="Shipped" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>cloud path</span>
+                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                      cloud path
+                    </span>
                   </div>
                   <CmpBadge v="yes" label="Included" />
                 </div>
@@ -353,18 +502,29 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               </section>
 
               {/* ── 02: Note generation ── */}
-              <section style={{ borderTop: '1px solid #f0f2f6', paddingTop: 10, marginTop: 4, paddingBottom: 8 }}>
+              <section
+                style={{
+                  borderTop: '1px solid #f0f2f6',
+                  paddingTop: 10,
+                  marginTop: 4,
+                  paddingBottom: 8,
+                }}
+              >
                 <GrpHeader num="02" title="Note generation" count="2 / 5 at parity" />
 
                 <div style={parityRow()} className="cmp-parity">
                   <Feat name="PT templates (eval, follow-up, progress, discharge)" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="ok" label="Shipped" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>PT-specific</span>
+                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                      PT-specific
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="yes" label="Included" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>200+ templates</span>
+                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                      200+ templates
+                    </span>
                   </div>
                 </div>
 
@@ -388,7 +548,14 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     name="ICD-10 billing code suggestions"
                     desc="AI suggests ICD-10 and CPT codes from the finished note so you don't have to code from memory."
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <CmpBadge v="wip" label="In development" />
                   </div>
                   <CmpBadge v="yes" label="Included" />
@@ -399,7 +566,14 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     name="Post-generation AI chat"
                     desc="Prompt the AI to generate referral letters, patient summaries, or make structural edits after the note is already drafted."
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <CmpBadge v="planned" label="Planned" />
                   </div>
                   <CmpBadge v="yes" label="Included" />
@@ -407,14 +581,23 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               </section>
 
               {/* ── 03: Workflow & integrations ── */}
-              <section style={{ borderTop: '1px solid #f0f2f6', paddingTop: 10, marginTop: 4, paddingBottom: 8 }}>
+              <section
+                style={{
+                  borderTop: '1px solid #f0f2f6',
+                  paddingTop: 10,
+                  marginTop: 4,
+                  paddingBottom: 8,
+                }}
+              >
                 <GrpHeader num="03" title="Workflow & integrations" count="1 / 4 at parity" />
 
                 <div style={parityRow()} className="cmp-parity">
                   <Feat name="Patient charts with full session history" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="ok" label="Shipped" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>+ plan of care</span>
+                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                      + plan of care
+                    </span>
                   </div>
                   <CmpBadge v="yes" label="Included" />
                 </div>
@@ -424,7 +607,14 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     name="Mobile app (iOS & Android)"
                     desc="Record at the bedside on your phone, review and finalize notes on your desk."
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <CmpBadge v="wip" label="In development" />
                   </div>
                   <CmpBadge v="yes" label="iOS & Android" />
@@ -435,7 +625,14 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     name="EHR copy & integration"
                     desc="One-click note export and structured data push for popular rehab EMRs."
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <CmpBadge v="wip" label="In development" />
                   </div>
                   <CmpBadge v="yes" label="Lite access" />
@@ -446,7 +643,14 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     name="Team & shared template library"
                     desc="Share custom note templates across your whole clinic — every PT uses the same structure."
                   />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <CmpBadge v="wip" label="In development" />
                   </div>
                   <CmpBadge v="yes" label="Included" />
@@ -454,7 +658,14 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               </section>
 
               {/* ── 04: Trust, control & cost ── */}
-              <section style={{ borderTop: '1px solid #f0f2f6', paddingTop: 10, marginTop: 4, paddingBottom: 8 }}>
+              <section
+                style={{
+                  borderTop: '1px solid #f0f2f6',
+                  paddingTop: 10,
+                  marginTop: 4,
+                  paddingBottom: 8,
+                }}
+              >
                 <GrpHeader num="04" title="Trust, control & cost" count="where we lead" lead />
 
                 <div style={leadRow()}>
@@ -486,49 +697,120 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
 
                 {/* Cost callout row */}
                 <div style={leadRow({ alignItems: 'center', paddingTop: 18, paddingBottom: 18 })}>
-                  <Feat name="Annual cost per clinician" desc="What a working PT pays in a year at typical visit volume." />
+                  <Feat
+                    name="Annual cost per clinician"
+                    desc="What a working PT pays in a year at typical visit volume."
+                  />
 
                   {/* PTScribe cost */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                      <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color: '#0a6d70' }}>~$15</span>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: '#0a6d70', opacity: 0.75 }}>/yr</span>
+                      <span
+                        style={{
+                          fontSize: 38,
+                          fontWeight: 700,
+                          letterSpacing: '-0.03em',
+                          lineHeight: 1,
+                          color: '#0a6d70',
+                        }}
+                      >
+                        ~$15
+                      </span>
+                      <span
+                        style={{ fontSize: 14, fontWeight: 500, color: '#0a6d70', opacity: 0.75 }}
+                      >
+                        /yr
+                      </span>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0a6d70', letterSpacing: '-0.005em' }}>Nearly free</div>
-                    <div style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO, letterSpacing: '0.02em' }}>pay-per-AI-call · cents per note</div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#0a6d70',
+                        letterSpacing: '-0.005em',
+                      }}
+                    >
+                      Nearly free
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: '#8893a5',
+                        fontFamily: MONO,
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      pay-per-AI-call · cents per note
+                    </div>
                   </div>
 
                   {/* Competitor cost */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                      <span style={{
-                        fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1,
-                        color: '#dc2942',
-                        textDecoration: 'line-through',
-                        textDecorationColor: 'rgba(220,41,66,0.4)',
-                        textDecorationThickness: '2px',
-                      }}>$1,800</span>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: '#dc2942', opacity: 0.7 }}>/yr</span>
+                      <span
+                        style={{
+                          fontSize: 38,
+                          fontWeight: 700,
+                          letterSpacing: '-0.03em',
+                          lineHeight: 1,
+                          color: '#dc2942',
+                          textDecoration: 'line-through',
+                          textDecorationColor: 'rgba(220,41,66,0.4)',
+                          textDecorationThickness: '2px',
+                        }}
+                      >
+                        $1,800
+                      </span>
+                      <span
+                        style={{ fontSize: 14, fontWeight: 500, color: '#dc2942', opacity: 0.7 }}
+                      >
+                        /yr
+                      </span>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#5a6577', letterSpacing: '-0.005em' }}>SaaS subscription</div>
-                    <div style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO, letterSpacing: '0.02em' }}>paid plan · $150/mo · per seat</div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#5a6577',
+                        letterSpacing: '-0.005em',
+                      }}
+                    >
+                      SaaS subscription
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: '#8893a5',
+                        fontFamily: MONO,
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      paid plan · $150/mo · per seat
+                    </div>
                   </div>
                 </div>
               </section>
 
               {/* Legend */}
-              <div style={{
-                display: 'flex', flexWrap: 'wrap', gap: 22,
-                padding: '16px 36px 10px', marginTop: 8,
-                borderTop: '1px dashed #edf0f4',
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 22,
+                  padding: '16px 36px 10px',
+                  marginTop: 8,
+                  borderTop: '1px dashed #edf0f4',
+                }}
+              >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <CmpBadge v="ok" label="Shipped" />
                   <span style={{ fontSize: 12, color: '#8893a5' }}>Available today.</span>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <CmpBadge v="wip" label="In development" />
-                  <span style={{ fontSize: 12, color: '#8893a5' }}>Active build — coming soon.</span>
+                  <span style={{ fontSize: 12, color: '#8893a5' }}>
+                    Active build — coming soon.
+                  </span>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <CmpBadge v="planned" label="Planned" />
@@ -538,37 +820,60 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
             </div>
 
             {/* ── Footer ───────────────────────────────────────────────── */}
-            <footer style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: 24, padding: '16px 36px',
-              borderTop: '1px solid #e4e8ee',
-              background: '#f4f6f9', flexWrap: 'wrap',
-            }}>
+            <footer
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 24,
+                padding: '16px 36px',
+                borderTop: '1px solid #e4e8ee',
+                background: '#f4f6f9',
+                flexWrap: 'wrap',
+              }}
+            >
               <div>
-                <div style={{ fontSize: 10.5, color: '#8893a5', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: MONO }}>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: '#8893a5',
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    fontFamily: MONO,
+                  }}
+                >
                   What's next
                 </div>
-                <div style={{ fontSize: 15.5, fontWeight: 600, margin: '4px 0 3px', color: '#1a2030' }}>
+                <div
+                  style={{ fontSize: 15.5, fontWeight: 600, margin: '4px 0 3px', color: '#1a2030' }}
+                >
                   PTScribe ships new features monthly.{' '}
                   <span style={{ color: '#0ea5a8' }}>Try it free today.</span>
                 </div>
                 <div style={{ fontSize: 12.5, color: '#5a6577', maxWidth: 520 }}>
-                  ICD-10 coding, mobile, and EHR integration are in active development.
-                  Most PTs pay under $25/year at normal visit volume.
+                  ICD-10 coding, mobile, and EHR integration are in active development. Most PTs pay
+                  under $25/year at normal visit volume.
                 </div>
               </div>
               <button
-                onClick={() => { onClose(); onTryDemo?.(); }}
+                onClick={() => {
+                  onClose();
+                  onTryDemo?.();
+                }}
                 style={{
                   padding: '11px 24px',
-                  background: '#0ea5a8', color: 'white',
-                  border: 'none', borderRadius: 10,
-                  fontSize: 14.5, fontWeight: 700,
-                  cursor: 'pointer', flexShrink: 0,
+                  background: '#0ea5a8',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 10,
+                  fontSize: 14.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  flexShrink: 0,
                   transition: 'background 150ms ease-out',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#0a6d70')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#0ea5a8')}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#0a6d70')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = '#0ea5a8')}
               >
                 Try Demo →
               </button>

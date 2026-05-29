@@ -17,15 +17,21 @@ describe('promoteTier', () => {
   });
 
   it('blocks T2 when a T3 result already exists', () => {
-    expect(promoteTier({ ...empty, t3Transcript: 'cloud' }, { tier: 't2', text: 'local' })).toBeNull();
+    expect(
+      promoteTier({ ...empty, t3Transcript: 'cloud' }, { tier: 't2', text: 'local' }),
+    ).toBeNull();
   });
 
   it('blocks T1 when a T2 result already exists', () => {
-    expect(promoteTier({ ...empty, t2Transcript: 'whisper' }, { tier: 't1', text: 'live' })).toBeNull();
+    expect(
+      promoteTier({ ...empty, t2Transcript: 'whisper' }, { tier: 't1', text: 'live' }),
+    ).toBeNull();
   });
 
   it('lets T3 win over an existing T2', () => {
-    expect(promoteTier({ ...empty, t2Transcript: 'whisper' }, { tier: 't3', text: 'cloud' })).toEqual({
+    expect(
+      promoteTier({ ...empty, t2Transcript: 'whisper' }, { tier: 't3', text: 'cloud' }),
+    ).toEqual({
       transcript: 'cloud',
       activeTranscriptTier: 't3',
     });
@@ -33,7 +39,10 @@ describe('promoteTier', () => {
 
   it('lets T3 win even when both lower tiers are present (top tier never blocked)', () => {
     expect(
-      promoteTier({ t1Transcript: 'a', t2Transcript: 'b', t3Transcript: undefined }, { tier: 't3', text: 'c' }),
+      promoteTier(
+        { t1Transcript: 'a', t2Transcript: 'b', t3Transcript: undefined },
+        { tier: 't3', text: 'c' },
+      ),
     ).toEqual({ transcript: 'c', activeTranscriptTier: 't3' });
   });
 

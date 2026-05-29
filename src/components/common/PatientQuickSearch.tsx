@@ -35,9 +35,10 @@ export function PatientQuickSearch() {
   const q = query.trim().toLowerCase();
   const results = q
     ? patients
-        .filter((p) =>
-          `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
-          (p.primaryDiagnosis ?? '').toLowerCase().includes(q),
+        .filter(
+          (p) =>
+            `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+            (p.primaryDiagnosis ?? '').toLowerCase().includes(q),
         )
         .slice(0, 8)
     : [];
@@ -128,8 +129,7 @@ export function PatientQuickSearch() {
                   padding: '7px 10px',
                   borderRadius: 6,
                   border: 'none',
-                  background:
-                    i === highlight ? 'var(--color-pt-accent-soft)' : 'transparent',
+                  background: i === highlight ? 'var(--color-pt-accent-soft)' : 'transparent',
                   color: 'var(--color-pt-text)',
                   cursor: 'pointer',
                   fontSize: 12.5,

@@ -53,13 +53,18 @@ function evalCond(col: string, op: string, row: Row, paramIter: Iterator<unknown
 function evalWhere(whereTokens: string[], row: Row, paramIter: Iterator<unknown>): boolean {
   let i = 0;
   while (i < whereTokens.length) {
-    if (whereTokens[i].toLowerCase() === 'and') { i++; continue; }
-    const col = unquote(whereTokens[i]); i++;
+    if (whereTokens[i].toLowerCase() === 'and') {
+      i++;
+      continue;
+    }
+    const col = unquote(whereTokens[i]);
+    i++;
     if (i >= whereTokens.length) break;
     if (whereTokens[i].toLowerCase() === 'is') {
       i++;
       if (whereTokens[i]?.toLowerCase() === 'not') {
-        i++; i++;
+        i++;
+        i++;
         if (!evalCond(col, 'is not null', row, paramIter)) return false;
       } else {
         i++;
@@ -67,9 +72,11 @@ function evalWhere(whereTokens: string[], row: Row, paramIter: Iterator<unknown>
       }
       continue;
     }
-    const op = whereTokens[i]; i++;
+    const op = whereTokens[i];
+    i++;
     if (whereTokens[i] === '?') i++;
-    if (!evalCond(col, op, row, { next: () => ({ value: paramIter.next().value, done: false }) })) return false;
+    if (!evalCond(col, op, row, { next: () => ({ value: paramIter.next().value, done: false }) }))
+      return false;
   }
   return true;
 }
@@ -114,7 +121,8 @@ function makeD1Fake(): { db: D1Database; store: Store } {
       ti++;
       const cols: string[] = [];
       while (ti < tokens.length && tokens[ti].toLowerCase() !== 'from') {
-        cols.push(unquote(tokens[ti])); ti++;
+        cols.push(unquote(tokens[ti]));
+        ti++;
       }
       ti++;
       const tableName = unquote(nextTok());
@@ -123,10 +131,12 @@ function makeD1Fake(): { db: D1Database; store: Store } {
       if (tokens[ti]?.toLowerCase() === 'where') {
         ti++;
         const whereTokens = tokens.slice(ti);
-        filtered = rows.filter(row => evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>));
+        filtered = rows.filter((row) =>
+          evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>),
+        );
       }
       const hasAll = cols.includes('*');
-      const results: Row[] = filtered.map(row => {
+      const results: Row[] = filtered.map((row) => {
         if (hasAll) return { ...row };
         const out: Row = {};
         for (const c of cols) out[c] = row[c];
@@ -136,17 +146,26 @@ function makeD1Fake(): { db: D1Database; store: Store } {
     }
 
     if (upper.startsWith('INSERT INTO')) {
-      ti++; ti++;
+      ti++;
+      ti++;
       const tableName = unquote(nextTok());
       const rows = getTable(tableName);
       const colNames: string[] = [];
-      while (ti < tokens.length && tokens[ti].toLowerCase() !== 'values' && tokens[ti].toLowerCase() !== 'on') {
-        colNames.push(unquote(tokens[ti])); ti++;
+      while (
+        ti < tokens.length &&
+        tokens[ti].toLowerCase() !== 'values' &&
+        tokens[ti].toLowerCase() !== 'on'
+      ) {
+        colNames.push(unquote(tokens[ti]));
+        ti++;
       }
       let isUpsert = false;
       if (tokens[ti]?.toLowerCase() === 'values') ti++;
       const insertParams = params.slice(0, colNames.length);
-      const restLower = tokens.slice(ti).map(t => t.toLowerCase()).join(' ');
+      const restLower = tokens
+        .slice(ti)
+        .map((t) => t.toLowerCase())
+        .join(' ');
       if (restLower.includes('on conflict')) isUpsert = true;
 
       const newRow: Row = {};
@@ -160,14 +179,17 @@ function makeD1Fake(): { db: D1Database; store: Store } {
             break;
           }
         }
-        const existingIdx = rows.findIndex(r => r[conflictCol] === newRow[conflictCol]);
+        const existingIdx = rows.findIndex((r) => r[conflictCol] === newRow[conflictCol]);
         if (existingIdx >= 0) {
           const upsertParams = params.slice(colNames.length);
           const updated = { ...rows[existingIdx] };
           let inSet = false;
           let upsertParamIdx = 0;
           for (let j = ti; j < tokens.length; j++) {
-            if (tokens[j].toLowerCase() === 'set') { inSet = true; continue; }
+            if (tokens[j].toLowerCase() === 'set') {
+              inSet = true;
+              continue;
+            }
             if (inSet && j + 2 < tokens.length && tokens[j + 1] === '=' && tokens[j + 2] === '?') {
               updated[unquote(tokens[j])] = upsertParams[upsertParamIdx++];
               j += 2;
@@ -204,7 +226,9 @@ function makeD1Fake(): { db: D1Database; store: Store } {
         ti++;
         const whereTokens = tokens.slice(ti);
         for (const row of rows) {
-          if (evalWhere([...whereTokens], row, whereParams[Symbol.iterator]() as Iterator<unknown>)) {
+          if (
+            evalWhere([...whereTokens], row, whereParams[Symbol.iterator]() as Iterator<unknown>)
+          ) {
             for (let i = 0; i < setAssignments.length; i++) row[setAssignments[i]] = setParams[i];
             changes++;
           }
@@ -219,14 +243,18 @@ function makeD1Fake(): { db: D1Database; store: Store } {
     }
 
     if (upper.startsWith('DELETE FROM')) {
-      ti++; ti++;
+      ti++;
+      ti++;
       const tableName = unquote(nextTok());
       const rows = getTable(tableName);
       if (tokens[ti]?.toLowerCase() === 'where') {
         ti++;
         const whereTokens = tokens.slice(ti);
         const before = rows.length;
-        const kept = rows.filter(row => !evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>));
+        const kept = rows.filter(
+          (row) =>
+            !evalWhere([...whereTokens], row, params[Symbol.iterator]() as Iterator<unknown>),
+        );
         store.set(tableName, kept);
         return { meta: { changes: before - kept.length, last_row_id: 0, duration: 0 } };
       }
@@ -240,27 +268,39 @@ function makeD1Fake(): { db: D1Database; store: Store } {
 
   function makeStatement(sql: string, boundParams: unknown[] = []): D1Statement {
     const stmt: D1Statement = {
-      bind(...args: unknown[]): D1Statement { return makeStatement(sql, [...boundParams, ...args]); },
-      async first(): Promise<Row | null> { return execSql(sql, boundParams).results?.[0] ?? null; },
+      bind(...args: unknown[]): D1Statement {
+        return makeStatement(sql, [...boundParams, ...args]);
+      },
+      async first(): Promise<Row | null> {
+        return execSql(sql, boundParams).results?.[0] ?? null;
+      },
       async all(): Promise<{ results: Row[]; meta: D1Result['meta'] }> {
         const res = execSql(sql, boundParams);
         return { results: res.results ?? [], meta: res.meta };
       },
-      async run(): Promise<D1Result> { return execSql(sql, boundParams); },
+      async run(): Promise<D1Result> {
+        return execSql(sql, boundParams);
+      },
       async raw(): Promise<unknown[][]> {
-        return (execSql(sql, boundParams).results ?? []).map(r => Object.values(r));
+        return (execSql(sql, boundParams).results ?? []).map((r) => Object.values(r));
       },
     };
     return stmt;
   }
 
   const d1 = {
-    prepare(sql: string): D1Statement { return makeStatement(sql); },
-    async batch(statements: D1Statement[]): Promise<D1Result[]> {
-      return Promise.all(statements.map(s => s.run()));
+    prepare(sql: string): D1Statement {
+      return makeStatement(sql);
     },
-    async exec(sql: string): Promise<D1Result> { return execSql(sql, []); },
-    async dump(): Promise<ArrayBuffer> { return new ArrayBuffer(0); },
+    async batch(statements: D1Statement[]): Promise<D1Result[]> {
+      return Promise.all(statements.map((s) => s.run()));
+    },
+    async exec(sql: string): Promise<D1Result> {
+      return execSql(sql, []);
+    },
+    async dump(): Promise<ArrayBuffer> {
+      return new ArrayBuffer(0);
+    },
   } as unknown as D1Database;
 
   return { db: d1, store };
@@ -301,31 +341,43 @@ function makePutReq(pathname: string, body: unknown): Request {
   });
 }
 
-function seedUser(db: ReturnType<typeof makeDb>, row: {
-  id: string; email: string; tenantId?: string | null; role?: string;
-}) {
-  return db.insertInto('user').values({
-    id: row.id,
-    name: 'Test User',
-    email: row.email,
-    emailVerified: 1,
-    image: null,
-    planTier: 'personal-free',
-    tenantId: row.tenantId ?? null,
-    role: row.role ?? 'owner',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  }).execute();
+function seedUser(
+  db: ReturnType<typeof makeDb>,
+  row: {
+    id: string;
+    email: string;
+    tenantId?: string | null;
+    role?: string;
+  },
+) {
+  return db
+    .insertInto('user')
+    .values({
+      id: row.id,
+      name: 'Test User',
+      email: row.email,
+      emailVerified: 1,
+      image: null,
+      planTier: 'personal-free',
+      tenantId: row.tenantId ?? null,
+      role: row.role ?? 'owner',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+    .execute();
 }
 
 function seedOrg(db: ReturnType<typeof makeDb>, row: { id: string; name?: string }) {
-  return db.insertInto('organization').values({
-    id: row.id,
-    name: row.name ?? 'Test Org',
-    contactEmail: 'admin@testorg.com',
-    phone: '555-0100',
-    createdAt: Date.now(),
-  }).execute();
+  return db
+    .insertInto('organization')
+    .values({
+      id: row.id,
+      name: row.name ?? 'Test Org',
+      contactEmail: 'admin@testorg.com',
+      phone: '555-0100',
+      createdAt: Date.now(),
+    })
+    .execute();
 }
 
 // ── user GET tests ───────────────────────────────────────────────────────────
@@ -346,27 +398,45 @@ describe('GET /api/config/user', () => {
 
   it('unauth → 401', async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await handleConfigRoute(makeGetReq('/api/config/user'), env, ctx, '/api/config/user');
+    const res = await handleConfigRoute(
+      makeGetReq('/api/config/user'),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(401);
     expect((await json(res)).code).toBe('UNAUTHORIZED');
   });
 
   it('no stored row → { config: null }', async () => {
-    const res = await handleConfigRoute(makeGetReq('/api/config/user'), env, ctx, '/api/config/user');
+    const res = await handleConfigRoute(
+      makeGetReq('/api/config/user'),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ config: null });
   });
 
   it('row present → returns parsed blob with templates/exercises defaulting to []', async () => {
-    await db.insertInto('user_config').values({
-      userId: 'u1',
-      settings: '{"theme":"dark"}',
-      clinician: '{"name":"Alice"}',
-      templates: '[]',
-      exercises: '[]',
-      updatedAt: 1000,
-    }).execute();
-    const res = await handleConfigRoute(makeGetReq('/api/config/user'), env, ctx, '/api/config/user');
+    await db
+      .insertInto('user_config')
+      .values({
+        userId: 'u1',
+        settings: '{"theme":"dark"}',
+        clinician: '{"name":"Alice"}',
+        templates: '[]',
+        exercises: '[]',
+        updatedAt: 1000,
+      })
+      .execute();
+    const res = await handleConfigRoute(
+      makeGetReq('/api/config/user'),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(200);
     const body = await json(res);
     const cfg = body.config as Record<string, unknown>;
@@ -396,18 +466,33 @@ describe('PUT /api/config/user', () => {
 
   it('unauth → 401', async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { updatedAt: 1000 }), env, ctx, '/api/config/user');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { updatedAt: 1000 }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(401);
   });
 
   it('missing updatedAt → 400 MISSING_FIELDS', async () => {
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { settings: {} }), env, ctx, '/api/config/user');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { settings: {} }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('MISSING_FIELDS');
   });
 
   it('non-finite updatedAt → 400 MISSING_FIELDS', async () => {
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { updatedAt: 'not-a-number' }), env, ctx, '/api/config/user');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { updatedAt: 'not-a-number' }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('MISSING_FIELDS');
   });
@@ -435,11 +520,20 @@ describe('PUT /api/config/user', () => {
   });
 
   it('forbidden clinical key → 400 FORBIDDEN_KEY; no DB write', async () => {
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { patients: [], updatedAt: 1000 }), env, ctx, '/api/config/user');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { patients: [], updatedAt: 1000 }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('FORBIDDEN_KEY');
     // DB must not have been written
-    const row = await db.selectFrom('user_config').select(['userId']).where('userId', '=', 'u1').executeTakeFirst();
+    const row = await db
+      .selectFrom('user_config')
+      .select(['userId'])
+      .where('userId', '=', 'u1')
+      .executeTakeFirst();
     expect(row).toBeUndefined();
   });
 
@@ -457,13 +551,24 @@ describe('PUT /api/config/user', () => {
 
   it('PUT then GET round-trip', async () => {
     const putRes = await handleConfigRoute(
-      makePutReq('/api/config/user', { settings: { theme: 'light' }, clinician: { name: 'Bob' }, updatedAt: 2000 }),
-      env, ctx, '/api/config/user',
+      makePutReq('/api/config/user', {
+        settings: { theme: 'light' },
+        clinician: { name: 'Bob' },
+        updatedAt: 2000,
+      }),
+      env,
+      ctx,
+      '/api/config/user',
     );
     expect(putRes.status).toBe(200);
-    expect((await json(putRes))).toMatchObject({ ok: true, updatedAt: 2000 });
+    expect(await json(putRes)).toMatchObject({ ok: true, updatedAt: 2000 });
 
-    const getRes = await handleConfigRoute(makeGetReq('/api/config/user'), env, ctx, '/api/config/user');
+    const getRes = await handleConfigRoute(
+      makeGetReq('/api/config/user'),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(getRes.status).toBe(200);
     const body = await json(getRes);
     const cfg = body.config as Record<string, unknown>;
@@ -474,30 +579,73 @@ describe('PUT /api/config/user', () => {
 
   it('LWW reject: existing updatedAt:2000, PUT with updatedAt:1000 → 409 STALE_WRITE', async () => {
     // Seed an existing row with newer updatedAt
-    await db.insertInto('user_config').values({
-      userId: 'u1', settings: '{}', clinician: '{}', templates: '[]', exercises: '[]', updatedAt: 2000,
-    }).execute();
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { updatedAt: 1000 }), env, ctx, '/api/config/user');
+    await db
+      .insertInto('user_config')
+      .values({
+        userId: 'u1',
+        settings: '{}',
+        clinician: '{}',
+        templates: '[]',
+        exercises: '[]',
+        updatedAt: 2000,
+      })
+      .execute();
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { updatedAt: 1000 }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(409);
     expect((await json(res)).code).toBe('STALE_WRITE');
   });
 
   it('LWW apply: existing updatedAt:1000, PUT with updatedAt:2000 → applied', async () => {
-    await db.insertInto('user_config').values({
-      userId: 'u1', settings: '{}', clinician: '{}', templates: '[]', exercises: '[]', updatedAt: 1000,
-    }).execute();
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { settings: { v: 2 }, updatedAt: 2000 }), env, ctx, '/api/config/user');
+    await db
+      .insertInto('user_config')
+      .values({
+        userId: 'u1',
+        settings: '{}',
+        clinician: '{}',
+        templates: '[]',
+        exercises: '[]',
+        updatedAt: 1000,
+      })
+      .execute();
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { settings: { v: 2 }, updatedAt: 2000 }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(200);
-    const row = await db.selectFrom('user_config').select(['updatedAt', 'settings']).where('userId', '=', 'u1').executeTakeFirst();
+    const row = await db
+      .selectFrom('user_config')
+      .select(['updatedAt', 'settings'])
+      .where('userId', '=', 'u1')
+      .executeTakeFirst();
     expect(row?.updatedAt).toBe(2000);
     expect(JSON.parse(row?.settings as string)).toEqual({ v: 2 });
   });
 
   it('LWW equal updatedAt → applied (idempotent re-push)', async () => {
-    await db.insertInto('user_config').values({
-      userId: 'u1', settings: '{}', clinician: '{}', templates: '[]', exercises: '[]', updatedAt: 1000,
-    }).execute();
-    const res = await handleConfigRoute(makePutReq('/api/config/user', { updatedAt: 1000 }), env, ctx, '/api/config/user');
+    await db
+      .insertInto('user_config')
+      .values({
+        userId: 'u1',
+        settings: '{}',
+        clinician: '{}',
+        templates: '[]',
+        exercises: '[]',
+        updatedAt: 1000,
+      })
+      .execute();
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/user', { updatedAt: 1000 }),
+      env,
+      ctx,
+      '/api/config/user',
+    );
     expect(res.status).toBe(200);
   });
 
@@ -510,7 +658,11 @@ describe('PUT /api/config/user', () => {
       updatedAt: 100,
     };
     await handleConfigRoute(makePutReq('/api/config/user', body), env, ctx, '/api/config/user');
-    const row = await db.selectFrom('user_config').select(['templates']).where('userId', '=', 'u1').executeTakeFirst();
+    const row = await db
+      .selectFrom('user_config')
+      .select(['templates'])
+      .where('userId', '=', 'u1')
+      .executeTakeFirst();
     const templates = JSON.parse(row?.templates as string) as Array<{ id: string }>;
     expect(templates).toHaveLength(1);
     expect(templates[0].id).toBe('custom');
@@ -584,41 +736,72 @@ describe('PUT /api/config/org', () => {
 
   it('unauth → 401', async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await handleConfigRoute(makePutReq('/api/config/org', { updatedAt: 1 }), env, ctx, '/api/config/org');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/org', { updatedAt: 1 }),
+      env,
+      ctx,
+      '/api/config/org',
+    );
     expect(res.status).toBe(401);
   });
 
   it('non-manager member PUT → 403 FORBIDDEN', async () => {
     await seedUser(db, { id: 'std', email: 'std@test.com', tenantId: 'org1', role: 'standard' });
     mockGetSession.mockResolvedValue({ user: { id: 'std' } });
-    const res = await handleConfigRoute(makePutReq('/api/config/org', { updatedAt: 1000 }), env, ctx, '/api/config/org');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/org', { updatedAt: 1000 }),
+      env,
+      ctx,
+      '/api/config/org',
+    );
     expect(res.status).toBe(403);
     expect((await json(res)).code).toBe('FORBIDDEN');
   });
 
   it('missing updatedAt → 400 MISSING_FIELDS', async () => {
-    const res = await handleConfigRoute(makePutReq('/api/config/org', { policy: {} }), env, ctx, '/api/config/org');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/org', { policy: {} }),
+      env,
+      ctx,
+      '/api/config/org',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('MISSING_FIELDS');
   });
 
   it('forbidden key in org config → 400 FORBIDDEN_KEY; no DB write', async () => {
-    const res = await handleConfigRoute(makePutReq('/api/config/org', { sessions: [], updatedAt: 1 }), env, ctx, '/api/config/org');
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/org', { sessions: [], updatedAt: 1 }),
+      env,
+      ctx,
+      '/api/config/org',
+    );
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe('FORBIDDEN_KEY');
-    const row = await db.selectFrom('org_config').select(['orgId']).where('orgId', '=', 'org1').executeTakeFirst();
+    const row = await db
+      .selectFrom('org_config')
+      .select(['orgId'])
+      .where('orgId', '=', 'org1')
+      .executeTakeFirst();
     expect(row).toBeUndefined();
   });
 
   it('org PUT then GET round-trip', async () => {
     const putRes = await handleConfigRoute(
       makePutReq('/api/config/org', { policy: { requireNotes: true }, updatedAt: 5000 }),
-      env, ctx, '/api/config/org',
+      env,
+      ctx,
+      '/api/config/org',
     );
     expect(putRes.status).toBe(200);
-    expect((await json(putRes))).toMatchObject({ ok: true, updatedAt: 5000 });
+    expect(await json(putRes)).toMatchObject({ ok: true, updatedAt: 5000 });
 
-    const getRes = await handleConfigRoute(makeGetReq('/api/config/org'), env, ctx, '/api/config/org');
+    const getRes = await handleConfigRoute(
+      makeGetReq('/api/config/org'),
+      env,
+      ctx,
+      '/api/config/org',
+    );
     expect(getRes.status).toBe(200);
     const body = await json(getRes);
     const cfg = body.config as Record<string, unknown>;
@@ -628,24 +811,49 @@ describe('PUT /api/config/org', () => {
   });
 
   it('org LWW reject: existing updatedAt:3000, PUT with updatedAt:1000 → 409 STALE_WRITE', async () => {
-    await db.insertInto('org_config').values({
-      orgId: 'org1', policy: '{}', templates: '[]', exercises: '[]', updatedAt: 3000,
-    }).execute();
-    const res = await handleConfigRoute(makePutReq('/api/config/org', { updatedAt: 1000 }), env, ctx, '/api/config/org');
+    await db
+      .insertInto('org_config')
+      .values({
+        orgId: 'org1',
+        policy: '{}',
+        templates: '[]',
+        exercises: '[]',
+        updatedAt: 3000,
+      })
+      .execute();
+    const res = await handleConfigRoute(
+      makePutReq('/api/config/org', { updatedAt: 1000 }),
+      env,
+      ctx,
+      '/api/config/org',
+    );
     expect(res.status).toBe(409);
     expect((await json(res)).code).toBe('STALE_WRITE');
   });
 
   it('org LWW apply: existing updatedAt:1000, PUT with updatedAt:3000 → applied', async () => {
-    await db.insertInto('org_config').values({
-      orgId: 'org1', policy: '{}', templates: '[]', exercises: '[]', updatedAt: 1000,
-    }).execute();
+    await db
+      .insertInto('org_config')
+      .values({
+        orgId: 'org1',
+        policy: '{}',
+        templates: '[]',
+        exercises: '[]',
+        updatedAt: 1000,
+      })
+      .execute();
     const res = await handleConfigRoute(
       makePutReq('/api/config/org', { policy: { v: 2 }, updatedAt: 3000 }),
-      env, ctx, '/api/config/org',
+      env,
+      ctx,
+      '/api/config/org',
     );
     expect(res.status).toBe(200);
-    const row = await db.selectFrom('org_config').select(['updatedAt', 'policy']).where('orgId', '=', 'org1').executeTakeFirst();
+    const row = await db
+      .selectFrom('org_config')
+      .select(['updatedAt', 'policy'])
+      .where('orgId', '=', 'org1')
+      .executeTakeFirst();
     expect(row?.updatedAt).toBe(3000);
     expect(JSON.parse(row?.policy as string)).toEqual({ v: 2 });
   });
@@ -678,7 +886,12 @@ describe('config route method/route guards', () => {
   });
 
   it('unknown config path → 404 NOT_FOUND', async () => {
-    const res = await handleConfigRoute(makeGetReq('/api/config/unknown'), env, ctx, '/api/config/unknown');
+    const res = await handleConfigRoute(
+      makeGetReq('/api/config/unknown'),
+      env,
+      ctx,
+      '/api/config/unknown',
+    );
     expect(res.status).toBe(404);
     expect((await json(res)).code).toBe('NOT_FOUND');
   });

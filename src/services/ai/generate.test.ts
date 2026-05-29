@@ -152,7 +152,16 @@ describe('generateNote', () => {
   it('passes modifier block to callAnthropic when modifiers are set', async () => {
     mockCallAnthropic.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
 
-    await generateNote({ ...baseArgs, modifiers: { length: 'concise', clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] } });
+    await generateNote({
+      ...baseArgs,
+      modifiers: {
+        length: 'concise',
+        clinicalDetail: [],
+        codingBilling: [],
+        beyondNote: [],
+        customInstructions: [],
+      },
+    });
 
     expect(mockCallAnthropic).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -1,5 +1,9 @@
 import { useCallback, useState } from 'react';
-import { scrubPII, isPIIModelLoaded, PRIVACY_FILTER_MODEL } from '@/services/ai/client/privacyFilter';
+import {
+  scrubPII,
+  isPIIModelLoaded,
+  PRIVACY_FILTER_MODEL,
+} from '@/services/ai/client/privacyFilter';
 import { detectRegexPII } from '@/lib/pii/regexPII';
 import { applySpans, mergeSpans, type PIISpan } from '@/lib/pii/scrubSpans';
 import { useSettings } from '@/contexts/SettingsProvider';

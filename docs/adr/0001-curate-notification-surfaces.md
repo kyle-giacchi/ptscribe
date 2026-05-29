@@ -17,8 +17,8 @@ satisfied loudly and inconsistently.
 ## Decision
 
 We adopt **five canonical surfaces** — Toast, Inline alert, Blocking dialog, Alerts bell, Page
-banner — routed by two questions: *did the clinician just trigger it, in their current focus?* and
-*does it require an action to move forward?* (See the **Notification and error surfaces** entry in
+banner — routed by two questions: _did the clinician just trigger it, in their current focus?_ and
+_does it require an action to move forward?_ (See the **Notification and error surfaces** entry in
 `CONTEXT.md` for the per-surface definitions.)
 
 Three rules give the model teeth:
@@ -26,7 +26,7 @@ Three rules give the model teeth:
 1. **One event = one surface.** The same event is never announced twice. The redundant
    `toast.error` that accompanied inline AI-call errors is removed.
 2. **The Page banner is reserved for session-wide persistence/save failures**, not artifact-tied
-   errors. An unclassified *generation* failure moves to the Note's Inline alert via a generic
+   errors. An unclassified _generation_ failure moves to the Note's Inline alert via a generic
    fallback; the banner keeps only the storage/save-failure role it already serves.
 3. **The Alerts bell is cross-session / ambient only.** A failure specific to the artifact or
    affordance the clinician is working on is an Inline alert, never a bell entry.
