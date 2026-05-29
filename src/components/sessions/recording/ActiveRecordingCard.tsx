@@ -1,14 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Square, Pause, Play } from 'lucide-react';
-import { formatDuration } from '@/utils/format';
 import { Waveform } from '@/components/design/Waveform';
 import type { MicState } from '@/components/design/MicStatusPill';
 import type { UseWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { LiveTranscriptView } from './LiveTranscriptView';
+import { RecordingTimer } from '../RecordingTimer';
 
 // ── Active recording state ─────────────────────────────────────────────────────
 export function ActiveRecordingCard({
-  durationSec,
+  subscribeDuration,
+  getDurationSec,
   paused,
   chainActive,
   analyser,
@@ -18,7 +19,8 @@ export function ActiveRecordingCard({
   onPauseResume,
   onStopAndFinish,
 }: {
-  durationSec: number;
+  subscribeDuration: (cb: () => void) => () => void;
+  getDurationSec: () => number;
   paused: boolean;
   chainActive: boolean;
   analyser: AnalyserNode | null;
@@ -29,13 +31,6 @@ export function ActiveRecordingCard({
   onStopAndFinish: () => void;
 }) {
   const [transcriptVisible, setTranscriptVisible] = useState(true);
-  // Always-fresh elapsed-sec so the restart callback captures current duration, not a snapshot.
-  const durationSecRef = useRef(durationSec);
-  // Idiomatic ref-mirror. React 19 strict prefers writes inside useEffect, but
-  // the consumer (a stable restart callback) only reads from event handlers
-  // after commit, so the divergence window doesn't manifest in practice.
-  // eslint-disable-next-line react-hooks/refs
-  durationSecRef.current = durationSec;
 
   const micState: MicState = paused ? 'paused' : 'connected';
   const accentColor = paused ? 'var(--color-pt-amber)' : 'var(--color-pt-red)';
@@ -148,7 +143,9 @@ export function ActiveRecordingCard({
                 style={{ background: accentColor }}
               />
             </span>
-            <span
+            <RecordingTimer
+              subscribeDuration={subscribeDuration}
+              getDurationSec={getDurationSec}
               className="font-mono font-semibold tabular-nums"
               style={{
                 color: 'var(--color-pt-text)',
@@ -156,9 +153,7 @@ export function ActiveRecordingCard({
                 letterSpacing: '-0.03em',
                 lineHeight: 1,
               }}
-            >
-              {formatDuration(durationSec)}
-            </span>
+            />
             <span
               className="self-end pb-0.5 text-[11px] font-bold uppercase tracking-widest"
               style={{ color: accentFg }}

@@ -55,6 +55,17 @@ export interface UseRecorder {
    * Clear it to stop receiving callbacks.
    */
   onChunk: MutableRefObject<((blob: Blob, mimeType: string) => void) | null>;
+  /**
+   * External store for the live elapsed seconds. The tick interval updates an
+   * internal ref every ~250 ms and notifies subscribers WITHOUT a per-tick
+   * `setState`, so a `RecordingTimer` leaf can subscribe via
+   * `useSyncExternalStore` and re-render alone — the recorder's host component
+   * (SessionRoute) no longer re-renders once per second.
+   * `durationSec` on this object reflects only committed (paused/stopped/reset)
+   * values; live consumers must read `getDurationSec()` / subscribe.
+   */
+  subscribeDuration: (cb: () => void) => () => void;
+  getDurationSec: () => number;
 }
 
 const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -98,6 +109,24 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const [micDisconnected, setMicDisconnected] = useState(false);
   const [silenceWarning, setSilenceWarning] = useState(false);
   const silenceWarnActiveRef = useRef(false);
+
+  // ── Live duration external store ────────────────────────────────────────────
+  // The tick writes the live elapsed seconds here and notifies subscribers; this
+  // avoids a per-second setState in the host component. `durationSec` state is
+  // still updated on pause/stop/reset (low-frequency) for any render-time reader.
+  const durationRef = useRef(0);
+  const durationSubscribersRef = useRef(new Set<() => void>());
+  const notifyDuration = useCallback((value: number) => {
+    durationRef.current = value;
+    for (const cb of durationSubscribersRef.current) cb();
+  }, []);
+  const subscribeDuration = useCallback((cb: () => void) => {
+    durationSubscribersRef.current.add(cb);
+    return () => {
+      durationSubscribersRef.current.delete(cb);
+    };
+  }, []);
+  const getDurationSec = useCallback(() => durationRef.current, []);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -206,7 +235,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       const now = Date.now();
       const live = (now - startedAtRef.current) / 1000;
       const total = accumulatedRef.current + live;
-      setDurationSec(total);
+      // Notify the external store instead of setState so the live timer updates
+      // in a subscribing leaf without re-rendering the recorder's host component.
+      notifyDuration(total);
       const limits = limitsRef.current;
 
       // Sample voice level before limit checks so lastVoiceAtMs stays fresh
@@ -287,7 +318,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         }
       }
     }, 250);
-  }, []);
+  }, [notifyDuration]);
 
   const tickPause = useCallback(() => {
     if (tickRef.current) {
@@ -295,8 +326,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       tickRef.current = null;
     }
     accumulatedRef.current += (Date.now() - startedAtRef.current) / 1000;
+    // Commit the paused value to both state (render-time readers) and the store.
     setDurationSec(accumulatedRef.current);
-  }, []);
+    notifyDuration(accumulatedRef.current);
+  }, [notifyDuration]);
 
   /**
    * Builds the final blob from whatever in-memory chunks exist and transitions
@@ -447,6 +480,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         recorderRef.current = recorder;
         accumulatedRef.current = 0;
         setDurationSec(0);
+        notifyDuration(0);
         setBlob(null);
         setSoftWarnReached(false);
         setHardCapStopped(false);
@@ -494,7 +528,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         return false;
       }
     },
-    [teardown, tickStart, attachVisibilityHandler, finalizeInterrupted],
+    [teardown, tickStart, attachVisibilityHandler, finalizeInterrupted, notifyDuration],
   );
 
   const pause = useCallback(() => {
@@ -546,6 +580,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     chunksRef.current = [];
     accumulatedRef.current = 0;
     setDurationSec(0);
+    notifyDuration(0);
     setBlob(null);
     setError(null);
     setStatus('idle');
@@ -557,7 +592,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     setMicDisconnected(false);
     setSilenceWarning(false);
     silenceWarnActiveRef.current = false;
-  }, [teardown]);
+  }, [teardown, notifyDuration]);
 
   return {
     status,
@@ -578,5 +613,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     silenceWarning,
     analyser,
     onChunk: onChunkRef,
+    subscribeDuration,
+    getDurationSec,
   };
 }

@@ -198,7 +198,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   useAutoRotateClip(
     recorder.status,
-    recorder.durationSec,
+    recorder.getDurationSec,
     handleFinishedRecording,
     handleStartRecording,
   );
@@ -432,11 +432,14 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   // True when a note exists but none of the generation inputs have changed.
   // Regeneration is still allowed, but requires the user to explain what to improve.
-  const inputsUnchanged = !!note && (
+  // The JSON.stringify comparison is gated behind the cheap string/equality checks
+  // (short-circuit &&) so it only runs when the transcript + template already match
+  // and a note exists — not on every unrelated render of this hot component (F2).
+  const inputsUnchanged =
+    !!note &&
     effectiveTranscript === (note.generatedFromTranscript ?? '') &&
-    JSON.stringify(currentModifiers) === JSON.stringify(note.modifiers ?? emptyModifiers) &&
-    (session.templateId ?? '') === (note.templateId ?? '')
-  );
+    (session.templateId ?? '') === (note.templateId ?? '') &&
+    JSON.stringify(currentModifiers) === JSON.stringify(note.modifiers ?? emptyModifiers);
 
   function handleModifiersChange(next: import('@/types').SessionModifiers) {
     patchSession({ modifiers: next });

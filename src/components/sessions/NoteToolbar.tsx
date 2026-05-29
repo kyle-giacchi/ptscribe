@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { ChevronDown, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { TemplateDropdown } from './TemplateDropdown';
@@ -34,7 +34,7 @@ function countActiveModifiers(m: SessionModifiers): number {
   );
 }
 
-export function NoteToolbar({
+function NoteToolbarImpl({
   template, templates,
   hasDraftContent, canGenerate, requiresFeedback, isGenerating, note, patient,
   modifiers, onTemplateChange, onManageTemplates, onGenerate, onModifiersChange,
@@ -240,3 +240,5 @@ export function NoteToolbar({
     </div>
   );
 }
+
+export const NoteToolbar = memo(NoteToolbarImpl);

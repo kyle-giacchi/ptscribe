@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ClipboardList, Copy } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,7 +12,7 @@ export interface NotePanelProps {
   onSectionChange: (key: string, body: string) => void;
 }
 
-export function NotePanel({
+function NotePanelImpl({
   patient,
   note,
   template,
@@ -128,3 +129,5 @@ export function NotePanel({
     </div>
   );
 }
+
+export const NotePanel = memo(NotePanelImpl);
