@@ -10,6 +10,13 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  * shape. v0/v1 finance-app data is still rejected by `safeParse` and replaced with
  * the default empty state — these migrations only handle PTScribe v1+ data.
  *
+ * The `MIGRATIONS` table below is the single source of truth: entries must stay
+ * contiguous (`from === previous.to`) from v1 through CURRENT_VERSION, each step
+ * advancing exactly one version (`to === from + 1`). The runner drives the table
+ * with a while-loop; a missing step throws rather than silently stalling. To add a
+ * step: append `{ from: N, to: N + 1, fn: migrateVNToVN1 }`, define the function in
+ * numeric order, add a bullet here, and bump `APP_DATA_VERSION`.
+ *
  * - v1 → v2: OpenAI Whisper provider replaced with Cloudflare Workers AI Whisper.
  * - v2 → v3: `Session.audioRef` collapsed into `Session.clips: SessionClip[]` so
  *   a session can hold multiple discrete recordings. The legacy IDB Blob keyed
@@ -27,12 +34,12 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  * - v7 → v8: Adds `Settings.security.idleLockMinutes` (default 10). Auto-lock the vault
  *   after this many minutes of inactivity. `0` disables the timer.
  * - v8 → v9: Adds optional `Clinician.acknowledgedDisclosureAt` (ms timestamp). Captured
- * - v9 → v10: Adds optional `SessionClip.localTranscript` (whisper-tiny result kept as revert target).
  *   when the clinician checks the consent box during Setup; absence is fine for
  *   pre-existing data. No structural changes.
+ * - v9 → v10: Adds optional `SessionClip.localTranscript` (whisper-tiny result kept as revert target).
  * - v10 → v11: Adds `AppData.tenantId` (string). Defaults to `'local'` for all
  *   existing single-tenant vaults. Reserved for future multi-tenant routing.
- * - v11 → v12: Adds `Settings.session.autoFinish` (default true) and seeds a
+ * - v11 → v12: Adds `Settings.session.autoFinish` (default false) and seeds a
  *   built-in "Unassigned" patient row used by quick-record paths.
  * - v12 → v13: Adds `Settings.recordingLimits` (cost guardrails — 75 min soft warn,
  *   90 min hard cap, 10 min idle auto-stop), `Settings.orgPolicy` (active template
@@ -58,8 +65,12 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   (type `TranscriptTier`). Old `transcriptSource` values mapped: 'webspeech'→'t1',
  *   'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'. New `Session.editedTranscript`
  *   optional field added (no structural transform needed — defaults to absent).
+ * - v18 → v19: Adds `Settings.session.webSpeechEnabled` (default false) — live Web
+ *   Speech T1 capture is now opt-in.
  * - v19 → v20: Removes `Settings.orgPolicy.toneStyle` — tone is now a Modifier chip on
  *   each Session. Zod strips the stale field automatically; migration just bumps version.
+ * - v20 → v21: Adds optional `Session.aiErrors` (persisted AI-call failure log).
+ *   Existing sessions simply have no errors yet — nothing to backfill.
  * - v21 → v22: Adds optional `Session.cloudTranscribeCount` (persisted Nova cap counter).
  *   Existing sessions have consumed no cloud pass yet — leave undefined (read as 0).
  * - v22 → v23: Adds optional `Settings.audio.inputDeviceId` (microphone chosen in the
@@ -72,6 +83,48 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  *   retention). Legacy finalized sessions have no recorded finalize time — backfill
  *   `finalizedAt = updatedAt` so they are anchored; non-finalized sessions stay undefined.
  */
+
+type MigrationStep = {
+  from: number;
+  to: number;
+  fn: (input: Record<string, unknown>) => Record<string, unknown>;
+};
+
+/**
+ * Ordered, contiguous migration table — the single source of truth for the
+ * ladder. Entries run sequentially; a contiguity test in `migrations.test.ts`
+ * asserts coverage of every version in `1..CURRENT_VERSION` with `to === from + 1`.
+ */
+const MIGRATIONS: MigrationStep[] = [
+  { from: 1, to: 2, fn: migrateV1ToV2 },
+  { from: 2, to: 3, fn: migrateV2ToV3 },
+  { from: 3, to: 4, fn: migrateV3ToV4 },
+  { from: 4, to: 5, fn: migrateV4ToV5 },
+  { from: 5, to: 6, fn: migrateV5ToV6 },
+  { from: 6, to: 7, fn: migrateV6ToV7 },
+  { from: 7, to: 8, fn: migrateV7ToV8 },
+  { from: 8, to: 9, fn: migrateV8ToV9 },
+  { from: 9, to: 10, fn: migrateV9ToV10 },
+  { from: 10, to: 11, fn: migrateV10ToV11 },
+  { from: 11, to: 12, fn: migrateV11ToV12 },
+  { from: 12, to: 13, fn: migrateV12ToV13 },
+  { from: 13, to: 14, fn: migrateV13ToV14 },
+  { from: 14, to: 15, fn: migrateV14ToV15 },
+  { from: 15, to: 16, fn: migrateV15ToV16 },
+  { from: 16, to: 17, fn: migrateV16ToV17 },
+  { from: 17, to: 18, fn: migrateV17ToV18 },
+  { from: 18, to: 19, fn: migrateV18ToV19 },
+  { from: 19, to: 20, fn: migrateV19ToV20 },
+  { from: 20, to: 21, fn: migrateV20ToV21 },
+  { from: 21, to: 22, fn: migrateV21ToV22 },
+  { from: 22, to: 23, fn: migrateV22ToV23 },
+  { from: 23, to: 24, fn: migrateV23ToV24 },
+  { from: 24, to: 25, fn: migrateV24ToV25 },
+];
+
+/** Exposed for the contiguity test in `migrations.test.ts`. */
+export const __MIGRATIONS_FOR_TEST = MIGRATIONS;
+
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
   if (typeof version !== 'number') {
@@ -88,77 +141,13 @@ export function migrate(data: unknown): AppData {
 
   let working = data as Record<string, unknown>;
 
-  if ((working as { version?: number }).version === 1) {
-    working = migrateV1ToV2(working);
-  }
-  if ((working as { version?: number }).version === 2) {
-    working = migrateV2ToV3(working);
-  }
-  if ((working as { version?: number }).version === 3) {
-    working = migrateV3ToV4(working);
-  }
-  if ((working as { version?: number }).version === 4) {
-    working = migrateV4ToV5(working);
-  }
-  if ((working as { version?: number }).version === 5) {
-    working = migrateV5ToV6(working);
-  }
-  if ((working as { version?: number }).version === 6) {
-    working = migrateV6ToV7(working);
-  }
-  if ((working as { version?: number }).version === 7) {
-    working = migrateV7ToV8(working);
-  }
-  if ((working as { version?: number }).version === 8) {
-    working = migrateV8ToV9(working);
-  }
-  if ((working as { version?: number }).version === 9) {
-    working = migrateV9ToV10(working);
-  }
-  if ((working as { version?: number }).version === 10) {
-    working = migrateV10ToV11(working);
-  }
-  if ((working as { version?: number }).version === 11) {
-    working = migrateV11ToV12(working);
-  }
-  if ((working as { version?: number }).version === 12) {
-    working = migrateV12ToV13(working);
-  }
-  if ((working as { version?: number }).version === 13) {
-    working = migrateV13ToV14(working);
-  }
-  if ((working as { version?: number }).version === 14) {
-    working = migrateV14ToV15(working);
-  }
-  if ((working as { version?: number }).version === 15) {
-    working = migrateV15ToV16(working);
-  }
-  if ((working as { version?: number }).version === 16) {
-    working = migrateV16ToV17(working);
-  }
-  if ((working as { version?: number }).version === 17) {
-    working = migrateV17ToV18(working);
-  }
-  if ((working as { version?: number }).version === 18) {
-    working = migrateV18ToV19(working);
-  }
-  if ((working as { version?: number }).version === 19) {
-    working = migrateV19ToV20(working);
-  }
-  if ((working as { version?: number }).version === 20) {
-    working = migrateV20ToV21(working);
-  }
-  if ((working as { version?: number }).version === 21) {
-    working = migrateV21ToV22(working);
-  }
-  if ((working as { version?: number }).version === 22) {
-    working = migrateV22ToV23(working);
-  }
-  if ((working as { version?: number }).version === 23) {
-    working = migrateV23ToV24(working);
-  }
-  if ((working as { version?: number }).version === 24) {
-    working = migrateV24ToV25(working);
+  while ((working as { version: number }).version < CURRENT_VERSION) {
+    const v = (working as { version: number }).version;
+    const step = MIGRATIONS.find((m) => m.from === v);
+    if (!step) {
+      throw new Error(`migrate: no migration registered for version ${v}`);
+    }
+    working = step.fn(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -189,37 +178,6 @@ function migrateV1ToV2(input: Record<string, unknown>): Record<string, unknown> 
     }
     if (typeof tx.model !== 'string' || tx.model === 'whisper-1' || tx.model.length === 0) {
       tx.model = '@cf/openai/whisper-large-v3-turbo';
-    }
-  }
-  return next;
-}
-
-function migrateV3ToV4(input: Record<string, unknown>): Record<string, unknown> {
-  const next = { ...input, version: 4 } as Record<string, unknown>;
-  const settings = next.settings as
-    | { ai?: { transcription?: Record<string, unknown> } }
-    | undefined;
-  const tx = settings?.ai?.transcription;
-  if (tx && tx.model === '@cf/openai/whisper-large-v3-turbo') {
-    tx.model = '@cf/deepgram/nova-3';
-  }
-
-  const templates = Array.isArray(next.templates)
-    ? (next.templates as Record<string, unknown>[])
-    : [];
-  const hasPremium1 = templates.some((t) => t.builtin === true && t.name === 'Premium Prompt 1');
-  if (!hasPremium1) {
-    const seed = BUILTIN_TEMPLATES.find((t) => t.name === 'Premium Prompt 1');
-    if (seed) {
-      const now = Date.now();
-      templates.unshift({
-        ...seed,
-        id: newId(),
-        builtin: true,
-        createdAt: now,
-        updatedAt: now,
-      });
-      next.templates = templates;
     }
   }
   return next;
@@ -264,6 +222,37 @@ function migrateV2ToV3(input: Record<string, unknown>): Record<string, unknown> 
   return next;
 }
 
+function migrateV3ToV4(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 4 } as Record<string, unknown>;
+  const settings = next.settings as
+    | { ai?: { transcription?: Record<string, unknown> } }
+    | undefined;
+  const tx = settings?.ai?.transcription;
+  if (tx && tx.model === '@cf/openai/whisper-large-v3-turbo') {
+    tx.model = '@cf/deepgram/nova-3';
+  }
+
+  const templates = Array.isArray(next.templates)
+    ? (next.templates as Record<string, unknown>[])
+    : [];
+  const hasPremium1 = templates.some((t) => t.builtin === true && t.name === 'Premium Prompt 1');
+  if (!hasPremium1) {
+    const seed = BUILTIN_TEMPLATES.find((t) => t.name === 'Premium Prompt 1');
+    if (seed) {
+      const now = Date.now();
+      templates.unshift({
+        ...seed,
+        id: newId(),
+        builtin: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      next.templates = templates;
+    }
+  }
+  return next;
+}
+
 function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> {
   const next = { ...input, version: 5 } as Record<string, unknown>;
   const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
@@ -292,8 +281,44 @@ function migrateV4ToV5(input: Record<string, unknown>): Record<string, unknown> 
   return next;
 }
 
+function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 6 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingAudio = (settings.audio as Record<string, unknown> | undefined) ?? {};
+  const existingSu = (existingAudio.speedUp as Record<string, unknown> | undefined) ?? undefined;
+
+  next.settings = {
+    ...settings,
+    audio: {
+      ...existingAudio,
+      speedUp: {
+        enabled: typeof existingSu?.enabled === 'boolean' ? existingSu.enabled : false,
+        speed:
+          existingSu?.speed === 1.25 || existingSu?.speed === 1.5 || existingSu?.speed === 1.75
+            ? existingSu.speed
+            : 1.25,
+      },
+    },
+  };
+  return next;
+}
+
 function migrateV6ToV7(input: Record<string, unknown>): Record<string, unknown> {
   return { ...input, version: 7 };
+}
+
+function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 8 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingSec = (settings.security as Record<string, unknown> | undefined) ?? undefined;
+  const lock = existingSec?.idleLockMinutes;
+  next.settings = {
+    ...settings,
+    security: {
+      idleLockMinutes: typeof lock === 'number' && lock >= 0 && lock <= 120 ? Math.floor(lock) : 10,
+    },
+  };
+  return next;
 }
 
 function migrateV8ToV9(input: Record<string, unknown>): Record<string, unknown> {
@@ -306,6 +331,42 @@ function migrateV9ToV10(input: Record<string, unknown>): Record<string, unknown>
 
 function migrateV10ToV11(input: Record<string, unknown>): Record<string, unknown> {
   return { ...input, version: 11, tenantId: input.tenantId ?? 'local' };
+}
+
+function migrateV11ToV12(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 12 } as Record<string, unknown>;
+
+  // 1. session.autoFinish setting (default false).
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingSession = (settings.session as Record<string, unknown> | undefined) ?? undefined;
+  next.settings = {
+    ...settings,
+    session: {
+      autoFinish:
+        typeof existingSession?.autoFinish === 'boolean' ? existingSession.autoFinish : false,
+    },
+  };
+
+  // 2. Seed the built-in "Unassigned" patient if absent. Quick-record paths
+  // attach sessions to this row so a session can start before a real patient
+  // is selected.
+  const patients = Array.isArray(next.patients)
+    ? (next.patients as Record<string, unknown>[])
+    : [];
+  if (!patients.some((p) => p.id === UNASSIGNED_PATIENT_ID)) {
+    const now = Date.now();
+    patients.unshift({
+      id: UNASSIGNED_PATIENT_ID,
+      firstName: 'Unassigned',
+      lastName: '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    next.patients = patients;
+  }
+
+  return next;
 }
 
 function migrateV12ToV13(input: Record<string, unknown>): Record<string, unknown> {
@@ -364,78 +425,6 @@ function migrateV12ToV13(input: Record<string, unknown>): Record<string, unknown
   return next;
 }
 
-function migrateV11ToV12(input: Record<string, unknown>): Record<string, unknown> {
-  const next = { ...input, version: 12 } as Record<string, unknown>;
-
-  // 1. session.autoFinish setting (default false).
-  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
-  const existingSession = (settings.session as Record<string, unknown> | undefined) ?? undefined;
-  next.settings = {
-    ...settings,
-    session: {
-      autoFinish:
-        typeof existingSession?.autoFinish === 'boolean' ? existingSession.autoFinish : false,
-    },
-  };
-
-  // 2. Seed the built-in "Unassigned" patient if absent. Quick-record paths
-  // attach sessions to this row so a session can start before a real patient
-  // is selected.
-  const patients = Array.isArray(next.patients)
-    ? (next.patients as Record<string, unknown>[])
-    : [];
-  if (!patients.some((p) => p.id === UNASSIGNED_PATIENT_ID)) {
-    const now = Date.now();
-    patients.unshift({
-      id: UNASSIGNED_PATIENT_ID,
-      firstName: 'Unassigned',
-      lastName: '',
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    });
-    next.patients = patients;
-  }
-
-  return next;
-}
-
-function migrateV7ToV8(input: Record<string, unknown>): Record<string, unknown> {
-  const next = { ...input, version: 8 } as Record<string, unknown>;
-  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
-  const existingSec = (settings.security as Record<string, unknown> | undefined) ?? undefined;
-  const lock = existingSec?.idleLockMinutes;
-  next.settings = {
-    ...settings,
-    security: {
-      idleLockMinutes: typeof lock === 'number' && lock >= 0 && lock <= 120 ? Math.floor(lock) : 10,
-    },
-  };
-  return next;
-}
-
-function migrateV5ToV6(input: Record<string, unknown>): Record<string, unknown> {
-  const next = { ...input, version: 6 } as Record<string, unknown>;
-  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
-  const existingAudio = (settings.audio as Record<string, unknown> | undefined) ?? {};
-  const existingSu = (existingAudio.speedUp as Record<string, unknown> | undefined) ?? undefined;
-
-  next.settings = {
-    ...settings,
-    audio: {
-      ...existingAudio,
-      speedUp: {
-        enabled: typeof existingSu?.enabled === 'boolean' ? existingSu.enabled : false,
-        speed:
-          existingSu?.speed === 1.25 || existingSu?.speed === 1.5 || existingSu?.speed === 1.75
-            ? existingSu.speed
-            : 1.25,
-      },
-    },
-  };
-  return next;
-}
-
 function migrateV13ToV14(input: Record<string, unknown>): Record<string, unknown> {
   // New fields are optional and default to absent — no structural transformation needed.
   // editedAfterFinalizedAt and editedAfterFinalizedCount are written at runtime by
@@ -461,11 +450,75 @@ function migrateV14ToV15(input: Record<string, unknown>): Record<string, unknown
   return next;
 }
 
+function migrateV15ToV16(input: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...input, version: 16 } as Record<string, unknown>;
+  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
+  const existingUi = (settings.ui as Record<string, unknown> | undefined) ?? {};
+  next.settings = {
+    ...settings,
+    ui: {
+      ...existingUi,
+      theme: existingUi.theme === 'system' ? 'light' : existingUi.theme,
+    },
+  };
+  return next;
+}
+
 function migrateV16ToV17(input: Record<string, unknown>): Record<string, unknown> {
   // New optional fields on Session (localTranscript, aiTranscript) and SessionClip
   // (aiTranscript) all default to absent. TranscriptSource gains 'nova'. No structural
   // transformation needed — existing data passes the updated schema as-is.
   return { ...input, version: 17 };
+}
+
+function migrateV17ToV18(input: Record<string, unknown>): Record<string, unknown> {
+  // Rename transcript tier fields on sessions and clips.
+  // Session: liveTranscript→t1Transcript, localTranscript→t2Transcript, aiTranscript→t3Transcript
+  // SessionClip: same renames + liveTranscript→t1Transcript
+  // transcriptSource values: 'webspeech'→'t1', 'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'
+  const sourceMap: Record<string, string> = { webspeech: 't1', whisper: 't2', nova: 't3', manual: 'edited' };
+  const sessions = Array.isArray(input.sessions) ? (input.sessions as Record<string, unknown>[]) : [];
+  const migratedSessions = sessions.map((s) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(s)) {
+      if (k === 'liveTranscript') { out.t1Transcript = v; continue; }
+      if (k === 'localTranscript') { out.t2Transcript = v; continue; }
+      if (k === 'aiTranscript') { out.t3Transcript = v; continue; }
+      if (k === 'transcriptSource') {
+        out.activeTranscriptTier = typeof v === 'string' ? (sourceMap[v] ?? v) : v;
+        continue;
+      }
+      out[k] = v;
+    }
+    const clips = Array.isArray(s.clips) ? (s.clips as Record<string, unknown>[]) : [];
+    out.clips = clips.map((c) => {
+      const clip: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(c)) {
+        if (k === 'liveTranscript') { clip.t1Transcript = v; continue; }
+        if (k === 'localTranscript') { clip.t2Transcript = v; continue; }
+        if (k === 'aiTranscript') { clip.t3Transcript = v; continue; }
+        clip[k] = v;
+      }
+      return clip;
+    });
+    return out;
+  });
+  return { ...input, version: 18, sessions: migratedSessions };
+}
+
+function migrateV18ToV19(input: Record<string, unknown>): Record<string, unknown> {
+  const settings = (input.settings as Record<string, unknown> | undefined) ?? {};
+  const session = (settings.session as Record<string, unknown> | undefined) ?? {};
+  return {
+    ...input,
+    version: 19,
+    settings: { ...settings, session: { ...session, webSpeechEnabled: false } },
+  };
+}
+
+function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {
+  // toneStyle removed from orgPolicy — Zod strips the stale field; just bump version.
+  return { ...input, version: 20 };
 }
 
 function migrateV20ToV21(input: Record<string, unknown>): Record<string, unknown> {
@@ -505,68 +558,4 @@ function migrateV24ToV25(input: Record<string, unknown>): Record<string, unknown
     return session;
   });
   return { ...input, sessions: nextSessions, version: 25 };
-}
-
-function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {
-  // toneStyle removed from orgPolicy — Zod strips the stale field; just bump version.
-  return { ...input, version: 20 };
-}
-
-function migrateV18ToV19(input: Record<string, unknown>): Record<string, unknown> {
-  const settings = (input.settings as Record<string, unknown> | undefined) ?? {};
-  const session = (settings.session as Record<string, unknown> | undefined) ?? {};
-  return {
-    ...input,
-    version: 19,
-    settings: { ...settings, session: { ...session, webSpeechEnabled: false } },
-  };
-}
-
-function migrateV17ToV18(input: Record<string, unknown>): Record<string, unknown> {
-  // Rename transcript tier fields on sessions and clips.
-  // Session: liveTranscript→t1Transcript, localTranscript→t2Transcript, aiTranscript→t3Transcript
-  // SessionClip: same renames + liveTranscript→t1Transcript
-  // transcriptSource values: 'webspeech'→'t1', 'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'
-  const sourceMap: Record<string, string> = { webspeech: 't1', whisper: 't2', nova: 't3', manual: 'edited' };
-  const sessions = Array.isArray(input.sessions) ? (input.sessions as Record<string, unknown>[]) : [];
-  const migratedSessions = sessions.map((s) => {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(s)) {
-      if (k === 'liveTranscript') { out.t1Transcript = v; continue; }
-      if (k === 'localTranscript') { out.t2Transcript = v; continue; }
-      if (k === 'aiTranscript') { out.t3Transcript = v; continue; }
-      if (k === 'transcriptSource') {
-        out.activeTranscriptTier = typeof v === 'string' ? (sourceMap[v] ?? v) : v;
-        continue;
-      }
-      out[k] = v;
-    }
-    const clips = Array.isArray(s.clips) ? (s.clips as Record<string, unknown>[]) : [];
-    out.clips = clips.map((c) => {
-      const clip: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(c)) {
-        if (k === 'liveTranscript') { clip.t1Transcript = v; continue; }
-        if (k === 'localTranscript') { clip.t2Transcript = v; continue; }
-        if (k === 'aiTranscript') { clip.t3Transcript = v; continue; }
-        clip[k] = v;
-      }
-      return clip;
-    });
-    return out;
-  });
-  return { ...input, version: 18, sessions: migratedSessions };
-}
-
-function migrateV15ToV16(input: Record<string, unknown>): Record<string, unknown> {
-  const next = { ...input, version: 16 } as Record<string, unknown>;
-  const settings = (next.settings as Record<string, unknown> | undefined) ?? {};
-  const existingUi = (settings.ui as Record<string, unknown> | undefined) ?? {};
-  next.settings = {
-    ...settings,
-    ui: {
-      ...existingUi,
-      theme: existingUi.theme === 'system' ? 'light' : existingUi.theme,
-    },
-  };
-  return next;
 }

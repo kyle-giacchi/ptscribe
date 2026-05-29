@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
 import type { UseWebSpeechTranscript } from '@/hooks/useLiveTranscript';
@@ -7,7 +8,18 @@ import { StatusBanner } from './StatusBanner';
 const ESTIMATED_BYTES_PER_SEC = 8 * 1024;
 const WARN_THRESHOLD_BYTES = 20 * 1024 * 1024;
 
-export function RecordingSizeHint({ durationSec }: { durationSec: number }) {
+/**
+ * Subscribes to the recorder's live-duration store so the size estimate stays
+ * current without re-rendering the host. Only this leaf reconciles per tick.
+ */
+export function RecordingSizeHint({
+  subscribeDuration,
+  getDurationSec,
+}: {
+  subscribeDuration: (cb: () => void) => () => void;
+  getDurationSec: () => number;
+}) {
+  const durationSec = useSyncExternalStore(subscribeDuration, getDurationSec, getDurationSec);
   const estimatedBytes = durationSec * ESTIMATED_BYTES_PER_SEC;
   const estimatedMb = estimatedBytes / (1024 * 1024);
   const approachingCap = estimatedBytes >= WARN_THRESHOLD_BYTES;
@@ -30,6 +42,22 @@ export function RecordingSizeHint({ durationSec }: { durationSec: number }) {
     );
   }
   return null;
+}
+
+/**
+ * Renders the live elapsed minutes (rounded) by subscribing to the recorder
+ * duration store, so the soft-warn banner copy stays current without re-rendering
+ * its host. Used inside the soft-warn StatusBanner.
+ */
+export function RecordingElapsedMinutes({
+  subscribeDuration,
+  getDurationSec,
+}: {
+  subscribeDuration: (cb: () => void) => () => void;
+  getDurationSec: () => number;
+}) {
+  const durationSec = useSyncExternalStore(subscribeDuration, getDurationSec, getDurationSec);
+  return <>{Math.round(durationSec / 60)}</>;
 }
 
 export function RecordingNotices({

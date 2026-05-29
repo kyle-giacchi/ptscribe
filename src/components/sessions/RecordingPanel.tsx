@@ -10,7 +10,7 @@ import type { SessionClip } from '@/types';
 import { StatusBanner } from './recording/StatusBanner';
 import { IdleRecordingCard } from './recording/IdleRecordingCard';
 import { ActiveRecordingCard } from './recording/ActiveRecordingCard';
-import { RecordingSizeHint, RecordingNotices, LiveTranscriptPreview } from './recording/RecordingNotices';
+import { RecordingSizeHint, RecordingNotices, LiveTranscriptPreview, RecordingElapsedMinutes } from './recording/RecordingNotices';
 import { playAlertChime } from './recording/playAlertChime';
 
 export interface RecordingPanelProps {
@@ -155,7 +155,8 @@ export function RecordingPanel({
 
       {recording ? (
         <ActiveRecordingCard
-          durationSec={recorder.durationSec}
+          subscribeDuration={recorder.subscribeDuration}
+          getDurationSec={recorder.getDurationSec}
           paused={recorder.status === 'paused'}
           chainActive={false}
           analyser={recorder.analyser}
@@ -169,13 +170,22 @@ export function RecordingPanel({
         <IdleRecordingCard onStart={onStart} onUpload={onUpload} onSkip={onSkip} uploadStatus={uploadStatus} isAddingClip={clips.length > 0} capabilities={capabilities} />
       )}
 
-      {recording && <RecordingSizeHint durationSec={recorder.durationSec} />}
+      {recording && (
+        <RecordingSizeHint
+          subscribeDuration={recorder.subscribeDuration}
+          getDurationSec={recorder.getDurationSec}
+        />
+      )}
 
       {recording && recorder.softWarnReached && (
         <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
-          This take has been recording for {Math.round(recorder.durationSec / 60)} min — consider
-          stopping and starting a fresh clip. Auto-stop at {settings.recordingLimits.maxMinutes}{' '}
-          min.
+          This take has been recording for{' '}
+          <RecordingElapsedMinutes
+            subscribeDuration={recorder.subscribeDuration}
+            getDurationSec={recorder.getDurationSec}
+          />{' '}
+          min — consider stopping and starting a fresh clip. Auto-stop at{' '}
+          {settings.recordingLimits.maxMinutes} min.
         </StatusBanner>
       )}
 

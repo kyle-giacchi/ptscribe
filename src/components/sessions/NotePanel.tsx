@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, ClipboardList, Copy } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,13 +9,20 @@ export interface NotePanelProps {
   patient: Patient;
   note: Note | undefined;
   template: NoteTemplate | undefined;
+  /**
+   * True when the note was generated from inputs (transcript / template /
+   * modifiers) that have since changed. Surfaces a banner prompting the
+   * clinician to regenerate. Suppressed once the note is finalized.
+   */
+  isStale?: boolean;
   onSectionChange: (key: string, body: string) => void;
 }
 
-export function NotePanel({
+function NotePanelImpl({
   patient,
   note,
   template,
+  isStale,
   onSectionChange,
 }: NotePanelProps) {
   const navigate = useNavigate();
@@ -52,6 +60,22 @@ export function NotePanel({
         >
           <AlertTriangle size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
           Edited after finalization ({new Date(note.editedAfterFinalizedAt).toLocaleString()})
+        </div>
+      )}
+
+      {/* Stale banner — note no longer matches the current transcript/template/modifiers */}
+      {isStale && !note?.finalized && (
+        <div
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs"
+          style={{
+            borderColor: 'var(--color-caution)',
+            background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
+            color: 'var(--color-caution)',
+          }}
+        >
+          <AlertTriangle size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
+          Generated from an earlier version of the transcript — regenerate to sync, or finalize
+          as-is.
         </div>
       )}
 
@@ -128,3 +152,5 @@ export function NotePanel({
     </div>
   );
 }
+
+export const NotePanel = memo(NotePanelImpl);
