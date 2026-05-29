@@ -14,7 +14,12 @@
 // intentional: the audit log must be readable before the vault is unlocked so
 // tampering is detectable at startup. Only action codes and timestamps are
 // stored here — no clinical content or PII.
-const STORAGE_KEY = 'ptnotes.auditLog';
+//
+// The log is profile-scoped (ADR-0007): `STORAGE_KEYS.auditLog` resolves to the
+// active profile's namespace, so one profile's security-event history is never
+// visible to another.
+import { STORAGE_KEYS } from '@/lib/storageKeys';
+
 const MAX_ENTRIES = 500;
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -50,7 +55,7 @@ async function sha256Hex(input: string): Promise<string> {
 
 function readRaw(): AuditEntry[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.auditLog);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as AuditEnvelope;
     if (parsed?.v !== 1 || !Array.isArray(parsed.entries)) return [];
@@ -62,7 +67,7 @@ function readRaw(): AuditEntry[] {
 
 function writeRaw(entries: AuditEntry[]): void {
   const trimmed = entries.slice(-MAX_ENTRIES);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, entries: trimmed }));
+  localStorage.setItem(STORAGE_KEYS.auditLog, JSON.stringify({ v: 1, entries: trimmed }));
 }
 
 export const auditLog = {
@@ -109,6 +114,6 @@ export const auditLog = {
   },
 
   clear(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEYS.auditLog);
   },
 };

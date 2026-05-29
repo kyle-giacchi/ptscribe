@@ -224,6 +224,22 @@ _Avoid_: backup password, reset code, recovery key (reserve "key" for the DEK/KE
 A self-contained v2 backup file whose DEK is wrapped by both the passphrase and (if set) the recovery code, so it can be restored on **any** device with either secret. The backup **file** (not a server) is the cross-device transport. Distinct from the same-device-only v1 encrypted backup, which is still importable.
 _Avoid_: cloud backup, sync (PTScribe does not sync clinical data to a server).
 
+## Profiles and multi-user devices
+
+A **Profile** is a cryptographically-isolated partition of _all_ on-device data — its own [vault](#vault-and-the-recording-workflow) (passphrase + DEK), its own AppData, audio, and audit log. One profile's DEK cannot decrypt another profile's data; isolation is cryptographic, not a UI filter. A device (browser profile) can hold several Profiles, but only one is unlocked at a time.
+
+Three kinds, distinguished by how the Profile is identified:
+
+- **Default local profile** — the single Profile that **not-logged-in** (anonymous, local-first) use always lands in. There is exactly one; PTScribe is fully usable here with no cloud account. Two anonymous clinicians on the same device share this one Profile — separation requires logging in.
+- **Authenticated profile** — keyed to a registered user's account identity. The **same account always maps to the same Profile** on a given device, and is the only kind that participates in [config sync](#account-config--sync). Multiple registered users on one device each get their own Authenticated profile, mutually undecryptable.
+- **Reserved test Profiles** — [Demo mode and Test User](#demo-mode) are **two separate** reserved Profiles (`demo` and `test-user`), each isolated from the other and from every real Profile. Neither syncs; neither shares storage with a real Profile, and they do **not** share storage with each other. (This supersedes the older "demo and real data share one namespace / Demo and Test User are one `DEMO_USER` identity" behavior — they now diverge at the storage layer even though they still share the `DEMO_USER` _auth_ identity.)
+
+Logging in is therefore an **act of selecting/creating a Profile**, not a precondition for using the app. Clinical data still never leaves the device; Profiles are about _separating_ on-device data between people who share a device, not about moving it to a server.
+
+Switching into a Profile **never migrates or merges** data from another Profile: logging into an account selects (or, first time, creates empty) that account's Profile; it does not adopt whatever the anonymous local Profile was holding. Moving clinical data between Profiles is only ever done by the clinician via an explicit [portable backup](#vault-and-the-recording-workflow) export/import.
+
+_Avoid_: "account" or "tenant" as a synonym for Profile — a Profile is the on-device encryption partition; an account is the cloud identity that may _bind_ to one.
+
 ## Interruption and recovery
 
 The clinician's session can be interrupted at any phase. The contract is **never silent**: every recovery path surfaces what happened and lets the clinician choose how to proceed.
@@ -281,7 +297,7 @@ A transient toast is never the _only_ indicator of a persistent error.
 
 Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** — a clinician trying the app should walk through the real workflow end-to-end against their own audio, not a canned scripted demo. The contract:
 
-- **Vault auto-unlocks**, first-run wizard is skipped, and a demo patient + a sample session are seeded into the same storage the rest of the app uses. There is no namespace split — demo and real data share `ptnotes.appData` and `ptnotes-audio`. The persistent "DEMO MODE" badge and the seeded-demo-patient affordance are the safeguards; clinicians who care about isolation should run a separate browser profile.
+- **Vault auto-unlocks**, first-run wizard is skipped, and a demo patient + a sample session are seeded into the demo [Profile](#profiles-and-multi-user-devices). Demo runs in its own isolated `demo` Profile — it does **not** share `ptnotes.appData` / `ptnotes-audio` with a real Profile or with the `test-user` Profile. The persistent "DEMO MODE" badge is still shown as a defensive signal.
 - **Note generation hits the real Anthropic Worker.** A clinician trying the app needs to see the actual AI output for the audio they recorded. The cost is bounded by the clinician's own input rate.
 - **T2 local Whisper runs normally** — it's free and is the local-pipeline showcase.
 - **Cloud transcription (Nova) is hard-disabled.** "Improve with AI" in Curate and "Re-transcribe with cloud AI" in the T2-failure dialog are both unavailable with an explanatory tooltip (_"Cloud transcription is disabled in demo mode."_). This is the single largest provider cost and is the deliberate exclusion.
@@ -296,7 +312,7 @@ The `VITE_DEMO_MODE` flag currently switches on **two distinct entry experiences
 - **Demo mode** — the _guided showcase_. Entered via **Try Demo**. The user is dropped into a single seeded demo session and **kept there** (navigation is locked to that session); a Demo Patient + sample session are pre-seeded. This is the canned-walkthrough surface.
 - **Test User** — the _full real-app experience_. Entered via **Login as Test User** on the sign-in screen. Navigation is **not** locked — the user roams the whole app (dashboard, patients, notes, templates, etc.) as in the real product. The app starts **clean**: only the clinician is seeded (no demo patient or sample session). The vault still auto-unlocks with the shared demo passphrase and the "DEMO MODE" badge still shows, because the underlying build is still the demo build — but the _behavior_ is the unconstrained app, not the locked walkthrough.
 
-Both run as the same `DEMO_USER` identity and both are unavailable when `VITE_DEMO_MODE=false`. The only thing that distinguishes a Test User session from a Demo session at runtime is a **persistent "test user" marker** (localStorage) set by the Login-as-Test-User action and cleared by **Log out** — so a Test User session behaves like a real login: it survives reloads and new tabs until the user explicitly logs out. **Log out** is a full exit: it clears both the test-user marker and the AppGate code, returning to the Landing/sign-in screen.
+Both share the `DEMO_USER` _auth_ identity and both are unavailable when `VITE_DEMO_MODE=false`, but they are **separate [Profiles](#profiles-and-multi-user-devices)** at the storage layer (`demo` vs `test-user`) and never bleed into each other. The runtime signal that selects between them is the **persistent "test user" marker** (localStorage) set by the Login-as-Test-User action and cleared by **Log out** — so a Test User session behaves like a real login: it survives reloads and new tabs until the user explicitly logs out, and it reads/writes only the `test-user` Profile's storage. **Log out** is a full exit: it locks the vault, clears the test-user marker and the AppGate code, and returns to the Landing/sign-in screen.
 
 ## Account config & sync
 
