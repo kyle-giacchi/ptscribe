@@ -119,7 +119,7 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 | `useCapturePhase`        | Recording + upload lifecycle: `handleStartRecording`, `handleFinishedRecording`, `handleUploadAudio`. Wires `useRecorder` (WAL chunking, wake lock, VAD T1 segment recorder) to clip/session mutations. |
 | `useTranscriptSource`    | Transcript-tier resolution: `backgroundT2` (auto local-Whisper pass via `useBackgroundTranscription`), `runT3` (explicit Nova "Improve with AI", capped 1×/session), `revertToLocal`. |
 | `useGeneratePhase`       | AI note generation loop + `finalize`/`unfinalize` + section edits, wired to NoteToolbar/NotePanel.                                                                 |
-| `useActionGuard`         | Per-session rate-limit guard: `checkActionGuard`, `recordAction`, plus `transcribeUsed` / `generateUsed` counters.                                                 |
+| `useActionGuard`         | Anti-double-tap **cooldown only** (`checkActionGuard`, `recordAction`). Lifetime per-session caps are not tracked here — they persist on the Session (`cloudTranscribeCount`, `generateCount`) so they survive reload/Revert/Unlock. |
 
 `AppDataProvider` owns persistence. Slice providers are thin wrappers that give domain-scoped mutators; they read from `appData` and delegate writes back up via `updateXSlice`.
 

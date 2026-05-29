@@ -65,6 +65,12 @@ export const CURRENT_VERSION = APP_DATA_VERSION;
  * - v22 → v23: Adds optional `Settings.audio.inputDeviceId` (microphone chosen in the
  *   AudioCheck pre-flight). Existing users have made no choice — leave undefined so
  *   recording keeps using the system default device.
+ * - v23 → v24: Adds optional `Session.generateCount` (persisted note-generation cap
+ *   counter, mirroring `cloudTranscribeCount`). Existing sessions have run no tracked
+ *   generations yet — leave undefined (read as 0).
+ * - v24 → v25: Adds optional `Session.finalizedAt` (anchors finalize-gated audio
+ *   retention). Legacy finalized sessions have no recorded finalize time — backfill
+ *   `finalizedAt = updatedAt` so they are anchored; non-finalized sessions stay undefined.
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
@@ -147,6 +153,12 @@ export function migrate(data: unknown): AppData {
   }
   if ((working as { version?: number }).version === 22) {
     working = migrateV22ToV23(working);
+  }
+  if ((working as { version?: number }).version === 23) {
+    working = migrateV23ToV24(working);
+  }
+  if ((working as { version?: number }).version === 24) {
+    working = migrateV24ToV25(working);
   }
 
   if ((working as { version?: number }).version !== CURRENT_VERSION) {
@@ -472,6 +484,27 @@ function migrateV22ToV23(input: Record<string, unknown>): Record<string, unknown
   // Additive optional field: Settings.audio.inputDeviceId. Existing users have made
   // no AudioCheck mic selection — leave undefined so recording uses the default device.
   return { ...input, version: 23 };
+}
+
+function migrateV23ToV24(input: Record<string, unknown>): Record<string, unknown> {
+  // Additive optional field: Session.generateCount. Existing sessions have run no
+  // tracked generations yet — leave undefined (treated as 0 at read time).
+  return { ...input, version: 24 };
+}
+
+function migrateV24ToV25(input: Record<string, unknown>): Record<string, unknown> {
+  // Additive optional field: Session.finalizedAt. Backfill legacy finalized sessions
+  // to their updatedAt so finalize-gated audio retention has an anchor; non-finalized
+  // sessions stay undefined.
+  const sessions = Array.isArray(input.sessions) ? input.sessions : [];
+  const nextSessions = sessions.map((s) => {
+    const session = s as Record<string, unknown>;
+    if (session.status === 'finalized' && session.finalizedAt === undefined) {
+      return { ...session, finalizedAt: session.updatedAt };
+    }
+    return session;
+  });
+  return { ...input, sessions: nextSessions, version: 25 };
 }
 
 function migrateV19ToV20(input: Record<string, unknown>): Record<string, unknown> {

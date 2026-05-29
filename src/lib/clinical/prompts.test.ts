@@ -224,7 +224,7 @@ describe('buildUserPrompt', () => {
     expect(result).not.toContain('Prior note');
   });
 
-  it('includes optional patient fields when present', () => {
+  it('includes sex and primary diagnosis when present, but never ICD-10 or patient notes', () => {
     const patient: Patient = {
       ...basePatient,
       sex: 'F',
@@ -235,8 +235,11 @@ describe('buildUserPrompt', () => {
     const result = buildUserPrompt({ template: baseTemplate, transcript: baseTranscript, patient });
     expect(result).toContain('Sex: F');
     expect(result).toContain('Primary diagnosis: Knee OA');
-    expect(result).toContain('ICD-10: M17.11');
-    expect(result).toContain('Allergic to NSAIDs');
+    // ICD-10 is a coded identifier and patient notes are free-text PHI — neither is sent (A9).
+    expect(result).not.toContain('M17.11');
+    expect(result).not.toContain('ICD-10:');
+    expect(result).not.toContain('Allergic to NSAIDs');
+    expect(result).not.toContain('Patient notes:');
   });
 
   it('omits optional patient fields when absent', () => {
@@ -267,5 +270,27 @@ describe('buildUserPrompt', () => {
     });
     expect(result).not.toContain('MRN-12345-SECRET');
     expect(result).not.toContain('MRN');
+  });
+
+  it('does not leak ICD-10 into the prompt', () => {
+    const patient: Patient = { ...basePatient, icd10: 'M17.11-SECRET' };
+    const result = buildUserPrompt({
+      template: baseTemplate,
+      transcript: baseTranscript,
+      patient,
+    });
+    expect(result).not.toContain('M17.11-SECRET');
+    expect(result).not.toContain('ICD-10:');
+  });
+
+  it('does not leak patient free-text notes into the prompt', () => {
+    const patient: Patient = { ...basePatient, notes: 'NOTES-12345-SECRET' };
+    const result = buildUserPrompt({
+      template: baseTemplate,
+      transcript: baseTranscript,
+      patient,
+    });
+    expect(result).not.toContain('NOTES-12345-SECRET');
+    expect(result).not.toContain('Patient notes:');
   });
 });

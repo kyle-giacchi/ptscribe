@@ -6,7 +6,7 @@ import { generateNote } from '@/services/ai/generate';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { newId } from '@/utils/ids';
-import type { useActionGuard } from './useActionGuard';
+import { MAX_GENERATES_PER_SESSION, type useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
 import type {
   Note,
@@ -127,6 +127,15 @@ export function useGeneratePhase({
         return;
       }
 
+      // Lifetime cap is session-backed (persisted) so it survives reload, Revert,
+      // and Unlock — mirrors the cloud-transcribe cap in useTranscriptSource.
+      // Absent count reads as 0. checkActionGuard below enforces only the cooldown.
+      const spentGen = session?.generateCount ?? 0;
+      if (spentGen >= MAX_GENERATES_PER_SESSION) {
+        toast.error(`Note generation limit reached (${MAX_GENERATES_PER_SESSION} per session).`);
+        return;
+      }
+
       const guard = checkActionGuard('generate');
       if (!guard.allowed) {
         toast.error(guard.reason);
@@ -226,7 +235,11 @@ export function useGeneratePhase({
             }),
           };
         }
-        patchSession({ status: 'ready', ...errorPatch });
+        // Fold the persisted generate-cap increment into the SAME success patch as
+        // status + any errorPatch. A separate patchSession here would clobber those
+        // fields (makeListMutators double-write footgun). A successful HTTP call
+        // counts against the cap regardless of whether the note came back blank.
+        patchSession({ status: 'ready', generateCount: spentGen + 1, ...errorPatch });
       } catch (e) {
         let errorPatch: Partial<Session> = {};
         if (e instanceof AiCallError) {
@@ -318,14 +331,17 @@ export function useGeneratePhase({
     }
     const target = ensureNote();
     finalizeNote(target.id);
-    patchSession({ status: 'finalized' });
+    // finalizedAt anchors finalize-gated audio retention (CONTEXT.md §Audio retention).
+    patchSession({ status: 'finalized', finalizedAt: Date.now() });
     toast.success('Note finalized');
   }, [missingRequiredLabels, ensureNote, finalizeNote, patchSession]);
 
   const unfinalize = useCallback(() => {
     if (!note) return;
     unfinalizeNote(note.id);
-    patchSession({ status: 'ready' });
+    // Re-opening clears the finalize anchor so retention does not purge a session
+    // that is active again. Re-finalizing re-stamps finalizedAt.
+    patchSession({ status: 'ready', finalizedAt: undefined });
   }, [note, unfinalizeNote, patchSession]);
 
   const copyMarkdown = useCallback((markdown: string) => {

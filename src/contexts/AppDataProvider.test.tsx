@@ -3,7 +3,7 @@ import { render, act, screen, waitFor, fireEvent } from '@testing-library/react'
 import {
   AppDataProvider,
   useAppData,
-  purgeStaleAudio,
+  purgeFinalizedAudio,
   purgeOrphanChunks,
 } from './AppDataProvider';
 import { defaultAppData } from '@/schemas';
@@ -307,55 +307,71 @@ describe('AppDataProvider', () => {
   });
 });
 
-// ─── purgeStaleAudio (pure unit tests — no rendering) ─────────────────────────
+// ─── purgeFinalizedAudio (pure unit tests — no rendering) ─────────────────────
 
-describe('purgeStaleAudio', () => {
-  it('calls remove for each clip whose createdAt is before the cutoff', () => {
+describe('purgeFinalizedAudio', () => {
+  it('NEVER removes clips for a non-finalized session, even with old clips (core bug guard)', () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const sessions = [
+      { status: 'draft', clips: [{ id: 'old-clip', createdAt: 1 }] },
+      { status: 'ready', clips: [{ id: 'ready-clip', createdAt: 1 }] },
+      { status: 'recording', clips: [{ id: 'rec-clip', createdAt: 1 }] },
+    ] as unknown as AppData['sessions'];
+
+    purgeFinalizedAudio(sessions, { remove });
+
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('removes every clip for a finalized session', () => {
     const remove = vi.fn().mockResolvedValue(undefined);
     const sessions = [
       {
-        clips: [
-          { id: 'old-clip', createdAt: 100 },
-          { id: 'new-clip', createdAt: 2000 },
-        ],
+        status: 'finalized',
+        finalizedAt: 1000,
+        clips: [{ id: 'a', createdAt: 1 }, { id: 'b', createdAt: 2 }],
       },
     ] as unknown as AppData['sessions'];
 
-    purgeStaleAudio(sessions, { remove }, 500);
-
-    expect(remove).toHaveBeenCalledWith('old-clip');
-    expect(remove).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not call remove when no clips predate the cutoff', () => {
-    const remove = vi.fn();
-    const sessions = [
-      { clips: [{ id: 'recent', createdAt: 9999 }] },
-    ] as unknown as AppData['sessions'];
-
-    purgeStaleAudio(sessions, { remove }, 500);
-
-    expect(remove).not.toHaveBeenCalled();
-  });
-
-  it('handles an empty sessions array without error', () => {
-    const remove = vi.fn();
-    purgeStaleAudio([], { remove }, Date.now());
-    expect(remove).not.toHaveBeenCalled();
-  });
-
-  it('removes clips across multiple sessions', () => {
-    const remove = vi.fn().mockResolvedValue(undefined);
-    const sessions = [
-      { clips: [{ id: 'a', createdAt: 1 }] },
-      { clips: [{ id: 'b', createdAt: 2 }, { id: 'c', createdAt: 9999 }] },
-    ] as unknown as AppData['sessions'];
-
-    purgeStaleAudio(sessions, { remove }, 500);
+    purgeFinalizedAudio(sessions, { remove });
 
     expect(remove).toHaveBeenCalledWith('a');
     expect(remove).toHaveBeenCalledWith('b');
     expect(remove).toHaveBeenCalledTimes(2);
+  });
+
+  it('purges a finalized session even when finalizedAt is absent (status is the gate)', () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const sessions = [
+      { status: 'finalized', clips: [{ id: 'legacy', createdAt: 1 }] },
+    ] as unknown as AppData['sessions'];
+
+    purgeFinalizedAudio(sessions, { remove });
+
+    expect(remove).toHaveBeenCalledWith('legacy');
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('purges only the finalized sessions in a mixed set', () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const sessions = [
+      { status: 'finalized', clips: [{ id: 'fin-a', createdAt: 1 }] },
+      { status: 'draft', clips: [{ id: 'draft-b', createdAt: 1 }] },
+      { status: 'finalized', clips: [{ id: 'fin-c', createdAt: 1 }] },
+    ] as unknown as AppData['sessions'];
+
+    purgeFinalizedAudio(sessions, { remove });
+
+    expect(remove).toHaveBeenCalledWith('fin-a');
+    expect(remove).toHaveBeenCalledWith('fin-c');
+    expect(remove).not.toHaveBeenCalledWith('draft-b');
+    expect(remove).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles an empty sessions array without error', () => {
+    const remove = vi.fn();
+    purgeFinalizedAudio([], { remove });
+    expect(remove).not.toHaveBeenCalled();
   });
 });
 
