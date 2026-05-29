@@ -5,12 +5,13 @@ import { MAX_GENERATES_PER_SESSION } from './useActionGuard';
 import type { GenerateNoteResult } from '@/services/ai/generate';
 import type { NoteTemplate, Patient, Session, Settings } from '@/types';
 
-const ensureNote = vi.fn();
 const updateNote = vi.fn();
 const addNote = vi.fn();
+const finalizeNote = vi.fn();
+const unfinalizeNote = vi.fn();
 
 vi.mock('@/contexts/NotesProvider', () => ({
-  useNotes: () => ({ addNote, updateNote, ensureNote, notes: [] }),
+  useNotes: () => ({ addNote, updateNote, finalizeNote, unfinalizeNote, notes: [] }),
 }));
 
 vi.mock('@/services/ai/generate', () => ({
@@ -141,5 +142,30 @@ describe('useGeneratePhase — persisted generate cap', () => {
     const patch = vi.mocked(params.patchSession);
     const terminal = patch.mock.calls.find(([p]) => p.status === 'ready');
     expect(terminal![0]).toMatchObject({ generateCount: 5 });
+  });
+});
+
+describe('useGeneratePhase — finalize stamps finalizedAt', () => {
+  it('stamps finalizedAt alongside status:finalized in a single patch', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(777_000);
+    const params = makeParams();
+    const { result } = renderHook(() => useGeneratePhase(params));
+
+    act(() => result.current.finalize());
+
+    expect(params.patchSession).toHaveBeenCalledWith({ status: 'finalized', finalizedAt: 777_000 });
+    now.mockRestore();
+  });
+
+  it('clears finalizedAt when a finalized session is re-opened', () => {
+    const params = makeParams({
+      note: { id: 'note-1', sections: [] } as never,
+      session: makeSession({ status: 'finalized', finalizedAt: 777_000 }),
+    });
+    const { result } = renderHook(() => useGeneratePhase(params));
+
+    act(() => result.current.unfinalize());
+
+    expect(params.patchSession).toHaveBeenCalledWith({ status: 'ready', finalizedAt: undefined });
   });
 });

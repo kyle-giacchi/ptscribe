@@ -331,14 +331,17 @@ export function useGeneratePhase({
     }
     const target = ensureNote();
     finalizeNote(target.id);
-    patchSession({ status: 'finalized' });
+    // finalizedAt anchors finalize-gated audio retention (CONTEXT.md §Audio retention).
+    patchSession({ status: 'finalized', finalizedAt: Date.now() });
     toast.success('Note finalized');
   }, [missingRequiredLabels, ensureNote, finalizeNote, patchSession]);
 
   const unfinalize = useCallback(() => {
     if (!note) return;
     unfinalizeNote(note.id);
-    patchSession({ status: 'ready' });
+    // Re-opening clears the finalize anchor so retention does not purge a session
+    // that is active again. Re-finalizing re-stamps finalizedAt.
+    patchSession({ status: 'ready', finalizedAt: undefined });
   }, [note, unfinalizeNote, patchSession]);
 
   const copyMarkdown = useCallback((markdown: string) => {

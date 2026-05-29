@@ -729,6 +729,44 @@ describe('migrate v23 → v24: Session.generateCount', () => {
   });
 });
 
+describe('migrate v24 → v25: Session.finalizedAt', () => {
+  function v24WithSession(sessionOverrides: Record<string, unknown> = {}): Record<string, unknown> {
+    const seed = defaultAppData();
+    const now = Date.now();
+    const session: Record<string, unknown> = {
+      id: 'sess-1',
+      patientId: 'pat-1',
+      type: 'follow_up',
+      date: now,
+      status: 'draft',
+      clips: [],
+      createdAt: now,
+      updatedAt: now,
+      ...sessionOverrides,
+    };
+    return { ...seed, version: 24, sessions: [session] };
+  }
+
+  it('backfills finalizedAt to updatedAt for a legacy finalized session', () => {
+    const result = migrate(v24WithSession({ status: 'finalized', updatedAt: 12_345 }));
+    expect(result.version).toBe(CURRENT_VERSION);
+    expect(result.sessions[0].finalizedAt).toBe(12_345);
+    expect(AppDataSchema.safeParse(result).success).toBe(true);
+  });
+
+  it('leaves finalizedAt undefined for a non-finalized session', () => {
+    const result = migrate(v24WithSession({ status: 'draft' }));
+    expect(result.sessions[0].finalizedAt).toBeUndefined();
+  });
+
+  it('does not overwrite an already-present finalizedAt', () => {
+    const result = migrate(
+      v24WithSession({ status: 'finalized', updatedAt: 12_345, finalizedAt: 999 }),
+    );
+    expect(result.sessions[0].finalizedAt).toBe(999);
+  });
+});
+
 // ─── Migration robustness: missing-fields at boundary ───────────────────────
 
 /**

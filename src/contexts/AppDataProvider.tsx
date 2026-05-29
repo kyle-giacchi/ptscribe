@@ -46,15 +46,26 @@ export interface AppDataContextValue {
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
-/** Remove audio clips whose createdAt timestamp predates `cutoffMs`. Fire-and-forget per clip. */
-export function purgeStaleAudio(
+/**
+ * Finalize-gated audio retention (CONTEXT.md §Audio retention). Removes per-clip
+ * audio for **finalized** sessions only — active/draft sessions keep all clip audio
+ * regardless of clip age, so Improve-with-AI and Revert keep working mid-visit.
+ * Fire-and-forget per clip; all deletes go through AudioRepository (vault boundary).
+ *
+ * Option (a): clinical audio is purged shortly after Finalize. `finalizedAt` is the
+ * retention anchor; the `autoDeleteAudioAfterDays` setting acts as an on/off switch
+ * at the call site (a finalized session's audio is dropped on the next sweep when
+ * retention is enabled). The old blunt age-sweep keyed off `clip.createdAt` and could
+ * delete audio for an active, pre-Finalize session — this guard fixes that.
+ */
+export function purgeFinalizedAudio(
   sessions: AppData['sessions'],
   repo: { remove: (id: string) => Promise<void> },
-  cutoffMs: number,
 ): void {
   for (const session of sessions) {
+    if (session.status !== 'finalized') continue;
     for (const clip of session.clips) {
-      if (clip.createdAt < cutoffMs) void repo.remove(clip.id);
+      void repo.remove(clip.id);
     }
   }
 }
@@ -144,9 +155,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       if (dataRepository.hasCorruptData()) setCorruptWarning(true);
       if (vault.isTwoTabConflict()) setTwoTabWarning(true);
 
-      const days = data.settings.retention.autoDeleteAudioAfterDays;
-      if (days) {
-        purgeStaleAudio(data.sessions, audioRepository, Date.now() - days * 24 * 60 * 60 * 1000);
+      // Retention is gated on the setting being enabled. Under the finalize-anchored
+      // model the day-count is effectively an on/off switch (see purgeFinalizedAudio).
+      if (data.settings.retention.autoDeleteAudioAfterDays) {
+        purgeFinalizedAudio(data.sessions, audioRepository);
       }
 
       const activeClipIds = new Set(data.sessions.flatMap((s) => s.clips.map((c) => c.id)));
