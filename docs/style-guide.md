@@ -22,47 +22,22 @@ Two-layer palette: **surfaces** (cool blue-gray) frame **accents** (cyan-teal fo
 
 ```css
 /* Surfaces */
---color-pt-bg: #1a2030           /* outer dark frame */
---color-pt-surface: #ffffff      /* card / header background */
---color-pt-surface-alt: #f4f6f9  /* app canvas (body background) */
---color-pt-surface-mut: #fafbfc  /* integrity strips, list rows */
---color-pt-border: #e4e8ee       /* standard borders */
---color-pt-border-strong: #d6dce5
-
-/* Text */
---color-pt-text: #1a2030         /* primary — same hue as the frame */
---color-pt-text-2: #5a6577       /* secondary / labels */
---color-pt-text-3: #8893a5       /* placeholder / subtle */
-
-/* Accent — cyan-teal */
---color-pt-accent: #0ea5a8       /* primary CTAs, active states */
---color-pt-accent-soft: #e6f7f6  /* tinted chip backgrounds */
---color-pt-accent-border: #9fdcdc
---color-pt-accent-fg: #0a6d70    /* text on accent-soft; hover bg for btn-primary */
-
-/* Semantic — red */
---color-pt-red: #dc2942
---color-pt-red-soft: #fdecee
---color-pt-red-border: #f5b8bf
---color-pt-red-fg: #9b1d2e
-
-/* Semantic — amber */
---color-pt-amber: #c47a09
---color-pt-amber-soft: #fdf3df
---color-pt-amber-border: #f0d495
---color-pt-amber-fg: #7a4c04
-
-/* Semantic — violet */
---color-pt-violet: #6f5acc       /* info, AI-related states */
---color-pt-violet-soft: #eeebfa
---color-pt-violet-border: #cfc6ee
---color-pt-violet-fg: #4a3aa3
-
-/* Semantic — slate */
---color-pt-slate: #7c8699        /* neutral pills, secondary status */
---color-pt-slate-soft: #f1f3f7
---color-pt-slate-border: #dde2ea
---color-pt-slate-fg: #374055
+--color-pt-bg: #1a2030 /* outer dark frame */ --color-pt-surface: #ffffff
+  /* card / header background */ --color-pt-surface-alt: #f4f6f9 /* app canvas (body background) */
+  --color-pt-surface-mut: #fafbfc /* integrity strips, list rows */ --color-pt-border: #e4e8ee
+  /* standard borders */ --color-pt-border-strong: #d6dce5 /* Text */ --color-pt-text: #1a2030
+  /* primary — same hue as the frame */ --color-pt-text-2: #5a6577 /* secondary / labels */
+  --color-pt-text-3: #8893a5 /* placeholder / subtle */ /* Accent — cyan-teal */
+  --color-pt-accent: #0ea5a8 /* primary CTAs, active states */ --color-pt-accent-soft: #e6f7f6
+  /* tinted chip backgrounds */ --color-pt-accent-border: #9fdcdc --color-pt-accent-fg: #0a6d70
+  /* text on accent-soft; hover bg for btn-primary */ /* Semantic — red */ --color-pt-red: #dc2942
+  --color-pt-red-soft: #fdecee --color-pt-red-border: #f5b8bf --color-pt-red-fg: #9b1d2e
+  /* Semantic — amber */ --color-pt-amber: #c47a09 --color-pt-amber-soft: #fdf3df
+  --color-pt-amber-border: #f0d495 --color-pt-amber-fg: #7a4c04 /* Semantic — violet */
+  --color-pt-violet: #6f5acc /* info, AI-related states */ --color-pt-violet-soft: #eeebfa
+  --color-pt-violet-border: #cfc6ee --color-pt-violet-fg: #4a3aa3 /* Semantic — slate */
+  --color-pt-slate: #7c8699 /* neutral pills, secondary status */ --color-pt-slate-soft: #f1f3f7
+  --color-pt-slate-border: #dde2ea --color-pt-slate-fg: #374055;
 ```
 
 ### 2.2 Usage rules
@@ -80,21 +55,23 @@ Two-layer palette: **surfaces** (cool blue-gray) frame **accents** (cyan-teal fo
 Single typeface throughout: **Inter**. It's neutral, legible at clinical distances, and renders well on both Mac Retina and low-DPI Windows.
 
 ```css
---font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif
---font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
---font-display: 'Inter'  /* same family; .font-display adds weight 600 + -0.02em tracking */
+--font-sans:
+  'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+  sans-serif --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+  monospace --font-display: 'Inter'
+    /* same family; .font-display adds weight 600 + -0.02em tracking */;
 ```
 
 ### 3.1 Scale
 
-| Role              | Size      | Weight | Notes                                              |
-| ----------------- | --------- | ------ | -------------------------------------------------- |
-| Page title        | 20–24px   | 600    | `.font-display`; one per page                      |
-| Section heading   | 15–16px   | 600    | Sentence case; never ALL CAPS                      |
-| Body              | 14–15px   | 400    | Default reading size                               |
-| Label / caption   | 12–13px   | 500    | `--color-pt-text-2`                                |
-| Timer / ID        | any       | 400    | `.tnum` — tabular numerals; `.font-mono` if fixed  |
-| Button            | 14px      | 500    | Via `.btn` — don't override                        |
+| Role            | Size    | Weight | Notes                                             |
+| --------------- | ------- | ------ | ------------------------------------------------- |
+| Page title      | 20–24px | 600    | `.font-display`; one per page                     |
+| Section heading | 15–16px | 600    | Sentence case; never ALL CAPS                     |
+| Body            | 14–15px | 400    | Default reading size                              |
+| Label / caption | 12–13px | 500    | `--color-pt-text-2`                               |
+| Timer / ID      | any     | 400    | `.tnum` — tabular numerals; `.font-mono` if fixed |
+| Button          | 14px    | 500    | Via `.btn` — don't override                       |
 
 ### 3.2 Rules
 
@@ -116,10 +93,15 @@ Sensible starting points, not rules — adjust per interaction:
 
 ```css
 /* Button hover / focus ring */
-transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+transition:
+  background-color 120ms ease-out,
+  color 120ms ease-out,
+  border-color 120ms ease-out;
 
 /* Sidebar slide, modal enter */
-transition: transform 200ms ease-out, opacity 200ms ease-out;
+transition:
+  transform 200ms ease-out,
+  opacity 200ms ease-out;
 
 /* Toast fade */
 transition: opacity 150ms ease-in;
@@ -137,12 +119,12 @@ transition: opacity 150ms ease-in;
 
 ### Responsive defaults
 
-| Breakpoint | Component | Behavior |
-|---|---|---|
-| `< 1024 px` | `GlobalTopNav` | Horizontal nav collapses to a hamburger overflow menu. |
-| `< 1024 px` | `TranscriptPanel` | Auto-collapses on Review tab (`useBelowBreakpoint(1024)`); reopens via `TranscriptCollapsedTab` rail. |
-| `< 768 px` (md) | Dashboard `Sidebar` | Hides the rail and adds a hamburger drawer with overlay + slide-in. |
-| `< 768 px` | `ClipsDrawer` | Renders as a bottom sheet (80 vh, safe-area padding) instead of a right-side 380 px drawer. |
+| Breakpoint      | Component           | Behavior                                                                                              |
+| --------------- | ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `< 1024 px`     | `GlobalTopNav`      | Horizontal nav collapses to a hamburger overflow menu.                                                |
+| `< 1024 px`     | `TranscriptPanel`   | Auto-collapses on Review tab (`useBelowBreakpoint(1024)`); reopens via `TranscriptCollapsedTab` rail. |
+| `< 768 px` (md) | Dashboard `Sidebar` | Hides the rail and adds a hamburger drawer with overlay + slide-in.                                   |
+| `< 768 px`      | `ClipsDrawer`       | Renders as a bottom sheet (80 vh, safe-area padding) instead of a right-side 380 px drawer.           |
 
 All dismissable surfaces (overflow menus, `ClipsDrawer`, search results, alerts) close on Escape and outside-click via the shared `useDismissable` hook.
 
@@ -187,14 +169,14 @@ Toasts use the `sonner` library via `<Toaster>` in `AppShell`. Call `toast.succe
 
 ## 7. Semantic color usage guide
 
-| Situation                            | Color token                | Example                                   |
-| ------------------------------------ | -------------------------- | ----------------------------------------- |
-| Primary CTA, active nav item         | `pt-accent`                | Save, Start recording                     |
-| AI in progress (transcribing, gen)   | `pt-violet`                | Generating note… spinner                  |
-| Success / completed                  | `pt-accent` (positive)     | Transcription ready                       |
-| Caution / non-critical warning       | `pt-amber`                 | "Session was backgrounded — verify time"  |
-| Error / failed / destructive confirm | `pt-red`                   | "Transcription failed", delete confirm    |
-| Neutral badge / status               | `pt-slate`                 | "Draft", "Pending"                        |
+| Situation                            | Color token            | Example                                  |
+| ------------------------------------ | ---------------------- | ---------------------------------------- |
+| Primary CTA, active nav item         | `pt-accent`            | Save, Start recording                    |
+| AI in progress (transcribing, gen)   | `pt-violet`            | Generating note… spinner                 |
+| Success / completed                  | `pt-accent` (positive) | Transcription ready                      |
+| Caution / non-critical warning       | `pt-amber`             | "Session was backgrounded — verify time" |
+| Error / failed / destructive confirm | `pt-red`               | "Transcription failed", delete confirm   |
+| Neutral badge / status               | `pt-slate`             | "Draft", "Pending"                       |
 
 ---
 

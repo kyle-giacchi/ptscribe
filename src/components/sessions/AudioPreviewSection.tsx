@@ -28,7 +28,7 @@ function AudioTrackRow({
     >
       <div className="mb-2.5 flex items-center gap-2">
         <span
-          className="text-[11px] font-semibold uppercase tracking-wide"
+          className="text-[11px] font-semibold tracking-wide uppercase"
           style={{ color: 'var(--color-pt-text-2)' }}
         >
           {label}
@@ -68,13 +68,8 @@ export function AudioPreviewSection({
   const { settings, updateAudio } = useSettings();
   const [open, setOpen] = useState(true);
 
-  const {
-    activeSilenced,
-    compilingSilence,
-    activeSilenceError,
-    compileSilence,
-    resetSilence,
-  } = useAudioProcessing(mergedAudioBlob, silencedMergedBlob);
+  const { activeSilenced, compilingSilence, activeSilenceError, compileSilence, resetSilence } =
+    useAudioProcessing(mergedAudioBlob, silencedMergedBlob);
 
   const sd = settings.audio.silenceDetection;
 
@@ -116,7 +111,7 @@ export function AudioPreviewSection({
       </div>
 
       {open && (
-        <div className="space-y-2 px-4 pb-4 pt-3">
+        <div className="space-y-2 px-4 pt-3 pb-4">
           <AudioTrackRow label="Full Audio">
             <BlobWaveform blob={mergedAudioBlob} />
           </AudioTrackRow>
@@ -132,10 +127,7 @@ export function AudioPreviewSection({
                       updateAudio({ silenceDetection: { ...sd, enabled: e.target.checked } })
                     }
                   />
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: 'var(--color-pt-text-2)' }}
-                  >
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-pt-text-2)' }}>
                     Silence trimming
                   </span>
                 </label>

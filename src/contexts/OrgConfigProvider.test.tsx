@@ -16,8 +16,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 function stubFetch(impl?: (...a: unknown[]) => unknown) {
   const spy = vi.fn(
-    impl ??
-      (async () => ({ ok: true, json: async () => ({ config: null, canManage: false }) })),
+    impl ?? (async () => ({ ok: true, json: async () => ({ config: null, canManage: false }) })),
   );
   vi.stubGlobal('fetch', spy);
   return spy;

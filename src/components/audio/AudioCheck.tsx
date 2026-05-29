@@ -74,8 +74,7 @@ export function AudioCheck({ open, onClose }: { open: boolean; onClose: () => vo
       setPhase('connecting');
       try {
         const constraints: MediaStreamConstraints = {
-          audio:
-            selectedId === DEFAULT_DEVICE ? true : { deviceId: { exact: selectedId } },
+          audio: selectedId === DEFAULT_DEVICE ? true : { deviceId: { exact: selectedId } },
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (cancelled) {

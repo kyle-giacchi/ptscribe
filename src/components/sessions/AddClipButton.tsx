@@ -60,18 +60,27 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
         className="inline-flex items-center"
         style={{
           gap: 6,
-          height: 32, padding: '0 12px',
+          height: 32,
+          padding: '0 12px',
           background: 'var(--color-pt-surface)',
           border: '1px solid var(--color-pt-border)',
           borderRight: 'none',
-          borderTopLeftRadius: 7, borderBottomLeftRadius: 7,
-          fontSize: 12.5, fontWeight: 500,
-          color: 'var(--color-pt-text)', cursor: 'pointer',
+          borderTopLeftRadius: 7,
+          borderBottomLeftRadius: 7,
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: 'var(--color-pt-text)',
+          cursor: 'pointer',
         }}
       >
         <span
           aria-hidden
-          style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--color-pt-red, #dc2626)' }}
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: 999,
+            background: 'var(--color-pt-red, #dc2626)',
+          }}
         />
         New recording
       </button>
@@ -86,10 +95,12 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center justify-center"
         style={{
-          width: 28, height: 32,
+          width: 28,
+          height: 32,
           background: open ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
           border: '1px solid var(--color-pt-border)',
-          borderTopRightRadius: 7, borderBottomRightRadius: 7,
+          borderTopRightRadius: 7,
+          borderBottomRightRadius: 7,
           color: open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
           cursor: 'pointer',
         }}
@@ -103,7 +114,9 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
           role="menu"
           className="absolute z-40"
           style={{
-            top: '100%', right: 0, marginTop: 6,
+            top: '100%',
+            right: 0,
+            marginTop: 6,
             width: 240,
             background: 'var(--color-pt-surface)',
             border: '1px solid var(--color-pt-border)',
@@ -115,17 +128,30 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
           <button
             type="button"
             role="menuitem"
-            onClick={() => { setOpen(false); onRecord(); }}
+            onClick={() => {
+              setOpen(false);
+              onRecord();
+            }}
             className="flex w-full items-center gap-2"
             style={{
-              padding: '8px 10px', borderRadius: 6,
-              background: 'transparent', border: 'none',
-              fontSize: 12.5, color: 'var(--color-pt-text)', cursor: 'pointer', textAlign: 'left',
+              padding: '8px 10px',
+              borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+              fontSize: 12.5,
+              color: 'var(--color-pt-text)',
+              cursor: 'pointer',
+              textAlign: 'left',
             }}
           >
             <span
               aria-hidden
-              style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--color-pt-red, #dc2626)' }}
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 999,
+                background: 'var(--color-pt-red, #dc2626)',
+              }}
             />
             Record new clip
           </button>
@@ -135,9 +161,14 @@ export function AddClipButton({ onRecord, onUpload }: AddClipButtonProps) {
             onClick={() => fileRef.current?.open()}
             className="flex w-full items-center gap-2"
             style={{
-              padding: '8px 10px', borderRadius: 6,
-              background: 'transparent', border: 'none',
-              fontSize: 12.5, color: 'var(--color-pt-text)', cursor: 'pointer', textAlign: 'left',
+              padding: '8px 10px',
+              borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+              fontSize: 12.5,
+              color: 'var(--color-pt-text)',
+              cursor: 'pointer',
+              textAlign: 'left',
             }}
           >
             <Upload size={13} strokeWidth={2} />

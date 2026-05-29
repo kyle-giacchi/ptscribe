@@ -248,7 +248,13 @@ async function handleCreateOrg(
   // Create org and assign owner first; consume token last so it remains valid on any failure.
   await db
     .insertInto('organization')
-    .values({ id: orgId, name: org.name, contactEmail: org.contactEmail, phone: org.phone, createdAt: now })
+    .values({
+      id: orgId,
+      name: org.name,
+      contactEmail: org.contactEmail,
+      phone: org.phone,
+      createdAt: now,
+    })
     .execute();
 
   // Conditional update: only succeeds if tenantId is still NULL (guards concurrent submissions).
@@ -528,8 +534,10 @@ async function handleChangeRole(
   } catch {
     return orgError('INVALID_JSON', 'Invalid JSON', 400);
   }
-  if (!body.userId || !body.role) return orgError('MISSING_FIELDS', 'userId and role are required', 400);
-  if (body.userId === caller.userId) return orgError('CANNOT_CHANGE_SELF', 'You cannot change your own role', 400);
+  if (!body.userId || !body.role)
+    return orgError('MISSING_FIELDS', 'userId and role are required', 400);
+  if (body.userId === caller.userId)
+    return orgError('CANNOT_CHANGE_SELF', 'You cannot change your own role', 400);
   if (!INVITABLE_ROLES.has(body.role)) return orgError('INVALID_ROLE', 'Invalid role', 400);
 
   // Conditional: target must be in this org and must not be the owner.
@@ -563,7 +571,8 @@ async function handleRemoveMember(
     return orgError('INVALID_JSON', 'Invalid JSON', 400);
   }
   if (!body.userId) return orgError('MISSING_FIELDS', 'userId is required', 400);
-  if (body.userId === caller.userId) return orgError('CANNOT_REMOVE_SELF', 'You cannot remove yourself', 400);
+  if (body.userId === caller.userId)
+    return orgError('CANNOT_REMOVE_SELF', 'You cannot remove yourself', 400);
 
   // Clear org membership; reset to the personal-account default role.
   // Conditional: target must be in this org and must not be the owner.

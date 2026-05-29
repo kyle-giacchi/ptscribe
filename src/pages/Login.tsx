@@ -12,7 +12,8 @@ type View = 'default' | 'magic-form' | 'magic-sent';
 const errorMessages: Record<string, string> = {
   'missing-token': 'The magic link was incomplete. Please request a new one.',
   'invalid-link': 'This magic link is invalid or has expired. Please request a new one.',
-  network: 'We couldn’t reach the server to verify your link. Check your connection and try the link again — it hasn’t been used up.',
+  network:
+    'We couldn’t reach the server to verify your link. Check your connection and try the link again — it hasn’t been used up.',
 };
 
 const PASSKEY_NO_CREDENTIAL =
@@ -32,7 +33,9 @@ export function Login() {
   const from = (location.state as { from?: Location })?.from?.pathname ?? '/';
 
   // Best-effort model warm-up — swallow rejections so it never leaks an unhandled rejection.
-  useEffect(() => { void whisperLoader.ensureReady().catch(() => {}); }, []);
+  useEffect(() => {
+    void whisperLoader.ensureReady().catch(() => {});
+  }, []);
 
   async function handlePasskey() {
     setError(null);
@@ -48,7 +51,10 @@ export function Login() {
     } catch (err) {
       // WebAuthn throws NotAllowedError when the user dismisses the prompt or no
       // matching passkey exists on this device — guide them to the email path.
-      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+      if (
+        err instanceof DOMException &&
+        (err.name === 'NotAllowedError' || err.name === 'AbortError')
+      ) {
         setError(PASSKEY_NO_CREDENTIAL);
       } else {
         setError('Passkey sign-in failed. Try again or use a magic link.');
@@ -171,7 +177,12 @@ export function Login() {
         {view === 'default' && (
           <>
             <p
-              style={{ margin: '0 0 28px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
+              style={{
+                margin: '0 0 28px',
+                color: 'var(--color-pt-text-2)',
+                fontSize: 14,
+                lineHeight: 1.6,
+              }}
             >
               Use your device passkey for the fastest sign-in. New here, or on a new device? Email
               yourself a link to get in, then add a passkey once you&apos;re signed in.
@@ -219,40 +230,40 @@ export function Login() {
             </button>
 
             {isDemoMode() && (
-            <div
-              style={{
-                margin: '20px 0 4px',
-                borderTop: '1px solid var(--color-pt-border)',
-                paddingTop: 16,
-              }}
-            >
-              <button
-                onClick={() => {
-                  // Test User = the full real-app experience on a demo build:
-                  // mark the session, satisfy AppGate + the API gate header, then
-                  // enter the app. DemoBootstrap reads the marker and steps aside
-                  // (no demo seeding, no nav-lock).
-                  activateTestUserSession();
-                  unlockGateForDemo();
-                  navigate('/today', { replace: true });
-                }}
-                disabled={loading}
+              <div
                 style={{
-                  width: '100%',
-                  padding: '11px',
-                  background: 'transparent',
-                  color: 'var(--color-pt-text-3)',
-                  border: '1px dashed var(--color-pt-border)',
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  letterSpacing: '0.01em',
+                  margin: '20px 0 4px',
+                  borderTop: '1px solid var(--color-pt-border)',
+                  paddingTop: 16,
                 }}
               >
-                Login as Test User
-              </button>
-            </div>
+                <button
+                  onClick={() => {
+                    // Test User = the full real-app experience on a demo build:
+                    // mark the session, satisfy AppGate + the API gate header, then
+                    // enter the app. DemoBootstrap reads the marker and steps aside
+                    // (no demo seeding, no nav-lock).
+                    activateTestUserSession();
+                    unlockGateForDemo();
+                    navigate('/today', { replace: true });
+                  }}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    padding: '11px',
+                    background: 'transparent',
+                    color: 'var(--color-pt-text-3)',
+                    border: '1px dashed var(--color-pt-border)',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Login as Test User
+                </button>
+              </div>
             )}
           </>
         )}
@@ -260,7 +271,12 @@ export function Login() {
         {view === 'magic-form' && (
           <>
             <p
-              style={{ margin: '0 0 24px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
+              style={{
+                margin: '0 0 24px',
+                color: 'var(--color-pt-text-2)',
+                fontSize: 14,
+                lineHeight: 1.6,
+              }}
             >
               Enter your email and we&apos;ll send you a sign-in link.
             </p>
@@ -292,7 +308,8 @@ export function Login() {
                 style={{
                   width: '100%',
                   padding: '14px',
-                  background: loading || !email ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
+                  background:
+                    loading || !email ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 12,
@@ -344,11 +361,23 @@ export function Login() {
             >
               <MailCheck size={22} strokeWidth={1.75} />
             </div>
-            <p style={{ margin: '0 0 8px', color: 'var(--color-pt-text)', fontSize: 15, fontWeight: 600 }}>
+            <p
+              style={{
+                margin: '0 0 8px',
+                color: 'var(--color-pt-text)',
+                fontSize: 15,
+                fontWeight: 600,
+              }}
+            >
               Check your email
             </p>
             <p
-              style={{ margin: '0 0 24px', color: 'var(--color-pt-text-2)', fontSize: 14, lineHeight: 1.6 }}
+              style={{
+                margin: '0 0 24px',
+                color: 'var(--color-pt-text-2)',
+                fontSize: 14,
+                lineHeight: 1.6,
+              }}
             >
               We sent a sign-in link to <strong>{email}</strong>. Click the link to continue.
             </p>

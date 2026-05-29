@@ -7,7 +7,10 @@ export function parseCsvInvites(content: string): ParsedInviteRow[] {
   if (lines.length < 2) return [];
 
   const delimiter = lines[0].includes('\t') ? '\t' : ',';
-  const headers = lines[0].split(delimiter).map(stripQuotes).map((h) => h.toLowerCase());
+  const headers = lines[0]
+    .split(delimiter)
+    .map(stripQuotes)
+    .map((h) => h.toLowerCase());
 
   const EMAIL_HEADERS = ['email', 'e-mail', 'email address', 'emailaddress'];
   const col = headers.findIndex((h) => EMAIL_HEADERS.includes(h));

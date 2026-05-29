@@ -14,7 +14,7 @@ Quality checklist: PASSED (2026-05-10)
 
 ## The Verified Replication Prompt
 
-```
+````
 You are a World-Class Senior Creative Technologist and Lead Frontend Engineer.
 
 **Aesthetic Identity:** Clinical Warmth / The PT's Quiet, Confident Front Door
@@ -138,7 +138,7 @@ DO NOT add gradients, outlines, or texture to the headline. The whitespace does 
   #ldg-ctas { flex-direction: column !important; align-items: stretch !important; }
   #ldg-ctas > button { text-align: center !important; }
 }
-```
+````
 
 ---
 
@@ -250,6 +250,7 @@ The crown jewel. A tall section (~4800px) with a sticky browser mockup. React st
 opacity based on workflowStep.
 
 OUTER CONTAINER:
+
 ```
 <div style={{ maxWidth: 1040px, margin: '0 auto', padding: '0 24px 80px' }}>
   <div style={{
@@ -300,6 +301,7 @@ OUTER CONTAINER:
 ```
 
 IntersectionObserver logic:
+
 ```typescript
 const [workflowStep, setWorkflowStep] = useState(0);
 const sentinel1 = useRef<HTMLDivElement>(null);
@@ -308,20 +310,27 @@ const sentinel3 = useRef<HTMLDivElement>(null);
 
 useEffect(() => {
   const observers: IntersectionObserver[] = [];
-  [[sentinel1, 1], [sentinel2, 2], [sentinel3, 3]].forEach(([ref, step]) => {
+  [
+    [sentinel1, 1],
+    [sentinel2, 2],
+    [sentinel3, 3],
+  ].forEach(([ref, step]) => {
     if (!(ref as React.RefObject<HTMLDivElement>).current) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setWorkflowStep(step as number); },
-      { threshold: 0.5 }
+      ([entry]) => {
+        if (entry.isIntersecting) setWorkflowStep(step as number);
+      },
+      { threshold: 0.5 },
     );
     obs.observe((ref as React.RefObject<HTMLDivElement>).current!);
     observers.push(obs);
   });
-  return () => observers.forEach(o => o.disconnect());
+  return () => observers.forEach((o) => o.disconnect());
 }, []);
 ```
 
 SCREEN CONTENT — STEP 0 "Record. Hands-free.":
+
 ```
 bg: white, padding: 32px, display: flex, flex-direction: column, align-items: center, gap: 24px
 
@@ -346,6 +355,7 @@ Sub-headline: "Record. Hands-free." / "No extra hardware — just your browser a
 ```
 
 SCREEN CONTENT — STEP 1 "Transcription in seconds.":
+
 ```
 bg: white, padding: 32px
 
@@ -371,6 +381,7 @@ Sub-headline: "Transcription in seconds." / "Whisper AI converts the session to 
 ```
 
 SCREEN CONTENT — STEP 2 "Your note, drafted.":
+
 ```
 bg: white, padding: 28px
 
@@ -395,6 +406,7 @@ Sub-headline: "Your note, drafted." / "Claude writes the SOAP structure from the
 ```
 
 SCREEN CONTENT — STEP 3 "Ready to sign.":
+
 ```
 bg: white, padding: 28px
 
@@ -677,7 +689,8 @@ Image Sources:        None. All visual content is pure inline CSS + HTML:
 
 ## EXECUTION DIRECTIVE
 
-*"Do not build a marketing page; build the first moment of trust between a burnt-out clinician and a tool that promises to give them their evenings back."*
+_"Do not build a marketing page; build the first moment of trust between a burnt-out clinician and a tool that promises to give them their evenings back."_
+
 ```
 
 ---
@@ -685,3 +698,4 @@ Image Sources:        None. All visual content is pure inline CSS + HTML:
 ## User Instruction
 
 Paste the block above into Claude or your preferred code generation tool to build the site. All phase outputs are saved in `plans/`.
+```

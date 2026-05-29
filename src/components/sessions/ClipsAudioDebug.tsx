@@ -101,54 +101,52 @@ const ClipRow = memo(function ClipRow({
             </span>
           </div>
           {clip.errorMessage && (
-            <p
-              className="mt-1 break-words text-[12px]"
-              style={{ color: 'var(--color-negative)' }}
-            >
+            <p className="mt-1 text-[12px] break-words" style={{ color: 'var(--color-negative)' }}>
               {clip.errorMessage}
             </p>
           )}
         </div>
 
         {/* Delete control — only rendered when onDeleteClip is provided */}
-        {onDeleteClip && (pendingDelete ? (
-          <div className="flex shrink-0 items-center gap-1.5">
+        {onDeleteClip &&
+          (pendingDelete ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                className="btn btn-ghost py-0.5 text-xs"
+                onClick={() => setPendingDelete(false)}
+                style={{ touchAction: 'manipulation' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost py-0.5 text-xs"
+                style={{ color: 'var(--color-negative)', touchAction: 'manipulation' }}
+                onClick={() => {
+                  setPendingDelete(false);
+                  onDeleteClip(clip.id);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              className="btn btn-ghost py-0.5 text-xs"
-              onClick={() => setPendingDelete(false)}
-              style={{ touchAction: 'manipulation' }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost py-0.5 text-xs"
-              style={{ color: 'var(--color-negative)', touchAction: 'manipulation' }}
-              onClick={() => {
-                setPendingDelete(false);
-                onDeleteClip(clip.id);
+              aria-label="Delete clip"
+              onClick={() => setPendingDelete(true)}
+              disabled={blocked}
+              className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-pt-red-soft)] disabled:opacity-40"
+              style={{
+                color: 'var(--color-pt-red)',
+                cursor: blocked ? 'not-allowed' : 'pointer',
+                touchAction: 'manipulation',
               }}
             >
-              Delete
+              <Trash2 size={14} strokeWidth={2} />
             </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            aria-label="Delete clip"
-            onClick={() => setPendingDelete(true)}
-            disabled={blocked}
-            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--color-pt-red-soft)] disabled:opacity-40"
-            style={{
-              color: 'var(--color-pt-red)',
-              cursor: blocked ? 'not-allowed' : 'pointer',
-              touchAction: 'manipulation',
-            }}
-          >
-            <Trash2 size={14} strokeWidth={2} />
-          </button>
-        ))}
+          ))}
       </div>
 
       {showWaveform && (
@@ -159,18 +157,18 @@ const ClipRow = memo(function ClipRow({
 
       {clip.t1Transcript && clip.status !== 'transcribed' && (
         <div
-          className="border-t px-3.5 pb-3 pt-2.5"
+          className="border-t px-3.5 pt-2.5 pb-3"
           style={{ borderColor: 'var(--color-pt-border)' }}
         >
           <details>
             <summary
-              className="cursor-pointer select-none text-[12px] font-medium"
+              className="cursor-pointer text-[12px] font-medium select-none"
               style={{ color: 'var(--color-pt-text-2)' }}
             >
               Live transcript ({wordCount(clip.t1Transcript)} words)
             </summary>
             <p
-              className="mt-2 whitespace-pre-wrap text-xs leading-relaxed"
+              className="mt-2 text-xs leading-relaxed whitespace-pre-wrap"
               style={{ color: 'var(--color-pt-text)' }}
             >
               {clip.t1Transcript}
@@ -181,18 +179,18 @@ const ClipRow = memo(function ClipRow({
 
       {clip.status === 'transcribed' && clip.transcript && (
         <div
-          className="border-t px-3.5 pb-3 pt-2.5"
+          className="border-t px-3.5 pt-2.5 pb-3"
           style={{ borderColor: 'var(--color-pt-border)' }}
         >
           <details>
             <summary
-              className="cursor-pointer select-none text-[12px] font-medium"
+              className="cursor-pointer text-[12px] font-medium select-none"
               style={{ color: 'var(--color-pt-text-2)' }}
             >
               View transcript ({wordCount(clip.transcript)} words)
             </summary>
             <p
-              className="mt-2 whitespace-pre-wrap text-xs leading-relaxed"
+              className="mt-2 text-xs leading-relaxed whitespace-pre-wrap"
               style={{ color: 'var(--color-pt-text)' }}
             >
               {clip.transcript}
@@ -208,7 +206,7 @@ export const ClipStatusBadge = memo(function ClipStatusBadge({ status }: { statu
   const meta = clipBadgeMeta(status);
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold tracking-wide uppercase"
       style={{
         background: meta.bg,
         color: meta.fg,

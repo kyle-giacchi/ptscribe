@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-const LOW_STORAGE_BYTES = 200 * 1024 * 1024;      // 200 MB
-const CRITICAL_STORAGE_BYTES = 50 * 1024 * 1024;  //  50 MB
+const LOW_STORAGE_BYTES = 200 * 1024 * 1024; // 200 MB
+const CRITICAL_STORAGE_BYTES = 50 * 1024 * 1024; //  50 MB
 
 export type MicPermissionState = 'granted' | 'denied' | 'prompt' | 'unavailable';
 
@@ -31,8 +31,7 @@ export function useDeviceCapabilities(): DeviceCapabilities {
 
   const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory;
   const concurrency = navigator.hardwareConcurrency ?? 4;
-  const isLowMemoryDevice =
-    (deviceMemory !== undefined && deviceMemory < 2) || concurrency <= 2;
+  const isLowMemoryDevice = (deviceMemory !== undefined && deviceMemory < 2) || concurrency <= 2;
 
   useEffect(() => {
     let permStatus: PermissionStatus | null = null;
@@ -44,7 +43,7 @@ export function useDeviceCapabilities(): DeviceCapabilities {
           permStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
           setMicPermission(permStatus.state as MicPermissionState);
           permStatus.onchange = () => {
-            setMicPermission((permStatus!.state) as MicPermissionState);
+            setMicPermission(permStatus!.state as MicPermissionState);
           };
         } catch {
           setMicPermission('unavailable');

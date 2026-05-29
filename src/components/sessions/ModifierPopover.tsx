@@ -57,7 +57,11 @@ const PRESET_GROUPS: PresetGroupDef[] = [
     field: 'language',
     type: 'radio',
     options: [
-      { value: 'medical_terminology', name: 'Medical terminology', desc: 'ICD-10 friendly phrasing' },
+      {
+        value: 'medical_terminology',
+        name: 'Medical terminology',
+        desc: 'ICD-10 friendly phrasing',
+      },
       { value: 'plain_language', name: 'Plain language', desc: '7th-grade reading level' },
       { value: 'spanish_output', name: 'Spanish output', desc: 'Translate plan + patient summary' },
     ],
@@ -67,11 +71,27 @@ const PRESET_GROUPS: PresetGroupDef[] = [
     field: 'clinicalDetail',
     type: 'checkbox',
     options: [
-      { value: 'pertinent_negatives', name: 'Include pertinent negatives', desc: '"Denies…" line per system' },
+      {
+        value: 'pertinent_negatives',
+        name: 'Include pertinent negatives',
+        desc: '"Denies…" line per system',
+      },
       { value: 'include_ros', name: 'Include ROS', desc: 'Review of systems' },
-      { value: 'quote_verbatim', name: 'Quote patient verbatim', desc: 'Preserve key patient phrases in HPI' },
-      { value: 'differential_diagnosis', name: 'Differential diagnosis', desc: 'Append DDx for new problems' },
-      { value: 'risk_scores', name: 'Auto-calculate risk scores', desc: 'ASCVD, CHA₂DS₂-VASc, etc.' },
+      {
+        value: 'quote_verbatim',
+        name: 'Quote patient verbatim',
+        desc: 'Preserve key patient phrases in HPI',
+      },
+      {
+        value: 'differential_diagnosis',
+        name: 'Differential diagnosis',
+        desc: 'Append DDx for new problems',
+      },
+      {
+        value: 'risk_scores',
+        name: 'Auto-calculate risk scores',
+        desc: 'ASCVD, CHA₂DS₂-VASc, etc.',
+      },
     ],
   },
   {
@@ -79,9 +99,21 @@ const PRESET_GROUPS: PresetGroupDef[] = [
     field: 'codingBilling',
     type: 'checkbox',
     options: [
-      { value: 'icd10_suggestions', name: 'ICD-10 suggestions', desc: 'Inline code hints in Assessment' },
-      { value: 'em_level', name: 'E/M level suggestion', desc: 'Recommend 99213 / 99214 from complexity' },
-      { value: 'hcc_flags', name: 'Flag HCC opportunities', desc: 'Surface chronic conditions for risk adjustment' },
+      {
+        value: 'icd10_suggestions',
+        name: 'ICD-10 suggestions',
+        desc: 'Inline code hints in Assessment',
+      },
+      {
+        value: 'em_level',
+        name: 'E/M level suggestion',
+        desc: 'Recommend 99213 / 99214 from complexity',
+      },
+      {
+        value: 'hcc_flags',
+        name: 'Flag HCC opportunities',
+        desc: 'Surface chronic conditions for risk adjustment',
+      },
     ],
   },
   {
@@ -89,23 +121,46 @@ const PRESET_GROUPS: PresetGroupDef[] = [
     field: 'beyondNote',
     type: 'checkbox',
     options: [
-      { value: 'suggested_orders', name: 'Suggested orders', desc: 'Labs, imaging, referrals based on Plan' },
-      { value: 'med_rec_check', name: 'Med reconciliation check', desc: 'Flag interactions, dose, gaps' },
-      { value: 'patient_education', name: 'Patient education paragraph', desc: 'Appended after Plan' },
-      { value: 'transcript_timestamps', name: 'Cite transcript timestamps', desc: 'Inline [mm:ss] references' },
+      {
+        value: 'suggested_orders',
+        name: 'Suggested orders',
+        desc: 'Labs, imaging, referrals based on Plan',
+      },
+      {
+        value: 'med_rec_check',
+        name: 'Med reconciliation check',
+        desc: 'Flag interactions, dose, gaps',
+      },
+      {
+        value: 'patient_education',
+        name: 'Patient education paragraph',
+        desc: 'Appended after Plan',
+      },
+      {
+        value: 'transcript_timestamps',
+        name: 'Cite transcript timestamps',
+        desc: 'Inline [mm:ss] references',
+      },
     ],
   },
 ];
 
 function isRowActive(draft: SessionModifiers, field: string, value: string): boolean {
   switch (field) {
-    case 'voice': return draft.voice === value;
-    case 'length': return draft.length === value;
-    case 'language': return draft.language === value;
-    case 'clinicalDetail': return draft.clinicalDetail.includes(value as ModifierClinicalDetail);
-    case 'codingBilling': return draft.codingBilling.includes(value as ModifierCodingBilling);
-    case 'beyondNote': return draft.beyondNote.includes(value as ModifierBeyondNote);
-    default: return false;
+    case 'voice':
+      return draft.voice === value;
+    case 'length':
+      return draft.length === value;
+    case 'language':
+      return draft.language === value;
+    case 'clinicalDetail':
+      return draft.clinicalDetail.includes(value as ModifierClinicalDetail);
+    case 'codingBilling':
+      return draft.codingBilling.includes(value as ModifierCodingBilling);
+    case 'beyondNote':
+      return draft.beyondNote.includes(value as ModifierBeyondNote);
+    default:
+      return false;
   }
 }
 
@@ -354,7 +409,6 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
 
       {/* Scroll area */}
       <div style={{ maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-
         {/* Custom instructions block */}
         {showCustomBlock && (
           <div
@@ -397,7 +451,12 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     <button
                       type="button"
                       onClick={() => toggleInstruction(c.id)}
-                      style={{ ...checkboxStyle(c.active), cursor: 'pointer', padding: 0, marginTop: 2 }}
+                      style={{
+                        ...checkboxStyle(c.active),
+                        cursor: 'pointer',
+                        padding: 0,
+                        marginTop: 2,
+                      }}
                       aria-label={c.active ? 'Deactivate' : 'Activate'}
                     >
                       {c.active && <Check size={9} color="white" strokeWidth={3} />}
@@ -411,16 +470,36 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                         color: 'var(--color-pt-text)',
                       }}
                     >
-                      <span style={{ fontStyle: 'normal', color: 'var(--color-pt-text-2)', marginRight: 2 }}>"</span>
+                      <span
+                        style={{
+                          fontStyle: 'normal',
+                          color: 'var(--color-pt-text-2)',
+                          marginRight: 2,
+                        }}
+                      >
+                        "
+                      </span>
                       {c.text}
-                      <span style={{ fontStyle: 'normal', color: 'var(--color-pt-text-2)', marginLeft: 2 }}>"</span>
+                      <span
+                        style={{
+                          fontStyle: 'normal',
+                          color: 'var(--color-pt-text-2)',
+                          marginLeft: 2,
+                        }}
+                      >
+                        "
+                      </span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 2, paddingLeft: 22 }}>
                     <button type="button" style={ghostBtnStyle} onClick={() => openEdit(c)}>
                       <Pencil size={10} /> Edit
                     </button>
-                    <button type="button" style={ghostBtnStyle} onClick={() => removeInstruction(c.id)}>
+                    <button
+                      type="button"
+                      style={ghostBtnStyle}
+                      onClick={() => removeInstruction(c.id)}
+                    >
                       <Trash2 size={10} /> Remove
                     </button>
                   </div>
@@ -439,7 +518,9 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                   gap: 8,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
                   <span style={{ ...labelStyle, color: SAGE }}>
                     {editingId ? 'edit instruction' : 'new instruction'}
                   </span>
@@ -468,7 +549,14 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     minHeight: 64,
                   }}
                 />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 6,
+                  }}
+                >
                   <button
                     type="button"
                     onClick={cancelComposer}

@@ -42,11 +42,13 @@ function computeWordDiff(original: string, scrubbed: string): DiffPart[] {
 
   // Backtrack to build the diff sequence
   const raw: DiffPart[] = [];
-  let i = n, j = m;
+  let i = n,
+    j = m;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && origTokens[i - 1] === scrubbedTokens[j - 1]) {
       raw.unshift({ type: 'same', text: origTokens[i - 1] });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       raw.unshift({ type: 'added', text: scrubbedTokens[j - 1] });
       j--;
@@ -149,9 +151,9 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
   return (
     <Modal open={open} onClose={resetAndClose} title="Scrub PII" size="xl">
       <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
-        Structured identifiers (email, phone, SSN, MRN) are matched instantly on-device.
-        Run a deep scan to also catch names and places with the local AI model.
-        Review the diff before applying — the scrubbed version replaces your edited transcript.
+        Structured identifiers (email, phone, SSN, MRN) are matched instantly on-device. Run a deep
+        scan to also catch names and places with the local AI model. Review the diff before applying
+        — the scrubbed version replaces your edited transcript.
       </p>
 
       {/* Diff / preview area */}
@@ -176,8 +178,11 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
         )}
 
         {scanState === 'scanning' && (
-          <span className="flex items-center gap-2" style={{ color: 'var(--color-fg-muted)', fontFamily: 'inherit' }}>
-            <Loader2 size={13} className="animate-spin shrink-0" />
+          <span
+            className="flex items-center gap-2"
+            style={{ color: 'var(--color-fg-muted)', fontFamily: 'inherit' }}
+          >
+            <Loader2 size={13} className="shrink-0 animate-spin" />
             {scrubProgress ?? 'Scanning…'}
           </span>
         )}
@@ -220,7 +225,10 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
         )}
 
         {scanState === 'error' && (
-          <span className="flex items-start gap-2" style={{ color: 'var(--color-error, #dc2626)', fontFamily: 'inherit' }}>
+          <span
+            className="flex items-start gap-2"
+            style={{ color: 'var(--color-error, #dc2626)', fontFamily: 'inherit' }}
+          >
             <AlertCircle size={13} style={{ marginTop: 2, flexShrink: 0 }} />
             {errorMsg}
           </span>
@@ -229,7 +237,10 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
 
       {/* Entity count summary */}
       {hasText && scanState === 'ready' && (
-        <p className="text-sm" style={{ color: entityCount === 0 ? 'var(--color-fg-muted)' : 'var(--color-pt-accent)' }}>
+        <p
+          className="text-sm"
+          style={{ color: entityCount === 0 ? 'var(--color-fg-muted)' : 'var(--color-pt-accent)' }}
+        >
           {entityCount === 0
             ? deepScanned
               ? 'No PII detected — transcript looks clean.'

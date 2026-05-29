@@ -63,7 +63,11 @@ export function KVRow({
             className="opacity-0 transition-opacity group-hover:opacity-100"
             style={{ flexShrink: 0, color: isCopied ? '#10b981' : 'var(--color-pt-text-3)' }}
           >
-            {isCopied ? <Check size={10} strokeWidth={2.5} /> : <Copy size={10} strokeWidth={1.75} />}
+            {isCopied ? (
+              <Check size={10} strokeWidth={2.5} />
+            ) : (
+              <Copy size={10} strokeWidth={1.75} />
+            )}
           </span>
         )}
       </span>

@@ -69,7 +69,9 @@ describe('ExercisesProvider', () => {
     await waitFor(() =>
       expect(ref.current.exercises.find((e) => e.id === exercise.id)).toBeDefined(),
     );
-    await act(async () => ref.current.updateExercise(exercise.id, { name: 'Terminal Knee Extension' }));
+    await act(async () =>
+      ref.current.updateExercise(exercise.id, { name: 'Terminal Knee Extension' }),
+    );
     await waitFor(() =>
       expect(ref.current.exercises.find((e) => e.id === exercise.id)?.name).toBe(
         'Terminal Knee Extension',

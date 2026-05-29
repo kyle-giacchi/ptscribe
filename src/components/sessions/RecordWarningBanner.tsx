@@ -35,9 +35,9 @@ export function RecordWarningBanner({ onBackToReview, onDismiss }: RecordWarning
           Recording more will invalidate your generated note
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
-          Any new clips will be added to your transcript, but your note was generated from
-          the previous transcript. You&apos;ll need to re-run transcription and regenerate
-          before the note reflects this recording.
+          Any new clips will be added to your transcript, but your note was generated from the
+          previous transcript. You&apos;ll need to re-run transcription and regenerate before the
+          note reflects this recording.
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>

@@ -114,6 +114,7 @@ Height: ~100px total | BG: black #000 pill + teal buy-bar below | Position: fixe
 ```
 
 **TYPOGRAPHY + CONTENT MAP:**
+
 ```
   Logo link     → "Glossar"          | 22px / 500 / white
   Hamburger     → ≡ icon (3 lines)   | white lines
@@ -150,12 +151,14 @@ Height: 420px | BG: transparent (body #F5F5F7) | Padding: ~80px top
 ```
 
 **COMPOSITION MAP — App Icon:**
+
 - Rounded square (~60px), border-radius ~15px
 - Gradient fill: teal/cyan (#00CCCC → #07819C), top-left to bottom-right
 - White folded-corner element in bottom-left of icon (page-turn / widget metaphor)
 - Slight drop shadow under icon
 
 **TYPOGRAPHY + CONTENT MAP:**
+
 ```
   App icon    → [teal gradient square with white fold mark]
   H1          → "Fluency at glances."              | 32px / 700 / #050505 / center
@@ -197,6 +200,7 @@ This is the hero of the page. A large rounded card that contains a sticky phone 
 ```
 
 **Phone mockup progression (scroll-driven):**
+
 1. Lock screen widget: A1 badge + "die Ausstellung / the exhibition" + IPA
 2. Home screen: full-bleed illustrated landscape wallpaper (rolling green hills, river valley, German countryside aesthetic, painted/illustrated style)
 3. App Library view: word list with level filters (All / A1 / A2 / B1 / B2 / C1 / C2)
@@ -204,6 +208,7 @@ This is the hero of the page. A large rounded card that contains a sticky phone 
 5. Settings/customize screen: Refresh Rate, Difficulty Level controls
 
 **Typography + Content Map:**
+
 ```
   Opening H2  → "Glossar turns the 80 times you look at your phone..."  | ~28px / 700 / #050505
   Subhead 1   → "3,800+ words."                                          | ~24px / 700 / #050505
@@ -239,6 +244,7 @@ Height: 860px | BG: white | Padding: ~80px top, ~80px bottom
 ```
 
 **Level Pill Colors:**
+
 ```
   A1: #008361 (dark green)
   A2: #0070C9 (blue, approx)
@@ -274,6 +280,7 @@ Height: 1333px | BG: light grey card (#F5F5F7), border-radius ~20px
 ```
 
 **Typography + Content Map:**
+
 ```
   H2          → "Seamless fluency."          | ~28px / 700 / #050505
   Subhead     → "Truly yours."               | ~22px / 700 / #050505
@@ -304,6 +311,7 @@ Height: 940px | BG: light grey card (#F5F5F7), border-radius ~20px
 ```
 
 **Vocabulary Card Design:**
+
 - Background: dark #1D1D1F (near-black)
 - Border-radius: ~16px
 - Level badge: colored circle (green/blue/purple) with level code (A1/A2/B1), top-left

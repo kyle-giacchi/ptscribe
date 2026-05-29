@@ -141,59 +141,39 @@ export function Exercises() {
         {filtered.map((e) => {
           const isOrg = orgExerciseIds.has(e.id);
           return (
-          <SurfaceCard key={e.id} padding={14}>
-            <div style={{ display: 'grid', gap: 8 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <h3
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--color-pt-text)',
-                      margin: 0,
-                    }}
-                  >
-                    {e.name}
-                  </h3>
-                  <div
-                    style={{
-                      marginTop: 2,
-                      fontSize: 11.5,
-                      color: 'var(--color-pt-text-3)',
-                      fontFamily: 'var(--font-mono)',
-                    }}
-                  >
-                    {REGION_LABEL[e.region]} · {CATEGORY_LABEL[e.category]}
+            <SurfaceCard key={e.id} padding={14}>
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <h3
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--color-pt-text)',
+                        margin: 0,
+                      }}
+                    >
+                      {e.name}
+                    </h3>
+                    <div
+                      style={{
+                        marginTop: 2,
+                        fontSize: 11.5,
+                        color: 'var(--color-pt-text-3)',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      {REGION_LABEL[e.region]} · {CATEGORY_LABEL[e.category]}
+                    </div>
                   </div>
-                </div>
-                {e.builtin ? (
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '2px 7px',
-                      borderRadius: 999,
-                      fontSize: 10,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      background: 'var(--color-pt-surface-mut)',
-                      color: 'var(--color-pt-text-3)',
-                      border: '1px solid var(--color-pt-border)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Lock size={10} /> Built-in
-                  </span>
-                ) : isOrg ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {e.builtin ? (
                     <span
                       style={{
                         display: 'inline-flex',
@@ -207,72 +187,92 @@ export function Exercises() {
                         background: 'var(--color-pt-surface-mut)',
                         color: 'var(--color-pt-text-3)',
                         border: '1px solid var(--color-pt-border)',
+                        flexShrink: 0,
                       }}
                     >
-                      <Building2 size={10} /> Org
+                      <Lock size={10} /> Built-in
                     </span>
-                    <PtButton
-                      variant="ghost"
-                      iconLeft={<Copy size={12} strokeWidth={2} />}
-                      style={{ padding: '4px 8px', fontSize: 11 }}
-                      onClick={() => cloneFromOrg(e)}
-                    >
-                      Clone
-                    </PtButton>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <PtButton
-                      variant="ghost"
-                      style={{ padding: '4px 8px', fontSize: 11 }}
-                      onClick={() => setEditing(e)}
-                    >
-                      <Pencil size={12} />
-                    </PtButton>
-                    <PtButton
-                      variant="ghost"
-                      style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-pt-red)' }}
-                      onClick={() => {
-                        if (confirm(`Delete "${e.name}"?`)) removeExercise(e.id);
-                      }}
-                    >
-                      <Trash2 size={12} />
-                    </PtButton>
-                  </div>
-                )}
-              </div>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: 'var(--color-pt-text-2)',
-                  margin: 0,
-                  lineHeight: 1.5,
-                }}
-              >
-                {e.instructions}
-              </p>
-              {e.cues && (
+                  ) : isOrg ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '2px 7px',
+                          borderRadius: 999,
+                          fontSize: 10,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          background: 'var(--color-pt-surface-mut)',
+                          color: 'var(--color-pt-text-3)',
+                          border: '1px solid var(--color-pt-border)',
+                        }}
+                      >
+                        <Building2 size={10} /> Org
+                      </span>
+                      <PtButton
+                        variant="ghost"
+                        iconLeft={<Copy size={12} strokeWidth={2} />}
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                        onClick={() => cloneFromOrg(e)}
+                      >
+                        Clone
+                      </PtButton>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <PtButton
+                        variant="ghost"
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                        onClick={() => setEditing(e)}
+                      >
+                        <Pencil size={12} />
+                      </PtButton>
+                      <PtButton
+                        variant="ghost"
+                        style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-pt-red)' }}
+                        onClick={() => {
+                          if (confirm(`Delete "${e.name}"?`)) removeExercise(e.id);
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </PtButton>
+                    </div>
+                  )}
+                </div>
                 <p
                   style={{
-                    fontSize: 11.5,
-                    fontStyle: 'italic',
-                    color: 'var(--color-pt-text-3)',
+                    fontSize: 12,
+                    color: 'var(--color-pt-text-2)',
                     margin: 0,
+                    lineHeight: 1.5,
                   }}
                 >
-                  Cue: {e.cues}
+                  {e.instructions}
                 </p>
-              )}
-              {e.defaultDosage && (
-                <p style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', margin: 0 }}>
-                  Default dosage:{' '}
-                  <span style={{ color: 'var(--color-pt-text)', fontWeight: 600 }}>
-                    {e.defaultDosage}
-                  </span>
-                </p>
-              )}
-            </div>
-          </SurfaceCard>
+                {e.cues && (
+                  <p
+                    style={{
+                      fontSize: 11.5,
+                      fontStyle: 'italic',
+                      color: 'var(--color-pt-text-3)',
+                      margin: 0,
+                    }}
+                  >
+                    Cue: {e.cues}
+                  </p>
+                )}
+                {e.defaultDosage && (
+                  <p style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', margin: 0 }}>
+                    Default dosage:{' '}
+                    <span style={{ color: 'var(--color-pt-text)', fontWeight: 600 }}>
+                      {e.defaultDosage}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </SurfaceCard>
           );
         })}
         {filtered.length === 0 && (

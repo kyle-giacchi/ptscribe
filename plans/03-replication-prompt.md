@@ -21,34 +21,34 @@ The reference site's genius is restraint + scroll momentum: generous whitespace,
 
 ### Palette
 
-| Semantic Name   | Descriptive Word | Hex       | Usage |
-|-----------------|-----------------|-----------|-------|
-| Primary Action  | "Teal"          | #0ea5a8   | CTAs, active states, icon fills, badge pills, price badge |
-| Primary Hover   | "Deep Teal"     | #0a6d70   | Hover state on primary buttons only |
-| Accent Soft     | "Mist"          | #e6f7f6   | Chip backgrounds, soft highlight tints |
-| Dark Frame      | "Midnight"      | #1a2030   | Nav pill background, dark cards, deep sections |
-| Page Canvas     | "Cloud"         | #f4f6f9   | Body background — analogous to Glossar's #F5F5F7 |
-| Surface         | "White"         | #ffffff   | Section cards, hero bg, card interiors |
-| Text Primary    | "Ink"           | #1a2030   | All headlines, body text |
-| Text Secondary  | "Slate"         | #5a6577   | Subtitles, labels, supporting copy |
-| Text Tertiary   | "Muted"         | #8893a5   | Placeholder, trust lines, caption copy |
-| Border          | "Feather"       | #e4e8ee   | Card edges, hairline dividers |
-| Border Strong   | "Bone"          | #d6dce5   | Input focus, strong separators |
-| Note Violet     | "Clinical Blue" | #6f5acc   | Evaluation note type badge |
-| Note Amber      | "Warm"          | #c47a09   | Progress note type badge |
-| Note Slate      | "Steel"         | #7c8699   | Discharge note type badge |
+| Semantic Name  | Descriptive Word | Hex     | Usage                                                     |
+| -------------- | ---------------- | ------- | --------------------------------------------------------- |
+| Primary Action | "Teal"           | #0ea5a8 | CTAs, active states, icon fills, badge pills, price badge |
+| Primary Hover  | "Deep Teal"      | #0a6d70 | Hover state on primary buttons only                       |
+| Accent Soft    | "Mist"           | #e6f7f6 | Chip backgrounds, soft highlight tints                    |
+| Dark Frame     | "Midnight"       | #1a2030 | Nav pill background, dark cards, deep sections            |
+| Page Canvas    | "Cloud"          | #f4f6f9 | Body background — analogous to Glossar's #F5F5F7          |
+| Surface        | "White"          | #ffffff | Section cards, hero bg, card interiors                    |
+| Text Primary   | "Ink"            | #1a2030 | All headlines, body text                                  |
+| Text Secondary | "Slate"          | #5a6577 | Subtitles, labels, supporting copy                        |
+| Text Tertiary  | "Muted"          | #8893a5 | Placeholder, trust lines, caption copy                    |
+| Border         | "Feather"        | #e4e8ee | Card edges, hairline dividers                             |
+| Border Strong  | "Bone"           | #d6dce5 | Input focus, strong separators                            |
+| Note Violet    | "Clinical Blue"  | #6f5acc | Evaluation note type badge                                |
+| Note Amber     | "Warm"           | #c47a09 | Progress note type badge                                  |
+| Note Slate     | "Steel"          | #7c8699 | Discharge note type badge                                 |
 
 ### Typography
 
-| Role        | Font Family                              | Weight | Size                       | Line-Height | Notes |
-|-------------|------------------------------------------|--------|----------------------------|-------------|-------|
-| Hero H1     | 'Inter', ui-sans-serif, system-ui        | 900    | clamp(52px, 9vw, 104px)    | 1.0         | letter-spacing: -0.04em; text-wrap: balance |
-| Section H2  | 'Inter', ui-sans-serif, system-ui        | 700    | clamp(28px, 4vw, 40px)     | 1.1         | letter-spacing: -0.02em |
-| Sub H3      | 'Inter', ui-sans-serif, system-ui        | 700    | 22–24px                    | 1.2         | letter-spacing: -0.01em |
-| Body        | 'Inter', ui-sans-serif, system-ui        | 400    | 16–18px                    | 1.6         | color: Text Secondary |
-| Label/Badge | 'Inter', ui-sans-serif, system-ui        | 700    | 11px                       | 1           | letter-spacing: 0.14em; text-transform: uppercase |
-| CTA Pill    | 'Inter', ui-sans-serif, system-ui        | 700    | 15.5px                     | normal      | letter-spacing: -0.01em |
-| Nav Logo    | 'Inter', ui-sans-serif, system-ui        | 700    | 15.5px                     | normal      | letter-spacing: -0.02em |
+| Role        | Font Family                       | Weight | Size                    | Line-Height | Notes                                             |
+| ----------- | --------------------------------- | ------ | ----------------------- | ----------- | ------------------------------------------------- |
+| Hero H1     | 'Inter', ui-sans-serif, system-ui | 900    | clamp(52px, 9vw, 104px) | 1.0         | letter-spacing: -0.04em; text-wrap: balance       |
+| Section H2  | 'Inter', ui-sans-serif, system-ui | 700    | clamp(28px, 4vw, 40px)  | 1.1         | letter-spacing: -0.02em                           |
+| Sub H3      | 'Inter', ui-sans-serif, system-ui | 700    | 22–24px                 | 1.2         | letter-spacing: -0.01em                           |
+| Body        | 'Inter', ui-sans-serif, system-ui | 400    | 16–18px                 | 1.6         | color: Text Secondary                             |
+| Label/Badge | 'Inter', ui-sans-serif, system-ui | 700    | 11px                    | 1           | letter-spacing: 0.14em; text-transform: uppercase |
+| CTA Pill    | 'Inter', ui-sans-serif, system-ui | 700    | 15.5px                  | normal      | letter-spacing: -0.01em                           |
+| Nav Logo    | 'Inter', ui-sans-serif, system-ui | 700    | 15.5px                  | normal      | letter-spacing: -0.02em                           |
 
 **⚑ Drama Ratio:** The hero headline uses 900-weight Inter at clamp(52px, 9vw, 104px) with -0.04em tracking on a white/transparent background — pure typographic impact through scale and weight, zero decoration. The accent word "care." in teal is the ONLY color break. Do not add gradients, outlines, or texture to the headline. The whitespace does the work.
 
@@ -87,6 +87,7 @@ The nav is a dark pill fixed at the top of the viewport, floating above all cont
 ```
 
 **Implementation spec:**
+
 ```
 position: fixed, top: 16px, left: 50%, transform: translateX(-50%), zIndex: 100
 background: #1a2030, border-radius: 999px
@@ -142,6 +143,7 @@ Center-aligned, white/transparent background, body bg gradient shows through. Fa
 ```
 
 **Implementation spec:**
+
 ```
 section: padding: 72px 48px 64px, max-width: 1040px, margin: 0 auto, text-align: center
 
@@ -218,6 +220,7 @@ This is the crown jewel of the page. A tall scroll-driven section (~4800px) with
 ```
 
 **Browser Mockup Design:**
+
 - Outer frame: #1a2030 (dark navy), border-radius: 16px, width: ~680px, centered
 - Chrome bar at top: 40px height, three dots (red/amber/green circles, 10px each, gap 6px), URL bar in center (pill shape, bg: rgba(255,255,255,0.1), "ptscribe.app/session/...)
 - Screen area below chrome: white background, shows app content
@@ -226,6 +229,7 @@ This is the crown jewel of the page. A tall scroll-driven section (~4800px) with
 **Scroll-driven states (4 states across ~4800px):**
 
 STATE 1 (scroll 0–1200px): "Record. Hands-free."
+
 - App screen shows: PTScribe session view
 - Patient name header: "Sarah M. — Follow-up"
 - Large circular record button (teal #0ea5a8, 80px diameter, pulsing ring animation)
@@ -235,6 +239,7 @@ STATE 1 (scroll 0–1200px): "Record. Hands-free."
 - Sub-headline fades in: "Record. Hands-free." (28px, 700, #1a2030) + "No extra hardware — just your browser and a microphone." (16px, #5a6577)
 
 STATE 2 (scroll 1200–2400px): "Transcription in seconds."
+
 - Recording in progress: timer shows "03:42", waveform is animated (4–6 vertical bars of varying height, #0ea5a8, animating up-down)
 - Red stop button replaces record button
 - Below: transcript lines appearing — 3–4 lines of text streaming in with a blinking cursor at end:
@@ -245,6 +250,7 @@ STATE 2 (scroll 1200–2400px): "Transcription in seconds."
 - Sub-headline: "Transcription in seconds." + "Whisper AI converts the session to text while you wrap up."
 
 STATE 3 (scroll 2400–3600px): "Your SOAP note, drafted."
+
 - Screen shows structured note being generated
 - Violet spinner in top-right: "Generating..." (#6f5acc)
 - Note sections filling in with shimmer-then-text reveal:
@@ -257,6 +263,7 @@ STATE 3 (scroll 2400–3600px): "Your SOAP note, drafted."
 - Sub-headline: "Your note, drafted." + "Claude writes the SOAP structure from the transcript. You review, edit, and sign."
 
 STATE 4 (scroll 3600–4800px): "Ready to sign."
+
 - Note is complete, no spinner
 - Green checkmark badge top-right: "Ready" in teal
 - Finalize button visible: "Finalize Note →" (teal, full-width button)
@@ -264,6 +271,7 @@ STATE 4 (scroll 3600–4800px): "Ready to sign."
 - Sub-headline: "Ready to sign." + "Edit any section, then finalize. Your note stays on your device, encrypted."
 
 **Sticky implementation:**
+
 ```javascript
 // The mockup container is position: sticky, top: 120px
 // The outer section is ~4800px tall
@@ -284,23 +292,38 @@ STATE 4 (scroll 3600–4800px): "Ready to sign."
 ```
 
 **Record button pulse animation:**
+
 ```css
 @keyframes ldg-pulse-ring {
-  0%   { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.5); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
 }
 .ldg-record-ring {
-  position: absolute; inset: -8px; border-radius: 999px;
+  position: absolute;
+  inset: -8px;
+  border-radius: 999px;
   border: 2px solid #0ea5a8;
-  animation: ldg-pulse-ring 1.5s cubic-bezier(0.22,1,0.36,1) infinite;
+  animation: ldg-pulse-ring 1.5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 ```
 
 **Waveform animation (STATE 2 only):**
+
 ```css
 @keyframes ldg-wave {
-  0%, 100% { transform: scaleY(0.3); }
-  50%       { transform: scaleY(1); }
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
 }
 /* 5 bars, each with different animation-delay: 0ms, 80ms, 160ms, 240ms, 320ms */
 /* height: 32px, width: 4px, background: #0ea5a8, border-radius: 999px */
@@ -332,6 +355,7 @@ Adapted from Glossar's Levels section (A1–C2 badges → PT note type badges). 
 ```
 
 **Note type pill colors:**
+
 ```
 Evaluation: #6f5acc (violet)
 SOAP:        #0ea5a8 (teal)
@@ -344,6 +368,7 @@ Each pill: border-radius: 999px, padding: 10px 22px
 ```
 
 **Note detail card (below pills):**
+
 ```
 Dark card: background: #1a2030, border-radius: 20px, padding: 32px, max-width: 520px, centered
 Shows example SOAP structure:
@@ -382,6 +407,7 @@ Adapted from Glossar's Showcase section. Large light-grey card showing the PTScr
 ```
 
 **Session list mockup (browser frame, dark):**
+
 ```
 Header bar: "Today's Sessions" (white, 16px, 600)
 Status filter tabs: All / Draft / Ready / Finalized (small pill tabs, active=teal)
@@ -423,6 +449,7 @@ Adapted from Glossar's vocabulary cards. 3-column grid of dark feature cards.
 ```
 
 **Feature card design:**
+
 ```
 Each card: background: #1a2030, border-radius: 16px, padding: 28px 24px
            display: flex, flex-direction: column, gap: 12px
@@ -467,6 +494,7 @@ Emotional close. Mirror of the hero — same icon, same center alignment, differ
 ```
 
 **Implementation spec:**
+
 ```
 Section: padding: 120px 48px, text-align: center, max-width: 1040px, margin: 0 auto
 
@@ -567,4 +595,4 @@ TECHNICAL REQUIREMENTS
 
 ## 5. EXECUTION DIRECTIVE
 
-*"Do not build a marketing page; build the first moment of trust between a burnt-out clinician and a tool that promises to give them their evenings back."*
+_"Do not build a marketing page; build the first moment of trust between a burnt-out clinician and a tool that promises to give them their evenings back."_

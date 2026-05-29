@@ -36,10 +36,7 @@ vi.mock('@/services/ai/client/localWhisper', () => ({
 
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
-import {
-  blobToFloat32,
-  transcribeFloat32Parallel,
-} from '@/services/ai/client/localWhisper';
+import { blobToFloat32, transcribeFloat32Parallel } from '@/services/ai/client/localWhisper';
 
 const mockFindSpeechRangesML = vi.mocked(findSpeechRangesML);
 const mockExtractRanges = vi.mocked(extractRanges);
@@ -135,7 +132,6 @@ describe('useBackgroundTranscription — T2 success path', () => {
     );
     expect(setTranscript).toHaveBeenCalledWith('hello world');
   });
-
 });
 
 describe('useBackgroundTranscription — T3 guard', () => {
@@ -178,10 +174,7 @@ describe('useBackgroundTranscription — speech-not-found', () => {
 
     await waitFor(() => expect(mockAddNotification).toHaveBeenCalled());
 
-    expect(mockAddNotification).toHaveBeenCalledWith(
-      'warning',
-      expect.any(String),
-    );
+    expect(mockAddNotification).toHaveBeenCalledWith('warning', expect.any(String));
   });
 });
 

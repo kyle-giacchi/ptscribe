@@ -13,7 +13,9 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
-vi.mock('sonner', () => ({ toast: { success: (m: string) => toastSuccess(m), error: (m: string) => toastError(m) } }));
+vi.mock('sonner', () => ({
+  toast: { success: (m: string) => toastSuccess(m), error: (m: string) => toastError(m) },
+}));
 
 // The org-config card consumes these; this suite covers members/invites, so we
 // stub the contexts with inert defaults (full coverage lives in their own tests).
@@ -38,7 +40,12 @@ function stubFetch(impl?: (...args: unknown[]) => unknown) {
 }
 
 const baseResponse: MembersResponse = {
-  org: { id: 'org-1', name: 'Coastal PT', contactEmail: 'admin@coastal.com', phone: '(555) 111-2222' },
+  org: {
+    id: 'org-1',
+    name: 'Coastal PT',
+    contactEmail: 'admin@coastal.com',
+    phone: '(555) 111-2222',
+  },
   yourRole: 'owner',
   canManage: true,
   members: [
@@ -46,7 +53,14 @@ const baseResponse: MembersResponse = {
     { id: 'u-2', name: 'Alex', email: 'alex@coastal.com', role: 'standard', isYou: false },
   ],
   invites: [
-    { id: 'inv-1', email: 'pending@coastal.com', role: 'standard', createdAt: 1000, expiresAt: 9_999_999_999_999, expired: false },
+    {
+      id: 'inv-1',
+      email: 'pending@coastal.com',
+      role: 'standard',
+      createdAt: 1000,
+      expiresAt: 9_999_999_999_999,
+      expired: false,
+    },
   ],
 };
 
@@ -76,14 +90,18 @@ describe('load states', () => {
     mockOrgId = null;
     const spy = stubFetch();
     renderPage();
-    await waitFor(() => expect(screen.getByText(/not part of an organization/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/not part of an organization/i)).toBeInTheDocument(),
+    );
     expect(spy).not.toHaveBeenCalled();
   });
 
   it('shows the no-org panel when the server says NOT_IN_ORG', async () => {
     stubFetch().mockResolvedValueOnce(jsonErr(403, { code: 'NOT_IN_ORG', error: 'no' }));
     renderPage();
-    await waitFor(() => expect(screen.getByText(/not part of an organization/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(/not part of an organization/i)).toBeInTheDocument(),
+    );
   });
 
   it('shows an error panel with retry on other failures', async () => {
@@ -115,7 +133,9 @@ describe('role gating (canManage)', () => {
   });
 
   it('hides invite form and member controls for view-only members', async () => {
-    stubFetch().mockResolvedValueOnce(jsonOk({ ...baseResponse, canManage: false, yourRole: 'standard' }));
+    stubFetch().mockResolvedValueOnce(
+      jsonOk({ ...baseResponse, canManage: false, yourRole: 'standard' }),
+    );
     renderPage();
     await waitFor(() => screen.getByText('Coastal PT'));
     expect(screen.queryByPlaceholderText('teammate@example.com')).not.toBeInTheDocument();
@@ -194,7 +214,8 @@ describe('mutations', () => {
     await waitFor(() => screen.getByText('Coastal PT'));
 
     // Alex's row has the editable role <select>.
-    const alexRow = screen.getByText('alex@coastal.com').closest('div')!.parentElement!.parentElement!;
+    const alexRow = screen.getByText('alex@coastal.com').closest('div')!.parentElement!
+      .parentElement!;
     const select = within(alexRow).getByLabelText('Role') as HTMLSelectElement;
     fireEvent.change(select, { target: { value: 'manager' } });
 
