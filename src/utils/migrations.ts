@@ -350,9 +350,7 @@ function migrateV11ToV12(input: Record<string, unknown>): Record<string, unknown
   // 2. Seed the built-in "Unassigned" patient if absent. Quick-record paths
   // attach sessions to this row so a session can start before a real patient
   // is selected.
-  const patients = Array.isArray(next.patients)
-    ? (next.patients as Record<string, unknown>[])
-    : [];
+  const patients = Array.isArray(next.patients) ? (next.patients as Record<string, unknown>[]) : [];
   if (!patients.some((p) => p.id === UNASSIGNED_PATIENT_ID)) {
     const now = Date.now();
     patients.unshift({
@@ -391,8 +389,7 @@ function migrateV12ToV13(input: Record<string, unknown>): Record<string, unknown
         typeof softWarn === 'number' && softWarn >= 15 && softWarn <= 240
           ? Math.floor(softWarn)
           : 75,
-      maxMinutes:
-        typeof max === 'number' && max >= 30 && max <= 240 ? Math.floor(max) : 90,
+      maxMinutes: typeof max === 'number' && max >= 30 && max <= 240 ? Math.floor(max) : 90,
       idleAutoStopMinutes:
         typeof idle === 'number' && idle >= 0 && idle <= 60 ? Math.floor(idle) : 10,
     },
@@ -476,14 +473,30 @@ function migrateV17ToV18(input: Record<string, unknown>): Record<string, unknown
   // Session: liveTranscript→t1Transcript, localTranscript→t2Transcript, aiTranscript→t3Transcript
   // SessionClip: same renames + liveTranscript→t1Transcript
   // transcriptSource values: 'webspeech'→'t1', 'whisper'→'t2', 'nova'→'t3', 'manual'→'edited'
-  const sourceMap: Record<string, string> = { webspeech: 't1', whisper: 't2', nova: 't3', manual: 'edited' };
-  const sessions = Array.isArray(input.sessions) ? (input.sessions as Record<string, unknown>[]) : [];
+  const sourceMap: Record<string, string> = {
+    webspeech: 't1',
+    whisper: 't2',
+    nova: 't3',
+    manual: 'edited',
+  };
+  const sessions = Array.isArray(input.sessions)
+    ? (input.sessions as Record<string, unknown>[])
+    : [];
   const migratedSessions = sessions.map((s) => {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(s)) {
-      if (k === 'liveTranscript') { out.t1Transcript = v; continue; }
-      if (k === 'localTranscript') { out.t2Transcript = v; continue; }
-      if (k === 'aiTranscript') { out.t3Transcript = v; continue; }
+      if (k === 'liveTranscript') {
+        out.t1Transcript = v;
+        continue;
+      }
+      if (k === 'localTranscript') {
+        out.t2Transcript = v;
+        continue;
+      }
+      if (k === 'aiTranscript') {
+        out.t3Transcript = v;
+        continue;
+      }
       if (k === 'transcriptSource') {
         out.activeTranscriptTier = typeof v === 'string' ? (sourceMap[v] ?? v) : v;
         continue;
@@ -494,9 +507,18 @@ function migrateV17ToV18(input: Record<string, unknown>): Record<string, unknown
     out.clips = clips.map((c) => {
       const clip: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(c)) {
-        if (k === 'liveTranscript') { clip.t1Transcript = v; continue; }
-        if (k === 'localTranscript') { clip.t2Transcript = v; continue; }
-        if (k === 'aiTranscript') { clip.t3Transcript = v; continue; }
+        if (k === 'liveTranscript') {
+          clip.t1Transcript = v;
+          continue;
+        }
+        if (k === 'localTranscript') {
+          clip.t2Transcript = v;
+          continue;
+        }
+        if (k === 'aiTranscript') {
+          clip.t3Transcript = v;
+          continue;
+        }
         clip[k] = v;
       }
       return clip;

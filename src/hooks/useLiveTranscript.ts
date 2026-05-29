@@ -82,54 +82,57 @@ export function useWebSpeechTranscript(): UseWebSpeechTranscript {
     [],
   );
 
-  const start = useCallback((getElapsedSec?: () => number) => {
-    if (!Ctor) {
-      setError('Live transcription is not supported in this browser.');
-      return;
-    }
-    getElapsedSecRef.current = getElapsedSec;
-    nextFinalIdxRef.current = 0;
-    setError(null);
-    const rec = new Ctor();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'en-US';
-    rec.onresult = (e) => {
-      if (!isMountedRef.current) return;
-      let interim = '';
-      let appended = '';
-      const startIdx = Math.max(e.resultIndex, nextFinalIdxRef.current);
-      for (let i = startIdx; i < e.results.length; i += 1) {
-        const r = e.results[i];
-        const text = r[0].transcript;
-        if (r.isFinal) {
-          appended += text;
-          nextFinalIdxRef.current = i + 1;
-        } else {
-          interim += text;
+  const start = useCallback(
+    (getElapsedSec?: () => number) => {
+      if (!Ctor) {
+        setError('Live transcription is not supported in this browser.');
+        return;
+      }
+      getElapsedSecRef.current = getElapsedSec;
+      nextFinalIdxRef.current = 0;
+      setError(null);
+      const rec = new Ctor();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+      rec.onresult = (e) => {
+        if (!isMountedRef.current) return;
+        let interim = '';
+        let appended = '';
+        const startIdx = Math.max(e.resultIndex, nextFinalIdxRef.current);
+        for (let i = startIdx; i < e.results.length; i += 1) {
+          const r = e.results[i];
+          const text = r[0].transcript;
+          if (r.isFinal) {
+            appended += text;
+            nextFinalIdxRef.current = i + 1;
+          } else {
+            interim += text;
+          }
         }
-      }
-      if (appended) {
-        const elapsedSec = getElapsedSecRef.current?.() ?? 0;
-        const wallTime = Date.now();
-        setAccumulatedText((prev) => (prev + ' ' + appended).trim());
-        setSegments((prev) => [...prev, { text: appended.trim(), elapsedSec, wallTime }]);
-      }
-      setInterimText(interim);
-    };
-    rec.onerror = (ev) => {
-      if (!isMountedRef.current) return;
-      setError(ev.error || 'speech error');
-    };
-    rec.onend = () => {
-      if (!isMountedRef.current) return;
-      setListening(false);
-      setInterimText('');
-    };
-    rec.start();
-    recRef.current = rec;
-    setListening(true);
-  }, [Ctor]);
+        if (appended) {
+          const elapsedSec = getElapsedSecRef.current?.() ?? 0;
+          const wallTime = Date.now();
+          setAccumulatedText((prev) => (prev + ' ' + appended).trim());
+          setSegments((prev) => [...prev, { text: appended.trim(), elapsedSec, wallTime }]);
+        }
+        setInterimText(interim);
+      };
+      rec.onerror = (ev) => {
+        if (!isMountedRef.current) return;
+        setError(ev.error || 'speech error');
+      };
+      rec.onend = () => {
+        if (!isMountedRef.current) return;
+        setListening(false);
+        setInterimText('');
+      };
+      rec.start();
+      recRef.current = rec;
+      setListening(true);
+    },
+    [Ctor],
+  );
 
   const stop = useCallback(() => {
     try {
@@ -148,5 +151,15 @@ export function useWebSpeechTranscript(): UseWebSpeechTranscript {
     setError(null);
   }, []);
 
-  return { supported, listening, accumulatedText, interimText, segments, error, start, stop, reset };
+  return {
+    supported,
+    listening,
+    accumulatedText,
+    interimText,
+    segments,
+    error,
+    start,
+    stop,
+    reset,
+  };
 }

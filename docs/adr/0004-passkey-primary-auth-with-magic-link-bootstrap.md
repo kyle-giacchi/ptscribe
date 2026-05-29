@@ -9,16 +9,16 @@ status: accepted
 Auth (BetterAuth on the Cloudflare Worker, D1-backed) currently exposes two sign-in paths in
 `src/pages/Login.tsx`: `signIn.passkey()` and `signIn.magicLink()`. Two things are broken:
 
-1. **There is no passkey *registration* anywhere.** The codebase calls `authClient.signIn.passkey()`
+1. **There is no passkey _registration_ anywhere.** The codebase calls `authClient.signIn.passkey()`
    but never `authClient.passkey.addPasskey()`. Since a WebAuthn credential can only be attached to
-   an *already-authenticated* account, sign-in-with-passkey can never succeed — there is no path that
+   an _already-authenticated_ account, sign-in-with-passkey can never succeed — there is no path that
    creates the credential in the first place.
 2. **Magic-link email is a `console.log` stub** (`worker/email.ts` `sendMagicLinkEmail`). The link is
    only ever printed to the Worker console, so no real user can complete a magic-link login either.
 
 The net effect: outside demo mode (`VITE_DEMO_MODE` default ON, which auto-unlocks), **no account can
 be bootstrapped at all.** We want passkey to be the everyday login, but WebAuthn fundamentally cannot
-be the *first* factor for a brand-new account — a passkey attaches to an account that already exists.
+be the _first_ factor for a brand-new account — a passkey attaches to an account that already exists.
 
 ## Decision
 
@@ -43,7 +43,7 @@ Adopt a **two-tier auth model**:
 - **Passkey-only (no email at all)** — rejected. Impossible: WebAuthn cannot create the first account
   credential. Something non-passkey must bootstrap.
 - **Email + password as the bootstrap credential** — rejected. Reintroduces the password we were
-  avoiding *and* its reset flow, which itself needs email. Email is on the critical path either way,
+  avoiding _and_ its reset flow, which itself needs email. Email is on the critical path either way,
   so magic-link bootstrap is strictly less surface than password + reset.
 - **MailChannels for sending** — rejected. MailChannels ended its free Cloudflare Workers tier in
   mid-2024; it now requires a paid account plus DKIM domain setup. Resend's free tier (~3k/mo) reaches

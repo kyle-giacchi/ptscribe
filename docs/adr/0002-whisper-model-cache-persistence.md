@@ -13,7 +13,7 @@ the fetch interceptor in `whisper.worker.ts`. The Workbox service worker does **
 its first matching rule, `/\/api\/.*/ → NetworkOnly`, wins for `/api/model/*`, so IDB is the sole
 store (confirmed by the comment at `whisper.worker.ts`: "IDB interceptor is the sole cache layer").
 
-That made the headline goal — *never reload the model when a user restarts a recording session* —
+That made the headline goal — _never reload the model when a user restarts a recording session_ —
 already true for the **in-app** reset (`handleResetSession`, demo "Start fresh"): none of them touch
 the worker, the `whisperLoader` singleton, or the cache DB. The real exposures were elsewhere:
 
@@ -21,7 +21,7 @@ the worker, the `whisperLoader` singleton, or the cache DB. The real exposures w
    `!isDemoMode() && isAuthenticated` (`AppDataProvider`) plus a one-shot first-run gate call. The
    most common users (demo, unauthenticated, returning) never requested durable storage.
 2. The onnxruntime WASM runtime was cached by Workbox `CacheFirst` with `maxAgeSeconds: 30 days`,
-   which the expiration plugin enforces *proactively*, independent of storage pressure — so the
+   which the expiration plugin enforces _proactively_, independent of storage pressure — so the
    runtime was force-evicted monthly even when the weights survived.
 3. Cache-first with no bypass meant a single corrupt/truncated cached file was **permanent**:
    `whisperLoader.reset()` and the gate's "Retry" re-read the same bad bytes, and no code path
@@ -38,7 +38,7 @@ patient, and persist it as aggressively as the platform allows:
 2. **The WASM runtime never time-expires.** Remove `maxAgeSeconds` from the `ml-assets` Workbox
    rules; rely on `maxEntries` LRU. Content-hashed filenames make a stale lingering entry benign.
 3. **Weights survive a full data wipe.** Settings' "Erase ALL local data" keeps the model cache.
-   The model is a *public, non-PHI* asset, so preserving it leaks nothing and keeps the app instantly
+   The model is a _public, non-PHI_ asset, so preserving it leaks nothing and keeps the app instantly
    ready. This is enforced, not incidental — see `docs/invariants.md`.
 4. **Corruption self-heals, with a manual escape hatch.** A `CACHE_VERSION` stamp lets a deliberate
    model swap evict stale files. On pipeline-load **exhaustion** (both auto-attempts failed — the
@@ -54,7 +54,7 @@ patient, and persist it as aggressively as the platform allows:
   so the common case had no eviction defense at all — directly defeating the goal.
 - **Clear the cache on every load failure (eager self-heal).** Rejected: a single network blip during
   `pipeline()` init would discard good cached weights and force a needless 40 MB re-download. Clearing
-  only on *exhaustion* distinguishes corruption from transient failure.
+  only on _exhaustion_ distinguishes corruption from transient failure.
 
 ## Consequences
 

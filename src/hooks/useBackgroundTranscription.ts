@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/contexts/NotificationsProvider';
-import { blobToFloat32, transcribeFloat32Parallel, LOCAL_WHISPER_DEFAULT_MODEL, WhisperExhaustedError } from '@/services/ai/client/localWhisper';
+import {
+  blobToFloat32,
+  transcribeFloat32Parallel,
+  LOCAL_WHISPER_DEFAULT_MODEL,
+  WhisperExhaustedError,
+} from '@/services/ai/client/localWhisper';
 import { promoteTier } from '@/services/transcript/promoteTier';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
@@ -55,7 +60,10 @@ export async function transcribeWithLocalWhisper(
   for (let i = 0; i < numChunks; i++) {
     if (signal?.aborted) return { ok: false, error: 'Aborted.' };
     const startSample = i * chunkLen;
-    const chunkAudio = samples.subarray(startSample, Math.min(startSample + chunkLen, samples.length));
+    const chunkAudio = samples.subarray(
+      startSample,
+      Math.min(startSample + chunkLen, samples.length),
+    );
     const startSec = i * LOCAL_CHUNK_SEC;
 
     let speech: Float32Array;
@@ -82,7 +90,9 @@ export async function transcribeWithLocalWhisper(
   const texts = await transcribeFloat32Parallel(
     speechChunks.map((c) => c.audio),
     LOCAL_WHISPER_DEFAULT_MODEL,
-    (done, total) => { onProgress?.(label(done, total)); },
+    (done, total) => {
+      onProgress?.(label(done, total));
+    },
   );
 
   if (signal?.aborted) return { ok: false, error: 'Aborted.' };
@@ -165,7 +175,11 @@ export function useBackgroundTranscription({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    transcribeWithLocalWhisper(silencedMergedBlob!, (msg) => setProgressLabel(msg), controller.signal)
+    transcribeWithLocalWhisper(
+      silencedMergedBlob!,
+      (msg) => setProgressLabel(msg),
+      controller.signal,
+    )
       .then((result) => {
         // Pass was superseded (blob changed) or the hook unmounted — drop it
         // so no stale setTranscript/patchSession/setPhase write occurs.

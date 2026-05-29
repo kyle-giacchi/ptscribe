@@ -10,11 +10,21 @@ interface Props {
 type ChapterId = 'ch-intro' | 'ch-security' | 'ch-voice' | 'ch-notes' | 'ch-future';
 
 const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
-  { id: 'ch-intro',    num: '00', name: 'Why I built this',      desc: '$1,800/yr per clinician. Really?' },
-  { id: 'ch-security', num: '01', name: 'Secure, local-first',   desc: 'Your data stays on your device.' },
-  { id: 'ch-voice',    num: '02', name: 'Voice & cost',          desc: "What's possible on a laptop." },
-  { id: 'ch-notes',    num: '03', name: 'Notes & the AI bound',  desc: 'The one place I send to the cloud.' },
-  { id: 'ch-future',   num: '04', name: 'Down the road',         desc: 'A clinic in a box.' },
+  { id: 'ch-intro', num: '00', name: 'Why I built this', desc: '$1,800/yr per clinician. Really?' },
+  {
+    id: 'ch-security',
+    num: '01',
+    name: 'Secure, local-first',
+    desc: 'Your data stays on your device.',
+  },
+  { id: 'ch-voice', num: '02', name: 'Voice & cost', desc: "What's possible on a laptop." },
+  {
+    id: 'ch-notes',
+    num: '03',
+    name: 'Notes & the AI bound',
+    desc: 'The one place I send to the cloud.',
+  },
+  { id: 'ch-future', num: '04', name: 'Down the road', desc: 'A clinic in a box.' },
 ];
 
 const REPO = 'https://github.com/kyle-giacchi/ptscribe';
@@ -23,7 +33,14 @@ const REPO = 'https://github.com/kyle-giacchi/ptscribe';
 
 function VaultIcon() {
   return (
-    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="3.5" y="5.5" width="25" height="21" rx="2" />
       <circle cx="13" cy="16" r="4.5" />
       <circle cx="13" cy="16" r="1.2" fill="currentColor" stroke="none" />
@@ -35,7 +52,14 @@ function VaultIcon() {
 
 function StorageIcon() {
   return (
-    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="3" y="6" width="26" height="20" rx="2" />
       <path d="M3 12h26" />
       <circle cx="6.5" cy="9" r="0.9" fill="currentColor" stroke="none" />
@@ -49,7 +73,14 @@ function StorageIcon() {
 
 function CloudIcon() {
   return (
-    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M9.5 23.5a5.2 5.2 0 01-.6-10.4 7.3 7.3 0 0114.2-1 4.7 4.7 0 011 9.3l-.4.1H9.5z" />
     </svg>
   );
@@ -58,7 +89,7 @@ function CloudIcon() {
 function GithubMark({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-      <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.08-2.7-1.08-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.22.83 1.22.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.66 7.66 0 014 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.74.54 1.49v2.21c0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.08-2.7-1.08-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.22.83 1.22.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.66 7.66 0 014 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.74.54 1.49v2.21c0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z" />
     </svg>
   );
 }
@@ -75,18 +106,30 @@ function SectionHead({ tag, title }: { tag: string; title: string }) {
   );
 }
 
-function ChapterHeader({ num, eyebrow, eyebrowVariant, title, lede }: {
+function ChapterHeader({
+  num,
+  eyebrow,
+  eyebrowVariant,
+  title,
+  lede,
+}: {
   num: string;
   eyebrow: string;
   eyebrowVariant?: 'sec' | 'trans' | 'note' | 'amber';
   title: string;
   lede: ReactNode;
 }) {
-  const eyebrowClass = eyebrowVariant ? `ch__eyebrow ch__eyebrow--${eyebrowVariant}` : 'ch__eyebrow';
-  const dotStyle: CSSProperties | undefined = eyebrowVariant === 'amber' ? { background: 'var(--amber)' } : undefined;
+  const eyebrowClass = eyebrowVariant
+    ? `ch__eyebrow ch__eyebrow--${eyebrowVariant}`
+    : 'ch__eyebrow';
+  const dotStyle: CSSProperties | undefined =
+    eyebrowVariant === 'amber' ? { background: 'var(--amber)' } : undefined;
   return (
     <header className="ch__head">
-      <div className="ch__num">CH<span>chapter</span>{num}</div>
+      <div className="ch__num">
+        CH<span>chapter</span>
+        {num}
+      </div>
       <div className="ch__head-r">
         <span className={eyebrowClass}>
           <span className="dot" style={dotStyle} />
@@ -99,7 +142,11 @@ function ChapterHeader({ num, eyebrow, eyebrowVariant, title, lede }: {
   );
 }
 
-function Pager({ prev, next, hint }: {
+function Pager({
+  prev,
+  next,
+  hint,
+}: {
   prev?: { id: ChapterId; label: string };
   next?: { id: ChapterId; label: string };
   hint?: string;
@@ -137,7 +184,9 @@ function Disclose({ tag, title, children }: { tag: string; title: string; childr
         <span className="disclose__hint mono">
           <span className="disclose__hint-open">Show technical detail</span>
           <span className="disclose__hint-close">Hide</span>
-          <span className="disclose__chev" aria-hidden="true">›</span>
+          <span className="disclose__chev" aria-hidden="true">
+            ›
+          </span>
         </span>
       </summary>
       <div className="disclose__body">{children}</div>
@@ -150,34 +199,50 @@ function Disclose({ tag, title, children }: { tag: string; title: string; childr
 function IntroChapter() {
   return (
     <section id="ch-intro" className="hiw__intro hiw__page is-active" data-page="ch-intro">
-      <span className="eyebrow mono hiw__intro-eyebrow eyebrow--v3">Why I built this · the pricing problem</span>
+      <span className="eyebrow mono hiw__intro-eyebrow eyebrow--v3">
+        Why I built this · the pricing problem
+      </span>
       <h1 className="hiw__intro-h1 intro-h1--loud" id="hiw-title">
         I honestly couldn't believe what these tools cost.
       </h1>
       <p className="hiw__intro-sub">
-        The leading SaaS clinical scribes run about <strong><span className="intro-h1__amt">$1,800 a year per clinician</span></strong> — roughly $150 a month, every month, for each clinician.
-        From a personal-AI perspective, a Claude Max subscription costs about the same and arguably gives you a lot more.
-        I get it: AI costs money, and running these models isn't free. But <em>$1,800-per-clinician-per-year</em> money?
-        Do we really need yet another payer (the clinician) and another provider (the SaaS company) wedged into the healthcare stack?
+        The leading SaaS clinical scribes run about{' '}
+        <strong>
+          <span className="intro-h1__amt">$1,800 a year per clinician</span>
+        </strong>{' '}
+        — roughly $150 a month, every month, for each clinician. From a personal-AI perspective, a
+        Claude Max subscription costs about the same and arguably gives you a lot more. I get it: AI
+        costs money, and running these models isn't free. But <em>$1,800-per-clinician-per-year</em>{' '}
+        money? Do we really need yet another payer (the clinician) and another provider (the SaaS
+        company) wedged into the healthcare stack?
       </p>
 
       <p className="note">
-        I built this for the clinicians who carry an active caseload: physical therapists.
-        PT practices tend to run on thinner margins than most other clinical specialties, which makes an <strong>$1,800-a-year-per-seat</strong> subscription sting that much more.
+        I built this for the clinicians who carry an active caseload: physical therapists. PT
+        practices tend to run on thinner margins than most other clinical specialties, which makes
+        an <strong>$1,800-a-year-per-seat</strong> subscription sting that much more.
       </p>
 
-      <div className="market-strip__h"><span>Annual cost · per clinician</span></div>
+      <div className="market-strip__h">
+        <span>Annual cost · per clinician</span>
+      </div>
       <div className="price-compare">
         <div className="price-card price-card--saas">
           <span className="price-card__kicker">Leading SaaS scribes</span>
           <span className="price-card__name">Subscription · per clinician</span>
-          <span className="price-card__v">$1,800<span className="unit">/yr</span></span>
+          <span className="price-card__v">
+            $1,800<span className="unit">/yr</span>
+          </span>
         </div>
-        <span className="price-compare__vs" aria-hidden="true">vs.</span>
+        <span className="price-compare__vs" aria-hidden="true">
+          vs.
+        </span>
         <div className="price-card price-card--ours">
           <span className="price-card__kicker">PTScribe</span>
           <span className="price-card__name">Estimated cloud spend · per clinician</span>
-          <span className="price-card__v"><span className="approx">~</span>$5<span className="unit">/yr</span></span>
+          <span className="price-card__v">
+            <span className="approx">~</span>$5<span className="unit">/yr</span>
+          </span>
         </div>
       </div>
       <div className="price-mult">
@@ -193,14 +258,19 @@ function IntroChapter() {
       <div className="market-facts" role="table" aria-label="Market facts">
         <div className="market-facts__head" role="row">
           <span role="columnheader">Fact</span>
-          <span role="columnheader" className="src">What it means in context</span>
+          <span role="columnheader" className="src">
+            What it means in context
+          </span>
           <span role="columnheader">Figure</span>
         </div>
 
         <div className="market-facts__row" role="row">
-          <span className="market-facts__k" role="cell">Licensed PTs · US</span>
+          <span className="market-facts__k" role="cell">
+            Licensed PTs · US
+          </span>
           <span className="market-facts__note" role="cell">
-            The full addressable market for a US-only physical-therapy scribe. <strong>BLS Occupational Outlook · 2024</strong>.
+            The full addressable market for a US-only physical-therapy scribe.{' '}
+            <strong>BLS Occupational Outlook · 2024</strong>.
           </span>
           <span className="market-facts__v" role="cell">
             <span className="approx">~</span>180,000<span className="unit">clinicians</span>
@@ -208,17 +278,25 @@ function IntroChapter() {
         </div>
 
         <div className="market-facts__row" role="row">
-          <span className="market-facts__k" role="cell">Average billable session</span>
-          <span className="market-facts__note" role="cell">
-            A typical 1:1 PT visit. Drives the per-clinician audio-minute estimate that anchors every downstream cost number.
+          <span className="market-facts__k" role="cell">
+            Average billable session
           </span>
-          <span className="market-facts__v" role="cell">30–45<span className="unit">min</span></span>
+          <span className="market-facts__note" role="cell">
+            A typical 1:1 PT visit. Drives the per-clinician audio-minute estimate that anchors
+            every downstream cost number.
+          </span>
+          <span className="market-facts__v" role="cell">
+            30–45<span className="unit">min</span>
+          </span>
         </div>
 
         <div className="market-facts__row" role="row">
-          <span className="market-facts__k" role="cell">Visits per clinician · year</span>
+          <span className="market-facts__k" role="cell">
+            Visits per clinician · year
+          </span>
           <span className="market-facts__note" role="cell">
-            ~10 patients/day × ~225 working days. Roughly <strong>1,100 hours</strong> of session audio per clinician, per year.
+            ~10 patients/day × ~225 working days. Roughly <strong>1,100 hours</strong> of session
+            audio per clinician, per year.
           </span>
           <span className="market-facts__v" role="cell">
             <span className="approx">~</span>2,250<span className="unit">visits/yr</span>
@@ -226,17 +304,25 @@ function IntroChapter() {
         </div>
 
         <div className="market-facts__row" role="row">
-          <span className="market-facts__k" role="cell">Manual note time · per visit</span>
-          <span className="market-facts__note" role="cell">
-            Hand-written documentation for the visit itself — longer for an initial eval, shorter for a daily/follow-up. Blended across a typical caseload.
+          <span className="market-facts__k" role="cell">
+            Manual note time · per visit
           </span>
-          <span className="market-facts__v" role="cell">10–15<span className="unit">min/note</span></span>
+          <span className="market-facts__note" role="cell">
+            Hand-written documentation for the visit itself — longer for an initial eval, shorter
+            for a daily/follow-up. Blended across a typical caseload.
+          </span>
+          <span className="market-facts__v" role="cell">
+            10–15<span className="unit">min/note</span>
+          </span>
         </div>
 
         <div className="market-facts__row is-alarm" role="row">
-          <span className="market-facts__k" role="cell">Industry-wide subs · half-adoption</span>
+          <span className="market-facts__k" role="cell">
+            Industry-wide subs · half-adoption
+          </span>
           <span className="market-facts__note" role="cell">
-            90,000 PTs × $1,800/yr — what would flow into SaaS subscription revenue if even <strong>half</strong> of US PTs subscribed.
+            90,000 PTs × $1,800/yr — what would flow into SaaS subscription revenue if even{' '}
+            <strong>half</strong> of US PTs subscribed.
           </span>
           <span className="market-facts__v" role="cell">
             <span className="approx">~</span>$162M<span className="unit">/yr</span>
@@ -244,9 +330,12 @@ function IntroChapter() {
         </div>
 
         <div className="market-facts__row" role="row">
-          <span className="market-facts__k" role="cell">Actual cloud compute · 100%</span>
+          <span className="market-facts__k" role="cell">
+            Actual cloud compute · 100%
+          </span>
           <span className="market-facts__note" role="cell">
-            Nova-3 on every minute of every visit, all 180k PTs. <strong>Barely half of what subscriptions collect.</strong> The gap is the markup.
+            Nova-3 on every minute of every visit, all 180k PTs.{' '}
+            <strong>Barely half of what subscriptions collect.</strong> The gap is the markup.
           </span>
           <span className="market-facts__v" role="cell">
             <span className="approx">~</span>$89M<span className="unit">/yr</span>
@@ -257,7 +346,8 @@ function IntroChapter() {
       <div className="intro-bridge-block">
         <span className="intro-bridge-block__eyebrow">The question</span>
         <p className="intro-bridge">
-          So it begs the question — <strong>could I build a secure, local-first clinical scribe that holds its own?</strong>
+          So it begs the question —{' '}
+          <strong>could I build a secure, local-first clinical scribe that holds its own?</strong>
         </p>
       </div>
 
@@ -265,26 +355,47 @@ function IntroChapter() {
         <article className="goal">
           <header className="goal__head">
             <span className="goal__k">Goal · 01</span>
-            <span className="goal__ch"><a href="#ch-security" data-goto="ch-security">→ ch. 01</a></span>
+            <span className="goal__ch">
+              <a href="#ch-security" data-goto="ch-security">
+                → ch. 01
+              </a>
+            </span>
           </header>
           <h3 className="goal__h">Patient data that genuinely never leaves the device.</h3>
-          <p className="goal__sub">No server-side DB. <code>AES-GCM</code> at rest, a tab-lifetime vault key, and the browser's <code>connect-src</code> CSP as the real fence.</p>
+          <p className="goal__sub">
+            No server-side DB. <code>AES-GCM</code> at rest, a tab-lifetime vault key, and the
+            browser's <code>connect-src</code> CSP as the real fence.
+          </p>
         </article>
         <article className="goal">
           <header className="goal__head">
             <span className="goal__k">Goal · 02</span>
-            <span className="goal__ch"><a href="#ch-voice" data-goto="ch-voice">→ ch. 02</a></span>
+            <span className="goal__ch">
+              <a href="#ch-voice" data-goto="ch-voice">
+                → ch. 02
+              </a>
+            </span>
           </header>
           <h3 className="goal__h">Live within the limits of a company-issued laptop.</h3>
-          <p className="goal__sub">Local Whisper for the canonical pass. Silence-trim + 1.5× speed-up. A WASM-class PII model — no 24 GB GPU required.</p>
+          <p className="goal__sub">
+            Local Whisper for the canonical pass. Silence-trim + 1.5× speed-up. A WASM-class PII
+            model — no 24 GB GPU required.
+          </p>
         </article>
         <article className="goal">
           <header className="goal__head">
             <span className="goal__k">Goal · 03</span>
-            <span className="goal__ch"><a href="#ch-notes" data-goto="ch-notes">→ ch. 03</a></span>
+            <span className="goal__ch">
+              <a href="#ch-notes" data-goto="ch-notes">
+                → ch. 03
+              </a>
+            </span>
           </header>
           <h3 className="goal__h">Match what the leading SaaS scribes ship today.</h3>
-          <p className="goal__sub">Live captions, diarized transcripts on demand, structured notes generated atomically, templated modifiers — without breaking local-first.</p>
+          <p className="goal__sub">
+            Live captions, diarized transcripts on demand, structured notes generated atomically,
+            templated modifiers — without breaking local-first.
+          </p>
         </article>
       </div>
 
@@ -293,68 +404,110 @@ function IntroChapter() {
           <a className="hiw__idx" href="#ch-security" data-goto="ch-security">
             <span className="hiw__idx-num mono">01</span>
             <span className="hiw__idx-body">
-              <span className="hiw__idx-kicker"><span className="ch__eyebrow ch__eyebrow--sec"><span className="dot" />Secure, local-first</span></span>
-              <span className="hiw__idx-title">No server-side database. Encrypted at rest. A worker that proxies and nothing else.</span>
+              <span className="hiw__idx-kicker">
+                <span className="ch__eyebrow ch__eyebrow--sec">
+                  <span className="dot" />
+                  Secure, local-first
+                </span>
+              </span>
+              <span className="hiw__idx-title">
+                No server-side database. Encrypted at rest. A worker that proxies and nothing else.
+              </span>
             </span>
             <span className="hiw__idx-leader" aria-hidden="true" />
             <span className="hiw__idx-meta mono">
               <span>vault · csp · proxy</span>
               <span className="hiw__idx-page">p. 1</span>
             </span>
-            <span className="hiw__idx-arrow" aria-hidden="true">→</span>
+            <span className="hiw__idx-arrow" aria-hidden="true">
+              →
+            </span>
           </a>
         </li>
         <li role="listitem">
           <a className="hiw__idx" href="#ch-voice" data-goto="ch-voice">
             <span className="hiw__idx-num mono">02</span>
             <span className="hiw__idx-body">
-              <span className="hiw__idx-kicker"><span className="ch__eyebrow ch__eyebrow--trans"><span className="dot" />Voice &amp; cost</span></span>
-              <span className="hiw__idx-title">Three ways to turn speech into text — and the audio-engineering tricks that make Nova affordable.</span>
+              <span className="hiw__idx-kicker">
+                <span className="ch__eyebrow ch__eyebrow--trans">
+                  <span className="dot" />
+                  Voice &amp; cost
+                </span>
+              </span>
+              <span className="hiw__idx-title">
+                Three ways to turn speech into text — and the audio-engineering tricks that make
+                Nova affordable.
+              </span>
             </span>
             <span className="hiw__idx-leader" aria-hidden="true" />
             <span className="hiw__idx-meta mono">
               <span>whisper · web speech · nova-3</span>
               <span className="hiw__idx-page">p. 2</span>
             </span>
-            <span className="hiw__idx-arrow" aria-hidden="true">→</span>
+            <span className="hiw__idx-arrow" aria-hidden="true">
+              →
+            </span>
           </a>
         </li>
         <li role="listitem">
           <a className="hiw__idx" href="#ch-notes" data-goto="ch-notes">
             <span className="hiw__idx-num mono">03</span>
             <span className="hiw__idx-body">
-              <span className="hiw__idx-kicker"><span className="ch__eyebrow ch__eyebrow--note"><span className="dot" />Notes &amp; the AI bound</span></span>
-              <span className="hiw__idx-title">The one critical-path feature I couldn't keep local — and the on-device PII model that softens the blow.</span>
+              <span className="hiw__idx-kicker">
+                <span className="ch__eyebrow ch__eyebrow--note">
+                  <span className="dot" />
+                  Notes &amp; the AI bound
+                </span>
+              </span>
+              <span className="hiw__idx-title">
+                The one critical-path feature I couldn't keep local — and the on-device PII model
+                that softens the blow.
+              </span>
             </span>
             <span className="hiw__idx-leader" aria-hidden="true" />
             <span className="hiw__idx-meta mono">
               <span>sonnet 4.6 · bert-ner · regex</span>
               <span className="hiw__idx-page">p. 3</span>
             </span>
-            <span className="hiw__idx-arrow" aria-hidden="true">→</span>
+            <span className="hiw__idx-arrow" aria-hidden="true">
+              →
+            </span>
           </a>
         </li>
         <li role="listitem">
           <a className="hiw__idx" href="#ch-future" data-goto="ch-future">
             <span className="hiw__idx-num mono">04</span>
             <span className="hiw__idx-body">
-              <span className="hiw__idx-kicker"><span className="ch__eyebrow"><span className="dot" style={{ background: 'var(--amber)' }} />Down the road</span></span>
-              <span className="hiw__idx-title">If "local" didn't have to mean your laptop — just a machine inside the building.</span>
+              <span className="hiw__idx-kicker">
+                <span className="ch__eyebrow">
+                  <span className="dot" style={{ background: 'var(--amber)' }} />
+                  Down the road
+                </span>
+              </span>
+              <span className="hiw__idx-title">
+                If "local" didn't have to mean your laptop — just a machine inside the building.
+              </span>
             </span>
             <span className="hiw__idx-leader" aria-hidden="true" />
             <span className="hiw__idx-meta mono">
               <span>fog computing · on-prem</span>
               <span className="hiw__idx-page">p. 4</span>
             </span>
-            <span className="hiw__idx-arrow" aria-hidden="true">→</span>
+            <span className="hiw__idx-arrow" aria-hidden="true">
+              →
+            </span>
           </a>
         </li>
       </ol>
 
       <p className="note" style={{ marginTop: 18 }}>
-        The <strong>~$5/yr PTScribe estimate</strong> is metered note-generation at a typical caseload; local Whisper carries the transcript for $0 and the Nova-3 "Improve with AI" pass is opt-in and capped 1× per session.
-        The <strong>$89M</strong> is a cloud-only counterfactual — what every minute of every visit would cost if you sent it all to Nova-3. PTScribe doesn't pay that, because local Whisper carries the default load.
-        {' '}<strong>$162M</strong> is a straightforward revenue estimate at $1,800/yr × 90k PTs, not a claim about any one vendor's margins.
+        The <strong>~$5/yr PTScribe estimate</strong> is metered note-generation at a typical
+        caseload; local Whisper carries the transcript for $0 and the Nova-3 "Improve with AI" pass
+        is opt-in and capped 1× per session. The <strong>$89M</strong> is a cloud-only
+        counterfactual — what every minute of every visit would cost if you sent it all to Nova-3.
+        PTScribe doesn't pay that, because local Whisper carries the default load.{' '}
+        <strong>$162M</strong> is a straightforward revenue estimate at $1,800/yr × 90k PTs, not a
+        claim about any one vendor's margins.
         <span className="note__sig">basis &amp; caveat</span>
       </p>
 
@@ -362,7 +515,15 @@ function IntroChapter() {
         <span className="hiw__pager-hint mono">Pick a chapter, or step through with ← / →</span>
         <a className="btn btn--primary hiw__pager-next" href="#ch-security" data-goto="ch-security">
           Start with the security model
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+          >
             <path d="M3 6h6M6 3l3 3-3 3" />
           </svg>
         </a>
@@ -381,7 +542,10 @@ function SecurityChapter() {
         title="Your data stays on your device unless you explicitly send it."
         lede={
           <>
-            Three layers enforce that. <strong>Everything lives on your machine, encrypted.</strong> The <strong>only thing that crosses the network is a thin proxy.</strong> And the <strong>browser's CSP is the real local-first fence</strong> — a compromised dependency can't phone home, because the browser refuses to open the connection.
+            Three layers enforce that. <strong>Everything lives on your machine, encrypted.</strong>{' '}
+            The <strong>only thing that crosses the network is a thin proxy.</strong> And the{' '}
+            <strong>browser's CSP is the real local-first fence</strong> — a compromised dependency
+            can't phone home, because the browser refuses to open the connection.
           </>
         }
       />
@@ -397,53 +561,93 @@ function SecurityChapter() {
           <div className="node node--ink">
             <div className="node__top">
               <span className="node__tag">browser tab</span>
-              <span className="node__glyph" aria-hidden="true"><VaultIcon /></span>
+              <span className="node__glyph" aria-hidden="true">
+                <VaultIcon />
+              </span>
             </div>
             <div className="node__name">Vault key (in memory)</div>
-            <div className="node__desc">Unlocked once when you open the app — passphrase or passkey. Held only in memory.</div>
+            <div className="node__desc">
+              Unlocked once when you open the app — passphrase or passkey. Held only in memory.
+            </div>
             <div className="node__meta">tab-lifetime</div>
           </div>
-          <div className="flow__arrow"><span className="flow__arrow-lbl">AES-GCM</span></div>
+          <div className="flow__arrow">
+            <span className="flow__arrow-lbl">AES-GCM</span>
+          </div>
           <div className="node node--sage">
             <div className="node__top">
               <span className="node__tag">at-rest</span>
-              <span className="node__glyph" aria-hidden="true"><StorageIcon /></span>
+              <span className="node__glyph" aria-hidden="true">
+                <StorageIcon />
+              </span>
             </div>
             <div className="node__name">localStorage + IndexedDB</div>
-            <div className="node__desc">Patients, sessions, notes, templates in <code>localStorage</code>. Audio Blobs in IndexedDB. Every byte sealed at rest.</div>
+            <div className="node__desc">
+              Patients, sessions, notes, templates in <code>localStorage</code>. Audio Blobs in
+              IndexedDB. Every byte sealed at rest.
+            </div>
             <div className="node__meta">no server-side DB</div>
           </div>
-          <div className="flow__arrow flow__arrow--rec"><span className="flow__arrow-lbl">explicit</span></div>
+          <div className="flow__arrow flow__arrow--rec">
+            <span className="flow__arrow-lbl">explicit</span>
+          </div>
           <div className="node">
             <div className="node__top">
               <span className="node__tag">network boundary</span>
-              <span className="node__glyph" aria-hidden="true"><CloudIcon /></span>
+              <span className="node__glyph" aria-hidden="true">
+                <CloudIcon />
+              </span>
             </div>
             <div className="node__name">Cloudflare Worker</div>
-            <div className="node__desc">A proxy and nothing else. Forwards AI calls. <strong>Never stores or logs clinical data.</strong> Provider credentials stay server-side.</div>
+            <div className="node__desc">
+              A proxy and nothing else. Forwards AI calls.{' '}
+              <strong>Never stores or logs clinical data.</strong> Provider credentials stay
+              server-side.
+            </div>
             <div className="node__meta">/api/transcribe · /api/generate</div>
           </div>
         </div>
 
         <div className="flow__branch">
-          <div className="flow__branch-stems"><span /><span /></div>
+          <div className="flow__branch-stems">
+            <span />
+            <span />
+          </div>
           <div className="flow__branch-row">
             <div className="node node--ghost">
-              <div className="node__top"><span className="node__tag">worker enforces</span><span className="node__glyph" /></div>
+              <div className="node__top">
+                <span className="node__tag">worker enforces</span>
+                <span className="node__glyph" />
+              </div>
               <div className="node__name">The cloud worker is locked to this app</div>
-              <div className="node__desc">It only accepts requests coming from PTScribe, caps how many anyone can send, and forwards to a fixed short list of AI models. It can't be turned into a free open proxy.</div>
+              <div className="node__desc">
+                It only accepts requests coming from PTScribe, caps how many anyone can send, and
+                forwards to a fixed short list of AI models. It can't be turned into a free open
+                proxy.
+              </div>
             </div>
             <div className="node node--ghost">
-              <div className="node__top"><span className="node__tag">the real fence</span><span className="node__glyph" /></div>
+              <div className="node__top">
+                <span className="node__tag">the real fence</span>
+                <span className="node__glyph" />
+              </div>
               <div className="node__name">The browser blocks outside connections</div>
-              <div className="node__desc">Even if a piece of code in PTScribe were tampered with, the browser refuses to let it talk to anywhere except PTScribe's own worker and the model download site. There's nowhere for stolen data to go.</div>
+              <div className="node__desc">
+                Even if a piece of code in PTScribe were tampered with, the browser refuses to let
+                it talk to anywhere except PTScribe's own worker and the model download site.
+                There's nowhere for stolen data to go.
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div className="note">
-        <p>An MVP focused on clinical transcription didn't need a database. But the scaffolding is already there — login, DB connections, even a way to deploy this across a whole company. Maybe go check it out. <strong>Maybe hire me.</strong></p>
+        <p>
+          An MVP focused on clinical transcription didn't need a database. But the scaffolding is
+          already there — login, DB connections, even a way to deploy this across a whole company.
+          Maybe go check it out. <strong>Maybe hire me.</strong>
+        </p>
         <span className="note__sig">github.com/kyle-giacchi/ptscribe</span>
       </div>
 
@@ -451,10 +655,12 @@ function SecurityChapter() {
 
       <div className="snippet" role="region" aria-label="The Worker is a proxy only">
         <div className="snippet__head">
-          <span className="snippet__head-l"><span className="snippet__head-dot" /> worker/index.ts</span>
+          <span className="snippet__head-l">
+            <span className="snippet__head-dot" /> worker/index.ts
+          </span>
           <span>"proxy and nothing else"</span>
         </div>
-<pre>{`// No persistence. No body is ever stored.
+        <pre>{`// No persistence. No body is ever stored.
 export default {
   async fetch(req, env) {
     if (!req.headers.get("Origin"))         return deny(403);
@@ -470,36 +676,64 @@ export default {
 }`}</pre>
       </div>
 
-      <Disclose tag="implementer detail" title="Cipher, key lifecycle, gate ordering, and the CSP value">
+      <Disclose
+        tag="implementer detail"
+        title="Cipher, key lifecycle, gate ordering, and the CSP value"
+      >
         <div className="specs">
           <div className="spec">
             <div className="spec__k">at-rest cipher</div>
-            <div className="spec__v"><code>AES-GCM</code></div>
-            <div className="spec__note">Web Crypto. Every byte of clinical data sealed before it touches storage.</div>
+            <div className="spec__v">
+              <code>AES-GCM</code>
+            </div>
+            <div className="spec__note">
+              Web Crypto. Every byte of clinical data sealed before it touches storage.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">key lifecycle</div>
-            <div className="spec__v"><code>tab-lifetime</code></div>
-            <div className="spec__note">Unlocked at cold open. Held in memory. Evicted when the tab closes. No idle timeout, no recovery.</div>
+            <div className="spec__v">
+              <code>tab-lifetime</code>
+            </div>
+            <div className="spec__note">
+              Unlocked at cold open. Held in memory. Evicted when the tab closes. No idle timeout,
+              no recovery.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">worker gates</div>
-            <div className="spec__v"><code>Origin · sha256 · rate limit · allowlist</code></div>
-            <div className="spec__note">No <code>Origin</code> → rejected. Pre-gate per-IP throttle, then post-gate per-IP and per-day, then global daily ceiling.</div>
+            <div className="spec__v">
+              <code>Origin · sha256 · rate limit · allowlist</code>
+            </div>
+            <div className="spec__note">
+              No <code>Origin</code> → rejected. Pre-gate per-IP throttle, then post-gate per-IP and
+              per-day, then global daily ceiling.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">CSP</div>
-            <div className="spec__v"><code>connect-src 'self' + HF</code></div>
-            <div className="spec__note">A compromised dep can't open a socket to an attacker server. The browser is the enforcer.</div>
+            <div className="spec__v">
+              <code>connect-src 'self' + HF</code>
+            </div>
+            <div className="spec__note">
+              A compromised dep can't open a socket to an attacker server. The browser is the
+              enforcer.
+            </div>
           </div>
         </div>
       </Disclose>
 
       <div className="takeaway">
-        <span className="takeaway__icon" aria-hidden="true">✓</span>
+        <span className="takeaway__icon" aria-hidden="true">
+          ✓
+        </span>
         <div>
           <div className="takeaway__h">There is nothing to leak from my servers</div>
-          <div className="takeaway__body">If my Cloudflare account vanished tomorrow, no patient data would vanish with it — because no patient data was ever there. The flip side: the vault key is yours alone, with no recovery. That's the deal local-first asks you to take.</div>
+          <div className="takeaway__body">
+            If my Cloudflare account vanished tomorrow, no patient data would vanish with it —
+            because no patient data was ever there. The flip side: the vault key is yours alone,
+            with no recovery. That's the deal local-first asks you to take.
+          </div>
         </div>
       </div>
 
@@ -521,19 +755,30 @@ function VoiceChapter() {
         title="More than anything, I wanted to find out what's possible on a moderately-powered phone or laptop."
         lede={
           <>
-            It turns out there's a whole spectrum. PTScribe uses several paths depending on the moment — a <strong>fully-local Whisper</strong> as the canonical transcript, a <strong>best-effort live preview</strong> while you record, and an <strong>opt-in cloud pass</strong> for the highest quality. Below: the options I explored, why I picked what I picked, and the audio-engineering trick that keeps the cloud bill from spiralling.
+            It turns out there's a whole spectrum. PTScribe uses several paths depending on the
+            moment — a <strong>fully-local Whisper</strong> as the canonical transcript, a{' '}
+            <strong>best-effort live preview</strong> while you record, and an{' '}
+            <strong>opt-in cloud pass</strong> for the highest quality. Below: the options I
+            explored, why I picked what I picked, and the audio-engineering trick that keeps the
+            cloud bill from spiralling.
           </>
         }
       />
 
       <p className="ch__lede" style={{ fontSize: 14.5, marginTop: 4, marginBottom: 14 }}>
-        Worst case first. <em>What if every user needed the highest-quality transcription?</em> Nova-3 bills by the minute, and at any real scale that compounds. So before a single second of audio goes to the cloud, I leaned on two tricks from my past life in audio engineering: <strong>silence removal</strong> and <strong>pitch-corrected speed-up</strong>. Both run on-device.
+        Worst case first. <em>What if every user needed the highest-quality transcription?</em>{' '}
+        Nova-3 bills by the minute, and at any real scale that compounds. So before a single second
+        of audio goes to the cloud, I leaned on two tricks from my past life in audio engineering:{' '}
+        <strong>silence removal</strong> and <strong>pitch-corrected speed-up</strong>. Both run
+        on-device.
       </p>
 
       <div className="cost-strip">
         <div className="cost-strip__title">
           <span>A typical 32-minute PT session</span>
-          <span className="cost-strip__title-r">unusually silent: exercise sets, manual therapy, repositioning, resting</span>
+          <span className="cost-strip__title-r">
+            unusually silent: exercise sets, manual therapy, repositioning, resting
+          </span>
         </div>
 
         <div className="cost-bar cost-bar--baseline">
@@ -544,7 +789,9 @@ function VoiceChapter() {
           <div className="cost-bar__track">
             <div className="cost-bar__fill cost-bar__fill--split" style={{ width: '100%' }} />
           </div>
-          <div className="cost-bar__value"><strong>32 min</strong> · 100%</div>
+          <div className="cost-bar__value">
+            <strong>32 min</strong> · 100%
+          </div>
         </div>
 
         <div className="cost-bar cost-bar--trim">
@@ -555,18 +802,27 @@ function VoiceChapter() {
           <div className="cost-bar__track">
             <div className="cost-bar__fill" style={{ width: '50%', background: 'var(--ink)' }} />
           </div>
-          <div className="cost-bar__value"><strong>16 min</strong> · <span className="pct-down">−50%</span></div>
+          <div className="cost-bar__value">
+            <strong>16 min</strong> · <span className="pct-down">−50%</span>
+          </div>
         </div>
 
         <div className="cost-bar cost-bar--speed">
           <div className="cost-bar__label">
             <span className="cost-bar__label-h">After 1.5× pitch-corrected speed-up</span>
-            <span className="cost-bar__label-sub">ASR handles 1.5× speech cleanly with no accuracy loss</span>
+            <span className="cost-bar__label-sub">
+              ASR handles 1.5× speech cleanly with no accuracy loss
+            </span>
           </div>
           <div className="cost-bar__track">
-            <div className="cost-bar__fill" style={{ width: '33.4%', background: 'var(--sage-deep)' }} />
+            <div
+              className="cost-bar__fill"
+              style={{ width: '33.4%', background: 'var(--sage-deep)' }}
+            />
           </div>
-          <div className="cost-bar__value"><strong>~10.7 min</strong> · <span className="pct-down">−67%</span> total</div>
+          <div className="cost-bar__value">
+            <strong>~10.7 min</strong> · <span className="pct-down">−67%</span> total
+          </div>
         </div>
 
         <div className="cost-bar__legend">
@@ -579,23 +835,38 @@ function VoiceChapter() {
       <div className="stats">
         <div className="stat stat--alarm">
           <span className="stat__k">Per-clinician, baseline</span>
-          <span className="stat__v">~$495<span className="unit">/yr</span></span>
+          <span className="stat__v">
+            ~$495<span className="unit">/yr</span>
+          </span>
           <span className="stat__sub">Every session sent to Nova at standard pricing.</span>
         </div>
         <div className="stat stat--emph">
           <span className="stat__k">Per-clinician, optimized</span>
-          <span className="stat__v">~$165<span className="unit">/yr</span></span>
-          <span className="stat__sub">Same coverage, with both features on. <strong>~$330/yr saved</strong>.</span>
+          <span className="stat__v">
+            ~$165<span className="unit">/yr</span>
+          </span>
+          <span className="stat__sub">
+            Same coverage, with both features on. <strong>~$330/yr saved</strong>.
+          </span>
         </div>
         <div className="stat">
           <span className="stat__k">US PT industry · net savings</span>
-          <span className="stat__v">~$59.5M<span className="unit">/yr</span></span>
-          <span className="stat__sub">180k PTs · $89M baseline → $30M optimized. Just from not transcribing silence.</span>
+          <span className="stat__v">
+            ~$59.5M<span className="unit">/yr</span>
+          </span>
+          <span className="stat__sub">
+            180k PTs · $89M baseline → $30M optimized. Just from not transcribing silence.
+          </span>
         </div>
       </div>
 
       <p className="note">
-        But that's the <em>cloud-only</em> picture. In PTScribe, Nova isn't the default path at all — local Whisper produces the transcript for free, and Nova is the capped, opt-in "Improve with AI" pass. These optimizations apply to the <strong>fraction</strong> of audio you choose to send to the cloud, on top of a default that's already $0. The numbers above are what a Nova-for-everything service would pay; PTScribe's actual cloud bill is a sliver of even the optimized figure.
+        But that's the <em>cloud-only</em> picture. In PTScribe, Nova isn't the default path at all
+        — local Whisper produces the transcript for free, and Nova is the capped, opt-in "Improve
+        with AI" pass. These optimizations apply to the <strong>fraction</strong> of audio you
+        choose to send to the cloud, on top of a default that's already $0. The numbers above are
+        what a Nova-for-everything service would pay; PTScribe's actual cloud bill is a sliver of
+        even the optimized figure.
       </p>
 
       <SectionHead tag="three paths" title="…and only one of them costs anything" />
@@ -609,11 +880,18 @@ function VoiceChapter() {
           <div className="tradeoff__right">
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-pro">Why I picked it</div>
-              <p>Runs entirely on-device in a Web Worker. The model downloads once, caches, and after that <strong>no audio ever leaves the machine</strong>. The thing I'm proudest of in this build.</p>
+              <p>
+                Runs entirely on-device in a Web Worker. The model downloads once, caches, and after
+                that <strong>no audio ever leaves the machine</strong>. The thing I'm proudest of in
+                this build.
+              </p>
             </div>
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-con">The catch</div>
-              <p>First transcription on a fresh browser pays a one-time model download. After that, it's free and offline — but the wait is real, so I design loading states around it.</p>
+              <p>
+                First transcription on a fresh browser pays a one-time model download. After that,
+                it's free and offline — but the wait is real, so I design loading states around it.
+              </p>
             </div>
           </div>
         </div>
@@ -626,11 +904,19 @@ function VoiceChapter() {
           <div className="tradeoff__right">
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-pro">Why it's here</div>
-              <p>A running transcript captured <em>during</em> the visit, opt-in and zero-network on browsers that support Web Speech. Lower-powered devices and older browsers can still capture a session.</p>
+              <p>
+                A running transcript captured <em>during</em> the visit, opt-in and zero-network on
+                browsers that support Web Speech. Lower-powered devices and older browsers can still
+                capture a session.
+              </p>
             </div>
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-con">The catch</div>
-              <p>It's best-effort, not canonical. Quality and availability vary by browser. The streaming cloud pass costs money. I treat this as a fallback, not the source of truth.</p>
+              <p>
+                It's best-effort, not canonical. Quality and availability vary by browser. The
+                streaming cloud pass costs money. I treat this as a fallback, not the source of
+                truth.
+              </p>
             </div>
           </div>
         </div>
@@ -643,56 +929,110 @@ function VoiceChapter() {
           <div className="tradeoff__right">
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-pro">When it wins</div>
-              <p>Speaker diarization (clinician vs. patient) and the cleanest dictation when accuracy matters more than privacy by default. Always an explicit click — never automatic.</p>
+              <p>
+                Speaker diarization (clinician vs. patient) and the cleanest dictation when accuracy
+                matters more than privacy by default. Always an explicit click — never automatic.
+              </p>
             </div>
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-con">The catch</div>
-              <p>It's the only one that actually costs me money. <strong>Please be gentle on my hosting bill</strong> — or just hire me so I can keep providing this for free.</p>
+              <p>
+                It's the only one that actually costs me money.{' '}
+                <strong>Please be gentle on my hosting bill</strong> — or just hire me so I can keep
+                providing this for free.
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <SectionHead tag="pipeline" title="The five passes that run before any audio leaves the machine" />
+      <SectionHead
+        tag="pipeline"
+        title="The five passes that run before any audio leaves the machine"
+      />
 
       <ol className="steps">
-        <li><b>Capture.</b> Web Audio records to memory. A VAD-gated streaming pass appends a live preview so there's a transcript building <em>during</em> the visit.</li>
-        <li><b>Silence-trim.</b> ML VAD identifies speech ranges. The non-speech regions are dropped before anything goes further. The original blob stays untouched.</li>
-        <li><b>1.5× pitch-corrected speed-up.</b> Phase-vocoder time-stretch keeps voices intelligible. ASR handles it cleanly — verified on real session audio.</li>
-        <li><b>Local Whisper (T2).</b> The canonical pass. A worker pool chunks audio at 2-min boundaries and transcribes in parallel.</li>
-        <li><b>Optional Nova-3 (T3).</b> An explicit click, capped 1× per session, lifetime. Receives the trimmed + sped-up audio — never the raw recording.</li>
+        <li>
+          <b>Capture.</b> Web Audio records to memory. A VAD-gated streaming pass appends a live
+          preview so there's a transcript building <em>during</em> the visit.
+        </li>
+        <li>
+          <b>Silence-trim.</b> ML VAD identifies speech ranges. The non-speech regions are dropped
+          before anything goes further. The original blob stays untouched.
+        </li>
+        <li>
+          <b>1.5× pitch-corrected speed-up.</b> Phase-vocoder time-stretch keeps voices
+          intelligible. ASR handles it cleanly — verified on real session audio.
+        </li>
+        <li>
+          <b>Local Whisper (T2).</b> The canonical pass. A worker pool chunks audio at 2-min
+          boundaries and transcribes in parallel.
+        </li>
+        <li>
+          <b>Optional Nova-3 (T3).</b> An explicit click, capped 1× per session, lifetime. Receives
+          the trimmed + sped-up audio — never the raw recording.
+        </li>
       </ol>
 
-      <Disclose tag="implementer detail" title="Specific models, libraries, and audio-engineering vocabulary">
+      <Disclose
+        tag="implementer detail"
+        title="Specific models, libraries, and audio-engineering vocabulary"
+      >
         <div className="specs">
           <div className="spec">
             <div className="spec__k">canonical local model</div>
-            <div className="spec__v"><code>Xenova/whisper-tiny.en</code></div>
-            <div className="spec__note">Runs in a Web Worker via <code>@huggingface/transformers</code>. Model files served from R2 at <code>/api/model/*</code>, cached in IDB after first download.</div>
+            <div className="spec__v">
+              <code>Xenova/whisper-tiny.en</code>
+            </div>
+            <div className="spec__note">
+              Runs in a Web Worker via <code>@huggingface/transformers</code>. Model files served
+              from R2 at <code>/api/model/*</code>, cached in IDB after first download.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">cloud model</div>
-            <div className="spec__v"><code>@cf/deepgram/nova-3</code></div>
-            <div className="spec__note">Cloudflare Workers AI, diarized. Reached via <code>POST /api/transcribe</code>. Capped at one Nova call per session, lifetime.</div>
+            <div className="spec__v">
+              <code>@cf/deepgram/nova-3</code>
+            </div>
+            <div className="spec__note">
+              Cloudflare Workers AI, diarized. Reached via <code>POST /api/transcribe</code>. Capped
+              at one Nova call per session, lifetime.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">live preview</div>
-            <div className="spec__v"><code>Web Speech API</code></div>
-            <div className="spec__note">Browser-native, zero-network where available. Falls back to streaming cloud Whisper on browsers without it.</div>
+            <div className="spec__v">
+              <code>Web Speech API</code>
+            </div>
+            <div className="spec__note">
+              Browser-native, zero-network where available. Falls back to streaming cloud Whisper on
+              browsers without it.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">time-stretch</div>
-            <div className="spec__v"><code>Phase vocoder, 1.5×</code></div>
-            <div className="spec__note">Pitch-preserving. Applied to the silence-trimmed audio before the optional Nova upload.</div>
+            <div className="spec__v">
+              <code>Phase vocoder, 1.5×</code>
+            </div>
+            <div className="spec__note">
+              Pitch-preserving. Applied to the silence-trimmed audio before the optional Nova
+              upload.
+            </div>
           </div>
         </div>
       </Disclose>
 
       <div className="takeaway">
-        <span className="takeaway__icon" aria-hidden="true">✓</span>
+        <span className="takeaway__icon" aria-hidden="true">
+          ✓
+        </span>
         <div>
           <div className="takeaway__h">Default path is free, private, and offline</div>
-          <div className="takeaway__body">You don't need to pay or trust the cloud to use PTScribe — local Whisper is the default. Nova is there <em>when you want it</em>, and even then you're sending a third of the audio you recorded. <strong>Local is the only path that stays at $0.</strong></div>
+          <div className="takeaway__body">
+            You don't need to pay or trust the cloud to use PTScribe — local Whisper is the default.
+            Nova is there <em>when you want it</em>, and even then you're sending a third of the
+            audio you recorded. <strong>Local is the only path that stays at $0.</strong>
+          </div>
         </div>
       </div>
 
@@ -714,13 +1054,21 @@ function NotesChapter() {
         title="The AI only ever sees what you approved. And I'll be honest about what that means."
         lede={
           <>
-            I haven't found the best solution for processing notes locally <em>for the average clinical user</em>. The CPU-bound models small enough to run in a browser just aren't big enough for the job — especially when you throw a long transcript at them. So this led me to the <strong>first "non-local feature" in the critical path</strong>. Ugh… I know. I hear your boos over the inter-webs.
+            I haven't found the best solution for processing notes locally{' '}
+            <em>for the average clinical user</em>. The CPU-bound models small enough to run in a
+            browser just aren't big enough for the job — especially when you throw a long transcript
+            at them. So this led me to the{' '}
+            <strong>first "non-local feature" in the critical path</strong>. Ugh… I know. I hear
+            your boos over the inter-webs.
           </>
         }
       />
 
       <p className="note">
-        Let's be honest about what "only the transcript" means: <em>everything</em> in that transcript goes with it, including any patient name or identifier that was spoken aloud during the visit and never edited out. So this leaves one more bit of friction on you, the clinician, to protect patient privacy — manually scrubbing PII before you hit generate.
+        Let's be honest about what "only the transcript" means: <em>everything</em> in that
+        transcript goes with it, including any patient name or identifier that was spoken aloud
+        during the visit and never edited out. So this leaves one more bit of friction on you, the
+        clinician, to protect patient privacy — manually scrubbing PII before you hit generate.
       </p>
 
       <SectionHead tag="the model I'd love to ship" title="…and the model I actually ship today" />
@@ -734,11 +1082,17 @@ function NotesChapter() {
           <div className="tradeoff__right">
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-pro">Why it's tempting</div>
-              <p>Catches PII with real contextual understanding. Run it with WebGPU on a machine with a discrete GPU and it's <em>excellent</em>.</p>
+              <p>
+                Catches PII with real contextual understanding. Run it with WebGPU on a machine with
+                a discrete GPU and it's <em>excellent</em>.
+              </p>
             </div>
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-con">Why I passed</div>
-              <p>I can't expect every clinician to have a 3090 with 24 GB of VRAM sitting under their desk. <em>(cue tears)</em></p>
+              <p>
+                I can't expect every clinician to have a 3090 with 24 GB of VRAM sitting under their
+                desk. <em>(cue tears)</em>
+              </p>
             </div>
           </div>
         </div>
@@ -751,11 +1105,18 @@ function NotesChapter() {
           <div className="tradeoff__right">
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-pro">Why it ships</div>
-              <p>Runs comfortably anywhere. NER catches contextual names; regex handles the high-confidence structured stuff (phone numbers, dates, IDs). <strong>Good enough to be genuinely useful, today.</strong></p>
+              <p>
+                Runs comfortably anywhere. NER catches contextual names; regex handles the
+                high-confidence structured stuff (phone numbers, dates, IDs).{' '}
+                <strong>Good enough to be genuinely useful, today.</strong>
+              </p>
             </div>
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-con">The trade</div>
-              <p>Not as smart as the big model on edge cases. Clear path to the larger model the day WebGPU + capable hardware are a safe assumption.</p>
+              <p>
+                Not as smart as the big model on edge cases. Clear path to the larger model the day
+                WebGPU + capable hardware are a safe assumption.
+              </p>
             </div>
           </div>
         </div>
@@ -765,10 +1126,12 @@ function NotesChapter() {
 
       <div className="snippet" role="region" aria-label="Generation request bound">
         <div className="snippet__head">
-          <span className="snippet__head-l"><span className="snippet__head-dot" /> src/api/generate.ts</span>
+          <span className="snippet__head-l">
+            <span className="snippet__head-dot" /> src/api/generate.ts
+          </span>
           <span>strictly bounded</span>
         </div>
-<pre>{`// Two things go on the wire. Three modifiers are appended server-side.
+        <pre>{`// Two things go on the wire. Three modifiers are appended server-side.
 const body: GenerateRequest = {
   transcript: edited ?? activeTier,        // edited > T3 > T2 > T1
   modifiers:  template.modifiers,          // tone / emphasis / custom
@@ -788,71 +1151,139 @@ const body: GenerateRequest = {
       >
         <div className="flow__strip" style={{ ['--cols' as string]: 5 } as CSSProperties}>
           <div className="node node--sage">
-            <div className="node__top"><span className="node__tag">on-device</span><span className="node__glyph" /></div>
+            <div className="node__top">
+              <span className="node__tag">on-device</span>
+              <span className="node__glyph" />
+            </div>
             <div className="node__name">Curated transcript</div>
-            <div className="node__desc">Whatever tier is active — your edits beat T3 beats T2 beats T1.</div>
+            <div className="node__desc">
+              Whatever tier is active — your edits beat T3 beats T2 beats T1.
+            </div>
           </div>
-          <div className="flow__arrow"><span className="flow__arrow-lbl">PII scrub</span></div>
+          <div className="flow__arrow">
+            <span className="flow__arrow-lbl">PII scrub</span>
+          </div>
           <div className="node node--sage">
-            <div className="node__top"><span className="node__tag">on-device</span><span className="node__glyph" /></div>
+            <div className="node__top">
+              <span className="node__tag">on-device</span>
+              <span className="node__glyph" />
+            </div>
             <div className="node__name">bert-base-NER + regex</div>
-            <div className="node__desc">Clinician-triggered. Review a diff before applying. <strong>Never silent.</strong></div>
+            <div className="node__desc">
+              Clinician-triggered. Review a diff before applying. <strong>Never silent.</strong>
+            </div>
           </div>
-          <div className="flow__arrow flow__arrow--rec"><span className="flow__arrow-lbl">explicit</span></div>
+          <div className="flow__arrow flow__arrow--rec">
+            <span className="flow__arrow-lbl">explicit</span>
+          </div>
           <div className="node node--rec">
-            <div className="node__top"><span className="node__tag">network · awaited</span><span className="node__glyph" /></div>
+            <div className="node__top">
+              <span className="node__tag">network · awaited</span>
+              <span className="node__glyph" />
+            </div>
             <div className="node__name">Anthropic Sonnet 4.6</div>
-            <div className="node__desc">Receives only the curated transcript + formatting modifiers. Returns the full structured note atomically.</div>
+            <div className="node__desc">
+              Receives only the curated transcript + formatting modifiers. Returns the full
+              structured note atomically.
+            </div>
           </div>
         </div>
 
         <div className="flow__branch">
-          <div className="flow__branch-stems"><span /><span /></div>
+          <div className="flow__branch-stems">
+            <span />
+            <span />
+          </div>
           <div className="flow__branch-row">
             <div className="node node--ghost">
-              <div className="node__top"><span className="node__tag">never sent</span><span className="node__glyph" /></div>
-              <div className="node__name">MRN · ICD-10 · prior notes · plan of care · prior sessions</div>
-              <div className="node__desc">The model doesn't see the chart. If you want prior context, you paste it in deliberately.</div>
+              <div className="node__top">
+                <span className="node__tag">never sent</span>
+                <span className="node__glyph" />
+              </div>
+              <div className="node__name">
+                MRN · ICD-10 · prior notes · plan of care · prior sessions
+              </div>
+              <div className="node__desc">
+                The model doesn't see the chart. If you want prior context, you paste it in
+                deliberately.
+              </div>
             </div>
             <div className="node node--ghost">
-              <div className="node__top"><span className="node__tag">honest caveat</span><span className="node__glyph" /></div>
+              <div className="node__top">
+                <span className="node__tag">honest caveat</span>
+                <span className="node__glyph" />
+              </div>
               <div className="node__name">What you spoke aloud, you sent</div>
-              <div className="node__desc">A name said during a visit is in the transcript until <em>you</em> scrub it. PII scrubbing is on-device, but clinician-triggered.</div>
+              <div className="node__desc">
+                A name said during a visit is in the transcript until <em>you</em> scrub it. PII
+                scrubbing is on-device, but clinician-triggered.
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <Disclose tag="implementer detail" title="Model sizes, runtime, and what the request builder enforces">
+      <Disclose
+        tag="implementer detail"
+        title="Model sizes, runtime, and what the request builder enforces"
+      >
         <div className="specs">
           <div className="spec">
             <div className="spec__k">PII scrub · today</div>
-            <div className="spec__v"><code>bert-base-NER + regex</code></div>
-            <div className="spec__note">~90 MB. WASM. Runs on a normal laptop. NER catches contextual names; regex handles phone numbers, dates, IDs.</div>
+            <div className="spec__v">
+              <code>bert-base-NER + regex</code>
+            </div>
+            <div className="spec__note">
+              ~90 MB. WASM. Runs on a normal laptop. NER catches contextual names; regex handles
+              phone numbers, dates, IDs.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">PII scrub · queued</div>
-            <div className="spec__v"><code>openai/privacy-filter</code></div>
-            <div className="spec__note">~875 MB. WebGPU. Excellent on capable hardware. Will ship the day WebGPU + 24 GB VRAM is a safe assumption.</div>
+            <div className="spec__v">
+              <code>openai/privacy-filter</code>
+            </div>
+            <div className="spec__note">
+              ~875 MB. WebGPU. Excellent on capable hardware. Will ship the day WebGPU + 24 GB VRAM
+              is a safe assumption.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">generation model</div>
-            <div className="spec__v"><code>claude-sonnet-4-6</code></div>
-            <div className="spec__note">Reached via <code>POST /api/generate</code>. Provider credentials stay server-side. One-shot — returns the full note atomically.</div>
+            <div className="spec__v">
+              <code>claude-sonnet-4-6</code>
+            </div>
+            <div className="spec__note">
+              Reached via <code>POST /api/generate</code>. Provider credentials stay server-side.
+              One-shot — returns the full note atomically.
+            </div>
           </div>
           <div className="spec">
             <div className="spec__k">request bound</div>
-            <div className="spec__v"><code>transcript + modifiers</code></div>
-            <div className="spec__note">Enforced in the request builder, not by trust. Chart context (MRN, ICD-10, prior notes, plan of care) is never assembled into the request body.</div>
+            <div className="spec__v">
+              <code>transcript + modifiers</code>
+            </div>
+            <div className="spec__note">
+              Enforced in the request builder, not by trust. Chart context (MRN, ICD-10, prior
+              notes, plan of care) is never assembled into the request body.
+            </div>
           </div>
         </div>
       </Disclose>
 
       <div className="takeaway takeaway--caveat">
-        <span className="takeaway__icon" aria-hidden="true">!</span>
+        <span className="takeaway__icon" aria-hidden="true">
+          !
+        </span>
         <div>
           <div className="takeaway__h">Note generation is the one trade I made on purpose</div>
-          <div className="takeaway__body">The transcript and modifiers go to Anthropic. Nothing else does. On-device PII scrubbing closes most of the gap, and the bigger model is queued for the day the hardware is there. That tension — <em>what's ideal vs. what runs on the machine the clinician was actually issued</em> — is the throughline of the whole project.</div>
+          <div className="takeaway__body">
+            The transcript and modifiers go to Anthropic. Nothing else does. On-device PII scrubbing
+            closes most of the gap, and the bigger model is queued for the day the hardware is
+            there. That tension —{' '}
+            <em>what's ideal vs. what runs on the machine the clinician was actually issued</em> —
+            is the throughline of the whole project.
+          </div>
         </div>
       </div>
 
@@ -871,15 +1302,24 @@ function FutureChapter() {
         num="04"
         eyebrow="Down the road · 90s read"
         eyebrowVariant="amber"
-        title={"What if “local” didn't have to mean your laptop — just a machine inside the building?"}
+        title={
+          "What if “local” didn't have to mean your laptop — just a machine inside the building?"
+        }
         lede={
           <>
-            Right now, "local-first" means <em>your laptop</em>. Great for privacy — but it's also why the heavy lifting (the big PII model, fully local note generation) keeps slamming into the "do you happen to own a 24 GB GPU?" wall. Most clinicians don't, and never will. So here's the idea I'm most excited about: a single capable box sitting in the back office of a PT practice — <strong>the clinic's brain</strong>.
+            Right now, "local-first" means <em>your laptop</em>. Great for privacy — but it's also
+            why the heavy lifting (the big PII model, fully local note generation) keeps slamming
+            into the "do you happen to own a 24 GB GPU?" wall. Most clinicians don't, and never
+            will. So here's the idea I'm most excited about: a single capable box sitting in the
+            back office of a PT practice — <strong>the clinic's brain</strong>.
           </>
         }
       />
 
-      <SectionHead tag="sketch" title="Every device talks to a box on the LAN — never the public internet" />
+      <SectionHead
+        tag="sketch"
+        title="Every device talks to a box on the LAN — never the public internet"
+      />
 
       <div className="lan">
         <div className="lan__col">
@@ -914,43 +1354,79 @@ function FutureChapter() {
           <span className="lan__brain-tag">the back office</span>
           <span className="lan__brain-name">Clinic brain (one box)</span>
           <div className="lan__brain-stack">
-            <div className="lan__brain-row"><span>PII scrub</span><span>openai/privacy-filter · 875 MB</span></div>
-            <div className="lan__brain-row"><span>Transcribe</span><span>whisper-large · diarized</span></div>
-            <div className="lan__brain-row"><span>Generate</span><span>local Sonnet-class · on-prem</span></div>
-            <div className="lan__brain-row"><span>GPU</span><span>24 GB · serves the whole clinic</span></div>
+            <div className="lan__brain-row">
+              <span>PII scrub</span>
+              <span>openai/privacy-filter · 875 MB</span>
+            </div>
+            <div className="lan__brain-row">
+              <span>Transcribe</span>
+              <span>whisper-large · diarized</span>
+            </div>
+            <div className="lan__brain-row">
+              <span>Generate</span>
+              <span>local Sonnet-class · on-prem</span>
+            </div>
+            <div className="lan__brain-row">
+              <span>GPU</span>
+              <span>24 GB · serves the whole clinic</span>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="roadmap">
-        <div className="roadmap__eyebrow">Fog computing · the office becomes its own private cloud</div>
+        <div className="roadmap__eyebrow">
+          Fog computing · the office becomes its own private cloud
+        </div>
         <h3 className="roadmap__title">Suddenly the trade-offs flip in the user’s favor.</h3>
         <div className="roadmap__grid">
           <div className="roadmap__card">
             <span className="roadmap__card-h">↩ data residency</span>
             <span className="roadmap__card-v">Data never leaves the building</span>
-            <span className="roadmap__card-sub">Audio, transcripts, notes — all of it stays within the four walls. An easier story to tell a compliance officer than "it's in a browser tab somewhere."</span>
+            <span className="roadmap__card-sub">
+              Audio, transcripts, notes — all of it stays within the four walls. An easier story to
+              tell a compliance officer than "it's in a browser tab somewhere."
+            </span>
           </div>
           <div className="roadmap__card">
             <span className="roadmap__card-h">⚙ hardware</span>
             <span className="roadmap__card-v">One GPU, whole clinic</span>
-            <span className="roadmap__card-sub">One capable machine serves the whole clinic. The laptops stay cheap and dumb; the powerhouse in the back does the real work.</span>
+            <span className="roadmap__card-sub">
+              One capable machine serves the whole clinic. The laptops stay cheap and dumb; the
+              powerhouse in the back does the real work.
+            </span>
           </div>
           <div className="roadmap__card">
             <span className="roadmap__card-h">$ cloud bill</span>
             <span className="roadmap__card-v">Goes to zero — for real</span>
-            <span className="roadmap__card-sub">No Nova passes, no Anthropic in the critical path. The office owns its own compute, so the marginal cost per note is… electricity.</span>
+            <span className="roadmap__card-sub">
+              No Nova passes, no Anthropic in the critical path. The office owns its own compute, so
+              the marginal cost per note is… electricity.
+            </span>
           </div>
           <div className="roadmap__card">
             <span className="roadmap__card-h">⤴ scale</span>
             <span className="roadmap__card-v">Multi-office groups</span>
-            <span className="roadmap__card-sub">A regional PT group could run one box per location, or a beefier one at HQ that satellite offices reach over a VPN.</span>
+            <span className="roadmap__card-sub">
+              A regional PT group could run one box per location, or a beefier one at HQ that
+              satellite offices reach over a VPN.
+            </span>
           </div>
         </div>
       </div>
 
       <div className="note">
-        <p>There's real network engineering to work out — service discovery so a laptop can find the box, auth so only clinic-owned devices can reach it, and a graceful fallback for when the box is down or someone's charting from home. But the bones are already there: the app is just a static bundle talking to a proxy. <strong>Point that proxy at a box on the LAN instead of a Cloudflare Worker, and… well. Maybe that's the v2.</strong> Or maybe that's where someone reading this comes in. ;)</p>
+        <p>
+          There's real network engineering to work out — service discovery so a laptop can find the
+          box, auth so only clinic-owned devices can reach it, and a graceful fallback for when the
+          box is down or someone's charting from home. But the bones are already there: the app is
+          just a static bundle talking to a proxy.{' '}
+          <strong>
+            Point that proxy at a box on the LAN instead of a Cloudflare Worker, and… well. Maybe
+            that's the v2.
+          </strong>{' '}
+          Or maybe that's where someone reading this comes in. ;)
+        </p>
         <span className="note__sig">github.com/kyle-giacchi/ptscribe</span>
       </div>
 
@@ -2154,7 +2630,9 @@ export function HowItWorksModal({ open, onClose }: Props) {
     s.id = 'hiw-modal-styles';
     s.textContent = STYLES;
     document.head.appendChild(s);
-    return () => { document.getElementById('hiw-modal-styles')?.remove(); };
+    return () => {
+      document.getElementById('hiw-modal-styles')?.remove();
+    };
   }, []);
 
   // Lock body scroll.
@@ -2162,20 +2640,27 @@ export function HowItWorksModal({ open, onClose }: Props) {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   // Reset scroll on chapter change.
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [active]);
 
   // Keyboard: ESC closes, ←/→ pages.
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
       const target = e.target as HTMLElement | null;
       if (target?.matches('input, textarea, [contenteditable="true"]')) return;
-      const idx = CHAPTERS.findIndex(c => c.id === active);
+      const idx = CHAPTERS.findIndex((c) => c.id === active);
       if (e.key === 'ArrowRight' && idx < CHAPTERS.length - 1) {
         e.preventDefault();
         setActive(CHAPTERS[idx + 1].id);
@@ -2193,20 +2678,24 @@ export function HowItWorksModal({ open, onClose }: Props) {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-goto]');
     if (!el) return;
     const id = el.dataset.goto as ChapterId | undefined;
-    if (!id || !CHAPTERS.some(c => c.id === id)) return;
+    if (!id || !CHAPTERS.some((c) => c.id === id)) return;
     e.preventDefault();
     setActive(id);
   }
 
-  const currentTitle = CHAPTERS.find(c => c.id === active)?.name ?? '';
+  const currentTitle = CHAPTERS.find((c) => c.id === active)?.name ?? '';
 
   return (
     <AnimatePresence>
       {open && (
         <div
           style={{
-            position: 'fixed', inset: 0, zIndex: 60,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           role="dialog"
           aria-modal="true"
@@ -2214,11 +2703,14 @@ export function HowItWorksModal({ open, onClose }: Props) {
         >
           <motion.div
             style={{
-              position: 'absolute', inset: 0,
+              position: 'absolute',
+              inset: 0,
               background: 'rgba(26, 32, 48, 0.45)',
               backdropFilter: 'blur(2px)',
             }}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
             aria-hidden
@@ -2234,13 +2726,21 @@ export function HowItWorksModal({ open, onClose }: Props) {
           >
             <header className="hiw__head">
               <div className="hiw__head-l">
-                <span className="hiw__head-mark" aria-hidden="true">P</span>
+                <span className="hiw__head-mark" aria-hidden="true">
+                  P
+                </span>
                 <span className="hiw__head-name">PTScribe</span>
                 <span className="hiw__head-divider" aria-hidden="true" />
                 <span className="hiw__head-title">{currentTitle}</span>
               </div>
               <div className="hiw__head-r">
-                <a href={REPO} target="_blank" rel="noopener noreferrer" className="hiw__edit-link" aria-label="Open the repo on GitHub">
+                <a
+                  href={REPO}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hiw__edit-link"
+                  aria-label="Open the repo on GitHub"
+                >
                   <GithubMark size={11} />
                   kyle-giacchi/ptscribe
                 </a>
@@ -2253,12 +2753,15 @@ export function HowItWorksModal({ open, onClose }: Props) {
             <aside className="hiw__rail" aria-label="Chapters">
               <div className="hiw__rail-eyebrow">Builder's journal</div>
               <nav className="toc">
-                {CHAPTERS.map(c => (
+                {CHAPTERS.map((c) => (
                   <a
                     key={c.id}
                     href={`#${c.id}`}
-                    className={`toc__item${active === c.id ? ' is-active' : ''}`}
-                    onClick={(e) => { e.preventDefault(); setActive(c.id); }}
+                    className={`toc__item${active === c.id ? 'is-active' : ''}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setActive(c.id);
+                    }}
                   >
                     <span className="toc__num">{c.num}</span>
                     <span>
@@ -2272,7 +2775,9 @@ export function HowItWorksModal({ open, onClose }: Props) {
               <div className="hiw__rail-foot">
                 <div className="hiw__rail-foot-l">
                   <span>Want the gory details?</span>
-                  <a href={REPO} target="_blank" rel="noopener noreferrer">↗ The repo</a>
+                  <a href={REPO} target="_blank" rel="noopener noreferrer">
+                    ↗ The repo
+                  </a>
                 </div>
               </div>
             </aside>

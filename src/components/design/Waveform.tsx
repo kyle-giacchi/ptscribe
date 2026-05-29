@@ -28,7 +28,9 @@ export function Waveform({ micState, height = 48, analyser }: WaveformProps) {
 
   useEffect(() => {
     analyserRef.current = analyser ?? null;
-    tdDataRef.current = analyser ? new Uint8Array(analyser.fftSize) as Uint8Array<ArrayBuffer> : null;
+    tdDataRef.current = analyser
+      ? (new Uint8Array(analyser.fftSize) as Uint8Array<ArrayBuffer>)
+      : null;
   }, [analyser]);
 
   useEffect(() => {

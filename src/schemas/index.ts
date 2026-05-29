@@ -69,12 +69,7 @@ const SessionModifiersSchema = z.object({
   codingBilling: z.array(z.enum(['icd10_suggestions', 'em_level', 'hcc_flags'])).default([]),
   beyondNote: z
     .array(
-      z.enum([
-        'suggested_orders',
-        'med_rec_check',
-        'patient_education',
-        'transcript_timestamps',
-      ]),
+      z.enum(['suggested_orders', 'med_rec_check', 'patient_education', 'transcript_timestamps']),
     )
     .default([]),
   customInstructions: z.array(CustomInstructionSchema).default([]),

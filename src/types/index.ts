@@ -121,10 +121,10 @@ export interface SessionClip {
   index: number;
   durationSec: number;
   status: ClipStatus;
-  transcript?: string;       // active transcript — mirrors the active tier's text
-  t1Transcript?: string;     // Tier 1 (Live Browser): Web Speech real-time capture during recording
-  t2Transcript?: string;     // Tier 2 (Whisper Local): auto-pass result, frozen after first write
-  t3Transcript?: string;     // Tier 3 (Nova AI): cloud result, written by explicit transcription action
+  transcript?: string; // active transcript — mirrors the active tier's text
+  t1Transcript?: string; // Tier 1 (Live Browser): Web Speech real-time capture during recording
+  t2Transcript?: string; // Tier 2 (Whisper Local): auto-pass result, frozen after first write
+  t3Transcript?: string; // Tier 3 (Nova AI): cloud result, written by explicit transcription action
   transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
   transcriptedAt?: number;
   startOffsetSec?: number;
@@ -141,11 +141,11 @@ export interface Session {
   durationMin?: number;
   status: SessionStatus;
   clips: SessionClip[];
-  transcript?: string;           // active transcript — mirrors the active tier's text
-  t1Transcript?: string;         // Tier 1 (Live Browser): merged per-clip Web Speech live transcripts
-  t2Transcript?: string;         // Tier 2 (Whisper Local): merged result, frozen after auto-pass
-  t3Transcript?: string;         // Tier 3 (Nova AI): merged cloud result, written on explicit transcription
-  editedTranscript?: string;     // Edited: user-modified transcript text
+  transcript?: string; // active transcript — mirrors the active tier's text
+  t1Transcript?: string; // Tier 1 (Live Browser): merged per-clip Web Speech live transcripts
+  t2Transcript?: string; // Tier 2 (Whisper Local): merged result, frozen after auto-pass
+  t3Transcript?: string; // Tier 3 (Nova AI): merged cloud result, written on explicit transcription
+  editedTranscript?: string; // Edited: user-modified transcript text
   activeTranscriptTier?: TranscriptTier;
   noteId?: ID;
   templateId?: ID;

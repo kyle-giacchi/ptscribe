@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 export function useBelowBreakpoint(maxWidthPx: number): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth < maxWidthPx,
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < maxWidthPx,
   );
 
   useEffect(() => {

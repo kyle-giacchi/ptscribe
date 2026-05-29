@@ -60,8 +60,13 @@ async function putUserConfig(
 
 export function ConfigSyncProvider({ children }: { children: ReactNode }) {
   const { currentUser, isAuthenticated } = useAuth();
-  const { appData, updateSettingsSlice, updateClinicianSlice, updateTemplatesSlice, updateExercisesSlice } =
-    useAppData();
+  const {
+    appData,
+    updateSettingsSlice,
+    updateClinicianSlice,
+    updateTemplatesSlice,
+    updateExercisesSlice,
+  } = useAppData();
 
   // Demo / test-user / unauthenticated ⇒ fully isolated, no network at all.
   const isolated =
@@ -121,7 +126,8 @@ export function ConfigSyncProvider({ children }: { children: ReactNode }) {
         const ok = await putUserConfig(projection, updatedAt);
         const hash = hashUserConfig(projection);
         lastHashRef.current = hash;
-        if (ok) writeSyncRecord(userId, { hash, localUpdatedAt: updatedAt, serverUpdatedAt: updatedAt });
+        if (ok)
+          writeSyncRecord(userId, { hash, localUpdatedAt: updatedAt, serverUpdatedAt: updatedAt });
       } else {
         // noop — record the current hash so the change effect has a baseline.
         lastHashRef.current = rec?.hash ?? hashUserConfig(projectUserConfig(appDataRef.current));

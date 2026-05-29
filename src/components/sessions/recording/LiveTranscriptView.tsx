@@ -26,7 +26,7 @@ function ChatBubble({
     <div className="flex items-end gap-2">
       {/* Avatar */}
       <div
-        className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
         style={{
           background: isInterim ? 'var(--color-pt-surface-alt)' : 'var(--color-pt-accent)',
           border: '1px solid var(--color-pt-border)',
@@ -47,7 +47,7 @@ function ChatBubble({
         {children}
         {timestamp && (
           <span
-            className="block text-right text-[10px] tabular-nums mt-1"
+            className="mt-1 block text-right text-[10px] tabular-nums"
             style={{ color: 'var(--color-pt-text-3)' }}
           >
             {timestamp}
@@ -66,7 +66,7 @@ function TypingIndicator() {
           {[0, 1, 2].map((i) => (
             <span
               key={i}
-              className="w-2 h-2 rounded-full animate-bounce"
+              className="h-2 w-2 animate-bounce rounded-full"
               style={{
                 background: 'var(--color-pt-text-3)',
                 animationDelay: `${i * 160}ms`,
@@ -132,26 +132,26 @@ export function LiveTranscriptView({
 
   return (
     <div
-      className={`relative w-full${expandToFill ? ' flex-1 min-h-0' : ''}`}
+      className={`relative w-full${expandToFill ? 'min-h-0 flex-1' : ''}`}
       style={expandToFill ? {} : { maxHeight: 300 }}
     >
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className={`w-full rounded-xl overflow-y-auto flex flex-col${expandToFill ? ' h-full' : ' max-h-full'}`}
+        className={`flex w-full overflow-y-auto rounded-xl flex-col${expandToFill ? 'h-full' : 'max-h-full'}`}
         style={{
           background: 'var(--color-pt-surface)',
           border: '1px solid var(--color-pt-border)',
         }}
       >
         {!hasContent ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 py-8 px-4">
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8">
             <div className="flex items-center gap-2.5">
               <div className="flex gap-1">
                 {[0, 1, 2].map((i) => (
                   <span
                     key={i}
-                    className="h-1.5 w-1.5 rounded-full animate-bounce"
+                    className="h-1.5 w-1.5 animate-bounce rounded-full"
                     style={{ background: 'var(--color-pt-text-3)', animationDelay: `${i * 160}ms` }}
                   />
                 ))}
@@ -161,16 +161,20 @@ export function LiveTranscriptView({
               </p>
             </div>
             {showNoSpeechHint && (
-              <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--color-pt-text-3)' }}>
-                Transcription starts after the first audio chunk (~5 s). First run downloads the model (~150 MB).
+              <p
+                className="text-center text-xs leading-relaxed"
+                style={{ color: 'var(--color-pt-text-3)' }}
+              >
+                Transcription starts after the first audio chunk (~5 s). First run downloads the
+                model (~150 MB).
               </p>
             )}
           </div>
         ) : (
           <>
             {/* Spacer pushes bubbles to the bottom when content is short */}
-            <div className="flex-1 min-h-3" />
-            <div className="px-3 py-3 flex flex-col gap-3">
+            <div className="min-h-3 flex-1" />
+            <div className="flex flex-col gap-3 px-3 py-3">
               {hasWebSpeech ? (
                 <>
                   {segments.map((seg) => (
@@ -179,7 +183,10 @@ export function LiveTranscriptView({
                       style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
                     >
                       <ChatBubble timestamp={fmtWallTime(seg.wallTime)}>
-                        <p className="text-sm leading-relaxed" style={{ color: 'var(--color-pt-text)' }}>
+                        <p
+                          className="text-sm leading-relaxed"
+                          style={{ color: 'var(--color-pt-text)' }}
+                        >
                           {seg.text.trim()}
                         </p>
                       </ChatBubble>
@@ -188,10 +195,13 @@ export function LiveTranscriptView({
                   {interimText && (
                     <div style={{ animation: 'transcript-slide-in 280ms ease-out both' }}>
                       <ChatBubble isInterim>
-                        <p className="text-sm leading-relaxed italic" style={{ color: 'var(--color-pt-text-3)' }}>
+                        <p
+                          className="text-sm leading-relaxed italic"
+                          style={{ color: 'var(--color-pt-text-3)' }}
+                        >
                           {interimText}
                           <span
-                            className="inline-block ml-0.5 w-px align-middle"
+                            className="ml-0.5 inline-block w-px align-middle"
                             style={{
                               height: '1em',
                               background: 'var(--color-pt-accent)',
@@ -207,16 +217,16 @@ export function LiveTranscriptView({
                 whisperBubbles.map((text, i) => {
                   const isLast = i === whisperBubbles.length - 1;
                   return (
-                    <div
-                      key={i}
-                      style={{ animation: 'transcript-slide-in 280ms ease-out both' }}
-                    >
+                    <div key={i} style={{ animation: 'transcript-slide-in 280ms ease-out both' }}>
                       <ChatBubble>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-pt-text)' }}>
+                        <p
+                          className="text-sm leading-relaxed whitespace-pre-wrap"
+                          style={{ color: 'var(--color-pt-text)' }}
+                        >
                           {text}
                           {isLast && (
                             <span
-                              className="inline-block ml-0.5 w-px align-middle"
+                              className="ml-0.5 inline-block w-px align-middle"
                               style={{
                                 height: '1em',
                                 background: 'var(--color-pt-accent)',
@@ -242,7 +252,7 @@ export function LiveTranscriptView({
           type="button"
           onClick={scrollToBottom}
           aria-label="Scroll to bottom"
-          className="absolute bottom-3 right-3 flex items-center justify-center rounded-full shadow-lg transition-opacity hover:opacity-90"
+          className="absolute right-3 bottom-3 flex items-center justify-center rounded-full shadow-lg transition-opacity hover:opacity-90"
           style={{
             width: 32,
             height: 32,

@@ -105,6 +105,16 @@ UI surfaces this as a Lock badge with a Clone action instead of Edit/Delete. Do 
 - Do not add "bypass" links or `?skip` query params that skip setup — the guard exists to ensure the clinician profile is populated before the app can render notes.
 - The guard runs after the first render (inside `useEffect`), so there is a single frame where children render before the redirect fires. Components must tolerate an empty clinician name.
 
+## Profile-scoped storage (ADR-0007)
+
+All on-device data is partitioned into cryptographically-isolated **Profiles** (CONTEXT.md §Profiles and multi-user devices). Every localStorage key and the audio IndexedDB are suffixed with the active profile id (`ptnotes.appData:<profileId>`, `ptnotes-audio:<profileId>`, etc.).
+
+- **One chokepoint for the active id.** `src/lib/profile/profileId.ts` owns the active profile id. `resolveProfileId()` derives it: demo build → `test-user` (marker set) or `demo`; non-demo build → the authenticated user id, else `local`. Never read the marker or branch on demo/auth to pick a namespace anywhere else.
+- **Keys resolve through `storageKeys.ts`.** `STORAGE_KEYS.*` are **getters** that suffix the base string with `getActiveProfileId()` at access time; `AudioRepository` opens `audioDbName()`. Do not hardcode a `ptnotes.*` string or the bare `ptnotes-audio` DB name — it would escape the profile namespace. (`ptnotes.gate` is the one intentional exception: the demo AppGate code is device-global.)
+- **`ProfileResolver` is the gate.** It sits outermost in `AppProviders` (outside `VaultGate`), waits for the BetterAuth session to resolve in non-demo builds before choosing a namespace, then `commitActiveProfile()`s the id. A profile **change** mid-page-life (login/logout/switch) forces a full `window.location.reload()` — the only safe teardown of the in-memory vault DEK + cached IDB handle. `signOut()` likewise reloads. Do not hot-swap profiles via React state.
+- **`demo` and `test-user` are separate profiles** that share the `DEMO_USER` auth identity but never share storage — this is what stops demo↔test↔real data bleed.
+- The Whisper **model cache (`ptscribe-model-cache`) stays app-global** and un-scoped (non-PHI, see [model-cache rule](#model-cache-is-app-global-and-survives-every-reset-path)). The legacy un-suffixed pre-Profile keys are purged once by `purgeLegacyUnscopedStorage()` (greenfield — no migration).
+
 ## Storage cap and audio offload
 
 `safeLocalStorage.setItem` throws if the serialized JSON of a single object exceeds 5 MB (`MAX_OBJECT_BYTES`). The throw is intentional — it surfaces the problem rather than silently dropping data.
@@ -142,7 +152,7 @@ When the vault is unlocked, **everything persisted goes through AES-GCM**. The e
 Key lifecycle (see `src/lib/vault/`):
 
 - KEK = Argon2id over the clinician's passphrase (16-byte salt, 64 MiB / t=3 / p=1). DEK = random AES-GCM-256 key, wrapped under KEK and persisted at `ptnotes.vault`.
-- The unwrapped DEK lives in memory only. Tab close evicts it; the next mount requires the passphrase (or recovery code) again. A **recovery code** (ADR-0003) wraps the *same* DEK under a second Argon2id-derived KEK, stored as `recovery` in the vault envelope — so a forgotten passphrase is recoverable on-device or via a portable backup. Losing *both* the passphrase and the recovery code still wipes access. The DEK is unwrapped **extractable** so it can be re-wrapped (changePassphrase, recovery-code generation); safe because any code in an unlocked tab already holds full decrypt power. **No idle-timeout relock exists** — a recording in progress is never interrupted by a vault prompt. If idle-locking is ever reintroduced, it must define WAL-chunk behavior during the locked window.
+- The unwrapped DEK lives in memory only. Tab close evicts it; the next mount requires the passphrase (or recovery code) again. A **recovery code** (ADR-0003) wraps the _same_ DEK under a second Argon2id-derived KEK, stored as `recovery` in the vault envelope — so a forgotten passphrase is recoverable on-device or via a portable backup. Losing _both_ the passphrase and the recovery code still wipes access. The DEK is unwrapped **extractable** so it can be re-wrapped (changePassphrase, recovery-code generation); safe because any code in an unlocked tab already holds full decrypt power. **No idle-timeout relock exists** — a recording in progress is never interrupted by a vault prompt. If idle-locking is ever reintroduced, it must define WAL-chunk behavior during the locked window.
 - `vault.isUnlocked()` is the gate. Repository methods that detect a locked vault while encrypted data exists must return `null` rather than crash, so `AppDataProvider` can fall through to `defaultAppData()` and let `VaultGate` prompt for the passphrase.
 
 Legacy plaintext migration (one-shot):
@@ -218,6 +228,7 @@ Non-obvious points a future editor must not "simplify away":
 **Do not skip `buildMergedAudioForReview` for uploaded clips.** The `UploadProcessingView` in `Session.tsx` waits for `clip.status === 'ready' | 'transcribed' | 'failed'`, then calls `buildMergedAudioForReview()` which builds `silencedMergedBlob` and kicks off T2. If you bypass this call, the "Processing audio" screen hangs and T2 never fires.
 
 Consequences of violating this rule:
+
 - Uploaded audio silently skips local transcription and the "Processing audio" screen hangs with no escape for the user.
 - Users on the 'local' provider get no automatic transcript.
 - `session.t2Transcript` is never populated, breaking the "Revert to Draft" flow in `TranscriptPanel`.
@@ -229,11 +240,11 @@ True parallelism requires one worker per concurrent inference job. The ONNX runt
 
 **Pool-size formula** (computed once per call from `navigator.hardwareConcurrency` and `navigator.deviceMemory`):
 
-| Condition | Pool size |
-| --- | --- |
-| `deviceMemory < 4` OR `hardwareConcurrency ≤ 4` | 1 (sequential) |
-| `hardwareConcurrency ≤ 8` | 2 |
-| `hardwareConcurrency > 8` | 3 (capped at chunk count) |
+| Condition                                       | Pool size                 |
+| ----------------------------------------------- | ------------------------- |
+| `deviceMemory < 4` OR `hardwareConcurrency ≤ 4` | 1 (sequential)            |
+| `hardwareConcurrency ≤ 8`                       | 2                         |
+| `hardwareConcurrency > 8`                       | 3 (capped at chunk count) |
 
 Rationale: each worker loads a full copy of the whisper-tiny ONNX weights (~40 MB). On devices with less than 4 GB RAM, or on constrained environments like iOS WKWebView, loading multiple 40 MB models risks OOM — pool size 1 eliminates that risk entirely. Mid-range devices cap at 2; high-core-count desktops get 3. Pool size is always capped at the actual chunk count so idle workers are never spawned.
 
@@ -245,14 +256,14 @@ Rationale: each worker loads a full copy of the whisper-tiny ONNX weights (~40 M
 
 ### Model cache is app-global and survives every reset path
 
-The Whisper weights live in their own IndexedDB database, **`ptscribe-model-cache`** (`whisper.worker.ts`), distinct from `ptnotes-audio` (clip audio) and from `localStorage` (AppData). It is the **sole** cache for the weights — the Workbox SW matches `/api/model/*` as `/\/api\/.*/ → NetworkOnly` *first*, so the service worker never caches them. It is scoped to **neither a `Session` nor a patient**; it is app-global infrastructure. See [ADR-0002](adr/0002-whisper-model-cache-persistence.md).
+The Whisper weights live in their own IndexedDB database, **`ptscribe-model-cache`** (`whisper.worker.ts`), distinct from `ptnotes-audio` (clip audio) and from `localStorage` (AppData). It is the **sole** cache for the weights — the Workbox SW matches `/api/model/*` as `/\/api\/.*/ → NetworkOnly` _first_, so the service worker never caches them. It is scoped to **neither a `Session` nor a patient**; it is app-global infrastructure. See [ADR-0002](adr/0002-whisper-model-cache-persistence.md).
 
 Rules:
 
 - **No reset path may clear `ptscribe-model-cache`.** `handleResetSession` (`Session.tsx`), demo "Start fresh" (`DemoBootstrap`), and Settings' "Erase ALL local data" (`Settings.tsx`, which calls `audioRepository.clear()`) must all leave it intact. The model is a public, non-PHI asset — preserving it across a full wipe leaks nothing and keeps local transcription instantly ready. A regression test guards this; do not "fix" it by adding a blanket clear-all.
 - **`navigator.storage.persist()` is requested for all users at startup** (demo, unauthenticated, authenticated), idempotently. It is the only defense against the browser evicting the weights from IDB. Do not re-gate it behind auth/demo.
 - **The `ml-assets` Workbox cache has no `maxAgeSeconds`.** The onnxruntime WASM runtime must not time-expire (Workbox's expiration plugin purges proactively, independent of storage pressure). Rely on `maxEntries` LRU only; content-hashed filenames make a stale entry benign.
-- **Cache is cleared only on load *exhaustion*, never on a transient retry.** The interceptor is strictly cache-first with no bypass, so a corrupt file is otherwise permanent. The auto-retry inside `whisperLoader` must stay cache-preserving (it handles the `pipelineLoadPromise` init race); only genuine exhaustion — and the explicit Settings "Clear & re-download model" / gate "Retry" — clears the store. A `CACHE_VERSION` stamp evicts stale files on a deliberate model swap.
+- **Cache is cleared only on load _exhaustion_, never on a transient retry.** The interceptor is strictly cache-first with no bypass, so a corrupt file is otherwise permanent. The auto-retry inside `whisperLoader` must stay cache-preserving (it handles the `pipelineLoadPromise` init race); only genuine exhaustion — and the explicit Settings "Clear & re-download model" / gate "Retry" — clears the store. A `CACHE_VERSION` stamp evicts stale files on a deliberate model swap.
 
 ## Type changes ripple
 

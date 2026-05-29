@@ -36,7 +36,9 @@ export function useAutoRotateClip(
           // and creating orphaned state on an unmounted component.
           if (unmounted) return;
           await onStart();
-          toast.info('Started a new clip — long sessions are split automatically for transcription.');
+          toast.info(
+            'Started a new clip — long sessions are split automatically for transcription.',
+          );
         } finally {
           rotatingRef.current = false;
         }

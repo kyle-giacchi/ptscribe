@@ -47,7 +47,9 @@
   --color-pt-slate-fg: #374055;
 
   /* Shared page-level surfaces */
-  --color-pt-landing-bg: oklch(97.5% 0.008 185); /* entry pages: Landing, Login, Setup, AuthCallback */
+  --color-pt-landing-bg: oklch(
+    97.5% 0.008 185
+  ); /* entry pages: Landing, Login, Setup, AuthCallback */
   --color-pt-overlay: oklch(0.28 0.03 250 / 0.32); /* mobile sidebar / modal scrim */
 
   /* === Legacy aliases (kept until full migration sweep) =================== */
@@ -404,13 +406,13 @@ body {
 
 /* iOS: prevent auto-zoom on input focus (requires min font-size 16px) */
 @media (max-width: 768px) {
-  input[type="text"],
-  input[type="email"],
-  input[type="password"],
-  input[type="search"],
-  input[type="tel"],
-  input[type="url"],
-  input[type="number"],
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='search'],
+  input[type='tel'],
+  input[type='url'],
+  input[type='number'],
   textarea,
   select {
     font-size: 16px;
@@ -418,12 +420,18 @@ body {
 }
 
 @media (max-width: 767px) {
-  .dashboard-shell { --dashboard-sidebar-cols: 1fr; }
+  .dashboard-shell {
+    --dashboard-sidebar-cols: 1fr;
+  }
 }
 
 @media (max-width: 1023px) {
-  header[role="banner"] nav[aria-label="Primary"] { display: none; }
+  header[role='banner'] nav[aria-label='Primary'] {
+    display: none;
+  }
 }
 @media (max-width: 767px) {
-  header[role="banner"] .global-search-input { display: none; }
+  header[role='banner'] .global-search-input {
+    display: none;
+  }
 }

@@ -42,7 +42,14 @@ function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)', marginBottom: 4 }}>
+        <div
+          style={{
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: 'var(--color-pt-text-2)',
+            marginBottom: 4,
+          }}
+        >
           Merged Full Audio
         </div>
         <BlobWaveform blob={mergedBlob} />
@@ -61,7 +68,10 @@ function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
           )}
         </div>
         {compilingSilence ? (
-          <div className="flex items-center gap-1.5" style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+          <div
+            className="flex items-center gap-1.5"
+            style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
+          >
             <Loader2 size={11} className="animate-spin" /> Computing…
           </div>
         ) : activeSilenced ? (
@@ -136,7 +146,10 @@ function SessionAudioBody({ session }: { session: Session }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+      <div
+        className="flex items-center gap-2"
+        style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}
+      >
         <Loader2 size={12} className="animate-spin" /> Loading audio from IndexedDB…
       </div>
     );

@@ -12,9 +12,7 @@ export function ReviewEmptyState() {
         background: 'var(--color-pt-surface)',
       }}
     >
-      <div
-        style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-fg)', marginBottom: 6 }}
-      >
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-fg)', marginBottom: 6 }}>
         Nothing to review yet
       </div>
       <div style={{ fontSize: 13, color: 'var(--color-fg-subtle)', lineHeight: 1.6 }}>

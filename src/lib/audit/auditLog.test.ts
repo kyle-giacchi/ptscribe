@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { auditLog, GENESIS_HASH } from './auditLog';
+import { STORAGE_KEYS } from '@/lib/storageKeys';
 
 beforeEach(() => {
   localStorage.clear();
@@ -54,9 +55,9 @@ describe('auditLog.verify', () => {
     await auditLog.append('backup:exported');
 
     // Tamper: mutate the first entry's action directly in localStorage.
-    const raw = JSON.parse(localStorage.getItem('ptnotes.auditLog')!);
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.auditLog)!);
     raw.entries[0].action = 'data:reset';
-    localStorage.setItem('ptnotes.auditLog', JSON.stringify(raw));
+    localStorage.setItem(STORAGE_KEYS.auditLog, JSON.stringify(raw));
 
     const result = await auditLog.verify();
     expect(result.valid).toBe(false);
@@ -70,9 +71,9 @@ describe('auditLog.verify', () => {
     await auditLog.append('vault:locked');
 
     // Delete the second entry.
-    const raw = JSON.parse(localStorage.getItem('ptnotes.auditLog')!);
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.auditLog)!);
     raw.entries.splice(1, 1);
-    localStorage.setItem('ptnotes.auditLog', JSON.stringify(raw));
+    localStorage.setItem(STORAGE_KEYS.auditLog, JSON.stringify(raw));
 
     const result = await auditLog.verify();
     expect(result.valid).toBe(false);

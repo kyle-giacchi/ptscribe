@@ -177,13 +177,7 @@ const TableHeader = memo(function TableHeader() {
   );
 });
 
-const NoteRow = memo(function NoteRow({
-  data,
-  isLast,
-}: {
-  data: NoteRowData;
-  isLast: boolean;
-}) {
+const NoteRow = memo(function NoteRow({ data, isLast }: { data: NoteRowData; isLast: boolean }) {
   const { note, patient, session } = data;
   const tone = noteTone(note, session?.date);
   const label = note.finalized ? 'Signed' : tone === 'flagged' ? 'Overdue' : 'Awaiting sign';

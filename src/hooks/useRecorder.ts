@@ -197,7 +197,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     voiceDetectorRef.current.teardown();
     setAnalyser(null);
     if (segmentRecRef.current) {
-      try { segmentRecRef.current.stop(); } catch { /* best-effort */ }
+      try {
+        segmentRecRef.current.stop();
+      } catch {
+        /* best-effort */
+      }
       segmentRecRef.current = null;
     }
     isSpeakingRef.current = false;
@@ -259,14 +263,20 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           segmentRecRef.current = seg;
           segmentStartAtRef.current = now;
           isSpeakingRef.current = true;
-        } catch { /* best-effort — never break main recording */ }
+        } catch {
+          /* best-effort — never break main recording */
+        }
       } else if (isSpeakingRef.current) {
         const segAge = now - segmentStartAtRef.current;
         if (silenceMs > 800 || segAge > 15_000) {
           const seg = segmentRecRef.current;
           segmentRecRef.current = null;
           isSpeakingRef.current = false;
-          try { seg?.stop(); } catch { /* best-effort */ }
+          try {
+            seg?.stop();
+          } catch {
+            /* best-effort */
+          }
           // Rotate immediately on max-length if speech is still live
           if (segAge > 15_000 && silenceMs < 200 && liveStream) {
             try {
@@ -278,7 +288,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
               segmentRecRef.current = seg2;
               segmentStartAtRef.current = now;
               isSpeakingRef.current = true;
-            } catch { /* best-effort */ }
+            } catch {
+              /* best-effort */
+            }
           }
         }
       }
@@ -538,7 +550,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     tickPause();
     // Stop the in-flight segment so Whisper processes what was captured before the pause.
     if (segmentRecRef.current) {
-      try { segmentRecRef.current.stop(); } catch { /* best-effort */ }
+      try {
+        segmentRecRef.current.stop();
+      } catch {
+        /* best-effort */
+      }
       segmentRecRef.current = null;
     }
     isSpeakingRef.current = false;
@@ -567,9 +583,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         const cb = stopResolveRef.current;
         if (!cb) return;
         stopResolveRef.current = null;
-        const fallback = chunksRef.current.length > 0
-          ? new Blob(chunksRef.current, { type: currentMimeRef.current })
-          : null;
+        const fallback =
+          chunksRef.current.length > 0
+            ? new Blob(chunksRef.current, { type: currentMimeRef.current })
+            : null;
         cb(fallback);
       }, 8000);
     });

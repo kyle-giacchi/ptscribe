@@ -221,7 +221,11 @@ export function Sidebar({ onClose, className }: SidebarProps) {
                 <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
                 <button
                   type="button"
-                  onClick={() => { setProfileOpen(false); onClose?.(); logout(); }}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onClose?.();
+                    logout();
+                  }}
                   className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
                   style={{
                     padding: '7px 12px',

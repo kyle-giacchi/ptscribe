@@ -9,7 +9,12 @@ interface TemplateDropdownProps {
   onManage: () => void;
 }
 
-export function TemplateDropdown({ template, templates, onChange, onManage }: TemplateDropdownProps) {
+export function TemplateDropdown({
+  template,
+  templates,
+  onChange,
+  onManage,
+}: TemplateDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -53,7 +58,14 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
         <span style={{ color: 'var(--color-pt-text-2)', fontWeight: 400, fontSize: 11 }}>
           Template
         </span>
-        <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            maxWidth: 120,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {template?.name ?? 'None'}
         </span>
         <ChevronDown
@@ -102,7 +114,10 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
           {/* Template list */}
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
             {templates.length === 0 && (
-              <p className="px-4 py-6 text-center text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
+              <p
+                className="px-4 py-6 text-center text-sm"
+                style={{ color: 'var(--color-pt-text-2)' }}
+              >
                 No templates available.
               </p>
             )}
@@ -112,14 +127,18 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
               const content = (
                 <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+                    <span
+                      className="text-sm font-semibold"
+                      style={{ color: 'var(--color-pt-text)' }}
+                    >
                       {t.name}
                     </span>
                     {isActive && (
                       <span
                         className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
                         style={{
-                          background: 'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)',
+                          background:
+                            'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)',
                           color: 'var(--color-pt-accent-fg)',
                         }}
                       >
@@ -128,7 +147,10 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--color-pt-text-2)' }}>
+                  <p
+                    className="mt-0.5 text-[11px] leading-snug"
+                    style={{ color: 'var(--color-pt-text-2)' }}
+                  >
                     {sectionSummary}
                   </p>
                 </div>
@@ -151,8 +173,16 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
                   key={t.id}
                   type="button"
                   className="flex w-full items-start gap-3 px-4 py-3"
-                  style={{ ...sharedStyle, cursor: 'pointer', border: 'none', background: sharedStyle.background }}
-                  onClick={() => { onChange(t.id); setOpen(false); }}
+                  style={{
+                    ...sharedStyle,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: sharedStyle.background,
+                  }}
+                  onClick={() => {
+                    onChange(t.id);
+                    setOpen(false);
+                  }}
                 >
                   {content}
                 </button>
@@ -174,7 +204,12 @@ export function TemplateDropdown({ template, templates, onChange, onManage }: Te
             <button
               type="button"
               className="inline-flex items-center gap-1 text-[11px] font-medium"
-              style={{ color: 'var(--color-pt-accent)', background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{
+                color: 'var(--color-pt-accent)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
               onClick={() => {
                 setOpen(false);
                 onManage();

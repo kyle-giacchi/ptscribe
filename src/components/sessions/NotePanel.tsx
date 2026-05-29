@@ -18,13 +18,7 @@ export interface NotePanelProps {
   onSectionChange: (key: string, body: string) => void;
 }
 
-function NotePanelImpl({
-  patient,
-  note,
-  template,
-  isStale,
-  onSectionChange,
-}: NotePanelProps) {
+function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: NotePanelProps) {
   const navigate = useNavigate();
   const sections: NoteSection[] =
     note?.sections ??
@@ -100,7 +94,7 @@ function NotePanelImpl({
                   borderLeft: isAssessment ? '3px solid var(--color-pt-accent-border)' : undefined,
                 }}
               >
-                <div className="flex items-center gap-2 mb-2">
+                <div className="mb-2 flex items-center gap-2">
                   <span
                     className="text-[11px] font-semibold tracking-widest uppercase"
                     style={{
@@ -125,7 +119,12 @@ function NotePanelImpl({
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      style={{ color: 'var(--color-fg-subtle)', fontSize: 11, padding: '2px 6px', gap: 3 }}
+                      style={{
+                        color: 'var(--color-fg-subtle)',
+                        fontSize: 11,
+                        padding: '2px 6px',
+                        gap: 3,
+                      }}
                       onClick={() =>
                         navigator.clipboard.writeText(s.body).then(
                           () => toast.success(`${s.label} copied`),

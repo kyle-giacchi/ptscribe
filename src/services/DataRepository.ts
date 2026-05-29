@@ -48,7 +48,10 @@ export const dataRepository = {
       const result = AppDataSchema.safeParse(migrated);
       if (!result.success) {
         if (import.meta.env.DEV) {
-          console.error('[DataRepository] AppData failed schema validation — quarantining corrupt data', result.error);
+          console.error(
+            '[DataRepository] AppData failed schema validation — quarantining corrupt data',
+            result.error,
+          );
         }
         quarantineCorrupt(raw);
         return null;

@@ -10,12 +10,17 @@ export function TranscriptCollapsedTab({ onExpand }: TranscriptCollapsedTabProps
       aria-label="Expand transcript panel"
       style={{
         writingMode: 'vertical-rl',
-        height: 120, padding: '12px 6px',
+        height: 120,
+        padding: '12px 6px',
         border: '1px solid var(--color-pt-border)',
-        borderRight: 'none', borderRadius: '8px 0 0 8px',
+        borderRight: 'none',
+        borderRadius: '8px 0 0 8px',
         background: 'var(--color-pt-surface)',
-        color: 'var(--color-pt-text-2)', cursor: 'pointer',
-        fontSize: 11.5, fontWeight: 600, letterSpacing: '0.04em',
+        color: 'var(--color-pt-text-2)',
+        cursor: 'pointer',
+        fontSize: 11.5,
+        fontWeight: 600,
+        letterSpacing: '0.04em',
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
     >

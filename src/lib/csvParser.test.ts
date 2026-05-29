@@ -41,9 +41,6 @@ describe('parseCsvInvites', () => {
 
   it('handles CRLF line endings', () => {
     const csv = 'email\r\nfoo@bar.com\r\nbaz@qux.com';
-    expect(parseCsvInvites(csv)).toEqual([
-      { email: 'foo@bar.com' },
-      { email: 'baz@qux.com' },
-    ]);
+    expect(parseCsvInvites(csv)).toEqual([{ email: 'foo@bar.com' }, { email: 'baz@qux.com' }]);
   });
 });

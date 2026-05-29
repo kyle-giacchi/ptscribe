@@ -9,7 +9,7 @@ export function playAlertChime(): void {
     const ctx = new AudioCtx();
     const now = ctx.currentTime;
     for (const [freq, start, dur] of [
-      [523.25, 0, 0.12],    // C5
+      [523.25, 0, 0.12], // C5
       [783.99, 0.15, 0.18], // G5
     ] as [number, number, number][]) {
       const osc = ctx.createOscillator();

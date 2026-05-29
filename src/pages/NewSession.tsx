@@ -496,7 +496,6 @@ export function NewSession() {
         onClose={closeCreatingTemplate}
         onCreate={handleCreateTemplate}
       />
-
     </div>
   );
 }

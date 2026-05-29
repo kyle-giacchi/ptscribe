@@ -1,13 +1,5 @@
 import { useRef, type ReactNode } from 'react';
-import {
-  Mic,
-  Upload,
-  AlertTriangle,
-  Info,
-  PenLine,
-  ChevronRight,
-  Loader2,
-} from 'lucide-react';
+import { Mic, Upload, AlertTriangle, Info, PenLine, ChevronRight, Loader2 } from 'lucide-react';
 import { useWhisperLoading } from '@/hooks/useWhisperLoading';
 import type { UploadStatus } from '@/hooks/sessionMachine/types';
 import type { DeviceCapabilities } from '@/hooks/useDeviceCapabilities';
@@ -47,11 +39,17 @@ function RouteTile({
       }}
     >
       <span style={{ flexShrink: 0, color: 'var(--color-pt-text-2)' }}>{icon}</span>
-      <span className="flex flex-col min-w-0" style={{ flex: 1 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>{title}</span>
+      <span className="flex min-w-0 flex-col" style={{ flex: 1 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
+          {title}
+        </span>
         <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{subtitle}</span>
       </span>
-      <ChevronRight size={16} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--color-pt-text-3)' }} />
+      <ChevronRight
+        size={16}
+        strokeWidth={2}
+        style={{ flexShrink: 0, color: 'var(--color-pt-text-3)' }}
+      />
     </button>
   );
 }
@@ -92,45 +90,49 @@ export function IdleRecordingCard({
         ? 'Preparing transcription model…'
         : null;
 
-  const capBanners = !capabilities || capabilities.checking ? null : (
-    <>
-      {noRecorder && (
-        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
-          Audio recording is not supported in this browser. Try Chrome, Edge, or Firefox.
-        </StatusBanner>
-      )}
-      {!noRecorder && micBlocked && (
-        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
-          Microphone access is blocked — open your browser settings to allow it for this site.
-        </StatusBanner>
-      )}
-      {capabilities.storageCritical && (
-        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
-          Device storage is critically low — recordings may fail to save. Free up space before recording.
-        </StatusBanner>
-      )}
-      {!capabilities.storageCritical && capabilities.storageLow && (
-        <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
-          Device storage is low — long recordings may not save completely.
-        </StatusBanner>
-      )}
-      {!capabilities.wasmSupported && (
-        <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
-          Live transcription (Whisper) isn&apos;t available here — WebAssembly is blocked. Cloud transcription still works after recording.
-        </StatusBanner>
-      )}
-      {capabilities.isLowMemoryDevice && capabilities.wasmSupported && (
-        <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
-          Low-memory device detected — live transcription may be slow or skip segments.
-        </StatusBanner>
-      )}
-      {capabilities.wasmSupported && whisperLoading && (
-        <StatusBanner icon={<Loader2 className="h-3.5 w-3.5 animate-spin" />} color="info">
-          Preparing transcription model — first run downloads ~150 MB. Recording will be enabled when ready.
-        </StatusBanner>
-      )}
-    </>
-  );
+  const capBanners =
+    !capabilities || capabilities.checking ? null : (
+      <>
+        {noRecorder && (
+          <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+            Audio recording is not supported in this browser. Try Chrome, Edge, or Firefox.
+          </StatusBanner>
+        )}
+        {!noRecorder && micBlocked && (
+          <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+            Microphone access is blocked — open your browser settings to allow it for this site.
+          </StatusBanner>
+        )}
+        {capabilities.storageCritical && (
+          <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
+            Device storage is critically low — recordings may fail to save. Free up space before
+            recording.
+          </StatusBanner>
+        )}
+        {!capabilities.storageCritical && capabilities.storageLow && (
+          <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
+            Device storage is low — long recordings may not save completely.
+          </StatusBanner>
+        )}
+        {!capabilities.wasmSupported && (
+          <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
+            Live transcription (Whisper) isn&apos;t available here — WebAssembly is blocked. Cloud
+            transcription still works after recording.
+          </StatusBanner>
+        )}
+        {capabilities.isLowMemoryDevice && capabilities.wasmSupported && (
+          <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
+            Low-memory device detected — live transcription may be slow or skip segments.
+          </StatusBanner>
+        )}
+        {capabilities.wasmSupported && whisperLoading && (
+          <StatusBanner icon={<Loader2 className="h-3.5 w-3.5 animate-spin" />} color="info">
+            Preparing transcription model — first run downloads ~150 MB. Recording will be enabled
+            when ready.
+          </StatusBanner>
+        )}
+      </>
+    );
 
   const hasBanners =
     capabilities &&
@@ -198,19 +200,26 @@ export function IdleRecordingCard({
                 : whisperGate
                   ? 'color-mix(in oklab, var(--color-pt-accent) 55%, var(--color-pt-surface))'
                   : 'var(--color-pt-accent)',
-              border: recordBlocked || whisperGate
-                ? '8px solid var(--color-pt-border)'
-                : '8px solid var(--color-pt-accent-soft)',
+              border:
+                recordBlocked || whisperGate
+                  ? '8px solid var(--color-pt-border)'
+                  : '8px solid var(--color-pt-accent-soft)',
               touchAction: 'manipulation',
-              boxShadow: recordBlocked || whisperGate
-                ? 'none'
-                : '0 12px 36px color-mix(in srgb, var(--color-pt-accent) 30%, transparent)',
+              boxShadow:
+                recordBlocked || whisperGate
+                  ? 'none'
+                  : '0 12px 36px color-mix(in srgb, var(--color-pt-accent) 30%, transparent)',
               opacity: isUploading ? 0.45 : 1,
               cursor: recordBlocked || whisperGate ? 'not-allowed' : 'pointer',
             }}
           >
             {whisperGate ? (
-              <Loader2 size={60} strokeWidth={1.5} style={{ color: 'white' }} className="animate-spin" />
+              <Loader2
+                size={60}
+                strokeWidth={1.5}
+                style={{ color: 'white' }}
+                className="animate-spin"
+              />
             ) : (
               <Mic size={64} strokeWidth={1.5} style={{ color: 'white' }} />
             )}
@@ -225,7 +234,7 @@ export function IdleRecordingCard({
 
       {/* Device capability warnings */}
       {hasBanners && (
-        <div className="w-full flex flex-col gap-2" style={{ maxWidth: 572 }}>
+        <div className="flex w-full flex-col gap-2" style={{ maxWidth: 572 }}>
           {capBanners}
         </div>
       )}
@@ -250,15 +259,20 @@ export function IdleRecordingCard({
         style={{ display: 'none' }}
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) { onUpload(file); e.target.value = ''; }
+          if (file) {
+            onUpload(file);
+            e.target.value = '';
+          }
         }}
       />
       <div className="flex flex-wrap items-stretch justify-center gap-3">
         <RouteTile
           icon={
-            isUploading
-              ? <Loader2 size={22} strokeWidth={2} className="animate-spin" />
-              : <Upload size={22} strokeWidth={2} />
+            isUploading ? (
+              <Loader2 size={22} strokeWidth={2} className="animate-spin" />
+            ) : (
+              <Upload size={22} strokeWidth={2} />
+            )
           }
           title="Upload audio"
           subtitle=".m4a · .mp3 · .wav up to 2hr"
@@ -281,13 +295,14 @@ export function IdleRecordingCard({
         {hasStatusMessage && (
           <p
             key={uploadStatus.message}
-            className="text-xs text-center"
+            className="text-center text-xs"
             style={{
-              color: uploadStatus.phase === 'error'
-                ? 'var(--color-pt-red-fg)'
-                : uploadStatus.phase === 'done'
-                  ? 'var(--color-pt-accent-fg)'
-                  : 'var(--color-pt-text-3)',
+              color:
+                uploadStatus.phase === 'error'
+                  ? 'var(--color-pt-red-fg)'
+                  : uploadStatus.phase === 'done'
+                    ? 'var(--color-pt-accent-fg)'
+                    : 'var(--color-pt-text-3)',
               animation: 'transcript-slide-in 200ms ease-out both',
             }}
           >

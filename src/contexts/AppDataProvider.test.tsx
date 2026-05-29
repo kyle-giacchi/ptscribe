@@ -73,7 +73,11 @@ describe('AppDataProvider', () => {
     let resolveLoad!: (v: AppData | null) => void;
     vi.spyOn(dataRepository, 'load').mockReturnValue(new Promise((r) => (resolveLoad = r)));
 
-    render(<AppDataProvider><div data-testid="child" /></AppDataProvider>);
+    render(
+      <AppDataProvider>
+        <div data-testid="child" />
+      </AppDataProvider>,
+    );
 
     expect(screen.getByText('Loading…')).toBeInTheDocument();
     expect(screen.queryByTestId('child')).toBeNull();
@@ -89,18 +93,24 @@ describe('AppDataProvider', () => {
   it('shows the corrupt-data banner when hasCorruptData returns true', async () => {
     vi.spyOn(dataRepository, 'hasCorruptData').mockReturnValue(true);
 
-    render(<AppDataProvider><div /></AppDataProvider>);
-
-    await waitFor(() =>
-      expect(screen.getByText(/could not be loaded/)).toBeInTheDocument(),
+    render(
+      <AppDataProvider>
+        <div />
+      </AppDataProvider>,
     );
+
+    await waitFor(() => expect(screen.getByText(/could not be loaded/)).toBeInTheDocument());
   });
 
   it('dismiss button hides the corrupt-data banner and calls clearCorruptData', async () => {
     vi.spyOn(dataRepository, 'hasCorruptData').mockReturnValue(true);
     const clearSpy = vi.spyOn(dataRepository, 'clearCorruptData').mockImplementation(() => {});
 
-    render(<AppDataProvider><div /></AppDataProvider>);
+    render(
+      <AppDataProvider>
+        <div />
+      </AppDataProvider>,
+    );
     await waitFor(() => screen.getByRole('button', { name: /dismiss/i }));
 
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
@@ -112,35 +122,41 @@ describe('AppDataProvider', () => {
   it('shows the two-tab banner when isTwoTabConflict returns true on load', async () => {
     vi.spyOn(vault, 'isTwoTabConflict').mockReturnValue(true);
 
-    render(<AppDataProvider><div /></AppDataProvider>);
-
-    await waitFor(() =>
-      expect(screen.getByText(/open in another tab/)).toBeInTheDocument(),
+    render(
+      <AppDataProvider>
+        <div />
+      </AppDataProvider>,
     );
+
+    await waitFor(() => expect(screen.getByText(/open in another tab/)).toBeInTheDocument());
   });
 
   it('tracks vault conflict changes through onConflictChange subscription', async () => {
-    render(<AppDataProvider><div /></AppDataProvider>);
+    render(
+      <AppDataProvider>
+        <div />
+      </AppDataProvider>,
+    );
     await waitFor(() => expect(capturedConflictCb).not.toBeNull());
 
     // Trigger a conflict.
     act(() => capturedConflictCb!(true));
-    await waitFor(() =>
-      expect(screen.getByText(/open in another tab/)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/open in another tab/)).toBeInTheDocument());
 
     // Clear the conflict.
     act(() => capturedConflictCb!(false));
-    await waitFor(() =>
-      expect(screen.queryByText(/open in another tab/)).toBeNull(),
-    );
+    await waitFor(() => expect(screen.queryByText(/open in another tab/)).toBeNull());
   });
 
   it('renders both banners simultaneously when corrupt and twoTab are both active', async () => {
     vi.spyOn(dataRepository, 'hasCorruptData').mockReturnValue(true);
     vi.spyOn(vault, 'isTwoTabConflict').mockReturnValue(true);
 
-    render(<AppDataProvider><div /></AppDataProvider>);
+    render(
+      <AppDataProvider>
+        <div />
+      </AppDataProvider>,
+    );
 
     await waitFor(() => {
       expect(screen.getAllByRole('alert')).toHaveLength(2);
@@ -154,7 +170,9 @@ describe('AppDataProvider', () => {
     const api = await renderProviderAndAwait();
     act(() => api.updateClinicianSlice({ ...api.appData.clinician, name: 'Dr. Test' }));
     expect(await dataRepository.load()).toBeNull();
-    await act(async () => { vi.advanceTimersByTime(350); });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
     vi.useRealTimers();
     await waitFor(async () => {
       const loaded = await dataRepository.load();
@@ -201,7 +219,9 @@ describe('AppDataProvider', () => {
     const newNotes = [{ id: 'n1' } as AppData['notes'][0]];
     act(() => api.bulkUpdate({ clinician: newClinician, notes: newNotes }));
 
-    await act(async () => { vi.advanceTimersByTime(350); });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
     vi.useRealTimers();
 
     await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
@@ -231,7 +251,9 @@ describe('AppDataProvider', () => {
     const saveSpy = vi.spyOn(dataRepository, 'save');
 
     act(() => api.resetAll());
-    await act(async () => { vi.advanceTimersByTime(350); });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
     vi.useRealTimers();
 
     await waitFor(() => expect(saveSpy).toHaveBeenCalledTimes(1));
@@ -252,13 +274,13 @@ describe('AppDataProvider', () => {
     );
 
     act(() => api.updateClinicianSlice({ ...api.appData.clinician, name: 'x' }));
-    await act(async () => { vi.advanceTimersByTime(350); });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
     vi.useRealTimers();
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining('Storage quota exceeded'),
-      ),
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Storage quota exceeded')),
     );
   });
 
@@ -270,7 +292,9 @@ describe('AppDataProvider', () => {
     );
 
     act(() => api.updateClinicianSlice({ ...api.appData.clinician, name: 'x' }));
-    await act(async () => { vi.advanceTimersByTime(350); });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
     vi.useRealTimers();
 
     await waitFor(() =>
@@ -286,13 +310,13 @@ describe('AppDataProvider', () => {
     vi.spyOn(dataRepository, 'save').mockRejectedValue(new Error('disk I/O error'));
 
     act(() => api.updateClinicianSlice({ ...api.appData.clinician, name: 'x' }));
-    await act(async () => { vi.advanceTimersByTime(350); });
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
     vi.useRealTimers();
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to save data'),
-      ),
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Failed to save data')),
     );
   });
 
@@ -329,7 +353,10 @@ describe('purgeFinalizedAudio', () => {
       {
         status: 'finalized',
         finalizedAt: 1000,
-        clips: [{ id: 'a', createdAt: 1 }, { id: 'b', createdAt: 2 }],
+        clips: [
+          { id: 'a', createdAt: 1 },
+          { id: 'b', createdAt: 2 },
+        ],
       },
     ] as unknown as AppData['sessions'];
 

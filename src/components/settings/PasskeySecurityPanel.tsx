@@ -136,7 +136,11 @@ export function PasskeySecurityPanel() {
                 background: 'var(--color-pt-surface-mut)',
               }}
             >
-              <KeyRound size={15} strokeWidth={2} style={{ color: 'var(--color-pt-accent-fg)', flexShrink: 0 }} />
+              <KeyRound
+                size={15}
+                strokeWidth={2}
+                style={{ color: 'var(--color-pt-accent-fg)', flexShrink: 0 }}
+              />
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span
                   style={{

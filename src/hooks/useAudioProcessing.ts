@@ -48,7 +48,10 @@ export function useAudioProcessing(
     setSilenceError(null);
     try {
       const sd = settings.audio.silenceDetection;
-      const result = await trimSilence(sourceBlob, { sensitivity: sd.sensitivity, padMs: sd.padMs });
+      const result = await trimSilence(sourceBlob, {
+        sensitivity: sd.sensitivity,
+        padMs: sd.padMs,
+      });
       setSilenced({ blob: result.trimmed, forId: KEY, savedSec: result.report.droppedSec });
     } catch (e) {
       setSilenceError({ msg: (e as Error).message, forId: KEY });
