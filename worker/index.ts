@@ -18,6 +18,16 @@ import { createAuth } from './auth';
 import { handleOrgRoute } from './org';
 import { handleConfigRoute } from './config';
 
+/**
+ * Workers Rate Limiting binding (GA). `limit()` is in-network, per-Cloudflare-
+ * location, and eventually consistent — fast (no KV read/write) but permissive,
+ * which is why the authoritative spend backstop stays on the KV global counter.
+ * Config (limit + 10s/60s period) lives in wrangler.jsonc, not here.
+ */
+interface RateLimitBinding {
+  limit(opts: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   AI: Ai;
   ASSETS: Fetcher;
@@ -27,7 +37,17 @@ export interface Env {
   /** Full origin of the app, e.g. https://ptscribe.app. Used for passkey rpID and cookie security. */
   AUTH_BASE_URL?: string;
   DB: D1Database;
+  /** KV — now the SOLE rate-limit store, used only for the post-gate global
+   *  daily Anthropic-spend counter. Per-IP limits moved to the Rate Limiting
+   *  bindings below. */
   RATE_LIMIT?: KVNamespace;
+  /** Per-IP per-minute limit on billable AI proxy calls (post-gate dispatch).
+   *  Configured via the `ratelimits` block in wrangler.jsonc, not in code.
+   *  Optional so local dev / unconfigured deploys fail open. */
+  API_RATE_LIMITER?: RateLimitBinding;
+  /** Per-IP pre-gate limit on all /api/* and /api/model/* traffic. Configured
+   *  in wrangler.jsonc. Optional → fail open when absent. */
+  PREGATE_RATE_LIMITER?: RateLimitBinding;
   MODELS?: R2Bucket;
   /** Comma-separated list of allowed request Origins. Defaults to same-origin
    *  plus localhost dev ports when unset. */
@@ -128,7 +148,7 @@ export default {
       if (!(await checkPreGateLimit(env, ip)).allowed) {
         res = apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
       } else {
-        res = await handleModelFile(url, env, ctx);
+        res = await handleModelFile(request, url, env, ctx);
       }
     } else if (url.pathname.startsWith('/api/')) {
       res = await handleApi(request, env, url);
@@ -214,7 +234,12 @@ function withSecurityHeaders(res: Response, url: URL): Response {
   });
 }
 
-async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
+async function handleModelFile(
+  request: Request,
+  url: URL,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   if (!env.MODELS) {
     return new Response(JSON.stringify({ error: 'Model storage not configured' }), {
       status: 503,
@@ -233,12 +258,22 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
     return new Response('Not found', { status: 404 });
   }
 
+  // Edge cache: model files are immutable, so a hit serves with no R2 read and
+  // no binding call. Checked after key validation so bad keys can't be cached.
+  // (GET-only route — the caller guards request.method === 'GET'.)
+  const cache = caches.default;
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
   const object = await env.MODELS.get(key);
   if (object) {
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-    return new Response(object.body, { headers });
+    const response = new Response(object.body, { headers });
+    // Fill the edge cache so subsequent shard requests skip R2 entirely.
+    ctx.waitUntil(cache.put(request, response.clone()));
+    return response;
   }
 
   // R2 miss — proxy from HuggingFace so the app works before model files are uploaded.
@@ -268,6 +303,9 @@ async function handleModelFile(url: URL, env: Env, ctx: ExecutionContext): Promi
   headers.set('Content-Type', contentType);
   headers.set('Cache-Control', cacheControl);
   if (hfContentLength) headers.set('Content-Length', String(hfContentLength));
+  // Not edge-cached here: the body is already tee'd to the client + R2, and a
+  // third clone of ~100 MB weights would add memory pressure. The R2 write above
+  // means the next request is an R2 hit, which *is* cached.
   return new Response(toClient, { status: 200, headers });
 }
 
@@ -635,9 +673,10 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   return json({ text });
 }
 
-const RATE_LIMIT_PRE_GATE_PER_MIN = 20;
-const RATE_LIMIT_PER_MIN = 10;
-const RATE_LIMIT_PER_DAY = 300;
+// Per-IP per-minute/pre-gate limits now live in the Rate Limiting bindings
+// (configured in wrangler.jsonc). The binding's period is 10s or 60s only, so
+// the former per-IP *daily* cap cannot be expressed by it and is dropped — the
+// KV global daily counter below remains the real spend backstop.
 const RATE_LIMIT_GLOBAL_PER_DAY = 500;
 
 // Upstream timeouts. Without these, a slow/hung upstream blocks the request to
@@ -676,17 +715,20 @@ function isTimeoutError(err: unknown): boolean {
   return name === 'TimeoutError' || name === 'AbortError';
 }
 
+// Pre-gate per-IP limit on all /api/* (and /api/model/*) traffic. Backed by the
+// Rate Limiting binding — no KV reads/writes, so unauthenticated/static/model
+// traffic no longer touches KV. Fail open when the binding is absent (local dev).
 async function checkPreGateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
-  if (!env.RATE_LIMIT) return { allowed: true };
-  const now = Date.now();
-  const key = `rl:pg:${ip}:${Math.floor(now / 60_000)}`;
-  const raw = await env.RATE_LIMIT.get(key);
-  const count = raw ? parseInt(raw, 10) : 0;
-  if (count >= RATE_LIMIT_PRE_GATE_PER_MIN) return { allowed: false };
-  await env.RATE_LIMIT.put(key, String(count + 1), { expirationTtl: 120 });
-  return { allowed: true };
+  if (!env.PREGATE_RATE_LIMITER) return { allowed: true };
+  const { success } = await env.PREGATE_RATE_LIMITER.limit({ key: ip });
+  return { allowed: success };
 }
 
+// Global daily Anthropic-spend counter. This is the ONLY remaining KV rate-limit
+// user, and it runs strictly post-gate (handleApi, after auth) so config/model/
+// static traffic never writes to KV. The read→write is intentionally non-atomic
+// and permissive: a small overshoot of the cap is acceptable — it is a spend
+// *alarm*, not a hard ledger. KV writes now scale with billable AI calls only.
 async function checkGlobalDailyLimit(env: Env): Promise<{ allowed: boolean }> {
   if (!env.RATE_LIMIT) return { allowed: true };
   const now = Date.now();
@@ -698,32 +740,13 @@ async function checkGlobalDailyLimit(env: Env): Promise<{ allowed: boolean }> {
   return { allowed: true };
 }
 
+// Per-IP per-minute limit on billable AI proxy calls (post-gate). Backed by the
+// Rate Limiting binding. The former per-IP daily cap is dropped (binding period
+// is 10s/60s only); the global daily KV counter is the spend backstop instead.
 async function checkRateLimit(env: Env, ip: string): Promise<{ allowed: boolean }> {
-  if (!env.RATE_LIMIT) return { allowed: true };
-  // KV read → increment → write is not atomic: two simultaneous requests at the limit
-  // can both pass. Acceptable at this traffic scale; do not assume strong consistency.
-  const now = Date.now();
-  const minuteKey = `rl:min:${ip}:${Math.floor(now / 60_000)}`;
-  const dayKey = `rl:day:${ip}:${Math.floor(now / 86_400_000)}`;
-
-  const [minRaw, dayRaw] = await Promise.all([
-    env.RATE_LIMIT.get(minuteKey),
-    env.RATE_LIMIT.get(dayKey),
-  ]);
-
-  const minCount = minRaw ? parseInt(minRaw, 10) : 0;
-  const dayCount = dayRaw ? parseInt(dayRaw, 10) : 0;
-
-  if (minCount >= RATE_LIMIT_PER_MIN || dayCount >= RATE_LIMIT_PER_DAY) {
-    return { allowed: false };
-  }
-
-  await Promise.all([
-    env.RATE_LIMIT.put(minuteKey, String(minCount + 1), { expirationTtl: 120 }),
-    env.RATE_LIMIT.put(dayKey, String(dayCount + 1), { expirationTtl: 172800 }),
-  ]);
-
-  return { allowed: true };
+  if (!env.API_RATE_LIMITER) return { allowed: true };
+  const { success } = await env.API_RATE_LIMITER.limit({ key: ip });
+  return { allowed: success };
 }
 
 function json(payload: unknown, status = 200): Response {
