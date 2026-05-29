@@ -29,15 +29,19 @@ export interface BackgroundT2State {
  * always starts at i * LOCAL_CHUNK_SEC seconds. VAD runs per-chunk so any
  * residual silence within each bucket is still stripped.
  */
-async function transcribeWithLocalWhisper(
+export async function transcribeWithLocalWhisper(
   blob: Blob,
   onProgress?: (msg: string) => void,
   signal?: AbortSignal,
 ): Promise<{ ok: true; text: string; chunks: TranscriptChunk[] } | { ok: false; error: string }> {
   const SR = 16000;
 
+  if (signal?.aborted) return { ok: false, error: 'Aborted.' };
+
   onProgress?.('Decoding audio…');
   const samples = await blobToFloat32(blob);
+
+  if (signal?.aborted) return { ok: false, error: 'Aborted.' };
 
   if (samples.length < SR * 0.5) {
     return { ok: false, error: 'Audio too short.' };
@@ -49,6 +53,7 @@ async function transcribeWithLocalWhisper(
   onProgress?.('Detecting speech…');
   const speechChunks: { startSec: number; audio: Float32Array }[] = [];
   for (let i = 0; i < numChunks; i++) {
+    if (signal?.aborted) return { ok: false, error: 'Aborted.' };
     const startSample = i * chunkLen;
     const chunkAudio = samples.subarray(startSample, Math.min(startSample + chunkLen, samples.length));
     const startSec = i * LOCAL_CHUNK_SEC;
@@ -129,16 +134,26 @@ export function useBackgroundTranscription({
 
   const hasRunRef = useRef(false);
   const retryCountRef = useRef(0);
+  // Tracks the AbortController for the in-flight pass so a blob change or
+  // unmount can cancel it before a new pass starts.
+  const abortRef = useRef<AbortController | null>(null);
   // Bumped by retry timers to re-trigger the effect after each backoff period.
   const [retryTick, setRetryTick] = useState(0);
 
   // Reset run-guards whenever the combined blob changes so T2 re-runs
   // automatically after the user adds new clips and calls buildMergedAudioForReview.
-  // Phase transitions ('idle'→'transcribing') are driven by the main effect below.
+  // Aborting first cancels any pass tied to the previous blob; this reset effect
+  // runs before the main effect on the same change, so abort-then-recreate is the
+  // correct sequence. Phase transitions are driven by the main effect below.
   useEffect(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     hasRunRef.current = false;
     retryCountRef.current = 0;
   }, [silencedMergedBlob]);
+
+  // Abort any in-flight pass on unmount so no post-unmount setState occurs.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     if (!session || !silencedMergedBlob || hasRunRef.current) return;
@@ -147,8 +162,14 @@ export function useBackgroundTranscription({
     setPhase('transcribing');
     setProgressLabel('');
 
-    transcribeWithLocalWhisper(silencedMergedBlob!, (msg) => setProgressLabel(msg))
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    transcribeWithLocalWhisper(silencedMergedBlob!, (msg) => setProgressLabel(msg), controller.signal)
       .then((result) => {
+        // Pass was superseded (blob changed) or the hook unmounted — drop it
+        // so no stale setTranscript/patchSession/setPhase write occurs.
+        if (controller.signal.aborted) return;
         if (result.ok) {
           // promoteTier owns the ordering rule: a fresh T2 may not clobber a
           // higher tier (T3) that produced output while Whisper was processing.
@@ -179,6 +200,7 @@ export function useBackgroundTranscription({
         }
       })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         if (err instanceof WhisperExhaustedError) {
           setPhase('error');
           setProgressLabel('');
