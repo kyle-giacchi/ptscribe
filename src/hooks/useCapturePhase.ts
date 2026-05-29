@@ -85,8 +85,10 @@ export function useCapturePhase({
   const whisperTextRef = useRef<string[]>([]);
 
   // Always-current ref so the live-transcript callback reads the latest duration.
+  // Read from the recorder's live-duration store (updated every tick) rather than
+  // the low-frequency `durationSec` state, which now only commits on pause/stop.
   const durationSecRef = useRef(0);
-  durationSecRef.current = recorder.durationSec;
+  durationSecRef.current = recorder.getDurationSec();
 
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
@@ -278,7 +280,10 @@ export function useCapturePhase({
     activeClipIdRef.current = null;
 
     const finalBlob = await recorder.stop();
-    const durationSec = recorder.durationSec;
+    // Read the live store snapshot — `stop()` has committed the final paused
+    // value to it synchronously, and unlike `recorder.durationSec` state it is
+    // not subject to the async render commit.
+    const durationSec = recorder.getDurationSec();
     webSpeech.stop();
 
     if (clipId) {
