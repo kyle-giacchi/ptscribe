@@ -18,7 +18,7 @@ import { vault } from '@/lib/vault/vault';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { useSessionReset } from '@/contexts/SessionResetContext';
 import { useGate } from '@/contexts/GateContext';
-import { deactivateTestUserSession } from '@/contexts/AuthContext';
+import { deactivateTestUserSession } from '@/lib/profile/profileId';
 import { useDismissable } from '@/hooks/useDismissable';
 import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
 import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';

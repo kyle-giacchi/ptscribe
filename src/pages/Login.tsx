@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { MailCheck } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
-import { activateTestUserSession } from '@/contexts/AuthContext';
+import { activateTestUserSession } from '@/lib/profile/profileId';
 import { isDemoMode } from '@/lib/demoMode';
 import { unlockGateForDemo } from '@/lib/gate';
 
