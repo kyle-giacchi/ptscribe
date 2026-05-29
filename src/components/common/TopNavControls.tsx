@@ -7,6 +7,7 @@ import { vault } from '@/lib/vault/vault';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { useSessionReset } from '@/contexts/SessionResetContext';
 import { useGate } from '@/contexts/GateContext';
+import { deactivateTestUserSession } from '@/contexts/AuthContext';
 import { useDismissable } from '@/hooks/useDismissable';
 import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
 import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';
@@ -387,7 +388,7 @@ export function ProfileButton() {
           <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
           <button
             type="button"
-            onClick={() => { setOpen(false); logout(); }}
+            onClick={() => { setOpen(false); deactivateTestUserSession(); logout(); }}
             className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
             style={{
               padding: '7px 12px',

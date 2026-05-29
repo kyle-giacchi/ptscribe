@@ -56,12 +56,22 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
 
 const TEST_USER_KEY = 'ptscribe-test-user-session';
 
+// Persisted in localStorage (not sessionStorage) so a Test User session behaves
+// like a real login: it survives reloads and new tabs until an explicit Log out.
 export function activateTestUserSession() {
-  sessionStorage.setItem(TEST_USER_KEY, '1');
+  localStorage.setItem(TEST_USER_KEY, '1');
+}
+
+export function deactivateTestUserSession() {
+  localStorage.removeItem(TEST_USER_KEY);
+}
+
+export function isTestUserSession(): boolean {
+  return localStorage.getItem(TEST_USER_KEY) === '1';
 }
 
 function RealAuthProvider({ children }: { children: ReactNode }) {
-  const isTestUser = sessionStorage.getItem(TEST_USER_KEY) === '1';
+  const isTestUser = isTestUserSession();
   const { data: session, isPending } = authClient.useSession();
   const value: AuthContextValue = {
     currentUser: isTestUser ? DEMO_USER : session ? mapSession(session) : null,
@@ -69,7 +79,7 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: isTestUser || !!session,
     signOut: async () => {
       vault.lock();
-      sessionStorage.removeItem(TEST_USER_KEY);
+      deactivateTestUserSession();
       await authClient.signOut();
       window.location.reload();
     },
