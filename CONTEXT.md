@@ -153,7 +153,7 @@ Two-stage automatic retention model:
 
 After full purge, the Note and its locked transcript remain intact; Improve with AI is no longer available for the session. The clinician's existing right to delete a session entirely (which deletes everything including transcript and Note) is unchanged.
 
-Implementation note: today the silenced+combined Blob is computed for playback only and not persisted. The Finalize prune step requires it to become persistent — a small storage change.
+**Implementation status (current):** The sweep (`purgeFinalizedAudio`, run at boot when `Settings.retention.autoDeleteAudioAfterDays` is enabled) is **finalize-gated** — it only ever removes audio for sessions whose `status === 'finalized'`, anchored on the persisted `Session.finalizedAt`. Active/draft sessions keep all clip audio regardless of age, so Improve-with-AI and Revert always work mid-visit. The implemented policy is the simplest faithful form: a finalized session's per-clip audio is dropped on the next sweep (the day-count acts as an on/off switch, not a delay), and the silenced+combined Blob is **not** persisted — the "keep combined blob for the window / drop at +14 days" rows above are the *designed* target, not yet built. (The earlier blunt age-sweep keyed off `clip.createdAt` and could delete audio for an active, pre-Finalize session — that bug is fixed.)
 
 ## Note editor
 
