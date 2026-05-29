@@ -4,6 +4,8 @@ import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { MailCheck } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
 import { activateTestUserSession } from '@/contexts/AuthContext';
+import { isDemoMode } from '@/lib/demoMode';
+import { unlockGateForDemo } from '@/lib/gate';
 
 type View = 'default' | 'magic-form' | 'magic-sent';
 
@@ -216,6 +218,7 @@ export function Login() {
               Email me a link instead
             </button>
 
+            {isDemoMode() && (
             <div
               style={{
                 margin: '20px 0 4px',
@@ -225,7 +228,12 @@ export function Login() {
             >
               <button
                 onClick={() => {
+                  // Test User = the full real-app experience on a demo build:
+                  // mark the session, satisfy AppGate + the API gate header, then
+                  // enter the app. DemoBootstrap reads the marker and steps aside
+                  // (no demo seeding, no nav-lock).
                   activateTestUserSession();
+                  unlockGateForDemo();
                   navigate('/today', { replace: true });
                 }}
                 disabled={loading}
@@ -245,6 +253,7 @@ export function Login() {
                 Login as Test User
               </button>
             </div>
+            )}
           </>
         )}
 
