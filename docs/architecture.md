@@ -8,7 +8,7 @@ src/
                   ai/transcribe.ts (Cloudflare Whisper), ai/generate.ts (Anthropic),
                   ai/client/localWhisper.ts (client-side Whisper via worker pool)
   contexts/       AppDataProvider (root) + slice providers (one per domain)
-  hooks/          useRecorder, useLiveTranscript, useRecordingFlow, 
+  hooks/          useRecorder, useLiveTranscript, useRecordingFlow,
                   useTranscriptionFlow, useGenerationFlow,
                   useBelowBreakpoint (window-width matcher), useDismissable (Esc + click-outside)
   pages/          Route-level components — consume hooks/contexts only
@@ -37,12 +37,12 @@ Dependencies flow one way: `pages/components` -> `hooks` -> `contexts` -> `servi
 
 `AppShell` is intentionally thin: `OfflineIndicator` + `GlobalTopNav` + optional demo banner + the routed `<Outlet/>` + `<Toaster/>`. It does **not** render a sidebar, page title, or per-page chrome — those belong to the page.
 
-| Layer | Component | Notes |
-|---|---|---|
-| App chrome (every route) | `GlobalTopNav` (52 px) | Hamburger overflow menu, brand, primary nav (My Chart, Review queue, Patients, Templates, Settings), `PatientQuickSearch` patient typeahead, `VaultPill`, `AlertsButton`, `ProfileButton`. Hamburger surfaces below 1024 px and the horizontal nav becomes the overflow menu. |
-| Dashboard rail | `Sidebar` | Rendered only by `pages/Dashboard.tsx` as a left rail. Hidden below `md` (768 px) and re-surfaced as a drawer behind a hamburger button at the page top. |
-| Session chrome | `SessionTopBar` (56 px) | Back-to-chart link, patient + session breadcrumb, status badge, `AddClipButton`, Audio clips toggle (controls `ClipsDrawer`), Sign & export / Unlock. |
-| Session content | `RecordingPanel` or `NotePanel` + `TranscriptPanel` + `ClipsDrawer` | Two tabs only: `record` and `review`. The legacy `clips` tab is gone — clips live in the inspector drawer. |
+| Layer                    | Component                                                           | Notes                                                                                                                                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App chrome (every route) | `GlobalTopNav` (52 px)                                              | Hamburger overflow menu, brand, primary nav (My Chart, Review queue, Patients, Templates, Settings), `PatientQuickSearch` patient typeahead, `VaultPill`, `AlertsButton`, `ProfileButton`. Hamburger surfaces below 1024 px and the horizontal nav becomes the overflow menu. |
+| Dashboard rail           | `Sidebar`                                                           | Rendered only by `pages/Dashboard.tsx` as a left rail. Hidden below `md` (768 px) and re-surfaced as a drawer behind a hamburger button at the page top.                                                                                                                      |
+| Session chrome           | `SessionTopBar` (56 px)                                             | Back-to-chart link, patient + session breadcrumb, status badge, `AddClipButton`, Audio clips toggle (controls `ClipsDrawer`), Sign & export / Unlock.                                                                                                                         |
+| Session content          | `RecordingPanel` or `NotePanel` + `TranscriptPanel` + `ClipsDrawer` | Two tabs only: `record` and `review`. The legacy `clips` tab is gone — clips live in the inspector drawer.                                                                                                                                                                    |
 
 `PatientQuickSearch` listens for ⌘/Ctrl-K to focus the input; results are patient matches (name or primary diagnosis), keyboard-navigable, navigate to `/patients/:id` on enter.
 
@@ -93,33 +93,33 @@ Audio Blobs follow a parallel path through `AudioRepository` to IndexedDB; only 
 
 ## Provider responsibilities
 
-| Provider            | Hook             | Mutators                                                                                                                                                                                                                                                                                                                               |
-| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AppDataProvider`   | `useAppData()`   | `updateClinicianSlice`, `updatePatientsSlice`, `updateSessionsSlice`, `updateNotesSlice`, `updateTemplatesSlice`, `updateExercisesSlice`, `updatePlansSlice`, `updateSettingsSlice`, `bulkUpdate`, `resetAll`. Slice updaters accept either a value or `(prev) => next`; returning the same reference short-circuits and skips a save. |
-| `ClinicianProvider` | `useClinician()` | `updateClinician(patch)`, `setClinician(next)`                                                                                                                                                                                                                                                                                         |
-| `PatientsProvider`  | `usePatients()`  | `addPatient`, `updatePatient`, `removePatient`, `setPatients`                                                                                                                                                                                                                                                                          |
-| `SessionsProvider`  | `useSessions()`  | `addSession`, `updateSession`, `removeSession`, `setSessions`                                                                                                                                                                                                                                                                          |
-| `NotesProvider`     | `useNotes()`     | `addNote`, `updateNote`, `removeNote`, `setNotes`, `finalizeNote(id)`                                                                                                                                                                                                                                                                  |
-| `TemplatesProvider` | `useTemplates()` | `addTemplate`, `updateTemplate` (no-op for builtins), `removeTemplate` (no-op for builtins), `cloneTemplate(id)`                                                                                                                                                                                                                       |
-| `ExercisesProvider` | `useExercises()` | `addExercise`, `updateExercise` (no-op for builtins), `removeExercise` (no-op for builtins)                                                                                                                                                                                                                                            |
-| `PlansProvider`     | `usePlans()`     | `addPlan`, `updatePlan`, `removePlan`, `setPlans`                                                                                                                                                                                                                                                                                      |
-| `SettingsProvider`  | `useSettings()`  | `updateSettings`, `updateAi`, `updateAudio`, `updateUi`, `updateSession`, `updateRecordingLimits`, `updateOrgPolicy`, `updateFirstRun`, `setIdleLockMinutes`, `setAutoDeleteAudioAfterDays`, `getPageMode` / `setPageMode` (per-page detail level; persisted directly to `localStorage`, not in `AppData`).                            |
-| `IdleLockProvider`  | —                | No mutators. Reads `settings.security.idleLockMinutes`; calls `vault.lock()` after that many minutes of inactivity. Must be inside `SettingsProvider`.                                                                                                                                                                                  |
-| `AuthProvider`      | `useAuth()`      | Wraps BetterAuth (passkey + magic link, served via Worker at `/api/auth`). Sits at router level, outside the app provider tree. Exposes `isAuthenticated`, `user`, `signOut`.                                                                                                                                                           |
-| `ConfigSyncProvider` | —               | Mounted inside `AppDataProvider`. Pulls non-clinical config from D1 on login and debounce-pushes on change via slice mutators. No mutators of its own. **Zero `/api/config/*` requests for demo/test-user/unauthenticated sessions** (isolation gate). See [Cross-device config sync](#cross-device-config-sync-d1).                       |
-| `OrgConfigProvider` | `useOrgConfig()` | Read-only org policy + shared template/exercise library (`policy`, `sharedTemplates`, `sharedExercises`, `canManage`, `updateOrgConfig`). Loads only when `currentUser.orgId` is set; demo/no-org isolated. Shared library is never written into AppData.                                                                                |
+| Provider             | Hook             | Mutators                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppDataProvider`    | `useAppData()`   | `updateClinicianSlice`, `updatePatientsSlice`, `updateSessionsSlice`, `updateNotesSlice`, `updateTemplatesSlice`, `updateExercisesSlice`, `updatePlansSlice`, `updateSettingsSlice`, `bulkUpdate`, `resetAll`. Slice updaters accept either a value or `(prev) => next`; returning the same reference short-circuits and skips a save. |
+| `ClinicianProvider`  | `useClinician()` | `updateClinician(patch)`, `setClinician(next)`                                                                                                                                                                                                                                                                                         |
+| `PatientsProvider`   | `usePatients()`  | `addPatient`, `updatePatient`, `removePatient`, `setPatients`                                                                                                                                                                                                                                                                          |
+| `SessionsProvider`   | `useSessions()`  | `addSession`, `updateSession`, `removeSession`, `setSessions`                                                                                                                                                                                                                                                                          |
+| `NotesProvider`      | `useNotes()`     | `addNote`, `updateNote`, `removeNote`, `setNotes`, `finalizeNote(id)`                                                                                                                                                                                                                                                                  |
+| `TemplatesProvider`  | `useTemplates()` | `addTemplate`, `updateTemplate` (no-op for builtins), `removeTemplate` (no-op for builtins), `cloneTemplate(id)`                                                                                                                                                                                                                       |
+| `ExercisesProvider`  | `useExercises()` | `addExercise`, `updateExercise` (no-op for builtins), `removeExercise` (no-op for builtins)                                                                                                                                                                                                                                            |
+| `PlansProvider`      | `usePlans()`     | `addPlan`, `updatePlan`, `removePlan`, `setPlans`                                                                                                                                                                                                                                                                                      |
+| `SettingsProvider`   | `useSettings()`  | `updateSettings`, `updateAi`, `updateAudio`, `updateUi`, `updateSession`, `updateRecordingLimits`, `updateOrgPolicy`, `updateFirstRun`, `setIdleLockMinutes`, `setAutoDeleteAudioAfterDays`, `getPageMode` / `setPageMode` (per-page detail level; persisted directly to `localStorage`, not in `AppData`).                            |
+| `IdleLockProvider`   | —                | No mutators. Reads `settings.security.idleLockMinutes`; calls `vault.lock()` after that many minutes of inactivity. Must be inside `SettingsProvider`.                                                                                                                                                                                 |
+| `AuthProvider`       | `useAuth()`      | Wraps BetterAuth (passkey + magic link, served via Worker at `/api/auth`). Sits at router level, outside the app provider tree. Exposes `isAuthenticated`, `user`, `signOut`.                                                                                                                                                          |
+| `ConfigSyncProvider` | —                | Mounted inside `AppDataProvider`. Pulls non-clinical config from D1 on login and debounce-pushes on change via slice mutators. No mutators of its own. **Zero `/api/config/*` requests for demo/test-user/unauthenticated sessions** (isolation gate). See [Cross-device config sync](#cross-device-config-sync-d1).                   |
+| `OrgConfigProvider`  | `useOrgConfig()` | Read-only org policy + shared template/exercise library (`policy`, `sharedTemplates`, `sharedExercises`, `canManage`, `updateOrgConfig`). Loads only when `currentUser.orgId` is set; demo/no-org isolated. Shared library is never written into AppData.                                                                              |
 
 ## Session flow hooks
 
 `Session.tsx` drives the visit through one orchestrator hook, `useSessionMachine`, which owns the session reducer (`sessionMachineReducer`) and composes the phase hooks below, re-exposing their handlers to the page:
 
-| Hook                     | Owns                                                                                                                                                              |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useSessionMachine`      | Top-level orchestrator. Reducer-backed session state; composes the phase hooks and surfaces their handlers/flags to `Session.tsx`.                                 |
-| `useCapturePhase`        | Recording + upload lifecycle: `handleStartRecording`, `handleFinishedRecording`, `handleUploadAudio`. Wires `useRecorder` (WAL chunking, wake lock, VAD T1 segment recorder) to clip/session mutations. |
-| `useTranscriptSource`    | Transcript-tier resolution: `backgroundT2` (auto local-Whisper pass via `useBackgroundTranscription`), `runT3` (explicit Nova "Improve with AI", capped 1×/session), `revertToLocal`. |
-| `useGeneratePhase`       | AI note generation loop + `finalize`/`unfinalize` + section edits, wired to NoteToolbar/NotePanel.                                                                 |
-| `useActionGuard`         | Anti-double-tap **cooldown only** (`checkActionGuard`, `recordAction`). Lifetime per-session caps are not tracked here — they persist on the Session (`cloudTranscribeCount`, `generateCount`) so they survive reload/Revert/Unlock. |
+| Hook                  | Owns                                                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `useSessionMachine`   | Top-level orchestrator. Reducer-backed session state; composes the phase hooks and surfaces their handlers/flags to `Session.tsx`.                                                                                                   |
+| `useCapturePhase`     | Recording + upload lifecycle: `handleStartRecording`, `handleFinishedRecording`, `handleUploadAudio`. Wires `useRecorder` (WAL chunking, wake lock, VAD T1 segment recorder) to clip/session mutations.                              |
+| `useTranscriptSource` | Transcript-tier resolution: `backgroundT2` (auto local-Whisper pass via `useBackgroundTranscription`), `runT3` (explicit Nova "Improve with AI", capped 1×/session), `revertToLocal`.                                                |
+| `useGeneratePhase`    | AI note generation loop + `finalize`/`unfinalize` + section edits, wired to NoteToolbar/NotePanel.                                                                                                                                   |
+| `useActionGuard`      | Anti-double-tap **cooldown only** (`checkActionGuard`, `recordAction`). Lifetime per-session caps are not tracked here — they persist on the Session (`cloudTranscribeCount`, `generateCount`) so they survive reload/Revert/Unlock. |
 
 `AppDataProvider` owns persistence. Slice providers are thin wrappers that give domain-scoped mutators; they read from `appData` and delegate writes back up via `updateXSlice`.
 
@@ -131,12 +131,12 @@ Without this split, every consumer of a single global context would re-render on
 
 ## Storage key namespace
 
-| Store                       | Key / name                                      | Contents                                                            |
-| --------------------------- | ----------------------------------------------- | ------------------------------------------------------------------- |
-| `localStorage`              | `ptnotes.appData`                               | Full `AppData` JSON blob (≤ 5 MB)                                   |
-| `localStorage`              | `ptnotes.vault`                                 | Wrapped DEK + KDF params; tab-scoped key only                       |
-| IndexedDB (`ptnotes-audio`) | object store `recordings`, key = `clipId`       | Final consolidated audio Blob per clip (written on recorder stop)   |
-| IndexedDB (`ptnotes-audio`) | object store `recording_chunks`, key = `clipId` | Per-chunk write-ahead log during recording; cleared after clip save |
+| Store                       | Key / name                                      | Contents                                                                                                                                               |
+| --------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `localStorage`              | `ptnotes.appData`                               | Full `AppData` JSON blob (≤ 5 MB)                                                                                                                      |
+| `localStorage`              | `ptnotes.vault`                                 | Wrapped DEK + KDF params; tab-scoped key only                                                                                                          |
+| IndexedDB (`ptnotes-audio`) | object store `recordings`, key = `clipId`       | Final consolidated audio Blob per clip (written on recorder stop)                                                                                      |
+| IndexedDB (`ptnotes-audio`) | object store `recording_chunks`, key = `clipId` | Per-chunk write-ahead log during recording; cleared after clip save                                                                                    |
 | `localStorage`              | `ptscribe-config-sync:<userId>`                 | Per-user config-sync record `{ hash, localUpdatedAt, serverUpdatedAt }` — LWW version for D1 sync; **not** in `AppData`. Plaintext (no clinical data). |
 
 Defined in `src/lib/storageKeys.ts`.
@@ -182,7 +182,7 @@ The Worker source lives at `worker/index.ts`; secrets are managed via `wrangler 
 
 **Defense in depth (all server-side, in `worker/index.ts`):**
 
-- **Origin enforcement** — a *missing* `Origin` header is denied (browsers always send one on `fetch`, so no-Origin implies a script/curl).
+- **Origin enforcement** — a _missing_ `Origin` header is denied (browsers always send one on `fetch`, so no-Origin implies a script/curl).
 - **Obscurity gate** — `x-ptscribe-key` must equal `sha256(PTSCRIBE_GATE)`, compared in constant time. This is friction, not auth; the real protection is the rate limits below.
 - **Rate limits (KV `env.RATE_LIMIT`)** — pre-gate 20/min/IP, then 10/min and 300/day per IP, plus a 500/day global ceiling (`RATE_LIMIT_PRE_GATE_PER_MIN` / `_PER_MIN` / `_PER_DAY` / `_GLOBAL_PER_DAY`). KV read→increment→write is non-atomic by design (a small over-count at the boundary is acceptable).
 - **Model allowlists** — `ALLOWED_GENERATE_MODELS` and the transcription allowlist reject any model ID before it reaches a provider.
@@ -192,30 +192,30 @@ The Worker source lives at `worker/index.ts`; secrets are managed via `wrangler 
 
 ### What runs where (local-first map)
 
-What runs on-device vs. over the network determines what is *instant* vs. a *wait* — the single most important fact for pacing any new UI.
+What runs on-device vs. over the network determines what is _instant_ vs. a _wait_ — the single most important fact for pacing any new UI.
 
-| Capability | Where | Network? | UX character |
-|---|---|---|---|
-| Data read/write + encryption | Browser (Repository + vault) | No | Instant |
-| Audio recording, silence-trim, VAD | Browser (Web Audio + Silero ML VAD) | No | Instant / background |
-| **T2 local Whisper** (canonical transcript) | Browser Web Worker pool | No (model fetched once, then IDB-cached) | **Async wait** (seconds–minutes) |
-| PII scrub (NER) | Browser Web Worker | No | Short wait, on demand |
-| Audio playback | Browser (Blob from IndexedDB) | No | Instant |
-| T1 live preview | Worker → Cloudflare Whisper *(or browser Web Speech)* | Yes | Streams during recording |
-| T3 Nova ("Improve with AI") | Worker → Deepgram | Yes | Async wait, **capped 1×/session** |
-| Note generation | Worker → Anthropic | Yes | Async wait, atomic result |
+| Capability                                  | Where                                                 | Network?                                 | UX character                      |
+| ------------------------------------------- | ----------------------------------------------------- | ---------------------------------------- | --------------------------------- |
+| Data read/write + encryption                | Browser (Repository + vault)                          | No                                       | Instant                           |
+| Audio recording, silence-trim, VAD          | Browser (Web Audio + Silero ML VAD)                   | No                                       | Instant / background              |
+| **T2 local Whisper** (canonical transcript) | Browser Web Worker pool                               | No (model fetched once, then IDB-cached) | **Async wait** (seconds–minutes)  |
+| PII scrub (NER)                             | Browser Web Worker                                    | No                                       | Short wait, on demand             |
+| Audio playback                              | Browser (Blob from IndexedDB)                         | No                                       | Instant                           |
+| T1 live preview                             | Worker → Cloudflare Whisper _(or browser Web Speech)_ | Yes                                      | Streams during recording          |
+| T3 Nova ("Improve with AI")                 | Worker → Deepgram                                     | Yes                                      | Async wait, **capped 1×/session** |
+| Note generation                             | Worker → Anthropic                                    | Yes                                      | Async wait, atomic result         |
 
 The app is usable **fully offline** except the three explicitly-networked actions (T1 live, T3 Nova, note generation). Design loading/empty states around the two real waits — the **T2 auto-pass** (between Capture and Curate) and **Generate** — not around generic "fetching data" spinners.
 
 ### AI model catalog
 
-| Model | Provider | Where it runs | Purpose |
-|---|---|---|---|
-| `@cf/deepgram/nova-3` | Cloudflare Workers AI | Cloudflare edge | Cloud transcription with speaker diarization (default; Whisper variants `@cf/openai/whisper`, `@cf/openai/whisper-large-v3-turbo` also allowlisted) |
-| `Xenova/whisper-tiny.en` | HuggingFace / Transformers.js | Browser Web Worker | Local (on-device) transcription (~40 MB ONNX; default `model.onnx`, no `dtype` needed) |
-| `Xenova/bert-base-NER` (INT8) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing, default (`dtype: 'q8'` → `onnx/model_quantized.onnx`, ~90 MB) |
-| `openai/privacy-filter` (Q4) | HuggingFace / Transformers.js | Browser Web Worker | On-device PII scrubbing, backup via `settings.session.piiModel` (`dtype: 'q4'`, ~875 MB; practical only after IDB cache) |
-| `claude-sonnet-4-6` | Anthropic | Cloudflare Worker proxy | Structured note generation |
+| Model                         | Provider                      | Where it runs           | Purpose                                                                                                                                             |
+| ----------------------------- | ----------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@cf/deepgram/nova-3`         | Cloudflare Workers AI         | Cloudflare edge         | Cloud transcription with speaker diarization (default; Whisper variants `@cf/openai/whisper`, `@cf/openai/whisper-large-v3-turbo` also allowlisted) |
+| `Xenova/whisper-tiny.en`      | HuggingFace / Transformers.js | Browser Web Worker      | Local (on-device) transcription (~40 MB ONNX; default `model.onnx`, no `dtype` needed)                                                              |
+| `Xenova/bert-base-NER` (INT8) | HuggingFace / Transformers.js | Browser Web Worker      | On-device PII scrubbing, default (`dtype: 'q8'` → `onnx/model_quantized.onnx`, ~90 MB)                                                              |
+| `openai/privacy-filter` (Q4)  | HuggingFace / Transformers.js | Browser Web Worker      | On-device PII scrubbing, backup via `settings.session.piiModel` (`dtype: 'q4'`, ~875 MB; practical only after IDB cache)                            |
+| `claude-sonnet-4-6`           | Anthropic                     | Cloudflare Worker proxy | Structured note generation                                                                                                                          |
 
 **Model file delivery + caching** — browser worker fetch interceptor checks IndexedDB (`ptscribe-model-cache`) first; on miss it requests `/api/model/{org}/{model}/resolve/main/{file}`. The Worker (`handleModelFile`) serves from the R2 bucket `ptnotes-models` if present, else proxies from HuggingFace and writes back to R2 (fire-and-forget). R2 keys mirror the HuggingFace URL path so the interceptor can derive them directly. The app works without seeding (first user per file pays the HuggingFace cold-download); pre-seed with `npx tsx scripts/seed-r2-models.ts` (Whisper) and `python scripts/convert-privacy-filter.py` (privacy filter). Verify with `wrangler r2 object list ptnotes-models --prefix "<org>/<model>"`.
 
@@ -225,14 +225,14 @@ Registered (non-demo) users persist their **non-clinical** config to Cloudflare 
 
 What syncs:
 
-| Data | Source | Synced? | D1 table |
-| --- | --- | --- | --- |
-| `settings` subtree | AppData | ✅ | `user_config` |
-| `clinician` profile | AppData | ✅ | `user_config` |
-| custom (`builtin:false`) templates/exercises | AppData | ✅ | `user_config` |
-| built-in templates/exercises | regenerated locally | ❌ never sent | — |
-| `patients`/`sessions`/`notes`/`plans`, audio | AppData / IndexedDB | ❌ **never** | — |
-| org profile / policy / shared library | D1 | ✅ | `org_config` |
+| Data                                         | Source              | Synced?       | D1 table      |
+| -------------------------------------------- | ------------------- | ------------- | ------------- |
+| `settings` subtree                           | AppData             | ✅            | `user_config` |
+| `clinician` profile                          | AppData             | ✅            | `user_config` |
+| custom (`builtin:false`) templates/exercises | AppData             | ✅            | `user_config` |
+| built-in templates/exercises                 | regenerated locally | ❌ never sent | —             |
+| `patients`/`sessions`/`notes`/`plans`, audio | AppData / IndexedDB | ❌ **never**  | —             |
+| org profile / policy / shared library        | D1                  | ✅            | `org_config`  |
 
 Data flow (client side):
 

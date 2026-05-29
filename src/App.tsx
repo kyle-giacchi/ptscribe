@@ -60,82 +60,90 @@ function PageLoader() {
 function AppProviders() {
   return (
     <NotificationsProvider>
-    <VaultGate>
-      <AppDataProvider>
-        <ConfigSyncProvider>
-        <OrgConfigProvider>
-        <ClinicianProvider>
-          <PatientsProvider>
-            <SessionsProvider>
-              <NotesProvider>
-                <TemplatesProvider>
-                  <ExercisesProvider>
-                    <PlansProvider>
-                      <SettingsProvider>
-                        <DebugDrawerProvider>
-                        <DemoBootstrap>
-                          <FirstRunGuard>
-                            <Suspense fallback={<PageLoader />}>
-                                <Routes>
-                                  <Route path="/setup" element={<Setup />} />
-                                  <Route path="/setup-check" element={<CheckingRequirements />} />
-                                  <Route element={<AppShell />}>
-                                    <Route path="/today" element={<Dashboard />} />
-                                    <Route path="/patients" element={<Patients />} />
-                                    <Route path="/patients/:id" element={<PatientDetail />} />
-                                    <Route path="/sessions/new" element={<NewSession />} />
-                                    <Route path="/sessions/:id" element={<SessionPage />} />
-                                    <Route path="/notes" element={<Notes />} />
-                                    <Route path="/templates" element={<Templates />} />
-                                    <Route path="/exercises" element={<Exercises />} />
-                                    <Route path="/settings" element={<Settings />} />
-                                    <Route path="/account" element={<UserSettings />} />
-                                    <Route path="/org" element={<OrgSettings />} />
-                                  </Route>
-                                  <Route
-                                    path="*"
-                                    element={
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          height: '100%',
-                                          gap: 12,
-                                          color: 'var(--color-fg)',
-                                          fontSize: 15,
-                                        }}
-                                      >
-                                        <span style={{ fontSize: 32, lineHeight: 1 }}>404</span>
-                                        <span>Page not found</span>
-                                        <Link
-                                          to="/today"
-                                          style={{ color: 'var(--color-accent)', fontSize: 14 }}
-                                        >
-                                          Go to dashboard
-                                        </Link>
-                                      </div>
-                                    }
-                                  />
-                                </Routes>
-                            </Suspense>
-                          </FirstRunGuard>
-                        </DemoBootstrap>
-                        <GlobalDebugDrawer />
-                        </DebugDrawerProvider>
-                      </SettingsProvider>
-                    </PlansProvider>
-                  </ExercisesProvider>
-                </TemplatesProvider>
-              </NotesProvider>
-            </SessionsProvider>
-          </PatientsProvider>
-        </ClinicianProvider>
-        </OrgConfigProvider>
-        </ConfigSyncProvider>
-      </AppDataProvider>
-    </VaultGate>
+      <VaultGate>
+        <AppDataProvider>
+          <ConfigSyncProvider>
+            <OrgConfigProvider>
+              <ClinicianProvider>
+                <PatientsProvider>
+                  <SessionsProvider>
+                    <NotesProvider>
+                      <TemplatesProvider>
+                        <ExercisesProvider>
+                          <PlansProvider>
+                            <SettingsProvider>
+                              <DebugDrawerProvider>
+                                <DemoBootstrap>
+                                  <FirstRunGuard>
+                                    <Suspense fallback={<PageLoader />}>
+                                      <Routes>
+                                        <Route path="/setup" element={<Setup />} />
+                                        <Route
+                                          path="/setup-check"
+                                          element={<CheckingRequirements />}
+                                        />
+                                        <Route element={<AppShell />}>
+                                          <Route path="/today" element={<Dashboard />} />
+                                          <Route path="/patients" element={<Patients />} />
+                                          <Route path="/patients/:id" element={<PatientDetail />} />
+                                          <Route path="/sessions/new" element={<NewSession />} />
+                                          <Route path="/sessions/:id" element={<SessionPage />} />
+                                          <Route path="/notes" element={<Notes />} />
+                                          <Route path="/templates" element={<Templates />} />
+                                          <Route path="/exercises" element={<Exercises />} />
+                                          <Route path="/settings" element={<Settings />} />
+                                          <Route path="/account" element={<UserSettings />} />
+                                          <Route path="/org" element={<OrgSettings />} />
+                                        </Route>
+                                        <Route
+                                          path="*"
+                                          element={
+                                            <div
+                                              style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                height: '100%',
+                                                gap: 12,
+                                                color: 'var(--color-fg)',
+                                                fontSize: 15,
+                                              }}
+                                            >
+                                              <span style={{ fontSize: 32, lineHeight: 1 }}>
+                                                404
+                                              </span>
+                                              <span>Page not found</span>
+                                              <Link
+                                                to="/today"
+                                                style={{
+                                                  color: 'var(--color-accent)',
+                                                  fontSize: 14,
+                                                }}
+                                              >
+                                                Go to dashboard
+                                              </Link>
+                                            </div>
+                                          }
+                                        />
+                                      </Routes>
+                                    </Suspense>
+                                  </FirstRunGuard>
+                                </DemoBootstrap>
+                                <GlobalDebugDrawer />
+                              </DebugDrawerProvider>
+                            </SettingsProvider>
+                          </PlansProvider>
+                        </ExercisesProvider>
+                      </TemplatesProvider>
+                    </NotesProvider>
+                  </SessionsProvider>
+                </PatientsProvider>
+              </ClinicianProvider>
+            </OrgConfigProvider>
+          </ConfigSyncProvider>
+        </AppDataProvider>
+      </VaultGate>
     </NotificationsProvider>
   );
 }

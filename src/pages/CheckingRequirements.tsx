@@ -86,7 +86,8 @@ async function detectBrowser(): Promise<BrowserInfo> {
   let m: RegExpMatchArray | null;
   if ((m = ua.match(/Edg\/(\d+)/))) return { name: 'Edge', version: m[1], family: 'chromium' };
   if ((m = ua.match(/OPR\/(\d+)/))) return { name: 'Opera', version: m[1], family: 'chromium' };
-  if ((m = ua.match(/Firefox\/(\d+)/))) return { name: 'Firefox', version: m[1], family: 'firefox' };
+  if ((m = ua.match(/Firefox\/(\d+)/)))
+    return { name: 'Firefox', version: m[1], family: 'firefox' };
   if ((m = ua.match(/Chrome\/(\d+)/))) return { name: 'Chrome', version: m[1], family: 'chromium' };
   // Safari keeps its real version in `Version/x`; the `Safari/` token is the
   // WebKit build number (e.g. 605), not the Safari release.
@@ -194,7 +195,10 @@ function CheckRow({ id, result, last }: { id: CheckId; result: CheckResult; last
       }}
     >
       <span
-        style={{ color: pending ? 'var(--color-pt-text-3)' : 'var(--color-pt-text-2)', display: 'flex' }}
+        style={{
+          color: pending ? 'var(--color-pt-text-3)' : 'var(--color-pt-text-2)',
+          display: 'flex',
+        }}
         aria-hidden
       >
         {META[id].icon}
@@ -367,8 +371,7 @@ export function CheckingRequirements() {
     [navigate, updateFirstRun],
   );
 
-  const continueTarget =
-    params.get('return') ?? (demo ? `/sessions/${DEMO_SESSION_ID}` : '/today');
+  const continueTarget = params.get('return') ?? (demo ? `/sessions/${DEMO_SESSION_ID}` : '/today');
 
   // Gentle auto-advance once everything is green (unless the user hovers Cancel).
   useEffect(() => {
@@ -405,7 +408,9 @@ export function CheckingRequirements() {
         >
           P
         </div>
-        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-pt-text)' }}>PTScribe</span>
+        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-pt-text)' }}>
+          PTScribe
+        </span>
       </header>
 
       <div
@@ -432,20 +437,15 @@ export function CheckingRequirements() {
               lineHeight: 1.5,
             }}
           >
-            A one-time check before you record — confirms audio capture &amp; on-device transcription
-            will work.
+            A one-time check before you record — confirms audio capture &amp; on-device
+            transcription will work.
           </p>
         </div>
 
         <SurfaceCard padding={0} style={{ width: 560, maxWidth: '100%' }}>
           <ul aria-label="Setup checks" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {CHECK_ORDER.map((id, i) => (
-              <CheckRow
-                key={id}
-                id={id}
-                result={state[id]}
-                last={i === CHECK_ORDER.length - 1}
-              />
+              <CheckRow key={id} id={id} result={state[id]} last={i === CHECK_ORDER.length - 1} />
             ))}
           </ul>
         </SurfaceCard>

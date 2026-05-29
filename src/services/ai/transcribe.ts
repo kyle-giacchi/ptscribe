@@ -28,9 +28,8 @@ const backends: Record<TranscriptionProvider, Backend> = {
     return { text: out.text, source: 'whisper' };
   },
   local: async (args) => {
-    const { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } = await import(
-      './client/localWhisper'
-    );
+    const { transcribeLocally, LOCAL_WHISPER_DEFAULT_MODEL } =
+      await import('./client/localWhisper');
     return transcribeLocally(args.blob, args.model || LOCAL_WHISPER_DEFAULT_MODEL, args.onProgress);
   },
   webspeech: () => {

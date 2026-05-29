@@ -58,9 +58,15 @@ function makeSession(overrides: Partial<Session> = {}): Session {
   };
 }
 
-const template = { id: 'tpl-1', format: 'soap', sections: [{ key: 'subjective', label: 'Subjective' }] } as unknown as NoteTemplate;
+const template = {
+  id: 'tpl-1',
+  format: 'soap',
+  sections: [{ key: 'subjective', label: 'Subjective' }],
+} as unknown as NoteTemplate;
 const patient = { id: 'pat-1', firstName: 'A', lastName: 'B' } as unknown as Patient;
-const settings = { ai: { generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' } } } as unknown as Settings;
+const settings = {
+  ai: { generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' } },
+} as unknown as Settings;
 
 const allowGuard: UseGeneratePhaseParams['checkActionGuard'] = () => ({ allowed: true });
 

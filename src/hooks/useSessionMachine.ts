@@ -265,11 +265,22 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     }),
     // Handlers are stable closures over refs — only re-memo when UI-visible values change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [capturePhase.backgroundWarningDismissed, capturePhase.whisperBubbles, capturePhase.uploadStatus],
+    [
+      capturePhase.backgroundWarningDismissed,
+      capturePhase.whisperBubbles,
+      capturePhase.uploadStatus,
+    ],
   );
 
   return useMemo(
-    () => ({ state, generate, transcribe: transcribeApi, capture, actionGuard, backgroundT2: transcriptSource.backgroundT2 }),
+    () => ({
+      state,
+      generate,
+      transcribe: transcribeApi,
+      capture,
+      actionGuard,
+      backgroundT2: transcriptSource.backgroundT2,
+    }),
     [state, generate, transcribeApi, capture, actionGuard, transcriptSource.backgroundT2],
   );
 }

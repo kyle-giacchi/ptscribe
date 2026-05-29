@@ -11,10 +11,10 @@ KEK, the key is evicted on tab close, and CONTEXT.md/invariants.md state plainly
 is no passphrase recovery." This makes every forgotten passphrase a permanent loss of all
 clinical data. Separately, the existing encrypted backup (`BackupService` v1) is **not
 portable across devices**: `exportBackup` encrypts under the source device's random DEK and
-`importBackup` decrypts with the *currently unlocked* vault's DEK, so a restore only succeeds
+`importBackup` decrypts with the _currently unlocked_ vault's DEK, so a restore only succeeds
 on the same vault — a fresh device has a different DEK and fails with "wrong passphrase" even
 when the passphrase is correct. The v1 file comment ("useless without the passphrase") is
-misleading; it is useless without the same *key*.
+misleading; it is useless without the same _key_.
 
 ## Decision
 
@@ -29,7 +29,7 @@ both entirely client-side. No server, no cloud storage of clinical data — the
   second wrapped-DEK envelope locally. Because it wraps the DEK (not the passphrase), the
   recovery code survives passphrase changes.
 - **Portable backup (v2 envelope)** — `{ ciphertext, wrappedDek_passphrase,
-  wrappedDek_recoveryCode, salts, ivs }`. AppData is encrypted under the DEK; the DEK is
+wrappedDek_recoveryCode, salts, ivs }`. AppData is encrypted under the DEK; the DEK is
   wrapped by both the passphrase-KEK and the recovery-KEK. Restore on **any** device by
   entering **either the passphrase or the recovery code** → derive KEK → unwrap DEK →
   decrypt. v1 (same-device) files remain importable for backwards compatibility. Audio
@@ -40,7 +40,7 @@ both entirely client-side. No server, no cloud storage of clinical data — the
 - **Cloud backup on Cloudflare (zero-knowledge or otherwise)** — rejected. Even E2E-encrypted,
   holding PHI ciphertext server-side breaks the "never leaves the device" hard rule + landing/
   CompareModal/architecture-narrative promise, and likely triggers HIPAA Business-Associate /
-  BAA obligations. Explicitly chosen *against* in favour of client-side file portability.
+  BAA obligations. Explicitly chosen _against_ in favour of client-side file portability.
 - **Backup encrypted under a separate export password** — rejected; recovery would be only as
   fresh as the last export and adds a second daily-unrelated secret without the in-place
   same-device recovery the code path gives.

@@ -25,11 +25,17 @@ export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
     let cancelled = false;
 
     const load = async () => {
-      if (!containerRef.current) { setLoading(false); return; }
+      if (!containerRef.current) {
+        setLoading(false);
+        return;
+      }
       try {
         const blob = await audioRepository.load(audioKey);
         if (cancelled) return;
-        if (!blob || !containerRef.current) { setLoading(false); return; }
+        if (!blob || !containerRef.current) {
+          setLoading(false);
+          return;
+        }
 
         const blobUrl = URL.createObjectURL(blob);
         blobUrlRef.current = blobUrl;
@@ -50,19 +56,39 @@ export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
         wsRef.current = ws;
 
         ws.on('ready', () => {
-          if (!cancelled) { setReady(true); setLoading(false); setDuration(ws.getDuration()); }
+          if (!cancelled) {
+            setReady(true);
+            setLoading(false);
+            setDuration(ws.getDuration());
+          }
         });
-        ws.on('audioprocess', () => { if (!cancelled) setCurrent(ws.getCurrentTime()); });
-        ws.on('seeking', () => { if (!cancelled) setCurrent(ws.getCurrentTime()); });
-        ws.on('play', () => { if (!cancelled) setPlaying(true); });
-        ws.on('pause', () => { if (!cancelled) setPlaying(false); });
-        ws.on('finish', () => { if (!cancelled) setPlaying(false); });
+        ws.on('audioprocess', () => {
+          if (!cancelled) setCurrent(ws.getCurrentTime());
+        });
+        ws.on('seeking', () => {
+          if (!cancelled) setCurrent(ws.getCurrentTime());
+        });
+        ws.on('play', () => {
+          if (!cancelled) setPlaying(true);
+        });
+        ws.on('pause', () => {
+          if (!cancelled) setPlaying(false);
+        });
+        ws.on('finish', () => {
+          if (!cancelled) setPlaying(false);
+        });
 
         ws.load(blobUrl).catch((e: Error) => {
-          if (!cancelled) { setLoading(false); setError(e.message || 'Failed to load audio'); }
+          if (!cancelled) {
+            setLoading(false);
+            setError(e.message || 'Failed to load audio');
+          }
         });
       } catch (e) {
-        if (!cancelled) { setLoading(false); setError((e as Error).message || 'Failed to load audio'); }
+        if (!cancelled) {
+          setLoading(false);
+          setError((e as Error).message || 'Failed to load audio');
+        }
       }
     };
 
@@ -104,7 +130,7 @@ export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
         </button>
         <div
           ref={containerRef}
-          className="min-h-[56px] sm:min-h-20 flex-1 overflow-hidden rounded-md"
+          className="min-h-[56px] flex-1 overflow-hidden rounded-md sm:min-h-20"
         />
         {ready && (
           <span

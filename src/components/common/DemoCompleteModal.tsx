@@ -20,7 +20,11 @@ export function DemoCompleteModal({ open, onClose }: DemoCompleteModalProps) {
   async function handleStartFresh() {
     setResetting(true);
     try {
-      try { await audioRepository.clear(); } catch { /* ignore audio errors */ }
+      try {
+        await audioRepository.clear();
+      } catch {
+        /* ignore audio errors */
+      }
       dataRepository.clearCorruptData();
       localStorage.removeItem(STORAGE_KEYS.pageModes);
       await dataRepository.save(defaultAppData());
@@ -48,11 +52,19 @@ export function DemoCompleteModal({ open, onClose }: DemoCompleteModalProps) {
           <CheckCircle2 size={24} strokeWidth={2} style={{ color: 'var(--color-positive)' }} />
         </div>
         <div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-pt-text)', marginBottom: 6 }}>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: 'var(--color-pt-text)',
+              marginBottom: 6,
+            }}
+          >
             Session complete!
           </h3>
           <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.6 }}>
-            The demo patient has been discharged. Start fresh to reset the demo and try again from the beginning.
+            The demo patient has been discharged. Start fresh to reset the demo and try again from
+            the beginning.
           </p>
         </div>
       </div>

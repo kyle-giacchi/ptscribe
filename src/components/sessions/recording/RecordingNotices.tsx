@@ -28,16 +28,16 @@ export function RecordingSizeHint({
   if (overCap) {
     return (
       <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="negative">
-        Estimated ~{estimatedMb.toFixed(1)} MB — past the 25 MB Whisper upload limit. Stop and
-        start a new clip.
+        Estimated ~{estimatedMb.toFixed(1)} MB — past the 25 MB Whisper upload limit. Stop and start
+        a new clip.
       </StatusBanner>
     );
   }
   if (approachingCap) {
     return (
       <StatusBanner icon={<Info className="h-3.5 w-3.5" />} color="info">
-        Estimated ~{estimatedMb.toFixed(1)} MB of 25 MB. Consider stopping &amp; starting a new
-        clip soon.
+        Estimated ~{estimatedMb.toFixed(1)} MB of 25 MB. Consider stopping &amp; starting a new clip
+        soon.
       </StatusBanner>
     );
   }

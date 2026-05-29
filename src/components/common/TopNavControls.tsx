@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Bell, Lock, Unlock, RotateCcw, Terminal, AlertCircle, AlertTriangle, SlidersHorizontal, HardDrive, LogOut } from 'lucide-react';
+import {
+  Bell,
+  Lock,
+  Unlock,
+  RotateCcw,
+  Terminal,
+  AlertCircle,
+  AlertTriangle,
+  SlidersHorizontal,
+  HardDrive,
+  LogOut,
+} from 'lucide-react';
 import { useStorageEstimate } from '@/hooks/useStorageEstimate';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { vault } from '@/lib/vault/vault';
@@ -22,7 +33,8 @@ function useVaultState(): { initialized: boolean; unlocked: boolean } {
   useEffect(() => {
     const refresh = () =>
       setState({ initialized: vault.isInitialized(), unlocked: vault.isUnlocked() });
-    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ptnotes-vault') : null;
+    const bc =
+      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ptnotes-vault') : null;
     if (bc) bc.onmessage = refresh;
     window.addEventListener('focus', refresh);
     document.addEventListener('visibilitychange', refresh);
@@ -45,7 +57,11 @@ export function VaultPill() {
   const label = unlocked ? 'Unlocked' : 'Locked';
   const tone = unlocked
     ? { fg: '#0a6d70', bg: '#e6f7f6', border: '#9fdcdc' }
-    : { fg: 'var(--color-pt-text-2)', bg: 'var(--color-pt-surface-mut)', border: 'var(--color-pt-border)' };
+    : {
+        fg: 'var(--color-pt-text-2)',
+        bg: 'var(--color-pt-surface-mut)',
+        border: 'var(--color-pt-border)',
+      };
   return (
     <span
       title={`Vault is ${label.toLowerCase()}`}
@@ -93,14 +109,20 @@ export function AlertsButton() {
         type="button"
         aria-label={`Warnings and errors${hasUnread ? ` — ${unreadCount} unread` : storageWarning ? ' — storage low' : ''}`}
         onClick={() => setOpen((o) => !o)}
-        className="relative flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
+        className="relative flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
         style={{
           width: 44,
           height: 44,
           borderRadius: 8,
           border: `1px solid ${open || showBadge ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
           background: open ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
-          color: hasUnread ? '#dc2626' : storageWarning ? '#d97706' : open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+          color: hasUnread
+            ? '#dc2626'
+            : storageWarning
+              ? '#d97706'
+              : open
+                ? 'var(--color-pt-accent-fg)'
+                : 'var(--color-pt-text-2)',
           cursor: 'pointer',
         }}
       >
@@ -182,7 +204,15 @@ export function AlertsButton() {
               No warnings or errors
             </div>
           ) : (
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none', maxHeight: 320, overflowY: 'auto' }}>
+            <ul
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: 'none',
+                maxHeight: 320,
+                overflowY: 'auto',
+              }}
+            >
               {storageWarning && (
                 <li
                   style={{
@@ -198,10 +228,25 @@ export function AlertsButton() {
                     <HardDrive size={13} strokeWidth={2} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)', lineHeight: 1.45 }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--color-pt-text)',
+                        lineHeight: 1.45,
+                      }}
+                    >
                       Local models unavailable
                     </p>
-                    <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--color-pt-text-2)', lineHeight: 1.4 }}>
+                    <p
+                      style={{
+                        margin: '2px 0 0',
+                        fontSize: 11.5,
+                        color: 'var(--color-pt-text-2)',
+                        lineHeight: 1.4,
+                      }}
+                    >
                       {available !== null
                         ? `${(available / (1024 * 1024)).toFixed(0)} MB free — on-device transcription and PII scrubbing need ~150 MB.`
                         : 'Storage is too low for on-device transcription and PII scrubbing (~150 MB required).'}
@@ -216,7 +261,8 @@ export function AlertsButton() {
                     display: 'flex',
                     gap: 8,
                     padding: '9px 14px',
-                    borderBottom: i < notifications.length - 1 ? '1px solid var(--color-pt-border)' : 'none',
+                    borderBottom:
+                      i < notifications.length - 1 ? '1px solid var(--color-pt-border)' : 'none',
                     alignItems: 'flex-start',
                   }}
                 >
@@ -234,10 +280,24 @@ export function AlertsButton() {
                     )}
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--color-pt-text)', lineHeight: 1.45 }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: 'var(--color-pt-text)',
+                        lineHeight: 1.45,
+                      }}
+                    >
                       {n.message}
                     </p>
-                    <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)', marginTop: 2, display: 'block' }}>
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        color: 'var(--color-pt-text-3)',
+                        marginTop: 2,
+                        display: 'block',
+                      }}
+                    >
                       {relativeFromNow(n.timestamp)}
                     </span>
                   </div>
@@ -276,7 +336,7 @@ export function ProfileButton() {
         type="button"
         aria-label="User profile"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)] min-w-[44px] min-h-[44px]"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center transition-colors hover:bg-[var(--color-pt-surface-mut)]"
         style={{
           width: 44,
           height: 44,
@@ -347,7 +407,10 @@ export function ProfileButton() {
               <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
               <button
                 type="button"
-                onClick={() => { setOpen(false); onResetSession(); }}
+                onClick={() => {
+                  setOpen(false);
+                  onResetSession();
+                }}
                 className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
                 style={{
                   padding: '7px 12px',
@@ -368,7 +431,10 @@ export function ProfileButton() {
           {DEBUG_TOOLS_ENABLED && (
             <button
               type="button"
-              onClick={() => { setOpen(false); openDebug(); }}
+              onClick={() => {
+                setOpen(false);
+                openDebug();
+              }}
               className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
               style={{
                 padding: '7px 12px',
@@ -388,7 +454,11 @@ export function ProfileButton() {
           <div style={{ height: 1, background: 'var(--color-pt-border)', margin: '2px 0' }} />
           <button
             type="button"
-            onClick={() => { setOpen(false); deactivateTestUserSession(); logout(); }}
+            onClick={() => {
+              setOpen(false);
+              deactivateTestUserSession();
+              logout();
+            }}
             className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
             style={{
               padding: '7px 12px',
@@ -409,4 +479,3 @@ export function ProfileButton() {
     </div>
   );
 }
-

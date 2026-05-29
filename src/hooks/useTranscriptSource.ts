@@ -68,8 +68,8 @@ export function useTranscriptSource({
     if (phase === 'transcribing' || phase === 'retrying') dispatch({ type: 't2/start' });
     else if (phase === 'done') dispatch({ type: 't2/done' });
     else if (phase === 'error') dispatch({ type: 't2/error' });
-  // backgroundT2 object is recreated each render; depend only on phase.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // backgroundT2 object is recreated each render; depend only on phase.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundT2.phase, dispatch]);
 
   const runT3 = useCallback(

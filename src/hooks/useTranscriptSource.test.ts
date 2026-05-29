@@ -51,14 +51,19 @@ describe('runT3 session-backed cap', () => {
     const { transcribe } = await import('@/services/ai/transcribe');
     const params = makeParams({
       session: {
-        id: 's1', type: 'evaluation', clips: [], status: 'draft',
+        id: 's1',
+        type: 'evaluation',
+        clips: [],
+        status: 'draft',
         cloudTranscribeCount: MAX_TRANSCRIBES_PER_SESSION,
       } as never,
     });
     const { result } = renderHook(() => useTranscriptSource(params));
     await result.current.runT3();
     expect(transcribe).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith('Cloud transcription was already used for this session.');
+    expect(toast.error).toHaveBeenCalledWith(
+      'Cloud transcription was already used for this session.',
+    );
   });
 
   it('increments cloudTranscribeCount on a successful Nova pass', async () => {
@@ -67,7 +72,11 @@ describe('runT3 session-backed cap', () => {
     (transcribe as Mock).mockResolvedValue({ text: 'final transcript' });
     const params = makeParams({
       session: {
-        id: 's1', type: 'evaluation', clips: [], status: 'draft', cloudTranscribeCount: 0,
+        id: 's1',
+        type: 'evaluation',
+        clips: [],
+        status: 'draft',
+        cloudTranscribeCount: 0,
       } as never,
     });
     const { result } = renderHook(() => useTranscriptSource(params));

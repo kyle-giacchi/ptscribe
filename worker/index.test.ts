@@ -76,8 +76,7 @@ function makeEnv(overrides: EnvOverrides = {}): Env {
   const env = {
     AI: overrides.AI ?? { run: vi.fn() },
     ASSETS: { fetch: vi.fn(async () => new Response('asset', { status: 200 })) },
-    ANTHROPIC_API_KEY:
-      'ANTHROPIC_API_KEY' in overrides ? overrides.ANTHROPIC_API_KEY : 'sk-test',
+    ANTHROPIC_API_KEY: 'ANTHROPIC_API_KEY' in overrides ? overrides.ANTHROPIC_API_KEY : 'sk-test',
     PTSCRIBE_GATE: 'PTSCRIBE_GATE' in overrides ? overrides.PTSCRIBE_GATE : GATE,
     AUTH_SECRET: 'auth-secret',
     DB: {} as unknown,
@@ -113,10 +112,7 @@ async function body(res: Response): Promise<{ code?: string; error?: string; tex
   return JSON.parse(await res.text());
 }
 
-function req(
-  path: string,
-  init: RequestInit & { headers?: Record<string, string> } = {},
-): Request {
+function req(path: string, init: RequestInit & { headers?: Record<string, string> } = {}): Request {
   return new Request(`${ORIGIN}${path}`, init);
 }
 
@@ -303,7 +299,10 @@ describe('Transcribe model allowlist + size caps', () => {
     const res = await worker.fetch(
       req('/api/transcribe', {
         method: 'POST',
-        headers: await gateHeaders({ 'x-ptscribe-model': 'evil/model', 'Content-Type': 'audio/webm' }),
+        headers: await gateHeaders({
+          'x-ptscribe-model': 'evil/model',
+          'Content-Type': 'audio/webm',
+        }),
         body: new Uint8Array([1]),
       }),
       makeEnv(),
@@ -419,8 +418,11 @@ describe('Generate validation', () => {
   });
 
   it('happy path → 200 {text}; system block carries cache_control by default', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ content: [{ type: 'text', text: 'note' }] }), { status: 200 }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ content: [{ type: 'text', text: 'note' }] }), {
+          status: 200,
+        }),
     );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -485,8 +487,12 @@ describe('Model proxy SSRF guards (GET /api/model/*)', () => {
   });
 
   it('R2 miss → HF fallback over 200 MiB → 404', async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response('x', { status: 200, headers: { 'Content-Length': String(200 * 1024 * 1024 + 1) } }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('x', {
+          status: 200,
+          headers: { 'Content-Length': String(200 * 1024 * 1024 + 1) },
+        }),
     );
     vi.stubGlobal('fetch', fetchMock);
     const env = makeEnv({ MODELS: { get: vi.fn(async () => null), put: vi.fn() } });

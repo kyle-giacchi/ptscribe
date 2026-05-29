@@ -11,7 +11,15 @@
 // DEMO ISOLATION (hard invariant): demo / test-user / unauthenticated / no-org
 // sessions make ZERO /api/config/org requests. The gate is the single guard.
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isDemoMode } from '@/lib/demoMode';
 import { DEMO_USER } from '@/lib/auth/demo';

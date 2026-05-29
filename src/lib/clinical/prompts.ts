@@ -53,7 +53,8 @@ const CLINICAL_DETAIL_INSTRUCTIONS: Record<ModifierClinicalDetail, string> = {
   pertinent_negatives: 'Include pertinent negatives ("Denies…") for each system reviewed.',
   include_ros: 'Include a Review of Systems (ROS) section in the note.',
   quote_verbatim: 'Preserve key patient phrases verbatim in the HPI, in quotation marks.',
-  differential_diagnosis: 'Append a differential diagnosis list for any new or unresolved problems.',
+  differential_diagnosis:
+    'Append a differential diagnosis list for any new or unresolved problems.',
   risk_scores:
     'Calculate and include relevant risk scores (e.g., ASCVD, CHA₂DS₂-VASc) when the transcript supplies sufficient data.',
 };

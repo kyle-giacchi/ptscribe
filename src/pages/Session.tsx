@@ -172,8 +172,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const handleRevertToLocal = sessionMachine.transcribe.revertToLocal;
   const clearTranscribeAiError = sessionMachine.transcribe.clearAiError;
   const { setMergedAudioBlob, setIsMerging } = sessionMachine.transcribe;
-  const { aiError: transcribeAiError, retryStatus: transcribeRetryStatus, debugStats } =
-    sessionMachine.state.transcribe;
+  const {
+    aiError: transcribeAiError,
+    retryStatus: transcribeRetryStatus,
+    debugStats,
+  } = sessionMachine.state.transcribe;
   const { generateUsed } = sessionMachine.actionGuard;
   const {
     backgroundWarningDismissed,
@@ -245,8 +248,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const handleFinalize = sessionMachine.generate.finalize;
   const handleUnfinalize = sessionMachine.generate.unfinalize;
   const { missingRequiredLabels } = sessionMachine.generate;
-  const { lastRawPayload, lastAiPrompts, lastKeyReport, aiError: generationAiError, retryStatus: generationRetryStatus } =
-    sessionMachine.state.generate;
+  const {
+    lastRawPayload,
+    lastAiPrompts,
+    lastKeyReport,
+    aiError: generationAiError,
+    retryStatus: generationRetryStatus,
+  } = sessionMachine.state.generate;
   const clearGenerationAiError = sessionMachine.generate.clearAiError;
 
   // ── Register this session with the app-global Debug drawer ──────────────
@@ -270,7 +278,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
       lastKeyReport,
       lastPiiScrub: piiScrub,
     });
-  }, [debugStats, speedFactor, lastRawPayload, lastAiPrompts, lastKeyReport, piiScrub, setSessionDebug]);
+  }, [
+    debugStats,
+    speedFactor,
+    lastRawPayload,
+    lastAiPrompts,
+    lastKeyReport,
+    piiScrub,
+    setSessionDebug,
+  ]);
 
   // ── PHI confirmation gate before generation ─────────────────────────────
   // Always shown (regardless of PII filter state) unless user has dismissed it
@@ -440,7 +456,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     settings.ai.generation.provider === 'anthropic' &&
     generateUsed < MAX_GENERATES_PER_SESSION;
 
-  const emptyModifiers = { clinicalDetail: [], codingBilling: [], beyondNote: [], customInstructions: [] };
+  const emptyModifiers = {
+    clinicalDetail: [],
+    codingBilling: [],
+    beyondNote: [],
+    customInstructions: [],
+  };
   const currentModifiers = session.modifiers ?? emptyModifiers;
 
   // Compare the live generation inputs against the snapshot the note was generated
@@ -462,7 +483,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     patchSession({ modifiers: next });
   }
 
-  const isTranscriptLocked = sortedClips.length === 0 && !effectiveTranscript.trim() && !recordingSkipped;
+  const isTranscriptLocked =
+    sortedClips.length === 0 && !effectiveTranscript.trim() && !recordingSkipped;
   const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
 
   const hasT2Transcript = !!session.t2Transcript;
@@ -525,407 +547,470 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   return (
     <SessionResetContext.Provider value={{ onResetSession: () => setResetModalOpen(true) }}>
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-
-      {/* ── Error banner ──────────────────────────────────── */}
-      {error && (
-        <div style={{ padding: '12px 22px 0' }}>
-          <ErrorBanner message={error} onDismiss={() => setError(null)} />
-        </div>
-      )}
-
-      {/* ── Top bar (replaces SessionTabBar) ──────────────── */}
-      <SessionTopBar
-        patient={patient}
-        session={session}
-        note={note}
-        totalDurationSec={totalDurationSec}
-        clipsCount={sortedClips.length}
-        clipsOpen={clipsOpen}
-        onToggleClips={() => setClipsOpen((o) => !o)}
-        onRecord={() => setActiveTab('record')}
-        onUpload={(file) => { void handleUpload(file); }}
-        missingRequiredLabels={missingRequiredLabels}
-        onFinalize={handleFinalizeWrapped}
-        onUnfinalize={handleUnfinalize}
-        showNoteActions={activeTab === 'review'}
-      />
-
-      {/* Collapsed transcript: a zero-height sticky bar pins the reopen pill to the top of
-          the scroll area (its nearest scroll ancestor is <main>, not the content div below
-          which has its own overflow). Lives outside the scroll content so it can't ride off. */}
-      {activeTab === 'review' && !isTranscriptLocked && transcriptCollapsed && (
-        <div
-          style={{
-            position: 'sticky', top: 0, height: 0, zIndex: 20,
-            display: 'flex', justifyContent: 'flex-end',
-            padding: '0 22px', pointerEvents: 'none',
-          }}
-        >
-          <div style={{ pointerEvents: 'auto' }}>
-            <TranscriptCollapsedTab onExpand={() => setTranscriptCollapsed(false)} />
-          </div>
-        </div>
-      )}
-
-      {/* ── Scrollable content ────────────────────────────── */}
-      <div
-        style={{
-          flex: 1,
-          padding: '10px 22px',
-          overflow: 'auto',
-          display: 'grid',
-          gap: 10,
-          alignContent: 'start',
-        }}
-      >
-
-        {/* ① Record tab */}
-        {activeTab === 'record' && (
-          <div role="tabpanel" id="panel-record" aria-labelledby="tab-record" style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {(sortedClips.length > 0 || effectiveTranscript.trim().length > 0) && (
-              <div>
-                <button
-                  type="button"
-                  className="btn btn-ghost py-1 text-xs"
-                  onClick={() => setActiveTab('review')}
-                >
-                  <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
-                </button>
-              </div>
-            )}
-            {showRecordWarning && (
-              <RecordWarningBanner
-                onBackToReview={() => setActiveTab('review')}
-                onDismiss={() => setRecordWarnDismissed(true)}
-              />
-            )}
-            {(processingUploadClipId || isUploadInProgress) ? (
-              <UploadProcessingView
-                durationSec={sortedClips.find((c) => c.id === processingUploadClipId)?.durationSec}
-                t2Phase={t2Phase}
-                t2Label={t2Label}
-                onRetry={() => { retryT2(); }}
-                onGoToNotes={() => { setProcessingUploadClipId(null); setActiveTab('review'); }}
-              />
-            ) : (
-              <RecordingPanel
-                recorder={recorder}
-                webSpeech={webSpeech}
-                clips={sortedClips}
-                whisperBubbles={whisperBubbles}
-                uploadStatus={uploadStatus}
-                onStart={handleStartRecordingWithGate}
-                onStopAndFinish={() => { void handleStopAndFinish(); setActiveTab('review'); }}
-                onPauseResume={handlePauseResume}
-                onUpload={handleUpload}
-                onSkip={handleSkipRecording}
-                wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
-                onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
-              />
-            )}
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+        {/* ── Error banner ──────────────────────────────────── */}
+        {error && (
+          <div style={{ padding: '12px 22px 0' }}>
+            <ErrorBanner message={error} onDismiss={() => setError(null)} />
           </div>
         )}
 
-        {/* ② Review tab */}
-        {activeTab === 'review' &&
-          (isTranscriptLocked ? (
-            <ReviewEmptyState />
-          ) : (
-            <div role="tabpanel" id="panel-review" aria-labelledby="tab-review" style={{ position: 'relative' }}>
-              <div
-                ref={reviewGridRef}
-                style={{
-                  position: 'relative',
-                  display: 'grid',
-                  gridTemplateColumns: transcriptCollapsed
-                    ? 'minmax(0, 1fr)'
-                    : `minmax(0, ${notePct}fr) 10px minmax(0, ${100 - notePct}fr)`,
-                  gap: transcriptCollapsed ? 24 : 16,
-                  alignItems: 'start',
-                }}
-              >
-              {/* ── Left: Clinical Note ── */}
-              <div>
-                {quickMode && (
-                  <div
-                    style={{
-                      padding: '9px 14px',
-                      borderRadius: 8,
-                      border: '1px solid var(--color-pt-border)',
-                      background: 'var(--color-pt-surface-mut)',
-                      fontSize: 12.5,
-                      color: 'var(--color-pt-text-3)',
-                      lineHeight: 1.5,
-                      marginBottom: 12,
-                    }}
+        {/* ── Top bar (replaces SessionTabBar) ──────────────── */}
+        <SessionTopBar
+          patient={patient}
+          session={session}
+          note={note}
+          totalDurationSec={totalDurationSec}
+          clipsCount={sortedClips.length}
+          clipsOpen={clipsOpen}
+          onToggleClips={() => setClipsOpen((o) => !o)}
+          onRecord={() => setActiveTab('record')}
+          onUpload={(file) => {
+            void handleUpload(file);
+          }}
+          missingRequiredLabels={missingRequiredLabels}
+          onFinalize={handleFinalizeWrapped}
+          onUnfinalize={handleUnfinalize}
+          showNoteActions={activeTab === 'review'}
+        />
+
+        {/* Collapsed transcript: a zero-height sticky bar pins the reopen pill to the top of
+          the scroll area (its nearest scroll ancestor is <main>, not the content div below
+          which has its own overflow). Lives outside the scroll content so it can't ride off. */}
+        {activeTab === 'review' && !isTranscriptLocked && transcriptCollapsed && (
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              height: 0,
+              zIndex: 20,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '0 22px',
+              pointerEvents: 'none',
+            }}
+          >
+            <div style={{ pointerEvents: 'auto' }}>
+              <TranscriptCollapsedTab onExpand={() => setTranscriptCollapsed(false)} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Scrollable content ────────────────────────────── */}
+        <div
+          style={{
+            flex: 1,
+            padding: '10px 22px',
+            overflow: 'auto',
+            display: 'grid',
+            gap: 10,
+            alignContent: 'start',
+          }}
+        >
+          {/* ① Record tab */}
+          {activeTab === 'record' && (
+            <div
+              role="tabpanel"
+              id="panel-record"
+              aria-labelledby="tab-record"
+              style={{
+                maxWidth: 960,
+                margin: '0 auto',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              {(sortedClips.length > 0 || effectiveTranscript.trim().length > 0) && (
+                <div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost py-1 text-xs"
+                    onClick={() => setActiveTab('review')}
                   >
-                    Quick note mode — type your note directly in the sections below.
-                  </div>
-                )}
-                {/* Title row */}
-                <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-                  <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-pt-text)', margin: 0 }}>
-                    Clinical note
-                  </h1>
-                  {note && (
-                    <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
-                      {busy === 'generating'
-                        ? 'Generating…'
-                        : `last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
-                    </span>
-                  )}
-                </div>
-
-                <NoteToolbar
-                  template={template}
-                  templates={allTemplates}
-                  hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
-                  canGenerate={canGenerate}
-                  requiresFeedback={inputsUnchanged}
-                  isGenerating={busy === 'generating'}
-                  note={note}
-                  patient={patient!}
-                  modifiers={currentModifiers}
-                  onTemplateChange={handleTemplateChange}
-                  onManageTemplates={() => setManageTemplatesOpen(true)}
-                  onGenerate={handleGenerate}
-                  onModifiersChange={handleModifiersChange}
-                />
-
-                <NotePanel
-                  patient={patient}
-                  note={note}
-                  template={template}
-                  isStale={noteIsStale}
-                  onSectionChange={handleSectionChange}
-                />
-                {generationRetryStatus ? (
-                  <div style={{ marginTop: 8 }}>
-                    <AiCallRetryStatus {...generationRetryStatus} />
-                  </div>
-                ) : null}
-                {generationAiError ? (
-                  <div style={{ marginTop: 8 }}>
-                    <AiCallError
-                      error={generationAiError}
-                      onRetry={() => {
-                        clearGenerationAiError();
-                        void handleGenerateRaw();
-                      }}
-                      onDismiss={clearGenerationAiError}
-                    />
-                  </div>
-                ) : null}
-              </div>
-
-              {/* ── Drag-to-resize divider ── */}
-              {!transcriptCollapsed && (
-                <div
-                  role="separator"
-                  aria-orientation="vertical"
-                  aria-label="Resize transcript panel"
-                  onPointerDown={startResize}
-                  style={{
-                    alignSelf: 'stretch', cursor: 'col-resize',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    minHeight: 80,
-                  }}
-                >
-                  <div style={{ width: 4, height: 48, borderRadius: 999, background: 'var(--color-pt-border)' }} />
+                    <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
+                  </button>
                 </div>
               )}
+              {showRecordWarning && (
+                <RecordWarningBanner
+                  onBackToReview={() => setActiveTab('review')}
+                  onDismiss={() => setRecordWarnDismissed(true)}
+                />
+              )}
+              {processingUploadClipId || isUploadInProgress ? (
+                <UploadProcessingView
+                  durationSec={
+                    sortedClips.find((c) => c.id === processingUploadClipId)?.durationSec
+                  }
+                  t2Phase={t2Phase}
+                  t2Label={t2Label}
+                  onRetry={() => {
+                    retryT2();
+                  }}
+                  onGoToNotes={() => {
+                    setProcessingUploadClipId(null);
+                    setActiveTab('review');
+                  }}
+                />
+              ) : (
+                <RecordingPanel
+                  recorder={recorder}
+                  webSpeech={webSpeech}
+                  clips={sortedClips}
+                  whisperBubbles={whisperBubbles}
+                  uploadStatus={uploadStatus}
+                  onStart={handleStartRecordingWithGate}
+                  onStopAndFinish={() => {
+                    void handleStopAndFinish();
+                    setActiveTab('review');
+                  }}
+                  onPauseResume={handlePauseResume}
+                  onUpload={handleUpload}
+                  onSkip={handleSkipRecording}
+                  wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
+                  onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
+                />
+              )}
+            </div>
+          )}
 
-              {/* ── Right: Transcript ── */}
-              {!transcriptCollapsed && (
-                <div style={{ position: 'relative' }}>
-                    <TranscriptPanel
-                      transcript={effectiveTranscript}
-                      clips={sortedClips}
-                      transcribing={busy === 'transcribing'}
-                      hasUserEdits={hasUserEdits}
-                      hasT2Transcript={hasT2Transcript}
-                      hasT3Transcript={!!session.t3Transcript}
-                      totalDurationSec={totalDurationSec}
-                      collapsed={transcriptCollapsed}
-                      onCollapse={() => setTranscriptCollapsed(true)}
-                      onChange={setEditedTranscript}
-                      onCommit={() => {
-                        if (editedTranscript.trim()) {
-                          patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
-                        } else if (session.editedTranscript) {
-                          patchSession({ editedTranscript: undefined });
-                        }
-                      }}
-                      onCreateTranscript={handleCreateTranscript}
-                      canImproveWithAI={!session.t3Transcript}
-                      cloudDisabledReason={
-                        isDemoMode()
-                          ? 'Cloud transcription is disabled in demo mode.'
-                          : (session.cloudTranscribeCount ?? 0) >= MAX_TRANSCRIBES_PER_SESSION
-                            ? 'Cloud transcription was already used for this session.'
-                            : undefined
-                      }
-                      onRevertToLocal={handleRevertToLocal}
-                      onCopyTranscript={handleCopyTranscript}
-                      onOpenPIIScrub={() => setPiiScrubOpen(true)}
-                      hasEditedTranscript={hasUserEdits}
-                      onRevertEdits={handleRevertEdits}
-                      seekSignal={seekSignal}
+          {/* ② Review tab */}
+          {activeTab === 'review' &&
+            (isTranscriptLocked ? (
+              <ReviewEmptyState />
+            ) : (
+              <div
+                role="tabpanel"
+                id="panel-review"
+                aria-labelledby="tab-review"
+                style={{ position: 'relative' }}
+              >
+                <div
+                  ref={reviewGridRef}
+                  style={{
+                    position: 'relative',
+                    display: 'grid',
+                    gridTemplateColumns: transcriptCollapsed
+                      ? 'minmax(0, 1fr)'
+                      : `minmax(0, ${notePct}fr) 10px minmax(0, ${100 - notePct}fr)`,
+                    gap: transcriptCollapsed ? 24 : 16,
+                    alignItems: 'start',
+                  }}
+                >
+                  {/* ── Left: Clinical Note ── */}
+                  <div>
+                    {quickMode && (
+                      <div
+                        style={{
+                          padding: '9px 14px',
+                          borderRadius: 8,
+                          border: '1px solid var(--color-pt-border)',
+                          background: 'var(--color-pt-surface-mut)',
+                          fontSize: 12.5,
+                          color: 'var(--color-pt-text-3)',
+                          lineHeight: 1.5,
+                          marginBottom: 12,
+                        }}
+                      >
+                        Quick note mode — type your note directly in the sections below.
+                      </div>
+                    )}
+                    {/* Title row */}
+                    <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+                      <h1
+                        style={{
+                          fontSize: 20,
+                          fontWeight: 600,
+                          color: 'var(--color-pt-text)',
+                          margin: 0,
+                        }}
+                      >
+                        Clinical note
+                      </h1>
+                      {note && (
+                        <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                          {busy === 'generating'
+                            ? 'Generating…'
+                            : `last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
+                        </span>
+                      )}
+                    </div>
+
+                    <NoteToolbar
+                      template={template}
+                      templates={allTemplates}
+                      hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
+                      canGenerate={canGenerate}
+                      requiresFeedback={inputsUnchanged}
+                      isGenerating={busy === 'generating'}
+                      note={note}
+                      patient={patient!}
+                      modifiers={currentModifiers}
+                      onTemplateChange={handleTemplateChange}
+                      onManageTemplates={() => setManageTemplatesOpen(true)}
+                      onGenerate={handleGenerate}
+                      onModifiersChange={handleModifiersChange}
                     />
-                    {transcribeRetryStatus ? (
+
+                    <NotePanel
+                      patient={patient}
+                      note={note}
+                      template={template}
+                      isStale={noteIsStale}
+                      onSectionChange={handleSectionChange}
+                    />
+                    {generationRetryStatus ? (
                       <div style={{ marginTop: 8 }}>
-                        <AiCallRetryStatus {...transcribeRetryStatus} />
+                        <AiCallRetryStatus {...generationRetryStatus} />
                       </div>
                     ) : null}
-                    {transcribeAiError ? (
+                    {generationAiError ? (
                       <div style={{ marginTop: 8 }}>
                         <AiCallError
-                          error={transcribeAiError}
+                          error={generationAiError}
                           onRetry={() => {
-                            clearTranscribeAiError();
-                            void handleCreateTranscript();
+                            clearGenerationAiError();
+                            void handleGenerateRaw();
                           }}
-                          onDismiss={clearTranscribeAiError}
+                          onDismiss={clearGenerationAiError}
                         />
                       </div>
                     ) : null}
+                  </div>
+
+                  {/* ── Drag-to-resize divider ── */}
+                  {!transcriptCollapsed && (
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize transcript panel"
+                      onPointerDown={startResize}
+                      style={{
+                        alignSelf: 'stretch',
+                        cursor: 'col-resize',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 80,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 4,
+                          height: 48,
+                          borderRadius: 999,
+                          background: 'var(--color-pt-border)',
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* ── Right: Transcript ── */}
+                  {!transcriptCollapsed && (
+                    <div style={{ position: 'relative' }}>
+                      <TranscriptPanel
+                        transcript={effectiveTranscript}
+                        clips={sortedClips}
+                        transcribing={busy === 'transcribing'}
+                        hasUserEdits={hasUserEdits}
+                        hasT2Transcript={hasT2Transcript}
+                        hasT3Transcript={!!session.t3Transcript}
+                        totalDurationSec={totalDurationSec}
+                        collapsed={transcriptCollapsed}
+                        onCollapse={() => setTranscriptCollapsed(true)}
+                        onChange={setEditedTranscript}
+                        onCommit={() => {
+                          if (editedTranscript.trim()) {
+                            patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
+                          } else if (session.editedTranscript) {
+                            patchSession({ editedTranscript: undefined });
+                          }
+                        }}
+                        onCreateTranscript={handleCreateTranscript}
+                        canImproveWithAI={!session.t3Transcript}
+                        cloudDisabledReason={
+                          isDemoMode()
+                            ? 'Cloud transcription is disabled in demo mode.'
+                            : (session.cloudTranscribeCount ?? 0) >= MAX_TRANSCRIBES_PER_SESSION
+                              ? 'Cloud transcription was already used for this session.'
+                              : undefined
+                        }
+                        onRevertToLocal={handleRevertToLocal}
+                        onCopyTranscript={handleCopyTranscript}
+                        onOpenPIIScrub={() => setPiiScrubOpen(true)}
+                        hasEditedTranscript={hasUserEdits}
+                        onRevertEdits={handleRevertEdits}
+                        seekSignal={seekSignal}
+                      />
+                      {transcribeRetryStatus ? (
+                        <div style={{ marginTop: 8 }}>
+                          <AiCallRetryStatus {...transcribeRetryStatus} />
+                        </div>
+                      ) : null}
+                      {transcribeAiError ? (
+                        <div style={{ marginTop: 8 }}>
+                          <AiCallError
+                            error={transcribeAiError}
+                            onRetry={() => {
+                              clearTranscribeAiError();
+                              void handleCreateTranscript();
+                            }}
+                            onDismiss={clearTranscribeAiError}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                  <ClipsDrawer
+                    open={clipsOpen}
+                    clips={sortedClips}
+                    onClose={() => setClipsOpen(false)}
+                    onJump={(t) => {
+                      setClipsOpen(false);
+                      if (transcriptCollapsed) setTranscriptCollapsed(false);
+                      setSeekSignal({ seconds: t, id: Date.now() });
+                    }}
+                    onDelete={handleDeleteClip}
+                    onRecord={() => {
+                      setClipsOpen(false);
+                      setActiveTab('record');
+                    }}
+                    onUpload={(file) => {
+                      setClipsOpen(false);
+                      void handleUpload(file);
+                    }}
+                    t2Phase={t2Phase}
+                    t2Label={t2Label}
+                  />
                 </div>
-              )}
-              <ClipsDrawer
-                open={clipsOpen}
-                clips={sortedClips}
-                onClose={() => setClipsOpen(false)}
-                onJump={(t) => {
-                  setClipsOpen(false);
-                  if (transcriptCollapsed) setTranscriptCollapsed(false);
-                  setSeekSignal({ seconds: t, id: Date.now() });
-                }}
-                onDelete={handleDeleteClip}
-                onRecord={() => { setClipsOpen(false); setActiveTab('record'); }}
-                onUpload={(file) => { setClipsOpen(false); void handleUpload(file); }}
-                t2Phase={t2Phase}
-                t2Label={t2Label}
-              />
               </div>
-            </div>
-          ))}
-
-
-      </div>
-
-      {/* ── PHI confirmation before sending transcript to Anthropic ── */}
-      <PhiConfirmDialog
-        open={phiConfirmOpen}
-        onCancel={() => setPhiConfirmOpen(false)}
-        onConfirm={handlePhiConfirm}
-      />
-
-      {/* ── Local Whisper unavailable recovery dialog ───── */}
-      <WhisperUnavailableDialog
-        open={whisperDialogOpen}
-        onUseWebSpeech={handleUseWebSpeech}
-        onRecordWithoutTranscription={handleRecordWithoutTranscription}
-        onCancel={handleCancelWhisperDialog}
-      />
-
-      {/* ── Demo complete modal ──────────────────────────── */}
-      <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
-
-      {/* ── Stale-note finalize confirmation (B2 stale-tracking) ── */}
-      <Modal
-        open={staleFinalizeOpen}
-        onClose={() => setStaleFinalizeOpen(false)}
-        title="Finalize an out-of-date note?"
-        size="sm"
-      >
-        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-          This note was generated from an earlier version of the transcript, template, or
-          modifiers. Finalizing now records a note that doesn't match the current transcript —
-          regenerate to sync them, or finalize as-is if the note is already what you want.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => setStaleFinalizeOpen(false)}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              setStaleFinalizeOpen(false);
-              handleGenerate('replace');
-            }}
-          >
-            Regenerate
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setStaleFinalizeOpen(false);
-              runFinalize();
-            }}
-          >
-            Finalize anyway
-          </button>
+            ))}
         </div>
-      </Modal>
 
-      {/* ── PII scrub modal ──────────────────────────────── */}
-      <PIIScrubModal
-        open={piiScrubOpen}
-        transcript={effectiveTranscript}
-        onApply={handleApplyScrub}
-        onClose={() => setPiiScrubOpen(false)}
-        onScrubDebug={handleScrubDebug}
-      />
+        {/* ── PHI confirmation before sending transcript to Anthropic ── */}
+        <PhiConfirmDialog
+          open={phiConfirmOpen}
+          onCancel={() => setPhiConfirmOpen(false)}
+          onConfirm={handlePhiConfirm}
+        />
 
-      {/* ── Manage templates modal ────────────────────────── */}
-      <ManageTemplatesModal
-        open={manageTemplatesOpen}
-        onClose={() => setManageTemplatesOpen(false)}
-      />
+        {/* ── Local Whisper unavailable recovery dialog ───── */}
+        <WhisperUnavailableDialog
+          open={whisperDialogOpen}
+          onUseWebSpeech={handleUseWebSpeech}
+          onRecordWithoutTranscription={handleRecordWithoutTranscription}
+          onCancel={handleCancelWhisperDialog}
+        />
 
-      {/* ── Template-change confirmation (note has content) ── */}
-      <Modal
-        open={pendingTemplateId !== null}
-        onClose={() => setPendingTemplateId(null)}
-        title="Change template?"
-        size="sm"
-      >
-        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-          Switching to{' '}
-          <strong>{allTemplates.find((t) => t.id === pendingTemplateId)?.name ?? 'another template'}</strong>{' '}
-          will clear the text you've written in this note.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => setPendingTemplateId(null)}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              const target = pendingTemplateId;
-              setPendingTemplateId(null);
-              if (target) applyTemplateChange(target);
-            }}
-          >
-            Change template
-          </button>
-        </div>
-      </Modal>
+        {/* ── Demo complete modal ──────────────────────────── */}
+        <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
 
-      {/* Debug drawer is rendered app-globally (GlobalDebugDrawer); this page
+        {/* ── Stale-note finalize confirmation (B2 stale-tracking) ── */}
+        <Modal
+          open={staleFinalizeOpen}
+          onClose={() => setStaleFinalizeOpen(false)}
+          title="Finalize an out-of-date note?"
+          size="sm"
+        >
+          <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+            This note was generated from an earlier version of the transcript, template, or
+            modifiers. Finalizing now records a note that doesn't match the current transcript —
+            regenerate to sync them, or finalize as-is if the note is already what you want.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setStaleFinalizeOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setStaleFinalizeOpen(false);
+                handleGenerate('replace');
+              }}
+            >
+              Regenerate
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setStaleFinalizeOpen(false);
+                runFinalize();
+              }}
+            >
+              Finalize anyway
+            </button>
+          </div>
+        </Modal>
+
+        {/* ── PII scrub modal ──────────────────────────────── */}
+        <PIIScrubModal
+          open={piiScrubOpen}
+          transcript={effectiveTranscript}
+          onApply={handleApplyScrub}
+          onClose={() => setPiiScrubOpen(false)}
+          onScrubDebug={handleScrubDebug}
+        />
+
+        {/* ── Manage templates modal ────────────────────────── */}
+        <ManageTemplatesModal
+          open={manageTemplatesOpen}
+          onClose={() => setManageTemplatesOpen(false)}
+        />
+
+        {/* ── Template-change confirmation (note has content) ── */}
+        <Modal
+          open={pendingTemplateId !== null}
+          onClose={() => setPendingTemplateId(null)}
+          title="Change template?"
+          size="sm"
+        >
+          <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+            Switching to{' '}
+            <strong>
+              {allTemplates.find((t) => t.id === pendingTemplateId)?.name ?? 'another template'}
+            </strong>{' '}
+            will clear the text you've written in this note.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setPendingTemplateId(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                const target = pendingTemplateId;
+                setPendingTemplateId(null);
+                if (target) applyTemplateChange(target);
+              }}
+            >
+              Change template
+            </button>
+          </div>
+        </Modal>
+
+        {/* Debug drawer is rendered app-globally (GlobalDebugDrawer); this page
           only registers its session id + live debug data with the provider. */}
 
-      {/* ── Reset session confirmation ────────────────────── */}
-      <ResetSessionModal
-        open={resetModalOpen}
-        onClose={() => setResetModalOpen(false)}
-        onConfirm={() => void handleResetSession()}
-      />
-    </div>
+        {/* ── Reset session confirmation ────────────────────── */}
+        <ResetSessionModal
+          open={resetModalOpen}
+          onClose={() => setResetModalOpen(false)}
+          onConfirm={() => void handleResetSession()}
+        />
+      </div>
     </SessionResetContext.Provider>
   );
 }
@@ -942,4 +1027,3 @@ function NotFound() {
     </div>
   );
 }
-

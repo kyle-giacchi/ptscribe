@@ -51,7 +51,9 @@ describe('noteMatchesInputs', () => {
   });
 
   it('returns false when the transcript has changed', () => {
-    expect(noteMatchesInputs(note(), { ...baseInputs, transcript: 'edited transcript' })).toBe(false);
+    expect(noteMatchesInputs(note(), { ...baseInputs, transcript: 'edited transcript' })).toBe(
+      false,
+    );
   });
 
   it('returns false when the template has changed', () => {
@@ -69,15 +71,20 @@ describe('noteMatchesInputs', () => {
 
   it('treats an undefined snapshot transcript as empty string', () => {
     expect(
-      noteMatchesInputs(note({ generatedFromTranscript: undefined }), { ...baseInputs, transcript: '' }),
+      noteMatchesInputs(note({ generatedFromTranscript: undefined }), {
+        ...baseInputs,
+        transcript: '',
+      }),
     ).toBe(true);
   });
 
   it('treats undefined modifiers on either side as the empty modifier set', () => {
-    expect(noteMatchesInputs(note({ modifiers: undefined }), { ...baseInputs, modifiers: undefined })).toBe(
-      true,
-    );
-    expect(noteMatchesInputs(note({ modifiers: undefined }), { ...baseInputs, modifiers: EMPTY })).toBe(true);
+    expect(
+      noteMatchesInputs(note({ modifiers: undefined }), { ...baseInputs, modifiers: undefined }),
+    ).toBe(true);
+    expect(
+      noteMatchesInputs(note({ modifiers: undefined }), { ...baseInputs, modifiers: EMPTY }),
+    ).toBe(true);
   });
 
   it('is insensitive to the selection order of multi-select modifiers', () => {

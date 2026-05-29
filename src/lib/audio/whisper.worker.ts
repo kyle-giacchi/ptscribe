@@ -128,23 +128,20 @@ async function getPipeline(
     // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
     // and crashes because the required scale tensor is absent. 'basic' skips it.
     session_options: { graphOptimizationLevel: 'basic' },
-    progress_callback: (p: {
-      status: string;
-      name?: string;
-      loaded?: number;
-      total?: number;
-    }) => {
+    progress_callback: (p: { status: string; name?: string; loaded?: number; total?: number }) => {
       post({ id: progressId, type: 'progress', ...p });
     },
-  }).then((p) => {
-    currentPipeline = p;
-    currentModel = model;
-    pipelineLoadPromise = null;
-    return p;
-  }).catch((err) => {
-    pipelineLoadPromise = null;
-    throw err;
-  });
+  })
+    .then((p) => {
+      currentPipeline = p;
+      currentModel = model;
+      pipelineLoadPromise = null;
+      return p;
+    })
+    .catch((err) => {
+      pipelineLoadPromise = null;
+      throw err;
+    });
   return pipelineLoadPromise;
 }
 

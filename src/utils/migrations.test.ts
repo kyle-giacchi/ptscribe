@@ -814,7 +814,10 @@ describe('migrate v10 → v11: missing-fields robustness', () => {
 describe('migrate v11 → v12: missing-fields robustness', () => {
   function v11Minimal(): Record<string, unknown> {
     const seed = defaultAppData();
-    const settings = { ...(seed.settings as unknown as Record<string, unknown>) } as Record<string, unknown>;
+    const settings = { ...(seed.settings as unknown as Record<string, unknown>) } as Record<
+      string,
+      unknown
+    >;
     delete settings.session;
     return {
       ...seed,
@@ -836,9 +839,7 @@ describe('migrate v11 → v12: missing-fields robustness', () => {
 
   it('seeds the Unassigned patient when patients array is empty', () => {
     const result = migrate(v11Minimal());
-    const unassigned = result.patients.find(
-      (p) => p.id === UNASSIGNED_PATIENT_ID,
-    );
+    const unassigned = result.patients.find((p) => p.id === UNASSIGNED_PATIENT_ID);
     expect(unassigned).toBeDefined();
     expect(unassigned?.firstName).toBe('Unassigned');
   });
@@ -867,9 +868,7 @@ describe('migrate v11 → v12: missing-fields robustness', () => {
   it('seeds Unassigned patient even when patients field is null (corrupt)', () => {
     const base = { ...v11Minimal(), patients: null };
     const result = migrate(base);
-    const unassigned = result.patients.find(
-      (p) => p.id === UNASSIGNED_PATIENT_ID,
-    );
+    const unassigned = result.patients.find((p) => p.id === UNASSIGNED_PATIENT_ID);
     expect(unassigned).toBeDefined();
   });
 

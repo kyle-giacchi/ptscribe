@@ -23,7 +23,11 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,cjs}": "eslint"
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "eslint",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,css,md,yml,yaml,html}": "prettier --write"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.6.11",

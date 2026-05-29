@@ -105,8 +105,7 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
     }
 
     if (response.ok) {
-      const contentType =
-        response.headers.get('Content-Type') ?? 'application/octet-stream';
+      const contentType = response.headers.get('Content-Type') ?? 'application/octet-stream';
       const buffer = await response.arrayBuffer();
       cachePut(url, { buffer, contentType });
       return new Response(buffer, {

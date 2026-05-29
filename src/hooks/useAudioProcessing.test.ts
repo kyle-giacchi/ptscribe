@@ -34,9 +34,7 @@ describe('useAudioProcessing — precomputedSilenced', () => {
   it('adopts the precomputed blob directly without calling trimSilence', async () => {
     const precomputed = new Blob([new Uint8Array(20)], { type: 'audio/webm' });
 
-    const { result } = renderHook(() =>
-      useAudioProcessing(fakeSource, precomputed),
-    );
+    const { result } = renderHook(() => useAudioProcessing(fakeSource, precomputed));
 
     await waitFor(() => expect(result.current.activeSilenced).not.toBeNull());
 
@@ -105,7 +103,9 @@ describe('useAudioProcessing — compileSilence / resetSilence', () => {
 
     expect(result.current.activeSilenced).toBeNull();
 
-    await act(async () => { await result.current.compileSilence(); });
+    await act(async () => {
+      await result.current.compileSilence();
+    });
 
     expect(mockTrimSilence).toHaveBeenCalledOnce();
     expect(result.current.activeSilenced?.blob).toBe(fakeTrimmed);
@@ -128,7 +128,9 @@ describe('useAudioProcessing — compileSilence / resetSilence', () => {
     await waitFor(() => expect(result.current.activeSilenced).not.toBeNull());
     act(() => result.current.resetSilence());
 
-    await act(async () => { await result.current.compileSilence(); });
+    await act(async () => {
+      await result.current.compileSilence();
+    });
 
     expect(result.current.compilingSilence).toBe(false);
     expect(result.current.activeSilenced).not.toBeNull();

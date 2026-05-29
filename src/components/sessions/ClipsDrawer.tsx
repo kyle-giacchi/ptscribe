@@ -37,13 +37,30 @@ interface InnerProps {
   t2Label: string;
 }
 
-function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRecord, onUpload, isMobile, t2Phase, t2Label }: InnerProps) {
+function Inner({
+  clips,
+  total,
+  newest,
+  fileRef,
+  onClose,
+  onJump,
+  onDelete,
+  onRecord,
+  onUpload,
+  isMobile,
+  t2Phase,
+  t2Label,
+}: InnerProps) {
   return (
     <>
       {/* Header */}
       <div
         className="flex items-center gap-2"
-        style={{ padding: '14px 18px', borderBottom: '1px solid var(--color-pt-border)', background: 'var(--color-pt-surface)' }}
+        style={{
+          padding: '14px 18px',
+          borderBottom: '1px solid var(--color-pt-border)',
+          background: 'var(--color-pt-surface)',
+        }}
       >
         <AudioLines size={14} strokeWidth={2} style={{ color: 'var(--color-pt-accent)' }} />
         <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-pt-text)', margin: 0 }}>
@@ -64,10 +81,21 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: 14,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
         {clips.length === 0 ? (
           <div style={{ padding: '32px 14px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>No clips yet</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+              No clips yet
+            </div>
             <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)', marginTop: 4 }}>
               Record or upload a clip to start.
             </div>
@@ -79,7 +107,10 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
               clip={clip}
               index={i}
               isActive={clip.id === newest?.id}
-              onJump={() => { onClose(); onJump(clip.startOffsetSec ?? 0); }}
+              onJump={() => {
+                onClose();
+                onJump(clip.startOffsetSec ?? 0);
+              }}
               onDelete={() => onDelete(clip.id)}
               t2Phase={t2Phase}
               t2Label={t2Label}
@@ -95,14 +126,19 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
           paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 14px)' : 14,
           borderTop: '1px solid var(--color-pt-border)',
           background: 'var(--color-pt-surface)',
-          display: 'flex', flexDirection: 'column', gap: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
         }}
       >
         <button
           type="button"
           className="btn btn-primary"
           style={{ height: 34, fontSize: 12.5 }}
-          onClick={() => { onClose(); onRecord(); }}
+          onClick={() => {
+            onClose();
+            onRecord();
+          }}
         >
           <Mic size={13} strokeWidth={2} /> New recording
         </button>
@@ -116,9 +152,20 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
         </button>
         <AudioFileInput
           ref={fileRef}
-          onPick={(f) => { onUpload(f); onClose(); }}
+          onPick={(f) => {
+            onUpload(f);
+            onClose();
+          }}
         />
-        <p style={{ margin: 0, fontSize: 11, color: 'var(--color-pt-text-3)', textAlign: 'center', lineHeight: 1.4 }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 11,
+            color: 'var(--color-pt-text-3)',
+            textAlign: 'center',
+            lineHeight: 1.4,
+          }}
+        >
           Adding a clip re-runs the note generation across all clips.
         </p>
       </div>
@@ -126,7 +173,17 @@ function Inner({ clips, total, newest, fileRef, onClose, onJump, onDelete, onRec
   );
 }
 
-export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, onUpload, t2Phase, t2Label }: ClipsDrawerProps) {
+export function ClipsDrawer({
+  open,
+  clips,
+  onClose,
+  onJump,
+  onDelete,
+  onRecord,
+  onUpload,
+  t2Phase,
+  t2Label,
+}: ClipsDrawerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<AudioFileInputHandle>(null);
   const isMobile = useBelowBreakpoint(768);
@@ -134,14 +191,28 @@ export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, 
   useDismissable({ open, onClose, ref: dialogRef, closeOnOutside: false });
 
   const total = clips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0);
-  const newest = clips.length > 0 ? clips.reduce((a, b) => (a.createdAt > b.createdAt ? a : b)) : null;
+  const newest =
+    clips.length > 0 ? clips.reduce((a, b) => (a.createdAt > b.createdAt ? a : b)) : null;
 
-  const innerProps: InnerProps = { clips, total, newest, fileRef, onClose, onJump, onDelete, onRecord, onUpload, isMobile, t2Phase, t2Label };
+  const innerProps: InnerProps = {
+    clips,
+    total,
+    newest,
+    fileRef,
+    onClose,
+    onJump,
+    onDelete,
+    onRecord,
+    onUpload,
+    isMobile,
+    t2Phase,
+    t2Label,
+  };
 
   return (
     <AnimatePresence>
-      {open && (
-        isMobile ? (
+      {open &&
+        (isMobile ? (
           <motion.div
             ref={dialogRef}
             role="dialog"
@@ -151,12 +222,17 @@ export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, 
             exit={{ y: '100%' }}
             transition={{ duration: duration.base, ease: ease.enter }}
             style={{
-              position: 'fixed', bottom: 0, left: 0, right: 0,
-              height: '80vh', zIndex: 30,
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '80vh',
+              zIndex: 30,
               background: 'var(--color-pt-surface)',
               borderTop: '1px solid var(--color-pt-border)',
               boxShadow: '0 -18px 36px rgba(43,40,38,0.10)',
-              display: 'flex', flexDirection: 'column',
+              display: 'flex',
+              flexDirection: 'column',
               paddingBottom: 'env(safe-area-inset-bottom)',
             }}
           >
@@ -172,24 +248,34 @@ export function ClipsDrawer({ open, clips, onClose, onJump, onDelete, onRecord, 
             exit={{ x: 380, opacity: 0 }}
             transition={{ duration: duration.base, ease: ease.enter }}
             style={{
-              position: 'absolute', top: 0, right: 0, bottom: 0,
-              width: 380, zIndex: 20,
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 380,
+              zIndex: 20,
               background: 'var(--color-pt-surface)',
               borderLeft: '1px solid var(--color-pt-border)',
               boxShadow: '-18px 0 36px rgba(43,40,38,0.10)',
-              display: 'flex', flexDirection: 'column',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <Inner {...innerProps} />
           </motion.div>
-        )
-      )}
+        ))}
     </AnimatePresence>
   );
 }
 
 function ClipCard({
-  clip, index, isActive, onJump, onDelete, t2Phase, t2Label,
+  clip,
+  index,
+  isActive,
+  onJump,
+  onDelete,
+  t2Phase,
+  t2Label,
 }: {
   clip: SessionClip;
   index: number;
@@ -220,20 +306,26 @@ function ClipCard({
   }, [playing, clip.id]);
 
   const bars = useMemo(
-    () => Array.from({ length: 48 }, (_, j) =>
-      Math.abs(Math.sin(j * 0.7 + index) * Math.cos(j * 0.18)) * 22,
-    ),
+    () =>
+      Array.from(
+        { length: 48 },
+        (_, j) => Math.abs(Math.sin(j * 0.7 + index) * Math.cos(j * 0.18)) * 22,
+      ),
     [index],
   );
 
-  const time = new Date(clip.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = new Date(clip.createdAt).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
   const source = 'in-room mic';
   const { statusTone, statusLabel } = (() => {
     if (clip.status === 'transcribed') return { statusTone: 'accent', statusLabel: 'Transcribed' };
     if (clip.status === 'failed') return { statusTone: 'negative', statusLabel: 'Failed' };
     if (clip.status === 'pending') return { statusTone: 'amber', statusLabel: 'Recording…' };
     // 'ready' or 'transcribing' — reflect T2 pipeline state
-    if (t2Phase === 'transcribing') return { statusTone: 'amber', statusLabel: t2Label || 'Transcribing…' };
+    if (t2Phase === 'transcribing')
+      return { statusTone: 'amber', statusLabel: t2Label || 'Transcribing…' };
     if (t2Phase === 'retrying') return { statusTone: 'amber', statusLabel: 'Retrying…' };
     if (t2Phase === 'done') return { statusTone: 'accent', statusLabel: 'Transcribed' };
     if (t2Phase === 'error') return { statusTone: 'negative', statusLabel: 'Failed' };
@@ -246,23 +338,31 @@ function ClipCard({
         padding: 12,
         borderRadius: 10,
         border: `1px solid ${isActive ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
-        borderLeft: isActive ? '3px solid var(--color-pt-accent-border)' : `1px solid var(--color-pt-border)`,
+        borderLeft: isActive
+          ? '3px solid var(--color-pt-accent-border)'
+          : `1px solid var(--color-pt-border)`,
         background: isActive
           ? 'color-mix(in oklab, var(--color-pt-accent) 12%, transparent)'
           : 'var(--color-pt-surface)',
-        display: 'flex', flexDirection: 'column', gap: 8,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
       }}
     >
       {/* Top row */}
       <div className="flex items-center gap-2">
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+        <span
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-pt-text-3)' }}
+        >
           #{index + 1}
         </span>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)' }}>
           Clip {index + 1}
         </span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+        <span
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-pt-text-3)' }}
+        >
           {formatDuration(clip.durationSec ?? 0)}
         </span>
       </div>
@@ -273,8 +373,11 @@ function ClipCard({
           <span
             key={j}
             style={{
-              width: 2, height: Math.max(2, h), borderRadius: 1,
-              background: 'var(--color-pt-text-3)', opacity: 0.55,
+              width: 2,
+              height: Math.max(2, h),
+              borderRadius: 1,
+              background: 'var(--color-pt-text-3)',
+              opacity: 0.55,
             }}
           />
         ))}
@@ -287,16 +390,24 @@ function ClipCard({
         <div style={{ flex: 1 }} />
         <span
           style={{
-            fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '2px 7px',
+            borderRadius: 999,
             background:
-              statusTone === 'accent' ? 'var(--color-pt-accent-soft)'
-              : statusTone === 'negative' ? 'color-mix(in oklab, var(--color-negative) 12%, transparent)'
-              : 'color-mix(in oklab, var(--color-caution) 14%, transparent)',
+              statusTone === 'accent'
+                ? 'var(--color-pt-accent-soft)'
+                : statusTone === 'negative'
+                  ? 'color-mix(in oklab, var(--color-negative) 12%, transparent)'
+                  : 'color-mix(in oklab, var(--color-caution) 14%, transparent)',
             color:
-              statusTone === 'accent' ? 'var(--color-pt-accent-fg)'
-              : statusTone === 'negative' ? 'var(--color-negative)'
-              : 'var(--color-caution)',
-            textTransform: 'uppercase', letterSpacing: '0.04em',
+              statusTone === 'accent'
+                ? 'var(--color-pt-accent-fg)'
+                : statusTone === 'negative'
+                  ? 'var(--color-negative)'
+                  : 'var(--color-caution)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
           }}
         >
           {statusLabel}
@@ -329,7 +440,12 @@ function ClipCard({
           type="button"
           aria-label={`Delete clip ${index + 1}`}
           className="btn btn-ghost"
-          style={{ height: 28, padding: '0 8px', marginLeft: 'auto', color: 'var(--color-pt-danger, #dc2626)' }}
+          style={{
+            height: 28,
+            padding: '0 8px',
+            marginLeft: 'auto',
+            color: 'var(--color-pt-danger, #dc2626)',
+          }}
           onClick={onDelete}
         >
           <Trash2 size={12} strokeWidth={2} />

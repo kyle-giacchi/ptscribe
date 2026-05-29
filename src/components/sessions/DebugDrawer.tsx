@@ -221,7 +221,9 @@ export function DebugDrawer({
               </span>
             </button>
             {errorLogOpen && (
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div
+                style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
                 {errorsNewestFirst.length === 0 ? (
                   <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
                     {hasSession
@@ -281,20 +283,50 @@ export function DebugDrawer({
                               {entry.call}
                               {entry.provider ? ` · ${entry.provider}` : ''}
                             </span>
-                            <span style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', fontVariantNumeric: 'tabular-nums' }}>
+                            <span
+                              style={{
+                                fontSize: 10.5,
+                                color: 'var(--color-fg-subtle)',
+                                fontVariantNumeric: 'tabular-nums',
+                              }}
+                            >
                               {new Date(entry.ts).toLocaleTimeString()}
                             </span>
                           </button>
                           {expanded && (
-                            <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              <div style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                            <div
+                              style={{
+                                padding: '0 10px 10px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 6,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 10.5,
+                                  color: 'var(--color-fg-subtle)',
+                                  display: 'flex',
+                                  flexWrap: 'wrap',
+                                  gap: 10,
+                                }}
+                              >
                                 {entry.status !== undefined && <span>status {entry.status}</span>}
                                 {entry.latencyMs !== undefined && <span>{entry.latencyMs}ms</span>}
-                                {entry.attempts !== undefined && <span>{entry.attempts} attempt(s)</span>}
+                                {entry.attempts !== undefined && (
+                                  <span>{entry.attempts} attempt(s)</span>
+                                )}
                                 <span>{new Date(entry.ts).toLocaleString()}</span>
                               </div>
                               {entry.detail && (
-                                <div style={{ fontSize: 11.5, color: 'var(--color-fg)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                <div
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: 'var(--color-fg)',
+                                    whiteSpace: 'pre-wrap',
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
                                   {entry.detail}
                                 </div>
                               )}
@@ -319,19 +351,27 @@ export function DebugDrawer({
                               )}
                               {entry.keyReport && (
                                 <div style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)' }}>
-                                  expected [{entry.keyReport.expected.join(', ') || '—'}] · returned [
-                                  {entry.keyReport.returned.join(', ') || '—'}]
+                                  expected [{entry.keyReport.expected.join(', ') || '—'}] · returned
+                                  [{entry.keyReport.returned.join(', ') || '—'}]
                                 </div>
                               )}
                               <button
                                 type="button"
                                 className="btn btn-ghost"
-                                style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11,
+                                }}
                                 onClick={() => {
-                                  void navigator.clipboard.writeText(JSON.stringify(entry, null, 2)).then(
-                                    () => toast.success('Copied'),
-                                    () => toast.error('Copy failed'),
-                                  );
+                                  void navigator.clipboard
+                                    .writeText(JSON.stringify(entry, null, 2))
+                                    .then(
+                                      () => toast.success('Copied'),
+                                      () => toast.error('Copy failed'),
+                                    );
                                 }}
                               >
                                 <Copy size={11} strokeWidth={2} />
@@ -391,9 +431,8 @@ export function DebugDrawer({
                       <span style={{ fontWeight: 600, color: 'var(--color-fg)' }}>
                         {Math.round(debugStats.droppedSec)}s
                       </span>{' '}
-                      trimmed (
-                      {Math.round((debugStats.droppedSec / debugStats.originalSec) * 100)}% of
-                      recording)
+                      trimmed ({Math.round((debugStats.droppedSec / debugStats.originalSec) * 100)}%
+                      of recording)
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
                       {Math.round(debugStats.originalSec)}s original →{' '}
@@ -509,7 +548,9 @@ export function DebugDrawer({
               </span>
             </button>
             {aiPromptOpen && (
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div
+                style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}
+              >
                 {lastAiPrompts ? (
                   <>
                     {(
@@ -529,7 +570,15 @@ export function DebugDrawer({
                             justifyContent: 'space-between',
                           }}
                         >
-                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: 'var(--color-fg-subtle)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                            }}
+                          >
                             {label}
                           </span>
                           <button
@@ -608,7 +657,9 @@ export function DebugDrawer({
               </span>
             </button>
             {requestPayloadOpen && (
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div
+                style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
                 {requestPayloadJson ? (
                   <>
                     <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
@@ -619,7 +670,13 @@ export function DebugDrawer({
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                      style={{
+                        alignSelf: 'flex-end',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 11,
+                      }}
                       onClick={() => {
                         void navigator.clipboard.writeText(requestPayloadJson).then(
                           () => toast.success('Copied'),
@@ -689,13 +746,21 @@ export function DebugDrawer({
               </span>
             </button>
             {rawPayloadOpen && (
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div
+                style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
                 {lastRawPayload ? (
                   <>
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                      style={{
+                        alignSelf: 'flex-end',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 11,
+                      }}
                       onClick={() => {
                         void navigator.clipboard.writeText(lastRawPayload).then(
                           () => toast.success('Copied'),
@@ -770,7 +835,9 @@ export function DebugDrawer({
               </span>
             </button>
             {keyMapOpen && (
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div
+                style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
                 {lastKeyReport ? (
                   <>
                     <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
@@ -783,15 +850,26 @@ export function DebugDrawer({
                         { label: 'Returned (AI)', keys: lastKeyReport.returned },
                         { label: 'Matched', keys: lastKeyReport.matched },
                         { label: 'Missing (expected, not returned)', keys: lastKeyReport.missing },
-                        { label: 'Unexpected (returned, not in template)', keys: lastKeyReport.unexpected },
+                        {
+                          label: 'Unexpected (returned, not in template)',
+                          keys: lastKeyReport.unexpected,
+                        },
                         { label: 'Matched but empty', keys: lastKeyReport.emptyMatched },
                       ] as { label: string; keys: string[] }[]
                     ).map(({ label, keys }) => (
                       <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)' }}>
+                        <span
+                          style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)' }}
+                        >
                           {label}
                         </span>
-                        <code style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', wordBreak: 'break-all' }}>
+                        <code
+                          style={{
+                            fontSize: 10.5,
+                            color: 'var(--color-fg-subtle)',
+                            wordBreak: 'break-all',
+                          }}
+                        >
                           {keys.length > 0 ? keys.join(', ') : '—'}
                         </code>
                       </div>
@@ -833,7 +911,13 @@ export function DebugDrawer({
                 PII scrub
               </span>
               {lastPiiScrub?.error ? (
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-pt-danger, #c0392b)' }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'var(--color-pt-danger, #c0392b)',
+                  }}
+                >
                   Failed
                 </span>
               ) : lastPiiScrub ? (
@@ -846,39 +930,68 @@ export function DebugDrawer({
               </span>
             </button>
             {piiOpen && (
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div
+                style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}
+              >
                 {lastPiiScrub ? (
                   <>
                     <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
                       Last scrub in this session. Regex matches structured identifiers instantly;
                       the deep scan adds names/places via the on-device NER model.
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--color-fg)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: 'var(--color-fg)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                      }}
+                    >
                       <div className="flex items-center justify-between">
                         <span style={{ color: 'var(--color-fg-subtle)' }}>Mode</span>
-                        <span>{lastPiiScrub.mode === 'deep' ? 'Deep scan (regex + model)' : 'Regex only'}</span>
+                        <span>
+                          {lastPiiScrub.mode === 'deep'
+                            ? 'Deep scan (regex + model)'
+                            : 'Regex only'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span style={{ color: 'var(--color-fg-subtle)' }}>Regex matches</span>
-                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{lastPiiScrub.regexCount}</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {lastPiiScrub.regexCount}
+                        </span>
                       </div>
                       {lastPiiScrub.mode === 'deep' && (
                         <div className="flex items-center justify-between">
                           <span style={{ color: 'var(--color-fg-subtle)' }}>Model added</span>
-                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>+{lastPiiScrub.modelAdded}</span>
+                          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                            +{lastPiiScrub.modelAdded}
+                          </span>
                         </div>
                       )}
                       <div className="flex items-center justify-between">
                         <span style={{ color: 'var(--color-fg-subtle)' }}>Total flagged</span>
-                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{lastPiiScrub.entityTotal}</span>
+                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {lastPiiScrub.entityTotal}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span style={{ color: 'var(--color-fg-subtle)' }}>Model loaded</span>
-                        <span>{lastPiiScrub.modelLoaded ? 'Yes' : 'No (first scan fetches it)'}</span>
+                        <span>
+                          {lastPiiScrub.modelLoaded ? 'Yes' : 'No (first scan fetches it)'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
                         <span style={{ color: 'var(--color-fg-subtle)' }}>Model</span>
-                        <code style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)', wordBreak: 'break-all', textAlign: 'right' }}>
+                        <code
+                          style={{
+                            fontSize: 10.5,
+                            color: 'var(--color-fg-subtle)',
+                            wordBreak: 'break-all',
+                            textAlign: 'right',
+                          }}
+                        >
                           {lastPiiScrub.model}
                         </code>
                       </div>

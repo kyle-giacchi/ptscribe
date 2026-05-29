@@ -38,7 +38,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, addNotification, markAllRead, clearAll }}>
+    <NotificationsContext.Provider
+      value={{ notifications, unreadCount, addNotification, markAllRead, clearAll }}
+    >
       {children}
     </NotificationsContext.Provider>
   );
