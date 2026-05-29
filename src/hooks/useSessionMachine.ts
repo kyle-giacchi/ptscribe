@@ -150,8 +150,9 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   // Shared reducer — owns lifecycle phase + transient AI surface for all three phases.
   const [state, dispatch] = useReducer(sessionMachineReducer, initialSessionMachineState);
 
-  // Shared action guard — tracks per-session transcribe/generate quotas.
-  const { checkActionGuard, recordAction, transcribeUsed, generateUsed } = useActionGuard();
+  // Shared action guard — owns only the anti-double-tap cooldown. Lifetime caps
+  // live on the persisted Session (see transcribeUsed/generateUsed below).
+  const { checkActionGuard, recordAction } = useActionGuard();
 
   // ── Phase hooks ──────────────────────────────────────────────────────────
 
@@ -239,6 +240,10 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     ],
   );
 
+  // Lifetime usage is read from the persisted Session, not from in-memory guard
+  // state, so the counts survive reload/Revert/Unlock. Absent reads as 0.
+  const transcribeUsed = session?.cloudTranscribeCount ?? 0;
+  const generateUsed = session?.generateCount ?? 0;
   const actionGuard = useMemo<SessionMachineActionGuardApi>(
     () => ({ checkActionGuard, recordAction, transcribeUsed, generateUsed }),
     [checkActionGuard, recordAction, transcribeUsed, generateUsed],
