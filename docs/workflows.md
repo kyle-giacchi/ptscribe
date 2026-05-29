@@ -465,9 +465,13 @@ Two-stage automatic retention model defined in [CONTEXT.md §Audio retention](..
 
 Today the silenced+combined Blob is computed for playback only and is not persisted. The Finalize prune step requires it to become persistent — a small storage change still to be made.
 
-## Regeneration and Modifiers (not-yet-built)
+## Regeneration and Modifiers
 
-[CONTEXT.md §Modifier](../CONTEXT.md#modifier) and [§Regeneration](../CONTEXT.md#regeneration) define a curated chip library (tone, emphasis, format) + an optional length-capped Custom-instruction free-text slot, attached to each Regenerate call. After **3 regenerations** in a session, every subsequent regen is preceded by a reflective dialog ("You've regenerated this Note 3 times — what isn't quite right?") whose checkbox + free-text feedback is injected into the next regen's AI prompt. None of this exists in the current code; the present Regenerate path is a straight re-call of `generateNote()` with no modifier injection and no soft-gate.
+[CONTEXT.md §Modifier](../CONTEXT.md#modifier) and [§Regeneration](../CONTEXT.md#regeneration) define a curated chip library (tone, emphasis, format) + an optional length-capped Custom-instruction free-text slot.
+
+**Modifiers — shipped.** Each session carries a `modifiers` field, edited via `ModifierPopover` and persisted on the Session. On every generate/regenerate, `useGeneratePhase` passes `session.modifiers` into `buildUserPrompt`, which the worker renders as a `modifierBlock` (`buildModifierBlock`) in the prompt. The modifier snapshot is captured at generate time so the Note records the modifiers it was produced under.
+
+**Regeneration feedback — shipped, but gated differently than originally designed.** Regeneration passes the prior Note (`regenerationDraft`) and free-text `regenerationFeedback` into the prompt. The soft-gate is **not** the originally-sketched "after 3 regenerations, reflective dialog" counter; instead, regeneration requires the clinician to supply feedback explaining what to improve **whenever the inputs are unchanged** since the last generate (`Session.tsx` `requiresFeedback={inputsUnchanged}`). This prevents no-op re-rolls without forcing a count-based dialog.
 
 ---
 
