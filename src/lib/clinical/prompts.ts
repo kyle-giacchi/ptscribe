@@ -129,6 +129,9 @@ export function buildUserPrompt({
 
   lines.push('# Patient context');
   // Send a pseudonym ID rather than the real name to limit PHI transmitted to Anthropic (A9).
+  // For the same reason we withhold coded/free-text identifiers: name and MRN are never sent,
+  // and neither is the ICD-10 code nor the free-text patient notes. Only the pseudonym, age,
+  // sex, and the clinician-authored primaryDiagnosis label leave the device.
   lines.push(`Patient ID: PT-${patient.id.slice(0, 8)}`);
   if (patient.dob) {
     const ageYears = Math.floor((Date.now() - patient.dob) / (365.25 * 24 * 3_600_000));
@@ -136,8 +139,6 @@ export function buildUserPrompt({
   }
   if (patient.sex) lines.push(`Sex: ${patient.sex}`);
   if (patient.primaryDiagnosis) lines.push(`Primary diagnosis: ${patient.primaryDiagnosis}`);
-  if (patient.icd10) lines.push(`ICD-10: ${patient.icd10}`);
-  if (patient.notes) lines.push(`Patient notes: ${patient.notes}`);
   if (sessionType) {
     const sessionTypeLabel: Record<SessionType, string> = {
       evaluation: 'Initial Evaluation',
