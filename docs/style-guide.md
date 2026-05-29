@@ -106,9 +106,13 @@ Single typeface throughout: **Inter**. It's neutral, legible at clinical distanc
 
 ## 4. Motion
 
-Use CSS transitions for simple state changes; reserve JS animation for list add/remove only. The app uses no animation library; avoid introducing one.
+The app uses [`motion/react`](https://motion.dev/) (Framer Motion) as its animation library — use it freely to make the interface feel polished and alive. CSS transitions remain a fine choice for simple state changes (hover, focus rings, color shifts) where reaching for JS would be overkill.
 
-### 4.1 Timing
+**Honor `prefers-reduced-motion`.** Users who set the OS "reduce motion" flag (often for vestibular conditions) should get opacity-only fades instead of movement. `motion/react`'s [`useReducedMotion()`](https://motion.dev/docs/react-accessibility) hook makes this nearly free — gate transforms behind it.
+
+### 4.1 Timing reference
+
+Sensible starting points, not rules — adjust per interaction:
 
 ```css
 /* Button hover / focus ring */
@@ -120,13 +124,6 @@ transition: transform 200ms ease-out, opacity 200ms ease-out;
 /* Toast fade */
 transition: opacity 150ms ease-in;
 ```
-
-### 4.2 What NOT to do
-
-- No spring physics, no bounce, no overshoot on anything functional.
-- No parallax or scroll-driven effects.
-- Honor `prefers-reduced-motion` — collapse all motion to opacity-only fades.
-- No loading spinners on the main workflow — use skeleton or inline status text instead.
 
 ---
 

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useBackgroundTranscription } from './useBackgroundTranscription';
+import {
+  useBackgroundTranscription,
+  transcribeWithLocalWhisper,
+} from './useBackgroundTranscription';
 import type { Session } from '@/types';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
@@ -226,5 +229,164 @@ describe('useBackgroundTranscription — re-run on blob change', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(patchSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Abort behavior (Plan 13) ────────────────────────────────────────────────
+
+/**
+ * Replace `transcribeFloat32Parallel` with a deferred promise so a pass can be
+ * held in-flight while we mutate the hook (change blob / unmount). Returns a
+ * `resolve` to settle the held pass afterwards, plus the captured abort signal.
+ */
+function deferParallelPass() {
+  let resolve!: (texts: string[]) => void;
+  const captured: { signal?: AbortSignal } = {};
+  mockTranscribeFloat32Parallel.mockImplementation(async () => {
+    return new Promise<string[]>((res) => {
+      resolve = res;
+    });
+  });
+  return { resolve: (texts: string[]) => resolve(texts), captured };
+}
+
+describe('useBackgroundTranscription — abort on blob change', () => {
+  it('aborts the prior pass and starts a fresh one when the blob changes mid-pass', async () => {
+    const { resolve } = deferParallelPass();
+    const blob1 = new Blob([new Uint8Array(100)]);
+    const blob2 = new Blob([new Uint8Array(200)]);
+    const patchSession = vi.fn();
+    const setTranscript = vi.fn();
+    const session = makeSession();
+
+    const { rerender } = renderHook(
+      ({ blob }: { blob: Blob }) =>
+        useBackgroundTranscription({
+          session,
+          patchSession,
+          setTranscript,
+          silencedMergedBlob: blob,
+        }),
+      { initialProps: { blob: blob1 } },
+    );
+
+    // First pass is now in-flight (parallel call entered, awaiting resolve).
+    await waitFor(() => expect(mockTranscribeFloat32Parallel).toHaveBeenCalledTimes(1));
+
+    // Swap to a fresh parallel impl for the second pass so it can complete.
+    mockTranscribeFloat32Parallel.mockResolvedValue(['second pass']);
+
+    // Change the blob mid-pass — reset effect should abort the first controller.
+    rerender({ blob: blob2 });
+
+    // Second pass should complete and patch with its result.
+    await waitFor(() =>
+      expect(patchSession).toHaveBeenCalledWith(
+        expect.objectContaining({ t2Transcript: 'second pass' }),
+      ),
+    );
+
+    // Now resolve the (aborted) first pass; its guard must drop the write so the
+    // only patch is from the second pass.
+    resolve(['first pass — should be dropped']);
+    await new Promise((r) => setTimeout(r, 50));
+
+    const patchedTexts = patchSession.mock.calls.map(
+      (c) => (c[0] as { t2Transcript?: string }).t2Transcript,
+    );
+    expect(patchedTexts).not.toContain('first pass — should be dropped');
+    expect(setTranscript).not.toHaveBeenCalledWith('first pass — should be dropped');
+  });
+});
+
+describe('useBackgroundTranscription — abort on unmount', () => {
+  it('does not patchSession/setTranscript after unmount mid-pass', async () => {
+    const { resolve } = deferParallelPass();
+    const patchSession = vi.fn();
+    const setTranscript = vi.fn();
+    const blob = makeSilencedBlob();
+    const session = makeSession();
+
+    const { unmount } = renderHook(() =>
+      useBackgroundTranscription({
+        session,
+        patchSession,
+        setTranscript,
+        silencedMergedBlob: blob,
+      }),
+    );
+
+    await waitFor(() => expect(mockTranscribeFloat32Parallel).toHaveBeenCalledTimes(1));
+
+    // Unmount while the pass is in-flight — unmount effect aborts the controller.
+    unmount();
+
+    // Resolve after unmount; the abort guard in .then must bail before any write.
+    resolve(['post-unmount result']);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(patchSession).not.toHaveBeenCalled();
+    expect(setTranscript).not.toHaveBeenCalled();
+  });
+});
+
+describe('transcribeWithLocalWhisper — direct abort checks', () => {
+  it('returns { ok: false, error: "Aborted." } for a pre-aborted signal without calling the parallel pass', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await transcribeWithLocalWhisper(
+      makeSilencedBlob(),
+      undefined,
+      controller.signal,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'Aborted.' });
+    expect(mockTranscribeFloat32Parallel).not.toHaveBeenCalled();
+    expect(mockBlobToFloat32).not.toHaveBeenCalled();
+  });
+
+  it('aborts after decode (before VAD/parallel) when the signal trips during blobToFloat32', async () => {
+    const controller = new AbortController();
+    // Abort while decoding; the post-decode check should catch it before any
+    // VAD work or the parallel Whisper pass runs.
+    mockBlobToFloat32.mockImplementation(async () => {
+      controller.abort();
+      return new Float32Array(SAMPLES);
+    });
+
+    const result = await transcribeWithLocalWhisper(
+      makeSilencedBlob(),
+      undefined,
+      controller.signal,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'Aborted.' });
+    expect(mockFindSpeechRangesML).not.toHaveBeenCalled();
+    expect(mockTranscribeFloat32Parallel).not.toHaveBeenCalled();
+  });
+
+  it('stops in the VAD loop on a multi-chunk pass aborted after the first chunk', async () => {
+    const controller = new AbortController();
+    // Two chunks worth of samples (chunkLen = 16000 * 120). Abort during the
+    // first chunk's VAD so the top-of-loop check stops the second iteration.
+    const chunkLen = 16_000 * 120;
+    mockBlobToFloat32.mockResolvedValue(new Float32Array(chunkLen + 16_000));
+    let vadCalls = 0;
+    mockFindSpeechRangesML.mockImplementation(async () => {
+      vadCalls++;
+      controller.abort();
+      return [{ startSec: 0, endSec: 2 }];
+    });
+
+    const result = await transcribeWithLocalWhisper(
+      makeSilencedBlob(),
+      undefined,
+      controller.signal,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'Aborted.' });
+    expect(vadCalls).toBe(1); // second iteration short-circuited by the loop guard
+    expect(mockTranscribeFloat32Parallel).not.toHaveBeenCalled();
   });
 });
