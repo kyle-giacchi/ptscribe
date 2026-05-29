@@ -8,6 +8,7 @@ import { useSettings } from '@/contexts/SettingsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { isDemoMode, DEMO_PATIENT_ID, DEMO_SESSION_ID } from '@/lib/demoMode';
+import { isTestUserSession } from '@/contexts/AuthContext';
 import type { Patient, Session } from '@/types';
 
 const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;
@@ -44,6 +45,12 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     if (!clinician.name.trim()) {
       setClinician({ name: 'Demo Clinician', credentials: 'DPT' });
     }
+
+    // Test User = full real-app experience: seed only the clinician, then step
+    // aside — no demo patient/session, no nav-lock, no continuity prompt, no
+    // forced setup-check. (Distinct from the guided "Try Demo" walkthrough.)
+    if (isTestUserSession()) return;
+
     if (!patients.find((p) => p.id === DEMO_PATIENT_ID)) {
       const now = Date.now();
       const next: Patient = {
