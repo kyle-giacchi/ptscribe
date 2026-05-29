@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 23;
+export const APP_DATA_VERSION = 24;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -165,6 +165,12 @@ export interface Session {
    * See CONTEXT.md §Cloud-transcription cap.
    */
   cloudTranscribeCount?: number;
+  /**
+   * Lifetime count of Anthropic note-generation runs for this session. Capped at
+   * MAX_GENERATES_PER_SESSION. Persisted so the cap survives reload, Revert, and
+   * Unlock — never reset by any client action. Absent is treated as 0 at read time.
+   */
+  generateCount?: number;
   createdAt: number;
   updatedAt: number;
 }

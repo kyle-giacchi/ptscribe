@@ -155,6 +155,7 @@ const SessionSchema = z.object({
   modifiers: SessionModifiersSchema.optional(),
   aiErrors: z.array(AiErrorEntrySchema).optional(),
   cloudTranscribeCount: z.number().int().min(0).optional(),
+  generateCount: z.number().int().min(0).optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
