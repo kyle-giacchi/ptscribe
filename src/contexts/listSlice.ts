@@ -25,27 +25,40 @@ export interface ListSliceMutators<T extends ListItem> {
  * - When `protectBuiltins: true` (templates, exercises) `update` and `remove`
  *   are no-ops for items with `builtin: true`.
  *
+ * `add`/`update`/`remove` pass **functional updaters** to `setItems` so a
+ * synchronous `add(x)` then `update(x.id, p)` (or a second `add`) composes
+ * against the latest array rather than a stale render-time snapshot. The
+ * `setItems` contract therefore accepts `(prev: T[]) => T[]`; every slice
+ * provider routes it through `updateXSlice`/`merge`, which already supports the
+ * functional form. See the `project_list_mutator_double_write` footgun.
+ *
+ * `get` deliberately still reads the render-time `items` snapshot — reads do
+ * not compose-write, so a caller needing the just-written value must re-derive
+ * it from the next render rather than `get`-ing immediately after `add`.
+ *
  * Providers wrap this and add domain-specific extras (e.g. `forPatient`,
  * `cloneTemplate`, `finalizeNote`).
  */
 export function makeListMutators<T extends ListItem>(
   items: T[],
-  setItems: (next: T[]) => void,
+  setItems: (next: T[] | ((prev: T[]) => T[])) => void,
   options?: { protectBuiltins?: boolean },
 ): ListSliceMutators<T> {
   const protectBuiltins = options?.protectBuiltins ?? false;
   return {
-    add: (item) => setItems([...items, item]),
+    add: (item) => setItems((prev) => [...prev, item]),
     update: (id, patch) =>
-      setItems(
-        items.map((it) => {
+      setItems((prev) =>
+        prev.map((it) => {
           if (it.id !== id) return it;
           if (protectBuiltins && it.builtin) return it;
           return { ...it, ...patch, updatedAt: Date.now() };
         }),
       ),
     remove: (id) =>
-      setItems(items.filter((it) => it.id !== id || (protectBuiltins && it.builtin === true))),
+      setItems((prev) =>
+        prev.filter((it) => it.id !== id || (protectBuiltins && it.builtin === true)),
+      ),
     get: (id) => items.find((it) => it.id === id),
   };
 }
