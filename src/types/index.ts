@@ -1,6 +1,6 @@
 export type ID = string;
 
-export const APP_DATA_VERSION = 24;
+export const APP_DATA_VERSION = 25;
 export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
@@ -171,6 +171,12 @@ export interface Session {
    * Unlock — never reset by any client action. Absent is treated as 0 at read time.
    */
   generateCount?: number;
+  /**
+   * ms timestamp the session was finalized. Anchors finalize-gated audio
+   * retention (CONTEXT.md §Audio retention). Absent on non-finalized sessions;
+   * legacy finalized sessions are backfilled to `updatedAt` at migration time.
+   */
+  finalizedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
