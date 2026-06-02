@@ -123,10 +123,11 @@ export function useGeneratePhase({
           toast.error('Add a transcript first.');
           return;
         }
-        if (settings.ai.generation.provider !== 'anthropic') {
-          toast.error('Enable Anthropic generation in Settings to draft a note.');
+        if (settings.ai.generation.provider === 'none') {
+          toast.error('Pick a generation provider in Settings to draft a note.');
           return;
         }
+        const genProvider = settings.ai.generation.provider;
 
         // Lifetime cap is session-backed (persisted) so it survives reload, Revert,
         // and Unlock — mirrors the cloud-transcribe cap in useTranscriptSource.
@@ -152,7 +153,7 @@ export function useGeneratePhase({
         const abortTimer = setTimeout(() => controller.abort(), 180_000);
         try {
           const result = await generateNote({
-            provider: settings.ai.generation.provider,
+            provider: genProvider,
             model: settings.ai.generation.model,
             template,
             transcript,
@@ -166,7 +167,7 @@ export function useGeneratePhase({
             onRetry: (info) =>
               dispatch({
                 type: 'generate/retry',
-                status: { provider: 'anthropic', attempt: info.attempt, max: info.max },
+                status: { provider: genProvider, attempt: info.attempt, max: info.max },
               }),
           });
 

@@ -1,6 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { useAppData } from './AppDataProvider';
-import { makeListMutators } from './listSlice';
+import { createListSliceContext } from './createListSliceContext';
 import { newId } from '@/utils/ids';
 import type { NoteTemplate } from '@/types';
 
@@ -13,41 +11,34 @@ export interface TemplatesContextValue {
   getTemplate: (id: string) => NoteTemplate | undefined;
 }
 
-const TemplatesContext = createContext<TemplatesContextValue | null>(null);
+const { Provider, useSlice } = createListSliceContext<NoteTemplate, TemplatesContextValue>({
+  label: 'Templates',
+  select: (appData) => appData.templates,
+  selectUpdater: (app) => app.updateTemplatesSlice,
+  protectBuiltins: true,
+  build: (m, templates) => ({
+    templates,
+    addTemplate: m.add,
+    updateTemplate: m.update,
+    removeTemplate: m.remove,
+    getTemplate: m.get,
+    cloneTemplate: (id) => {
+      const src = m.get(id);
+      if (!src) return undefined;
+      const now = Date.now();
+      const clone: NoteTemplate = {
+        ...src,
+        id: newId(),
+        name: `${src.name} (copy)`,
+        builtin: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      m.add(clone);
+      return clone;
+    },
+  }),
+});
 
-export function TemplatesProvider({ children }: { children: ReactNode }) {
-  const { appData, updateTemplatesSlice } = useAppData();
-  const templates = appData.templates;
-  const value = useMemo<TemplatesContextValue>(() => {
-    const m = makeListMutators(templates, updateTemplatesSlice, { protectBuiltins: true });
-    return {
-      templates,
-      addTemplate: m.add,
-      updateTemplate: m.update,
-      removeTemplate: m.remove,
-      getTemplate: m.get,
-      cloneTemplate: (id) => {
-        const src = m.get(id);
-        if (!src) return undefined;
-        const now = Date.now();
-        const clone: NoteTemplate = {
-          ...src,
-          id: newId(),
-          name: `${src.name} (copy)`,
-          builtin: false,
-          createdAt: now,
-          updatedAt: now,
-        };
-        m.add(clone);
-        return clone;
-      },
-    };
-  }, [templates, updateTemplatesSlice]);
-  return <TemplatesContext.Provider value={value}>{children}</TemplatesContext.Provider>;
-}
-
-export function useTemplates(): TemplatesContextValue {
-  const ctx = useContext(TemplatesContext);
-  if (!ctx) throw new Error('useTemplates must be used within TemplatesProvider');
-  return ctx;
-}
+export const TemplatesProvider = Provider;
+export const useTemplates = useSlice;

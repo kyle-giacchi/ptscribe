@@ -3,9 +3,15 @@ export type AiErrorKind =
   | 'rate_limit' // 429
   | 'auth' // 401, 403
   | 'empty' // 200 OK but missing/empty text
-  | 'timeout'; // AbortError from our internal timeout (NOT user-initiated cancel)
+  | 'timeout' // AbortError from our internal timeout (NOT user-initiated cancel)
+  // BYOK generation (ADR-0009/0010) — distinguished by the Worker's response `code`,
+  // not status alone (KEY_REJECTED=401 and PROVIDER_LIMITED=429 collide with auth/rate_limit).
+  | 'no_key' // 402 NO_KEY — no provider key stored for the active provider
+  | 'key_rejected' // 401 KEY_REJECTED — the user's provider rejected their key
+  | 'provider_limited' // 429 PROVIDER_LIMITED — the user's provider rate-limited / out of credit
+  | 'signin_required'; // 401 SIGNIN_REQUIRED — not authenticated (BYOK requires a session)
 
-export type AiProvider = 'anthropic' | 'nova';
+export type AiProvider = 'anthropic' | 'nova' | 'openai' | 'google';
 
 export interface AiCallErrorInit {
   kind: AiErrorKind;
@@ -40,16 +46,32 @@ export function classifyResponse(res: Response, _provider: AiProvider): AiErrorK
   return 'network';
 }
 
+/** Worker `code` → error kind. BYOK codes carry meaning the status can't (401/429
+ *  collide), so the response body `code` wins; we fall back to status otherwise. */
+const CODE_TO_KIND: Record<string, AiErrorKind> = {
+  NO_KEY: 'no_key',
+  KEY_REJECTED: 'key_rejected',
+  PROVIDER_LIMITED: 'provider_limited',
+  SIGNIN_REQUIRED: 'signin_required',
+};
+
+export function classifyError(code: string | undefined, res: Response): AiErrorKind {
+  if (code && CODE_TO_KIND[code]) return CODE_TO_KIND[code];
+  return classifyResponse(res, 'anthropic');
+}
+
 export interface FriendlyAiError {
   title: string;
   description: string;
-  action: 'retry' | 'wait' | 'refresh' | 'shorten' | 'check_network';
+  action: 'retry' | 'wait' | 'refresh' | 'shorten' | 'check_network' | 'open_settings' | 'signin';
   actionLabel: string;
 }
 
 const PROVIDER_NAMES: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
   nova: 'Cloudflare Nova',
+  openai: 'OpenAI',
+  google: 'Google',
 };
 
 export function friendlyAiError(err: AiCallError): FriendlyAiError {
@@ -91,6 +113,38 @@ export function friendlyAiError(err: AiCallError): FriendlyAiError {
           'The request took longer than expected and was canceled. Try again, optionally with a shorter transcript.',
         action: 'retry',
         actionLabel: 'Try again',
+      };
+    case 'no_key':
+      return {
+        title: `No ${name} API key set`,
+        description:
+          'Add your provider API key in Settings → AI providers to generate notes. The account also needs billing or credits enabled.',
+        action: 'open_settings',
+        actionLabel: 'Open Settings',
+      };
+    case 'key_rejected':
+      return {
+        title: `${name} rejected your API key`,
+        description:
+          'The stored key was refused. Re-paste a valid key in Settings, and confirm the provider account has billing/credits enabled.',
+        action: 'open_settings',
+        actionLabel: 'Open Settings',
+      };
+    case 'provider_limited':
+      return {
+        title: `${name} rate-limited the request`,
+        description:
+          'Your provider account is rate-limited or out of credit. Wait a moment and try again, or check your provider billing.',
+        action: 'wait',
+        actionLabel: 'Try again',
+      };
+    case 'signin_required':
+      return {
+        title: 'Sign in to generate notes',
+        description:
+          'Note generation with your own provider key requires an account. Sign in and try again.',
+        action: 'signin',
+        actionLabel: 'Sign in',
       };
   }
 }

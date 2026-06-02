@@ -202,7 +202,12 @@ export type AiErrorEntryKind =
   | 'timeout'
   | 'parse' // 200 OK but the JSON could not be parsed
   | 'key_mismatch' // parsed, but returned keys don't match the template
-  | 'blank'; // parsed + keys matched, but every section came back empty
+  | 'blank' // parsed + keys matched, but every section came back empty
+  // BYOK generation (ADR-0009/0010) — persisted so the error log explains a key/auth failure offline.
+  | 'no_key'
+  | 'key_rejected'
+  | 'provider_limited'
+  | 'signin_required';
 
 /**
  * One persisted AI-call failure. Transport failures store lean metadata only;
@@ -404,7 +409,7 @@ export interface PlanOfCare {
 // ─── Settings ───────────────────────────────────────────────────────────────
 
 export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'local' | 'none';
-export type GenerationProvider = 'anthropic' | 'none';
+export type GenerationProvider = 'anthropic' | 'openai' | 'google' | 'none';
 export type DensityMode = 'cozy' | 'compact';
 export type ThemeMode = 'system' | 'light' | 'dark';
 
