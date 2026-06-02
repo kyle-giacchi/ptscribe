@@ -5,9 +5,12 @@
  */
 
 import { apiFetch } from '@/lib/apiClient';
-import { AiCallError, classifyResponse, type AiErrorKind } from '../errors';
+import { AiCallError, classifyError, type AiErrorKind, type AiProvider } from '../errors';
 
 export interface AnthropicMessageArgs {
+  /** BYOK provider the Worker should generate against. Defaults to 'anthropic'.
+   *  Sent in the /api/generate body; the Worker resolves the user's key for it. */
+  provider?: Extract<AiProvider, 'anthropic' | 'openai' | 'google'>;
   model: string;
   /** Raw template system prompt — WITHOUT the modifier block. The Worker
    *  appends the modifier block server-side so the string sent to Anthropic
@@ -35,6 +38,9 @@ const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
 const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
 export async function callAnthropic(args: AnthropicMessageArgs): Promise<AnthropicResult> {
+  const provider = args.provider ?? 'anthropic';
+  const label =
+    provider === 'anthropic' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'Google';
   let lastErrorKind: AiErrorKind = 'network';
   let lastStatus: number | undefined;
   let lastRaw: string | undefined;
@@ -47,6 +53,7 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          provider,
           model: args.model,
           system: args.system,
           modifierBlock: args.modifierBlock,
@@ -64,13 +71,15 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
         lastRaw = body || res.statusText;
 
         if (!RETRYABLE_STATUSES.has(res.status)) {
+          // The Worker discriminates BYOK failures (NO_KEY, KEY_REJECTED, …) by a
+          // body `code`, since 401/429 alone collide with auth/rate-limit. Read it.
           throw new AiCallError({
-            kind: classifyResponse(res, 'anthropic'),
-            provider: 'anthropic',
+            kind: classifyError(parseErrorCode(body), res),
+            provider,
             status: res.status,
             attemptsMade: attempt,
             rawDetail: lastRaw,
-            message: `Anthropic call failed (${res.status}): ${lastRaw}`,
+            message: `${label} call failed (${res.status}): ${lastRaw}`,
           });
         }
 
@@ -78,11 +87,11 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
         if (attempt === MAX_ATTEMPTS) {
           throw new AiCallError({
             kind: 'network',
-            provider: 'anthropic',
+            provider,
             status: res.status,
             attemptsMade: attempt,
             rawDetail: lastRaw,
-            message: `Anthropic call failed after ${attempt} attempts (${res.status})`,
+            message: `${label} call failed after ${attempt} attempts (${res.status})`,
           });
         }
         args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: String(res.status) });
@@ -94,11 +103,11 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
       if (typeof data.text !== 'string' || data.text.length === 0) {
         throw new AiCallError({
           kind: 'empty',
-          provider: 'anthropic',
+          provider,
           status: res.status,
           attemptsMade: attempt,
           rawDetail: data.error,
-          message: data.error || 'Anthropic returned no text content',
+          message: data.error || `${label} returned no text content`,
         });
       }
       return { text: data.text };
@@ -111,11 +120,11 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
       if (attempt === MAX_ATTEMPTS) {
         throw new AiCallError({
           kind: lastErrorKind,
-          provider: 'anthropic',
+          provider,
           status: lastStatus,
           attemptsMade: attempt,
           rawDetail: lastRaw,
-          message: `Anthropic call failed after ${attempt} attempts: ${lastRaw}`,
+          message: `${label} call failed after ${attempt} attempts: ${lastRaw}`,
         });
       }
       args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: 'network' });
@@ -125,12 +134,22 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
 
   throw new AiCallError({
     kind: lastErrorKind,
-    provider: 'anthropic',
+    provider,
     status: lastStatus,
     attemptsMade: MAX_ATTEMPTS,
     rawDetail: lastRaw,
-    message: 'Anthropic call failed',
+    message: `${label} call failed`,
   });
+}
+
+/** Pull the Worker's `{ code }` discriminator out of an error body, if present. */
+function parseErrorCode(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown };
+    return typeof parsed.code === 'string' ? parsed.code : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function safeReadText(res: Response): Promise<string> {

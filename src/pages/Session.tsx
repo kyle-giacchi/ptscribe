@@ -453,7 +453,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ── Derived display values ────────────────────────────────────────────────
   const canGenerate =
     effectiveTranscript.trim().length > 0 &&
-    settings.ai.generation.provider === 'anthropic' &&
+    settings.ai.generation.provider !== 'none' &&
     generateUsed < MAX_GENERATES_PER_SESSION;
 
   const emptyModifiers = {

@@ -20,7 +20,9 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   const headers = new Headers(init.headers);
   if (hash) headers.set(GATE_HEADER, hash);
 
-  const res = await fetch(path, { ...init, headers });
+  // credentials:'include' so the BetterAuth session cookie reaches the Worker —
+  // /api/generate is session-first (BYOK), and the gate path no longer carries auth.
+  const res = await fetch(path, { credentials: 'include', ...init, headers });
 
   if (res.status === 401) {
     clearGateCode();
