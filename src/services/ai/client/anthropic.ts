@@ -1,11 +1,17 @@
 /**
  * Browser-side Anthropic client. Calls our hosted Worker at /api/generate;
- * the Worker forwards to api.anthropic.com using its server-side ANTHROPIC_API_KEY
- * secret. The browser never sees the key.
+ * the Worker forwards to the provider using its server-side key (BYOK). The
+ * browser never sees the key.
+ *
+ * The retry loop, backoff, abort handling, and network/exhaustion errors live
+ * in the shared {@link retryFetch} harness. This module keeps only what is
+ * generate-specific: the JSON request body, `interceptGate: false`, the
+ * retryable-status set, and the BYOK-aware error classification.
  */
 
 import { apiFetch } from '@/lib/apiClient';
-import { AiCallError, classifyError, type AiErrorKind, type AiProvider } from '../errors';
+import { AiCallError, classifyError, type AiProvider } from '../errors';
+import { retryFetch, safeReadText } from './retryFetch';
 
 export interface AnthropicMessageArgs {
   /** BYOK provider the Worker should generate against. Defaults to 'anthropic'.
@@ -35,21 +41,23 @@ export interface AnthropicResult {
 
 const RETRY_DELAYS_MS = [5_000, 10_000, 25_000];
 const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
-const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
 export async function callAnthropic(args: AnthropicMessageArgs): Promise<AnthropicResult> {
   const provider = args.provider ?? 'anthropic';
   const label =
     provider === 'anthropic' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'Google';
-  let lastErrorKind: AiErrorKind = 'network';
-  let lastStatus: number | undefined;
-  let lastRaw: string | undefined;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    if (args.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-    try {
-      const res = await apiFetch(
+  const { response, attempts } = await retryFetch(
+    {
+      provider,
+      label,
+      retryableStatuses: RETRYABLE_STATUSES,
+      delaysMs: RETRY_DELAYS_MS,
+      signal: args.signal,
+      onRetry: args.onRetry,
+    },
+    () =>
+      apiFetch(
         '/api/generate',
         {
           method: 'POST',
@@ -69,83 +77,36 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
         // Session-first route: a 401 is SIGNIN_REQUIRED / KEY_REJECTED (a provider/auth
         // signal we classify below), NOT a rejected gate code — don't let apiFetch wipe it.
         { interceptGate: false },
-      );
+      ),
+  );
 
-      if (!res.ok) {
-        const body = await safeReadText(res);
-        lastStatus = res.status;
-        lastRaw = body || res.statusText;
-
-        if (!RETRYABLE_STATUSES.has(res.status)) {
-          // The Worker discriminates BYOK failures (NO_KEY, KEY_REJECTED, …) by a
-          // body `code`, since 401/429 alone collide with auth/rate-limit. Read it.
-          throw new AiCallError({
-            kind: classifyError(parseErrorCode(body), res),
-            provider,
-            status: res.status,
-            attemptsMade: attempt,
-            rawDetail: lastRaw,
-            message: `${label} call failed (${res.status}): ${lastRaw}`,
-          });
-        }
-
-        lastErrorKind = 'network';
-        if (attempt === MAX_ATTEMPTS) {
-          throw new AiCallError({
-            kind: 'network',
-            provider,
-            status: res.status,
-            attemptsMade: attempt,
-            rawDetail: lastRaw,
-            message: `${label} call failed after ${attempt} attempts (${res.status})`,
-          });
-        }
-        args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: String(res.status) });
-        await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
-        continue;
-      }
-
-      const data = (await res.json()) as { text?: string; error?: string };
-      if (typeof data.text !== 'string' || data.text.length === 0) {
-        throw new AiCallError({
-          kind: 'empty',
-          provider,
-          status: res.status,
-          attemptsMade: attempt,
-          rawDetail: data.error,
-          message: data.error || `${label} returned no text content`,
-        });
-      }
-      return { text: data.text };
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      if (err instanceof AiCallError) throw err;
-
-      lastRaw = err instanceof Error ? err.message : String(err);
-      lastErrorKind = 'network';
-      if (attempt === MAX_ATTEMPTS) {
-        throw new AiCallError({
-          kind: lastErrorKind,
-          provider,
-          status: lastStatus,
-          attemptsMade: attempt,
-          rawDetail: lastRaw,
-          message: `${label} call failed after ${attempt} attempts: ${lastRaw}`,
-        });
-      }
-      args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: 'network' });
-      await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
-    }
+  if (!response.ok) {
+    const raw = await safeReadText(response);
+    const detail = raw || response.statusText;
+    // The Worker discriminates BYOK failures (NO_KEY, KEY_REJECTED, …) by a body
+    // `code`, since 401/429 alone collide with auth/rate-limit. Read it from the raw body.
+    throw new AiCallError({
+      kind: classifyError(parseErrorCode(raw), response),
+      provider,
+      status: response.status,
+      attemptsMade: attempts,
+      rawDetail: detail,
+      message: `${label} call failed (${response.status}): ${detail}`,
+    });
   }
 
-  throw new AiCallError({
-    kind: lastErrorKind,
-    provider,
-    status: lastStatus,
-    attemptsMade: MAX_ATTEMPTS,
-    rawDetail: lastRaw,
-    message: `${label} call failed`,
-  });
+  const data = (await response.json()) as { text?: string; error?: string };
+  if (typeof data.text !== 'string' || data.text.length === 0) {
+    throw new AiCallError({
+      kind: 'empty',
+      provider,
+      status: response.status,
+      attemptsMade: attempts,
+      rawDetail: data.error,
+      message: data.error || `${label} returned no text content`,
+    });
+  }
+  return { text: data.text };
 }
 
 /** Pull the Worker's `{ code }` discriminator out of an error body, if present. */
@@ -156,29 +117,4 @@ function parseErrorCode(body: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-async function safeReadText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return '';
-  }
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const timer = setTimeout(resolve, ms);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
 }
