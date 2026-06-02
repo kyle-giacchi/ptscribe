@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Production use requires an account; note generation is the enforcing chokepoint
@@ -48,13 +48,25 @@ where the requirement bites.
 
 ## Consequences
 
-- **Existing on-device data must be reconciled with a new login.** With Profiles
+- **Anonymous-data mapping: a new login starts _fresh_ — it never claims the `local` profile
+  (decided 2026-06-02).** With Profiles
   ([ADR-0007](0007-on-device-profiles-for-multi-user-isolation.md)) partitioning storage
-  cryptographically per profile, a brand-new login
-  must decide whether it **claims** the device's existing anonymous/profile data or starts
-  **fresh**. This is the genuinely thorny, surprising part and the main reason this ADR exists;
-  the chosen mapping (claim-on-login vs. fresh) must be specified before this ships, not
-  retrofitted after the first "where did my patients go?" report.
+  cryptographically per profile, a login resolves to its **own `userId` profile** and does **not**
+  adopt the anonymous `local` profile's data. This keeps ADR-0007's already-decided no-claim/no-merge
+  model (5a) intact rather than reversing it. The choice is safe — not merely tolerable — _because_
+  this ADR picked the **hard** gate: a non-demo user must authenticate **before** reaching
+  `FirstRunGuard`, `/setup`, or any data-creating route, so they land directly in their `userId`
+  profile and create data there. The `local` profile is therefore **structurally never populated in
+  production** (demo/test use the `demo`/`test-user` profiles, which bypass the gate; greenfield means
+  no login-optional build ever shipped to real users). The dreaded "where did my patients go?"
+  outcome is a property of a _lazy_ gate — which this ADR rejected — not of the hard gate. The only
+  residual `local` data is a developer's own pre-gate scratch data, recoverable (if ever needed) via
+  ADR-0007's explicit backup export/import, not via auto-claim. **Implementation:** the session check
+  must run ahead of the profile commit so an anonymous non-demo visit is redirected to `/login`
+  before `ProfileResolver` ever commits `local` (i.e. `RequireAuth` gates above the profile/vault
+  mount, not just the inner routes); a test pins "login → `userId` profile, no adoption of `local`."
+  Reopen this decision only if a **login-optional public beta** is ever shipped before the hard gate
+  — that is the sole scenario in which real users could accumulate `local` data worth claiming.
 - **Product copy is now wrong.** "No account needed" and the "~$5/yr" cloud-spend figure in the
   landing/`HowItWorksModal` no longer hold (account required; generation spend is the user's own
   provider bill). A deliberate copy rewrite is a hard dependency of launch.
