@@ -217,12 +217,6 @@ function IntroChapter() {
         company) wedged into the healthcare stack?
       </p>
 
-      <p className="note">
-        I built this for the clinicians who carry an active caseload: physical therapists. PT
-        practices tend to run on thinner margins than most other clinical specialties, which makes
-        an <strong>$1,800-a-year-per-seat</strong> subscription sting that much more.
-      </p>
-
       <div className="market-strip__h">
         <span>Annual cost · per clinician</span>
       </div>
@@ -244,12 +238,6 @@ function IntroChapter() {
             <span className="approx">~</span>$5<span className="unit">/yr</span>
           </span>
         </div>
-      </div>
-      <div className="price-mult">
-        <span className="price-mult__pill">
-          <span className="price-mult__big">~360×</span>
-          <span className="price-mult__lbl">cheaper per clinician · same outcome</span>
-        </span>
       </div>
 
       <h3 className="market-facts__title">
@@ -279,19 +267,6 @@ function IntroChapter() {
 
         <div className="market-facts__row" role="row">
           <span className="market-facts__k" role="cell">
-            Average billable session
-          </span>
-          <span className="market-facts__note" role="cell">
-            A typical 1:1 PT visit. Drives the per-clinician audio-minute estimate that anchors
-            every downstream cost number.
-          </span>
-          <span className="market-facts__v" role="cell">
-            30–45<span className="unit">min</span>
-          </span>
-        </div>
-
-        <div className="market-facts__row" role="row">
-          <span className="market-facts__k" role="cell">
             Visits per clinician · year
           </span>
           <span className="market-facts__note" role="cell">
@@ -305,14 +280,40 @@ function IntroChapter() {
 
         <div className="market-facts__row" role="row">
           <span className="market-facts__k" role="cell">
-            Manual note time · per visit
+            Average billable session
           </span>
           <span className="market-facts__note" role="cell">
-            Hand-written documentation for the visit itself — longer for an initial eval, shorter
-            for a daily/follow-up. Blended across a typical caseload.
+            A typical 1:1 PT visit. Drives the per-clinician audio-minute estimate that anchors
+            every downstream cost number.
           </span>
           <span className="market-facts__v" role="cell">
-            10–15<span className="unit">min/note</span>
+            30–45<span className="unit">min</span>
+          </span>
+        </div>
+
+        <div className="market-facts__row" role="row">
+          <span className="market-facts__k" role="cell">
+            Manual note time · per year
+          </span>
+          <span className="market-facts__note" role="cell">
+            Hand-written documentation — <strong>10–15 min/visit</strong>, blended across a typical
+            caseload — multiplied across all ~2,250 visits a clinician logs in a year.
+          </span>
+          <span className="market-facts__v" role="cell">
+            <span className="approx">~</span>375–560<span className="unit">hrs/yr</span>
+          </span>
+        </div>
+
+        <div className="market-facts__row" role="row">
+          <span className="market-facts__k" role="cell">
+            AI-assisted note time · per year
+          </span>
+          <span className="market-facts__note" role="cell">
+            Record → generate → review &amp; finalize. Real-world ambient-scribe studies land at{' '}
+            <strong>~4–6 min/visit</strong> — the same caseload, a fraction of the desk time.
+          </span>
+          <span className="market-facts__v" role="cell">
+            <span className="approx">~</span>150–225<span className="unit">hrs/yr</span>
           </span>
         </div>
 
@@ -351,53 +352,46 @@ function IntroChapter() {
         </p>
       </div>
 
-      <div className="goals">
-        <article className="goal">
-          <header className="goal__head">
-            <span className="goal__k">Goal · 01</span>
-            <span className="goal__ch">
-              <a href="#ch-security" data-goto="ch-security">
-                → ch. 01
-              </a>
+      <ol className="goals" role="list">
+        <li className="goal" role="listitem">
+          <a className="goal__link" href="#ch-security" data-goto="ch-security">
+            <span className="goal__k">01</span>
+            <span className="goal__body">
+              <span className="goal__h">
+                Your patients' information never leaves your computer.
+              </span>
+              <span className="goal__teaser">
+                No cloud, no outside servers, no one else holding the keys.
+              </span>
             </span>
-          </header>
-          <h3 className="goal__h">Patient data that genuinely never leaves the device.</h3>
-          <p className="goal__sub">
-            No server-side DB. <code>AES-GCM</code> at rest, a tab-lifetime vault key, and the
-            browser's <code>connect-src</code> CSP as the real fence.
-          </p>
-        </article>
-        <article className="goal">
-          <header className="goal__head">
-            <span className="goal__k">Goal · 02</span>
-            <span className="goal__ch">
-              <a href="#ch-voice" data-goto="ch-voice">
-                → ch. 02
-              </a>
+            <span className="goal__go">ch. 01 →</span>
+          </a>
+        </li>
+        <li className="goal" role="listitem">
+          <a className="goal__link" href="#ch-voice" data-goto="ch-voice">
+            <span className="goal__k">02</span>
+            <span className="goal__body">
+              <span className="goal__h">Runs on the everyday laptop you already have.</span>
+              <span className="goal__teaser">
+                No special equipment, no IT request, nothing new to buy.
+              </span>
             </span>
-          </header>
-          <h3 className="goal__h">Live within the limits of a company-issued laptop.</h3>
-          <p className="goal__sub">
-            Local Whisper for the canonical pass. Silence-trim + 1.5× speed-up. A WASM-class PII
-            model — no 24 GB GPU required.
-          </p>
-        </article>
-        <article className="goal">
-          <header className="goal__head">
-            <span className="goal__k">Goal · 03</span>
-            <span className="goal__ch">
-              <a href="#ch-notes" data-goto="ch-notes">
-                → ch. 03
-              </a>
+            <span className="goal__go">ch. 02 →</span>
+          </a>
+        </li>
+        <li className="goal" role="listitem">
+          <a className="goal__link" href="#ch-notes" data-goto="ch-notes">
+            <span className="goal__k">03</span>
+            <span className="goal__body">
+              <span className="goal__h">Covers the core features of the big-name scribes.</span>
+              <span className="goal__teaser">
+                The same polished notes — for a fraction of the price.
+              </span>
             </span>
-          </header>
-          <h3 className="goal__h">Match what the leading SaaS scribes ship today.</h3>
-          <p className="goal__sub">
-            Live captions, diarized transcripts on demand, structured notes generated atomically,
-            templated modifiers — without breaking local-first.
-          </p>
-        </article>
-      </div>
+            <span className="goal__go">ch. 03 →</span>
+          </a>
+        </li>
+      </ol>
 
       <ol className="hiw__index" role="list">
         <li role="listitem">
@@ -2110,17 +2104,17 @@ const STYLES = `
 /* ── Price compare ────────────────────────────────────────── */
 .price-compare {
   display: grid; grid-template-columns: 1fr auto 1fr;
-  align-items: stretch; gap: 14px; margin: 22px 0 0;
+  align-items: stretch; gap: 0; margin: 22px 0 0;
+  border: 1px solid var(--line-2); border-radius: 14px;
+  background: var(--paper-2); overflow: hidden;
 }
 .price-card {
-  border: 1px solid var(--line-2); border-radius: 14px;
-  padding: 22px 24px 20px; background: var(--paper-2);
+  border: none; border-radius: 0;
+  padding: 20px 24px; background: transparent;
   display: flex; flex-direction: column; gap: 4px; position: relative;
 }
 .price-card--ours {
-  background: var(--sage-tint);
-  border-color: rgba(10,109,112,0.36);
-  box-shadow: 0 1px 0 rgba(26,32,48,0.02), 0 0 0 3px rgba(10,109,112,0.06);
+  background: transparent;
 }
 .price-card__kicker {
   font-family: "JetBrains Mono", monospace;
@@ -2139,6 +2133,8 @@ const STYLES = `
   line-height: 1; color: var(--ink);
 }
 .price-card--ours .price-card__v { color: var(--sage-deep); }
+.price-card--saas .price-card__v { color: var(--ink-3); }
+.price-card--saas .price-card__v .unit { color: var(--ink-4); }
 .price-card__v .approx {
   font-size: 30px; color: var(--ink-3);
   font-weight: 500; margin-right: -2px; letter-spacing: -0.018em;
@@ -2151,11 +2147,14 @@ const STYLES = `
   margin-left: 4px; margin-bottom: 6px;
 }
 .price-compare__vs {
-  align-self: center;
+  align-self: stretch; display: flex; align-items: center;
   font-family: "JetBrains Mono", monospace;
   font-size: 11px; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--ink-3);
-  padding: 0 4px; font-weight: 600;
+  padding: 0 16px; font-weight: 600;
+  background: var(--paper-3);
+  border-left: 1px solid var(--line-2);
+  border-right: 1px solid var(--line-2);
 }
 .price-mult { display: flex; justify-content: center; margin: 14px 0 0; }
 .price-mult__pill {
@@ -2200,42 +2199,41 @@ const STYLES = `
   padding: 0 4px;
 }
 .goals {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 10px; margin: 4px 0 0;
+  list-style: none; margin: 16px 0 0; padding: 0;
+  border-top: 1px solid var(--line-2);
 }
-.goal {
-  position: relative;
-  background: var(--paper-2); border: 1px solid var(--line-2);
-  border-radius: 12px; padding: 14px 16px;
-  display: flex; flex-direction: column; gap: 6px; min-height: 0;
+.goal { border-bottom: 1px solid var(--line-2); }
+.goal__link {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: center; gap: 16px;
+  padding: 15px 10px; text-decoration: none; color: inherit;
+  cursor: pointer; transition: background 0.15s ease, padding-left 0.15s ease;
 }
-.goal__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.goal__link:hover { background: var(--paper-2); padding-left: 14px; }
 .goal__k {
   font-family: "JetBrains Mono", monospace;
-  font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--ink-3); font-weight: 600;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--ink-4); transition: color 0.15s ease;
 }
-.goal__ch {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9.5px; letter-spacing: 0.06em;
-  color: var(--ink-4); text-transform: uppercase;
-}
-.goal__ch a { color: var(--ink-3); text-decoration: none; cursor: pointer; }
-.goal__ch a:hover { color: var(--ink); text-decoration: underline; }
+.goal__link:hover .goal__k { color: var(--sage-deep); }
+.goal__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .goal__h {
-  font-size: 14px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
   line-height: 1.3; letter-spacing: -0.01em;
-  color: var(--ink); margin: 2px 0 0; text-wrap: pretty;
+  color: var(--ink); text-wrap: pretty;
 }
-.goal__sub {
-  font-size: 12px; color: var(--ink-3);
-  line-height: 1.5; margin: 0; text-wrap: pretty;
+.goal__teaser {
+  font-size: 12.5px; color: var(--ink-3);
+  line-height: 1.4; text-wrap: pretty;
 }
-.goal__sub code {
+.goal__go {
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px; background: var(--paper-3);
-  padding: 0 4px; border-radius: 3px; color: var(--ink-2);
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-4); white-space: nowrap;
+  opacity: 0; transform: translateX(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
 }
+.goal__link:hover .goal__go { opacity: 1; transform: translateX(0); color: var(--sage-deep); }
 
 /* ── Editorial index ──────────────────────────────────────── */
 .hiw__index {
@@ -2604,10 +2602,17 @@ const STYLES = `
   .hiw__pager { flex-direction: column; }
   .hiw__pager-next, .hiw__pager-prev { margin-left: 0; align-items: flex-start; text-align: left; width: 100%; }
   .price-compare { grid-template-columns: 1fr; }
+  .price-compare__vs {
+    justify-content: center; padding: 8px 0;
+    border-left: none; border-right: none;
+    border-top: 1px solid var(--line-2);
+    border-bottom: 1px solid var(--line-2);
+  }
   .price-card__v { font-size: 44px; }
   .market-facts__row, .market-facts__head { grid-template-columns: 1fr; gap: 4px; }
   .market-facts__v { text-align: left; }
-  .goals { grid-template-columns: 1fr; }
+  .goal__go { opacity: 1; transform: none; }
+  .goal__link:hover { padding-left: 10px; }
   .intro-bridge { font-size: 24px; }
   .intro-h1--loud { font-size: 30px; }
   .hiw__idx { grid-template-columns: auto 1fr auto; gap: 14px; padding: 16px 4px; }
