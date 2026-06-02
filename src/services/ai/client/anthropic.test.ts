@@ -82,6 +82,37 @@ describe('callAnthropic — success and non-retryable errors', () => {
     await expect(callAnthropic(baseArgs)).rejects.toThrow('upstream problem');
   });
 
+  it('defaults provider to anthropic in the request body', async () => {
+    mockApiFetch.mockResolvedValueOnce(jsonResponse(200, { text: 'ok' }));
+    await callAnthropic(baseArgs);
+    const body = JSON.parse(mockApiFetch.mock.calls[0][1]?.body as string);
+    expect(body.provider).toBe('anthropic');
+  });
+
+  it('sends the chosen BYOK provider in the request body', async () => {
+    mockApiFetch.mockResolvedValueOnce(jsonResponse(200, { text: 'ok' }));
+    await callAnthropic({ ...baseArgs, provider: 'openai' });
+    const body = JSON.parse(mockApiFetch.mock.calls[0][1]?.body as string);
+    expect(body.provider).toBe('openai');
+  });
+
+  it.each([
+    ['NO_KEY', 402, 'no_key'],
+    ['KEY_REJECTED', 401, 'key_rejected'],
+    ['PROVIDER_LIMITED', 429, 'provider_limited'],
+    ['SIGNIN_REQUIRED', 401, 'signin_required'],
+  ] as const)('maps Worker code %s (%i) to kind=%s', async (code, status, kind) => {
+    mockApiFetch.mockResolvedValueOnce(jsonResponse(status, { code, error: 'x' }));
+    await expect(callAnthropic({ ...baseArgs, provider: 'openai' })).rejects.toMatchObject({
+      name: 'AiCallError',
+      kind,
+      provider: 'openai',
+      status,
+      attemptsMade: 1,
+    });
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('throws immediately on a non-retryable 400 without retrying', async () => {
     mockApiFetch.mockResolvedValueOnce(textResponse(400, 'Bad Request'));
 

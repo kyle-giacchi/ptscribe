@@ -39,10 +39,15 @@ export function VaultGate({ children }: { children: ReactNode }) {
           if (!cancelled && result.ok) {
             setUnlocked(true);
           } else if (!cancelled) {
-            // Stale vault from a prior non-demo visit: nuke local data and
-            // re-init with the demo passphrase. The data is unrecoverable
-            // anyway (we don't have the user's passphrase), so this just
-            // saves the user from a dead-end prompt.
+            // An initialized vault in this profile's namespace won't open with
+            // the demo passphrase. Post-ADR-0007 this wipe is profile-scoped:
+            // resetLocalDataForDemo() only touches the demo/test-user namespace
+            // (STORAGE_KEYS getters), never a real `local`/`<userId>` profile —
+            // so this cannot reach real clinical data. Reachable only when
+            // getDemoPassphrase() changed out from under an existing demo vault;
+            // that demo data is unrecoverable anyway, so re-init cleanly.
+            // SAFETY DEPENDS ON: the wipe staying profile-scoped. See
+            // docs/invariants.md §Profile-scoped storage.
             await resetLocalDataForDemo();
             await vault.setup(demoPass);
             if (!cancelled) setUnlocked(true);

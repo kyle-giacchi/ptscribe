@@ -22,6 +22,14 @@ export function AiCallError({
       window.location.reload();
       return;
     }
+    if (friendly.action === 'open_settings') {
+      window.location.assign('/settings');
+      return;
+    }
+    if (friendly.action === 'signin') {
+      window.location.assign('/login');
+      return;
+    }
     onRetry?.();
   }
 

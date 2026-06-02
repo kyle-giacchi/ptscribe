@@ -33,6 +33,17 @@ vi.mock('@/contexts/OrgConfigProvider', () => ({
 vi.mock('@/contexts/TemplatesProvider', () => ({ useTemplates: () => ({ templates: [] }) }));
 vi.mock('@/contexts/ExercisesProvider', () => ({ useExercises: () => ({ exercises: [] }) }));
 
+// OrgKeysCard (issue 09) reads org key status via the keys client; stub it so this
+// members/invites suite doesn't route those calls through the fetch mock.
+vi.mock('@/services/ai/keysClient', () => ({
+  getOrgKeys: async () => ({ signinRequired: false, keys: [] }),
+  keyOps: () => ({
+    put: vi.fn(async () => ({ ok: false, code: 'X', message: 'x' })),
+    remove: vi.fn(async () => ({ ok: false, code: 'X', message: 'x' })),
+    verify: vi.fn(async () => ({ ok: false, code: 'X', message: 'x' })),
+  }),
+}));
+
 function stubFetch(impl?: (...args: unknown[]) => unknown) {
   const spy = vi.fn(impl);
   vi.stubGlobal('fetch', spy);

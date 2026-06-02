@@ -10,10 +10,16 @@
  *   x-ptscribe-language: <ISO-639-1>        (optional)
  *   body:            raw audio bytes
  *   response:        { text: string }
+ *
+ * The retry loop, backoff, abort handling, and network/exhaustion errors live
+ * in the shared {@link retryFetch} harness. This module keeps only what is
+ * Nova-specific: the request shape, the retryable-status set, and the
+ * success/error classification of the Response.
  */
 
 import { apiFetch } from '@/lib/apiClient';
-import { AiCallError, classifyResponse, type AiErrorKind } from '../errors';
+import { AiCallError, classifyResponse } from '../errors';
+import { retryFetch, safeReadText } from './retryFetch';
 
 export interface CloudflareWhisperArgs {
   model: string; // e.g. '@cf/deepgram/nova-3'
@@ -28,8 +34,8 @@ export interface CloudflareWhisperResult {
 }
 
 const RETRY_DELAYS_MS = [5_000, 10_000, 25_000];
+// Nova uploads are long; transient 408/425 are worth retrying (generate does not — see anthropic.ts).
 const RETRYABLE_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
-const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
 export async function transcribeWithCloudflare(
   args: CloudflareWhisperArgs,
@@ -42,116 +48,46 @@ export async function transcribeWithCloudflare(
   if (args.model) headers['x-ptscribe-model'] = args.model;
   if (args.language) headers['x-ptscribe-language'] = args.language;
 
-  let lastStatus: number | undefined;
-  let lastRaw: string | undefined;
-  let lastKind: AiErrorKind = 'network';
-
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    if (args.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-    try {
-      const res = await apiFetch('/api/transcribe', {
+  const { response, attempts } = await retryFetch(
+    {
+      provider: 'nova',
+      label: 'Nova',
+      retryableStatuses: RETRYABLE_STATUSES,
+      delaysMs: RETRY_DELAYS_MS,
+      signal: args.signal,
+      onRetry: args.onRetry,
+    },
+    () =>
+      apiFetch('/api/transcribe', {
         method: 'POST',
         headers,
         body: buffer,
         signal: args.signal,
-      });
+      }),
+  );
 
-      if (!res.ok) {
-        const body = await safeReadText(res);
-        lastStatus = res.status;
-        lastRaw = body || res.statusText;
-
-        if (!RETRYABLE_STATUSES.has(res.status)) {
-          throw new AiCallError({
-            kind: classifyResponse(res, 'nova'),
-            provider: 'nova',
-            status: res.status,
-            attemptsMade: attempt,
-            rawDetail: lastRaw,
-            message: `Nova call failed (${res.status}): ${lastRaw}`,
-          });
-        }
-
-        if (attempt === MAX_ATTEMPTS) {
-          throw new AiCallError({
-            kind: 'network',
-            provider: 'nova',
-            status: res.status,
-            attemptsMade: attempt,
-            rawDetail: lastRaw,
-            message: `Nova call failed after ${attempt} attempts (${res.status})`,
-          });
-        }
-        args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: String(res.status) });
-        await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
-        continue;
-      }
-
-      const data = (await res.json()) as { text?: string; error?: string };
-      if (typeof data.text !== 'string') {
-        throw new AiCallError({
-          kind: 'empty',
-          provider: 'nova',
-          status: res.status,
-          attemptsMade: attempt,
-          rawDetail: data.error,
-          message: data.error || 'Nova response missing `text`',
-        });
-      }
-      return { text: data.text };
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') throw err;
-      if (err instanceof AiCallError) throw err;
-
-      lastRaw = err instanceof Error ? err.message : String(err);
-      lastKind = 'network';
-      if (attempt === MAX_ATTEMPTS) {
-        throw new AiCallError({
-          kind: lastKind,
-          provider: 'nova',
-          status: lastStatus,
-          attemptsMade: attempt,
-          rawDetail: lastRaw,
-          message: `Nova call failed after ${attempt} attempts: ${lastRaw}`,
-        });
-      }
-      args.onRetry?.({ attempt, max: RETRY_DELAYS_MS.length, reason: 'network' });
-      await sleep(RETRY_DELAYS_MS[attempt - 1], args.signal);
-    }
+  if (!response.ok) {
+    const detail = (await safeReadText(response)) || response.statusText;
+    throw new AiCallError({
+      kind: classifyResponse(response, 'nova'),
+      provider: 'nova',
+      status: response.status,
+      attemptsMade: attempts,
+      rawDetail: detail,
+      message: `Nova call failed (${response.status}): ${detail}`,
+    });
   }
 
-  throw new AiCallError({
-    kind: lastKind,
-    provider: 'nova',
-    status: lastStatus,
-    attemptsMade: MAX_ATTEMPTS,
-    rawDetail: lastRaw,
-    message: 'Nova call failed',
-  });
-}
-
-async function safeReadText(res: Response): Promise<string> {
-  try {
-    return await res.text();
-  } catch {
-    return '';
+  const data = (await response.json()) as { text?: string; error?: string };
+  if (typeof data.text !== 'string') {
+    throw new AiCallError({
+      kind: 'empty',
+      provider: 'nova',
+      status: response.status,
+      attemptsMade: attempts,
+      rawDetail: data.error,
+      message: data.error || 'Nova response missing `text`',
+    });
   }
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const timer = setTimeout(resolve, ms);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
+  return { text: data.text };
 }

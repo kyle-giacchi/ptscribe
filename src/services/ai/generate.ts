@@ -39,50 +39,59 @@ export interface GenerateNoteResult {
 
 type GenerateBackend = (args: GenerateNoteArgs) => Promise<GenerateNoteResult>;
 
+// All three BYOK providers (Anthropic, OpenAI, Google) share one backend: the
+// prompt build is identical and only the `provider` sent to the Worker differs.
+// The Worker resolves the user's key for that provider and forwards the call.
+const workerBackend: GenerateBackend = async (args) => {
+  const provider = args.provider as 'anthropic' | 'openai' | 'google';
+  const userPrompt = buildUserPrompt({
+    template: args.template,
+    transcript: args.transcript,
+    patient: args.patient,
+    priorNote: args.priorNote,
+    sessionType: args.sessionType,
+    regenerationDraft: args.regenerationDraft,
+    regenerationFeedback: args.regenerationFeedback,
+  });
+
+  // Only the cloud path (Nova-3 / T3) produces a diarized transcript with
+  // speaker labels. T1 (browser speech recognition) and T2 (local Whisper)
+  // are a single merged stream, so we tell the model speakers aren't split.
+  const isDiarized = args.activeTranscriptTier === 't3';
+  const speakerNote = isDiarized ? DIARIZATION_NOTE : NO_DIARIZATION_NOTE;
+  const system = args.template.systemPrompt.trimEnd() + speakerNote + NO_PII_RULE;
+
+  const modifierBlock = args.modifiers ? buildModifierBlock(args.modifiers) : '';
+  const model = args.model || (provider === 'anthropic' ? 'claude-sonnet-4-6' : args.model);
+
+  const result = await callAnthropic({
+    provider,
+    model,
+    system,
+    modifierBlock,
+    user: userPrompt,
+    signal: args.signal,
+    onRetry: args.onRetry,
+  });
+
+  const parsed = extractJson(result.text);
+  const sections: NoteSection[] = args.template.sections.map((s) => ({
+    key: s.key,
+    label: s.label,
+    body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
+  }));
+  return {
+    sections,
+    rawText: result.text,
+    debugPrompts: { model, system, modifierBlock, user: userPrompt },
+    keyReport: buildKeyReport(args.template, parsed),
+  };
+};
+
 const generateBackends: Record<GenerationProvider, GenerateBackend> = {
-  anthropic: async (args) => {
-    const userPrompt = buildUserPrompt({
-      template: args.template,
-      transcript: args.transcript,
-      patient: args.patient,
-      priorNote: args.priorNote,
-      sessionType: args.sessionType,
-      regenerationDraft: args.regenerationDraft,
-      regenerationFeedback: args.regenerationFeedback,
-    });
-
-    // Only the cloud path (Nova-3 / T3) produces a diarized transcript with
-    // speaker labels. T1 (browser speech recognition) and T2 (local Whisper)
-    // are a single merged stream, so we tell the model speakers aren't split.
-    const isDiarized = args.activeTranscriptTier === 't3';
-    const speakerNote = isDiarized ? DIARIZATION_NOTE : NO_DIARIZATION_NOTE;
-    const system = args.template.systemPrompt.trimEnd() + speakerNote + NO_PII_RULE;
-
-    const modifierBlock = args.modifiers ? buildModifierBlock(args.modifiers) : '';
-    const model = args.model || 'claude-sonnet-4-6';
-
-    const result = await callAnthropic({
-      model,
-      system,
-      modifierBlock,
-      user: userPrompt,
-      signal: args.signal,
-      onRetry: args.onRetry,
-    });
-
-    const parsed = extractJson(result.text);
-    const sections: NoteSection[] = args.template.sections.map((s) => ({
-      key: s.key,
-      label: s.label,
-      body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
-    }));
-    return {
-      sections,
-      rawText: result.text,
-      debugPrompts: { model, system, modifierBlock, user: userPrompt },
-      keyReport: buildKeyReport(args.template, parsed),
-    };
-  },
+  anthropic: workerBackend,
+  openai: workerBackend,
+  google: workerBackend,
   none: () => {
     throw new Error('AI generation is disabled. Pick a provider in Settings.');
   },

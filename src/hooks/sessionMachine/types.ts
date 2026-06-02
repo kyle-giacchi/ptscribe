@@ -4,7 +4,7 @@ import type { AiDebugPrompts, GenerateKeyReport } from '@/types';
 // ── Shared ────────────────────────────────────────────────────────────────
 
 export interface RetryStatus {
-  provider: 'anthropic' | 'nova';
+  provider: 'anthropic' | 'nova' | 'openai' | 'google';
   attempt: number;
   max: number;
 }

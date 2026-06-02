@@ -7,6 +7,7 @@ import { useOrgConfig, type OrgPolicy } from '@/contexts/OrgConfigProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useExercises } from '@/contexts/ExercisesProvider';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
+import { OrgKeysCard } from '@/components/settings/OrgKeysCard';
 import type { OrgRole } from '@/lib/auth/types';
 
 // ── Server response shapes (worker/org.ts → handleListMembers) ──────────────
@@ -235,6 +236,8 @@ function OrgSettingsLoaded({
         onResend={(inviteId) => mutate('/api/org/invite/resend', { inviteId }, 'Invite resent.')}
         onRevoke={(inviteId) => mutate('/api/org/invite/revoke', { inviteId }, 'Invite revoked.')}
       />
+
+      <OrgKeysCard canManage={canManage} />
 
       <OrgConfigCard />
     </PageFrame>
