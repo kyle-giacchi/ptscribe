@@ -1,7 +1,7 @@
 import { Loader2 } from 'lucide-react';
 
 interface Props {
-  provider: 'anthropic' | 'nova';
+  provider: 'anthropic' | 'nova' | 'openai' | 'google';
   attempt: number;
   max: number;
 }
@@ -9,6 +9,8 @@ interface Props {
 const NAMES: Record<Props['provider'], string> = {
   anthropic: 'Anthropic',
   nova: 'Cloudflare Nova',
+  openai: 'OpenAI',
+  google: 'Google',
 };
 
 export function AiCallRetryStatus({ provider, attempt, max }: Props) {
