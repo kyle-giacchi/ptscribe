@@ -9,9 +9,12 @@
  *   POST /api/org/**       → Org management handler (no gate required, session auth)
  *   GET|PUT /api/config/** → User/org config sync (no gate required, session auth)
  *   POST /api/transcribe   body = audio/* (the actual MIME, e.g. audio/webm) → { text }
- *   POST /api/generate     body = JSON {model, system, user, ...}            → { text }
+ *   GET|PUT|DELETE /api/keys/** → BYOK provider-key management (session auth)
+ *   POST /api/generate     body = JSON {provider, model, system, user, ...}   → { text }
  *
- * /api/transcribe and /api/generate require `x-ptscribe-key: <env.PTSCRIBE_GATE>`.
+ * /api/transcribe requires `x-ptscribe-key: <env.PTSCRIBE_GATE>`. /api/generate is
+ * session-first (BYOK, ADR-0009/0010): an authenticated user generates against their
+ * own provider key; the shared key + gate path is locked to demo mode.
  */
 
 import { createAuth } from './auth';
@@ -62,7 +65,10 @@ export interface Env {
   /** Comma-separated list of allowed request Origins. Defaults to same-origin
    *  plus localhost dev ports when unset. */
   ALLOWED_ORIGINS?: string;
-  /** When "true", /api/transcribe (Nova) is rejected. Set on the demo deployment only. */
+  /** When "true": /api/transcribe (Nova) is rejected, AND a sessionless
+   *  /api/generate is allowed via the shared Anthropic key + gate (otherwise it
+   *  is 401 SIGNIN_REQUIRED). Set on demo/preview deployments only — load-bearing
+   *  for generation while auth is not yet live. */
   DEMO_MODE?: string;
   /** Resend API key (secret). When absent, transactional email falls back to a
    *  console.log so local dev works without a provider. See worker/email.ts. */
