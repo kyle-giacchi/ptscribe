@@ -52,6 +52,18 @@ export async function getUserKeys(): Promise<KeyListResult> {
   return { signinRequired: false, keys };
 }
 
+/**
+ * Fetch the org's masked key status (any member may read it — used only as an
+ * onboarding hint: "your organization provides a key"). Never returns a key.
+ */
+export async function getOrgKeys(): Promise<KeyListResult> {
+  const res = await apiFetch('/api/keys/org', { method: 'GET' }, { interceptGate: false });
+  if (res.status === 401 || res.status === 403) return { signinRequired: true };
+  const body = await readJson(res);
+  const keys = Array.isArray(body.keys) ? (body.keys as KeyStatus[]) : [];
+  return { signinRequired: false, keys };
+}
+
 /** Live-validate + store a key. The server rejects an invalid key (it is NOT stored). */
 export async function putUserKey(provider: KeyProvider, key: string): Promise<KeyMutationResult> {
   const res = await apiFetch(
