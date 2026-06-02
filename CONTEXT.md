@@ -298,7 +298,7 @@ A transient toast is never the _only_ indicator of a persistent error.
 Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** — a clinician trying the app should walk through the real workflow end-to-end against their own audio, not a canned scripted demo. The contract:
 
 - **Vault auto-unlocks**, first-run wizard is skipped, and a demo patient + a sample session are seeded into the demo [Profile](#profiles-and-multi-user-devices). Demo runs in its own isolated `demo` Profile — it does **not** share `ptnotes.appData` / `ptnotes-audio` with a real Profile or with the `test-user` Profile. The persistent "DEMO MODE" badge is still shown as a defensive signal.
-- **Note generation hits the real Anthropic Worker.** A clinician trying the app needs to see the actual AI output for the audio they recorded. The cost is bounded by the clinician's own input rate.
+- **Note generation hits the real Anthropic Worker on the [shared key](#generation-providers--api-keys-byok).** Demo is the **only** path that uses PTScribe's own provider key; a clinician trying the app needs to see the actual AI output for the audio they recorded. The cost is bounded by the clinician's own input rate. (Real, non-demo generation uses the user's or org's own key — see below.)
 - **T2 local Whisper runs normally** — it's free and is the local-pipeline showcase.
 - **Cloud transcription (Nova) is hard-disabled.** "Improve with AI" in Curate and "Re-transcribe with cloud AI" in the T2-failure dialog are both unavailable with an explanatory tooltip (_"Cloud transcription is disabled in demo mode."_). This is the single largest provider cost and is the deliberate exclusion.
 - **Persistent "DEMO MODE" badge** sits in the top nav on every screen — defensive against the failure mode of someone running a demo build with real patient context.
@@ -323,6 +323,19 @@ Vocabulary for the cross-device persistence of a registered user's **non-clinica
 - **Shared library** — the org-owned set of templates/exercises every member sees. They behave **like built-ins but sourced from the org**: badged "Org", read-only, offered as **Clone** (not Edit). They are never copied into the user's own data unless the clinician clones one.
 - **Config sync** — the local-first mirror that keeps user/org config in step across a clinician's devices: **last-write-wins** (newer wins), push-on-change, pull-on-login. It is **not** clinical-data sync — PTScribe never syncs patient records or audio to a server. The demo user is fully isolated and never syncs.
   - _Avoid_: "cloud backup" or "sync" as a blanket term — reserve "config sync" for this non-clinical path so it is never confused with clinical data leaving the device.
+
+## Generation providers & API keys (BYOK)
+
+Vocabulary for who supplies the AI credential that bills note generation. Note generation is the **only** AI step covered by BYOK — cloud transcription (Nova) stays on PTScribe's own account. Like [Account config & sync](#account-config--sync), these are account-infrastructure terms, not part of the clinician workflow, but they appear in code, UI, and PRs.
+
+- **Generation provider** — the AI service that produces a Note: **Anthropic**, **OpenAI**, or **Google**. Each clinician selects one as their [active provider](#generation-providers--api-keys-byok); the chosen provider and model ride [config sync](#account-config--sync), but the keys never do.
+- **Active provider** — the user's currently selected generation provider + model. Drives which key is looked up at Generate time.
+- **Personal key (BYOK)** — a registered user's own provider API key. Stored server-side (never returned to the browser after entry), used to bill that user's own provider account. Required for real (non-demo) generation.
+- **Org key** — an organization-provided provider key set by a manager. Inherited by org members who have no personal key for the active provider, so an invited clinician need not create their own provider account.
+- **Key resolution order** — at Generate time: **personal key → org key → blocked**. With no usable key, the Generate action is blocked with a prompt to add one (it does not silently fall back to the shared key).
+- **Shared key** — PTScribe's own provider key. **Demo-only** (see [Demo mode](#demo-mode)); never used for real generation.
+- **Verified key** — a key confirmed by a live validation call to its provider before being stored. The UI shows verified vs. unverified status; a key is never silently invalidated on a later runtime error.
+  - _Avoid_: "API key" unqualified when the distinction matters — say **personal key**, **org key**, or **shared key**.
 
 ## Primary success criterion
 
