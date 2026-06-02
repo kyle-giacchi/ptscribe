@@ -18,6 +18,15 @@ import { createAuth } from './auth';
 import { handleOrgRoute } from './org';
 import { handleConfigRoute } from './config';
 import { handleKeysRoute } from './keys';
+import { makeDb } from './db';
+import {
+  getProvider,
+  isProviderId,
+  isModelAllowed,
+  type BuildRequestInput,
+  type ProviderAdapter,
+} from './providers';
+import { decryptKey, KeyCryptoError } from './keyCrypto';
 
 /**
  * Workers Rate Limiting binding (GA). `limit()` is in-network, per-Cloudflare-
@@ -69,6 +78,9 @@ export interface Env {
 }
 
 interface GenerateBody {
+  /** Active generation provider (BYOK). Required on the authenticated path;
+   *  the demo/shared path forces 'anthropic'. */
+  provider?: string;
   model?: string;
   system?: string;
   /** Pre-built modifier block (tone + emphasis + custom). Appended to system prompt when present. */
@@ -88,11 +100,8 @@ const ALLOWED_TRANSCRIBE_MODELS = new Set([
   '@cf/openai/whisper-sherpa',
 ]);
 
-const ALLOWED_GENERATE_MODELS = new Set([
-  'claude-haiku-4-5-20251001',
-  'claude-sonnet-4-6',
-  'claude-opus-4-7',
-]);
+// Generation model allowlists now live per-provider in worker/providers/* and
+// are enforced via isModelAllowed() on both the user-key and shared/demo paths.
 
 // Keep aligned with src/lib/audioLimits.ts MAX_AUDIO_BYTES
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -129,6 +138,19 @@ export default {
       res = await withGate(request, env, { origin: 'lenient' }, () =>
         handleKeysRoute(request, env, ctx, url.pathname),
       );
+    } else if (url.pathname === '/api/generate' || url.pathname === '/api/v1/generate') {
+      // BYOK (issue 03): generation is session-first (user/org key), so it does
+      // NOT go through handleApi's shared x-ptscribe gate + billing caps. Method
+      // guard stays ahead of the origin check (405 before 403), then strict
+      // origin + the pre-gate DoS limiter via withGate. The shared/demo path
+      // re-applies the gate + caps itself, inside handleGenerate.
+      if (request.method !== 'POST') {
+        res = apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
+      } else {
+        res = await withGate(request, env, { origin: 'strict' }, () =>
+          handleGenerate(request, env, ctx),
+        );
+      }
     } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
       res = await withGate(request, env, { origin: 'skip' }, () =>
         handleModelFile(request, url, env, ctx),
@@ -385,9 +407,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     if (url.pathname === '/api/transcribe' || url.pathname === '/api/v1/transcribe') {
       return handleTranscribe(request, env);
     }
-    if (url.pathname === '/api/generate' || url.pathname === '/api/v1/generate') {
-      return handleGenerate(request, env);
-    }
+    // /api/generate is handled in fetch() (session-first BYOK path), not here.
     return apiError('NOT_FOUND', 'Not found', 404);
   });
 }
@@ -594,11 +614,30 @@ function fromWordTags(alt: DeepgramAlt): string {
   return lines.join('\n\n');
 }
 
-async function handleGenerate(request: Request, env: Env): Promise<Response> {
-  if (!env.ANTHROPIC_API_KEY) {
-    return apiError('MISSING_API_KEY', 'Server is missing ANTHROPIC_API_KEY secret', 500);
-  }
+/**
+ * Note generation (ADR-0009/0010). Session-first: an authenticated user generates
+ * against THEIR resolved provider key (personal → org → block); a sessionless call
+ * is allowed only in demo mode (shared key + gate + caps), else 401. The shared
+ * x-ptscribe gate and billing caps apply ONLY to the demo/shared path — the
+ * user-key path is authenticated by session and billed to the user's own provider.
+ */
+async function handleGenerate(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  // Session decides the path; body parsing is deferred into each branch so the
+  // shared/demo path enforces its gate + caps BEFORE touching the request body.
+  const session = await createAuth(env, ctx).api.getSession({ headers: request.headers });
+  const userId = session?.user?.id ?? null;
 
+  if (userId) return generateWithUserKey(request, env, userId);
+  if (env.DEMO_MODE === 'true') return generateWithSharedKey(request, env);
+  return apiError('SIGNIN_REQUIRED', 'Sign in to generate notes', 401);
+}
+
+/** Parse + validate the shared generation fields, or a 4xx Response. */
+async function parseGenerateBody(request: Request): Promise<GenerateBody | Response> {
   let body: GenerateBody;
   try {
     body = (await request.json()) as GenerateBody;
@@ -608,59 +647,165 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
   if (!body.model || !body.system || !body.user) {
     return apiError('MISSING_FIELDS', 'Missing model/system/user', 400);
   }
-  if (!ALLOWED_GENERATE_MODELS.has(body.model)) {
-    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
-  }
   if (body.user.length > 50_000) {
     return apiError('MISSING_FIELDS', 'user prompt too large', 400);
   }
+  return body;
+}
 
-  const modifierBlock = body.modifierBlock?.trim();
-  const finalSystem = modifierBlock
-    ? `${body.system.trimEnd()}\n\n${modifierBlock}`
-    : body.system.trimEnd();
+/** Authenticated path: resolve the user's/org's key for the active provider. */
+async function generateWithUserKey(request: Request, env: Env, userId: string): Promise<Response> {
+  const body = await parseGenerateBody(request);
+  if (body instanceof Response) return body;
+  const provider = body.provider;
+  if (!isProviderId(provider)) {
+    return apiError('INVALID_PROVIDER', 'Missing or unknown provider', 400);
+  }
+  if (!isModelAllowed(provider, body.model!)) {
+    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
+  }
 
-  const cacheSystem = body.cacheSystem !== false;
-  const systemBlocks = [
-    cacheSystem
-      ? { type: 'text', text: finalSystem, cache_control: { type: 'ephemeral' } }
-      : { type: 'text', text: finalSystem },
-  ];
+  let apiKey: string | null;
+  try {
+    apiKey = await resolveProviderKey(env, userId, provider);
+  } catch (err) {
+    if (err instanceof KeyCryptoError) {
+      console.error(`[generate] key crypto unavailable: ${err.message}`);
+      return apiError('KEY_ENC_UNAVAILABLE', 'Key storage is temporarily unavailable', 503);
+    }
+    throw err;
+  }
+  if (!apiKey) {
+    // Distinct code the client turns into an inline "add your key" prompt.
+    return apiError('NO_KEY', 'No API key set for the selected provider', 402);
+  }
 
+  return dispatchGeneration(getProvider(provider)!, buildGenInput(body, apiKey), {
+    surfaceProviderErrors: true,
+  });
+}
+
+/** Demo-only path: shared Anthropic key behind the x-ptscribe gate + billing caps. */
+async function generateWithSharedKey(request: Request, env: Env): Promise<Response> {
+  // Perimeter (gate + caps + key presence) is checked BEFORE the body is read.
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const gate = request.headers.get('x-ptscribe-key') ?? '';
+  const expectedHash = env.PTSCRIBE_GATE ? await sha256Hex(env.PTSCRIBE_GATE) : '';
+  if (!expectedHash || !timingSafeEqual(gate, expectedHash)) {
+    return apiError('UNAUTHORIZED', 'Unauthorized', 401);
+  }
+  if (!(await checkRateLimit(env, ip)).allowed) {
+    return apiError('RATE_LIMITED', 'Rate limit exceeded', 429);
+  }
+  if (!(await checkGlobalDailyLimit(env)).allowed) {
+    return apiError('RATE_LIMITED', 'Service daily limit reached', 429);
+  }
+  if (!env.ANTHROPIC_API_KEY) {
+    return apiError('MISSING_API_KEY', 'Server is missing ANTHROPIC_API_KEY secret', 500);
+  }
+
+  const body = await parseGenerateBody(request);
+  if (body instanceof Response) return body;
+  if (!isModelAllowed('anthropic', body.model!)) {
+    return apiError('MODEL_NOT_ALLOWED', `Model not allowed: ${body.model}`, 400);
+  }
+  return dispatchGeneration(getProvider('anthropic')!, buildGenInput(body, env.ANTHROPIC_API_KEY), {
+    surfaceProviderErrors: false,
+  });
+}
+
+/** Resolve the active provider's key for a user: personal → org → null. */
+async function resolveProviderKey(
+  env: Env,
+  userId: string,
+  provider: string,
+): Promise<string | null> {
+  const db = makeDb(env);
+  const personal = await db
+    .selectFrom('user_api_keys')
+    .select(['ciphertext', 'iv'])
+    .where('userId', '=', userId)
+    .where('provider', '=', provider)
+    .executeTakeFirst();
+  if (personal) return decryptKey(env, personal);
+
+  const user = await db
+    .selectFrom('user')
+    .select(['tenantId'])
+    .where('id', '=', userId)
+    .executeTakeFirst();
+  if (user?.tenantId) {
+    const org = await db
+      .selectFrom('org_api_keys')
+      .select(['ciphertext', 'iv'])
+      .where('orgId', '=', user.tenantId)
+      .where('provider', '=', provider)
+      .executeTakeFirst();
+    if (org) return decryptKey(env, org);
+  }
+  return null;
+}
+
+function buildGenInput(body: GenerateBody, apiKey: string): BuildRequestInput {
+  return {
+    model: body.model!,
+    system: body.system!,
+    modifierBlock: body.modifierBlock,
+    user: body.user!,
+    maxTokens: body.maxTokens,
+    temperature: body.temperature,
+    cacheSystem: body.cacheSystem,
+    apiKey,
+  };
+}
+
+/**
+ * Build + send the upstream call through a provider adapter and map the result.
+ * On the user-key path (`surfaceProviderErrors`), 401/403 → KEY_REJECTED and
+ * 429 → PROVIDER_LIMITED so the user sees their own provider's status; we never
+ * auto-flip the stored key. The demo/shared path stays generic + log-only.
+ */
+async function dispatchGeneration(
+  adapter: ProviderAdapter,
+  input: BuildRequestInput,
+  opts: { surfaceProviderErrors: boolean },
+): Promise<Response> {
+  const req = adapter.buildRequest(input);
   let upstream: Response;
   try {
-    upstream = await fetch('https://api.anthropic.com/v1/messages', {
+    upstream = await fetch(req.url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: body.model,
-        max_tokens: body.maxTokens ?? 2048,
-        temperature: body.temperature ?? 0.2,
-        system: systemBlocks,
-        messages: [{ role: 'user', content: [{ type: 'text', text: body.user }] }],
-      }),
+      headers: req.headers,
+      body: req.body,
       signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
     });
   } catch (err) {
     if (isTimeoutError(err)) {
-      console.error(`[generate] Anthropic upstream timed out after ${ANTHROPIC_TIMEOUT_MS}ms`);
+      console.error(`[generate] ${adapter.id} upstream timed out after ${ANTHROPIC_TIMEOUT_MS}ms`);
       return apiError('UPSTREAM_TIMEOUT', 'Note generation timed out', 504);
     }
-    console.error(`[generate] Anthropic upstream fetch failed: ${(err as Error).message}`);
+    console.error(`[generate] ${adapter.id} upstream fetch failed: ${(err as Error).message}`);
     return apiError('UPSTREAM_FAILED', 'Note generation failed upstream', 502);
   }
 
   if (!upstream.ok) {
-    // Keep the upstream detail in operator logs only; the client gets a
-    // generic message + status so we don't leak Anthropic account/quota text.
+    // Detail stays in operator logs only — never leak provider account/quota text.
     const detail = (await safeText(upstream)).slice(0, 200);
     console.error(
-      `[generate] Anthropic upstream ${upstream.status}: ${detail || upstream.statusText}`,
+      `[generate] ${adapter.id} upstream ${upstream.status}: ${detail || upstream.statusText}`,
     );
+    if (opts.surfaceProviderErrors) {
+      if (upstream.status === 401 || upstream.status === 403) {
+        return apiError('KEY_REJECTED', 'Your provider rejected the API key', 401);
+      }
+      if (upstream.status === 429) {
+        return apiError(
+          'PROVIDER_LIMITED',
+          'Your provider rate-limited the request or is out of credit',
+          429,
+        );
+      }
+    }
     return apiError(
       'UPSTREAM_FAILED',
       `Note generation failed upstream (${upstream.status})`,
@@ -668,14 +813,8 @@ async function handleGenerate(request: Request, env: Env): Promise<Response> {
     );
   }
 
-  const data = (await upstream.json()) as {
-    content?: { type: string; text?: string }[];
-  };
-  const text = (data.content ?? [])
-    .filter((b) => b.type === 'text' && typeof b.text === 'string')
-    .map((b) => b.text as string)
-    .join('');
-  if (!text) return apiError('EMPTY_TEXT', 'Anthropic response had no text content', 502);
+  const text = adapter.extractText(await upstream.json());
+  if (!text) return apiError('EMPTY_TEXT', 'Provider response had no text content', 502);
   return json({ text });
 }
 
@@ -781,7 +920,14 @@ type ErrorCode =
   | 'EMPTY_TEXT'
   | 'DEMO_DISABLED'
   | 'UPSTREAM_FAILED'
-  | 'UPSTREAM_TIMEOUT';
+  | 'UPSTREAM_TIMEOUT'
+  // BYOK generation (ADR-0009/0010, issue 03)
+  | 'SIGNIN_REQUIRED'
+  | 'INVALID_PROVIDER'
+  | 'NO_KEY'
+  | 'KEY_REJECTED'
+  | 'PROVIDER_LIMITED'
+  | 'KEY_ENC_UNAVAILABLE';
 
 function apiError(code: ErrorCode, error: string, status: number): Response {
   return json({ code, error }, status);
