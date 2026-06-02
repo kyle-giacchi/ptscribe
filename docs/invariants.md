@@ -115,6 +115,11 @@ All on-device data is partitioned into cryptographically-isolated **Profiles** (
 - **`demo` and `test-user` are separate profiles** that share the `DEMO_USER` auth identity but never share storage — this is what stops demo↔test↔real data bleed.
 - The Whisper **model cache (`ptscribe-model-cache`) stays app-global** and un-scoped (non-PHI, see [model-cache rule](#model-cache-is-app-global-and-survives-every-reset-path)). The legacy un-suffixed pre-Profile keys are purged once by `purgeLegacyUnscopedStorage()` (greenfield — no migration).
 
+**Two load-bearing assumptions make the destructive paths in this area safe. Both are unguarded by the type system — do not invalidate either without doing the matching work:**
+
+- **`legacyCleanup` assumes greenfield (no production users existed pre-ADR-0007).** `purgeLegacyUnscopedStorage()` _deletes_ the un-suffixed `ptnotes.*` keys and the legacy `ptnotes-audio` DB on first boot — it does **not** migrate them. This is correct only because no non-demo build ever shipped to real users. If a pre-Profile production build ever did ship (or ships before this is revisited), this function destroys those users' vault + clinical data irreversibly on upgrade. Anyone who breaks the greenfield assumption must convert this purge into a migration first.
+- **The demo auto-unlock wipe is safe _only because_ it is profile-scoped.** `VaultGate`'s `resetLocalDataForDemo()` removes `STORAGE_KEYS.vault/.appData/.pageModes` and clears the audio DB — but those getters resolve to the **`demo`/`test-user`** namespace, never `local`/`<userId>`. It fires when an initialized vault won't open with the demo passphrase. This is only reachable in demo mode, and only destroys demo data, **provided `getDemoPassphrase()` stays deterministic and unchanging** — if the demo passphrase ever changes, existing demo vaults stop opening and get wiped (acceptable: demo data), but the wipe must never be allowed to target a real profile's namespace.
+
 ## Storage cap and audio offload
 
 `safeLocalStorage.setItem` throws if the serialized JSON of a single object exceeds 5 MB (`MAX_OBJECT_BYTES`). The throw is intentional — it surfaces the problem rather than silently dropping data.
