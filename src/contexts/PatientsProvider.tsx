@@ -14,6 +14,10 @@ export interface PatientsContextValue {
 
 const PatientsContext = createContext<PatientsContextValue | null>(null);
 
+// Intentionally hand-written rather than built on createListSliceContext: `removePatient`
+// is a cross-slice cascade (bulkUpdate over notes/plans/sessions/patients + IndexedDB audio
+// shred) and `updatePatient` guards the UNASSIGNED sentinel. Those reach beyond a single list
+// slice, so this provider keeps its bespoke shape instead of widening the factory interface.
 export function PatientsProvider({ children }: { children: ReactNode }) {
   const { appData, updatePatientsSlice, bulkUpdate } = useAppData();
   const patients = appData.patients;

@@ -1,6 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { useAppData } from './AppDataProvider';
-import { makeListMutators } from './listSlice';
+import { createListSliceContext } from './createListSliceContext';
 import type { Exercise } from '@/types';
 
 export interface ExercisesContextValue {
@@ -11,26 +9,19 @@ export interface ExercisesContextValue {
   getExercise: (id: string) => Exercise | undefined;
 }
 
-const ExercisesContext = createContext<ExercisesContextValue | null>(null);
+const { Provider, useSlice } = createListSliceContext<Exercise, ExercisesContextValue>({
+  label: 'Exercises',
+  select: (appData) => appData.exercises,
+  selectUpdater: (app) => app.updateExercisesSlice,
+  protectBuiltins: true,
+  build: (m, exercises) => ({
+    exercises,
+    addExercise: m.add,
+    updateExercise: m.update,
+    removeExercise: m.remove,
+    getExercise: m.get,
+  }),
+});
 
-export function ExercisesProvider({ children }: { children: ReactNode }) {
-  const { appData, updateExercisesSlice } = useAppData();
-  const exercises = appData.exercises;
-  const value = useMemo<ExercisesContextValue>(() => {
-    const m = makeListMutators(exercises, updateExercisesSlice, { protectBuiltins: true });
-    return {
-      exercises,
-      addExercise: m.add,
-      updateExercise: m.update,
-      removeExercise: m.remove,
-      getExercise: m.get,
-    };
-  }, [exercises, updateExercisesSlice]);
-  return <ExercisesContext.Provider value={value}>{children}</ExercisesContext.Provider>;
-}
-
-export function useExercises(): ExercisesContextValue {
-  const ctx = useContext(ExercisesContext);
-  if (!ctx) throw new Error('useExercises must be used within ExercisesProvider');
-  return ctx;
-}
+export const ExercisesProvider = Provider;
+export const useExercises = useSlice;

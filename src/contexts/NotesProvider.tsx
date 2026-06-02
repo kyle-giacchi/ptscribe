@@ -1,6 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { useAppData } from './AppDataProvider';
-import { makeListMutators } from './listSlice';
+import { createListSliceContext } from './createListSliceContext';
 import type { Note } from '@/types';
 
 export interface NotesContextValue {
@@ -15,31 +13,23 @@ export interface NotesContextValue {
   forSession: (sessionId: string) => Note | undefined;
 }
 
-const NotesContext = createContext<NotesContextValue | null>(null);
+const { Provider, useSlice } = createListSliceContext<Note, NotesContextValue>({
+  label: 'Notes',
+  select: (appData) => appData.notes,
+  selectUpdater: (app) => app.updateNotesSlice,
+  build: (m, notes) => ({
+    notes,
+    addNote: m.add,
+    updateNote: m.update,
+    removeNote: m.remove,
+    finalizeNote: (id) => m.update(id, { finalized: true, finalizedAt: Date.now() }),
+    unfinalizeNote: (id) => m.update(id, { finalized: false, finalizedAt: undefined }),
+    getNote: m.get,
+    forPatient: (patientId) =>
+      notes.filter((n) => n.patientId === patientId).sort((a, b) => b.createdAt - a.createdAt),
+    forSession: (sessionId) => notes.find((n) => n.sessionId === sessionId),
+  }),
+});
 
-export function NotesProvider({ children }: { children: ReactNode }) {
-  const { appData, updateNotesSlice } = useAppData();
-  const notes = appData.notes;
-  const value = useMemo<NotesContextValue>(() => {
-    const m = makeListMutators(notes, updateNotesSlice);
-    return {
-      notes,
-      addNote: m.add,
-      updateNote: m.update,
-      removeNote: m.remove,
-      finalizeNote: (id) => m.update(id, { finalized: true, finalizedAt: Date.now() }),
-      unfinalizeNote: (id) => m.update(id, { finalized: false, finalizedAt: undefined }),
-      getNote: m.get,
-      forPatient: (patientId) =>
-        notes.filter((n) => n.patientId === patientId).sort((a, b) => b.createdAt - a.createdAt),
-      forSession: (sessionId) => notes.find((n) => n.sessionId === sessionId),
-    };
-  }, [notes, updateNotesSlice]);
-  return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>;
-}
-
-export function useNotes(): NotesContextValue {
-  const ctx = useContext(NotesContext);
-  if (!ctx) throw new Error('useNotes must be used within NotesProvider');
-  return ctx;
-}
+export const NotesProvider = Provider;
+export const useNotes = useSlice;
