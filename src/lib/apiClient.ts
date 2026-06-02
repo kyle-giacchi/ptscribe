@@ -15,7 +15,21 @@ export class GateRejectedError extends Error {
   }
 }
 
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export interface ApiFetchOptions {
+  /** When true (default), a 401 is treated as a rejected gate code: the stored
+   *  code is cleared and {@link GateRejectedError} is thrown. Session-authed
+   *  routes (BYOK /api/generate, /api/keys/*) pass `false` so their 401s —
+   *  SIGNIN_REQUIRED / KEY_REJECTED — reach the caller intact instead of nuking
+   *  the unrelated gate code. */
+  interceptGate?: boolean;
+}
+
+export async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+  opts: ApiFetchOptions = {},
+): Promise<Response> {
+  const { interceptGate = true } = opts;
   const hash = getStoredGateHash();
   const headers = new Headers(init.headers);
   if (hash) headers.set(GATE_HEADER, hash);
@@ -24,7 +38,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   // /api/generate is session-first (BYOK), and the gate path no longer carries auth.
   const res = await fetch(path, { credentials: 'include', ...init, headers });
 
-  if (res.status === 401) {
+  if (interceptGate && res.status === 401) {
     clearGateCode();
     throw new GateRejectedError();
   }

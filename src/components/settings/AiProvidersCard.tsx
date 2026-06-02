@@ -1,10 +1,62 @@
+import { useEffect, useState } from 'react';
 import { Field, TextInput, Select } from '@/components/ui/Field';
-import { Eyebrow, SurfaceCard } from '@/components/design';
+import { Eyebrow, SurfaceCard, SegmentedControl } from '@/components/design';
 import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { PROVIDER_CATALOG, defaultModelFor } from '@/services/ai/providerCatalog';
+import { getUserKeys, type KeyProvider, type KeyStatus } from '@/services/ai/keysClient';
+import { ProviderKeyCard } from './ProviderKeyCard';
+import type { GenerationProvider } from '@/types';
+
+const GEN_PROVIDERS: GenerationProvider[] = ['anthropic', 'openai', 'google', 'none'];
+const GEN_LABELS: Record<GenerationProvider, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  none: 'Off',
+};
 
 export function AiProvidersCard() {
   const { settings, updateAi } = useSettings();
+  const genProvider = settings.ai.generation.provider;
+
+  // Masked key status per provider (server-side, write-only). `null` = still
+  // loading; `signinRequired` = not authenticated, so BYOK key management is hidden.
+  const [keys, setKeys] = useState<Record<string, KeyStatus> | null>(null);
+  const [signinRequired, setSigninRequired] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getUserKeys().then((result) => {
+      if (cancelled) return;
+      if (result.signinRequired) {
+        setSigninRequired(true);
+        setKeys({});
+        return;
+      }
+      setSigninRequired(false);
+      setKeys(Object.fromEntries(result.keys.map((k) => [k.provider, k])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function changeGenProvider(next: GenerationProvider) {
+    if (next === 'none') {
+      updateAi({ generation: { ...settings.ai.generation, provider: 'none' } });
+      return;
+    }
+    // Switching provider keeps each provider's stored key (server-side, untouched);
+    // only re-point the active model to the new provider's default.
+    updateAi({ generation: { provider: next, model: defaultModelFor(next) } });
+  }
+
+  function handleKeyStatus(provider: KeyProvider, status: KeyStatus) {
+    setKeys((prev) => ({ ...(prev ?? {}), [provider]: status }));
+  }
+
+  const activeDescriptor = genProvider !== 'none' ? PROVIDER_CATALOG[genProvider] : null;
 
   return (
     <SurfaceCard padding={18}>
@@ -70,40 +122,59 @@ export function AiProvidersCard() {
           )}
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gap: 10,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          }}
-        >
+        {/* ── Note generation (BYOK) ─────────────────────────────────────── */}
+        <div style={{ display: 'grid', gap: 10 }}>
           <Field label="Generation provider">
-            <Select
-              value={settings.ai.generation.provider}
-              onChange={(e) =>
-                updateAi({
-                  generation: {
-                    ...settings.ai.generation,
-                    provider: e.target.value as typeof settings.ai.generation.provider,
-                  },
-                })
-              }
-            >
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="none">Off (manual notes only)</option>
-            </Select>
+            <div>
+              <SegmentedControl<GenerationProvider>
+                value={genProvider}
+                onChange={changeGenProvider}
+                items={GEN_PROVIDERS.map((p) => ({ value: p, label: GEN_LABELS[p] }))}
+              />
+            </div>
           </Field>
-          <Field label="Claude model">
-            <TextInput
-              placeholder="claude-sonnet-4-6"
-              value={settings.ai.generation.model}
-              onChange={(e) =>
-                updateAi({
-                  generation: { ...settings.ai.generation, model: e.target.value },
-                })
-              }
-            />
-          </Field>
+
+          {genProvider === 'none' ? (
+            <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+              AI note generation is off — you can still write and edit notes manually.
+            </div>
+          ) : (
+            <>
+              <Field label="Model" className="max-w-sm">
+                <Select
+                  value={settings.ai.generation.model}
+                  onChange={(e) =>
+                    updateAi({
+                      generation: { ...settings.ai.generation, model: e.target.value },
+                    })
+                  }
+                >
+                  {PROVIDER_CATALOG[genProvider].models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              {signinRequired ? (
+                <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+                  Sign in to add your own {activeDescriptor?.label} API key. With your key, note
+                  generation runs against your provider account.
+                </div>
+              ) : keys === null ? (
+                <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+                  Loading key status…
+                </div>
+              ) : activeDescriptor ? (
+                <ProviderKeyCard
+                  descriptor={activeDescriptor}
+                  status={keys[activeDescriptor.id]}
+                  onStatusChange={(s) => handleKeyStatus(activeDescriptor.id, s)}
+                />
+              ) : null}
+            </>
+          )}
         </div>
       </div>
     </SurfaceCard>

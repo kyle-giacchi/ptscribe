@@ -49,21 +49,27 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
     if (args.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
     try {
-      const res = await apiFetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider,
-          model: args.model,
-          system: args.system,
-          modifierBlock: args.modifierBlock,
-          user: args.user,
-          maxTokens: args.maxTokens,
-          temperature: args.temperature,
-          cacheSystem: args.cacheSystem,
-        }),
-        signal: args.signal,
-      });
+      const res = await apiFetch(
+        '/api/generate',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            model: args.model,
+            system: args.system,
+            modifierBlock: args.modifierBlock,
+            user: args.user,
+            maxTokens: args.maxTokens,
+            temperature: args.temperature,
+            cacheSystem: args.cacheSystem,
+          }),
+          signal: args.signal,
+        },
+        // Session-first route: a 401 is SIGNIN_REQUIRED / KEY_REJECTED (a provider/auth
+        // signal we classify below), NOT a rejected gate code — don't let apiFetch wipe it.
+        { interceptGate: false },
+      );
 
       if (!res.ok) {
         const body = await safeReadText(res);
