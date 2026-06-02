@@ -5,6 +5,7 @@ import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { PROVIDER_CATALOG, defaultModelFor } from '@/services/ai/providerCatalog';
 import { getUserKeys, type KeyProvider, type KeyStatus } from '@/services/ai/keysClient';
+import { useUsableKey } from '@/hooks/useUsableKey';
 import { ProviderKeyCard } from './ProviderKeyCard';
 import type { GenerationProvider } from '@/types';
 
@@ -19,6 +20,9 @@ const GEN_LABELS: Record<GenerationProvider, string> = {
 export function AiProvidersCard() {
   const { settings, updateAi } = useSettings();
   const genProvider = settings.ai.generation.provider;
+  // Org-key signal: surfaces "provided by your organization" so a member knows
+  // why Generate works without their own key (issue 09).
+  const { orgSet } = useUsableKey();
 
   // Masked key status per provider (server-side, write-only). `null` = still
   // loading; `signinRequired` = not authenticated, so BYOK key management is hidden.
@@ -167,11 +171,19 @@ export function AiProvidersCard() {
                   Loading key status…
                 </div>
               ) : activeDescriptor ? (
-                <ProviderKeyCard
-                  descriptor={activeDescriptor}
-                  status={keys[activeDescriptor.id]}
-                  onStatusChange={(s) => handleKeyStatus(activeDescriptor.id, s)}
-                />
+                <>
+                  <ProviderKeyCard
+                    descriptor={activeDescriptor}
+                    status={keys[activeDescriptor.id]}
+                    onStatusChange={(s) => handleKeyStatus(activeDescriptor.id, s)}
+                  />
+                  {orgSet ? (
+                    <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+                      Your organization provides a {activeDescriptor.label} key. It’s used when you
+                      haven’t set your own — your personal key takes priority.
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </>
           )}

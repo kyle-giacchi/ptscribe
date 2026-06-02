@@ -64,10 +64,18 @@ export async function getOrgKeys(): Promise<KeyListResult> {
   return { signinRequired: false, keys };
 }
 
+/** Key owner: a clinician's personal keys vs. the org's shared keys. */
+export type KeyScope = 'user' | 'org';
+const scopeBase = (scope: KeyScope) => (scope === 'org' ? '/api/keys/org' : '/api/keys/user');
+
 /** Live-validate + store a key. The server rejects an invalid key (it is NOT stored). */
-export async function putUserKey(provider: KeyProvider, key: string): Promise<KeyMutationResult> {
+async function putKey(
+  scope: KeyScope,
+  provider: KeyProvider,
+  key: string,
+): Promise<KeyMutationResult> {
   const res = await apiFetch(
-    '/api/keys/user',
+    scopeBase(scope),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -81,9 +89,9 @@ export async function putUserKey(provider: KeyProvider, key: string): Promise<Ke
 }
 
 /** Remove the stored key for a provider. Idempotent — succeeds even if unset. */
-export async function deleteUserKey(provider: KeyProvider): Promise<KeyMutationResult> {
+async function deleteKey(scope: KeyScope, provider: KeyProvider): Promise<KeyMutationResult> {
   const res = await apiFetch(
-    `/api/keys/user?provider=${encodeURIComponent(provider)}`,
+    `${scopeBase(scope)}?provider=${encodeURIComponent(provider)}`,
     { method: 'DELETE' },
     { interceptGate: false },
   );
@@ -96,9 +104,9 @@ export async function deleteUserKey(provider: KeyProvider): Promise<KeyMutationR
 }
 
 /** Re-validate the stored key against the provider. Never auto-invalidates on failure. */
-export async function verifyUserKey(provider: KeyProvider): Promise<KeyMutationResult> {
+async function verifyKey(scope: KeyScope, provider: KeyProvider): Promise<KeyMutationResult> {
   const res = await apiFetch(
-    '/api/keys/user/verify',
+    `${scopeBase(scope)}/verify`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,6 +117,29 @@ export async function verifyUserKey(provider: KeyProvider): Promise<KeyMutationR
   const body = await readJson(res);
   if (!res.ok) return NOT_OK(res, body);
   return { ok: true, status: maskFrom(provider, body) };
+}
+
+export const putUserKey = (provider: KeyProvider, key: string) => putKey('user', provider, key);
+export const deleteUserKey = (provider: KeyProvider) => deleteKey('user', provider);
+export const verifyUserKey = (provider: KeyProvider) => verifyKey('user', provider);
+
+export const putOrgKey = (provider: KeyProvider, key: string) => putKey('org', provider, key);
+export const deleteOrgKey = (provider: KeyProvider) => deleteKey('org', provider);
+export const verifyOrgKey = (provider: KeyProvider) => verifyKey('org', provider);
+
+/** Mutation trio for a scope — lets a shared component (ProviderKeyCard) drive either owner. */
+export interface KeyOps {
+  put: (provider: KeyProvider, key: string) => Promise<KeyMutationResult>;
+  remove: (provider: KeyProvider) => Promise<KeyMutationResult>;
+  verify: (provider: KeyProvider) => Promise<KeyMutationResult>;
+}
+
+export function keyOps(scope: KeyScope): KeyOps {
+  return {
+    put: (provider, key) => putKey(scope, provider, key),
+    remove: (provider) => deleteKey(scope, provider),
+    verify: (provider) => verifyKey(scope, provider),
+  };
 }
 
 /** Build a KeyStatus from a successful mutation response (set/last4/status/verifiedAt). */

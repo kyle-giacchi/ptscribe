@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { getUserKeys, putUserKey, deleteUserKey, verifyUserKey } from './keysClient';
+import {
+  getUserKeys,
+  getOrgKeys,
+  putUserKey,
+  deleteUserKey,
+  verifyUserKey,
+  putOrgKey,
+  deleteOrgKey,
+} from './keysClient';
 import { apiFetch } from '@/lib/apiClient';
 
 vi.mock('@/lib/apiClient', () => ({
@@ -84,5 +92,31 @@ describe('deleteUserKey / verifyUserKey', () => {
     mockApiFetch.mockResolvedValueOnce(jsonResponse(404, { code: 'NO_KEY', error: 'none' }));
     const result = await verifyUserKey('anthropic');
     expect(result).toMatchObject({ ok: false, code: 'NO_KEY' });
+  });
+});
+
+describe('org scope hits the org endpoints', () => {
+  it('getOrgKeys reads /api/keys/org and treats 403 as signinRequired', async () => {
+    mockApiFetch.mockResolvedValueOnce(jsonResponse(403, { code: 'NOT_IN_ORG' }));
+    expect(await getOrgKeys()).toEqual({ signinRequired: true });
+    expect(mockApiFetch.mock.calls[0][0]).toBe('/api/keys/org');
+  });
+
+  it('putOrgKey PUTs to /api/keys/org', async () => {
+    mockApiFetch.mockResolvedValueOnce(
+      jsonResponse(200, { ok: true, provider: 'anthropic', set: true, last4: 'abcd' }),
+    );
+    await putOrgKey('anthropic', 'sk-ant-x');
+    expect(mockApiFetch.mock.calls[0][0]).toBe('/api/keys/org');
+    expect(mockApiFetch.mock.calls[0][1]?.method).toBe('PUT');
+  });
+
+  it('deleteOrgKey DELETEs against /api/keys/org with the provider query', async () => {
+    mockApiFetch.mockResolvedValueOnce(
+      jsonResponse(200, { ok: true, provider: 'google', set: false }),
+    );
+    await deleteOrgKey('google');
+    expect(mockApiFetch.mock.calls[0][0]).toBe('/api/keys/org?provider=google');
+    expect(mockApiFetch.mock.calls[0][1]?.method).toBe('DELETE');
   });
 });
