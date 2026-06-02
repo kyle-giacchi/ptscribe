@@ -162,6 +162,38 @@ draft
 
 Transitions are owned by `useSessionMachine` (composing `useCapturePhase`, `useTranscriptSource`, and `useGeneratePhase`), driven from `Session.tsx`.
 
+#### Code map (read this before editing the machine)
+
+The session machine is ~1,800 lines across four hooks. It is large but **not tangled** — it's a thin coordinator over independent slices. Load this map instead of all four files when planning an edit.
+
+**Coordinator** — `src/hooks/useSessionMachine.ts`. Wires the three phase hooks + a shared reducer + the action guard into one `SessionMachine` interface. Owns no side effects; only routes data between phases (notably `capturePhase.silencedMergedBlob → transcriptSource`).
+
+**Two orthogonal notions of "phase" — do not conflate them:**
+
+- **`Session.status`** (persisted, on the `Session` entity) = the **lifecycle stage** the state machine above describes: `draft`/`recording`/`transcribing`/`generating`/`ready`/`finalized`. It survives reload and is the source of truth for resume/crash-recovery.
+- **Reducer slices** (`SessionMachineState`, in-memory, per-render, `sessionMachine/types.ts`) = **transient status of the in-flight operation**, each a tiny 3-state enum, reset on every mount:
+  - `generate.phase`: `idle | generating | error`
+  - `transcribe.phase`: `idle | transcribing | error` (T3 cloud Nova only)
+  - `t2.phase`: `idle | running | done | error` (background local-Whisper mirror — its only completion signal)
+  - `capture.uploadStatus.phase`: `idle | reading | saving | done | error`
+
+  They answer "is an AI call running right now / did it error", not "where is this session in its life". A note can be generating (`generate.phase === 'generating'`) while `Session.status` is still `draft` — that is correct, not a desync.
+
+**Ownership — which hook to edit:**
+
+| Hook                  | Owns                                                                            | Reducer slice(s) it dispatches |
+| --------------------- | ------------------------------------------------------------------------------- | ------------------------------ |
+| `useCapturePhase`     | recording, pause/resume, upload, clip delete, clip-merge → `silencedMergedBlob` | `capture/upload`               |
+| `useTranscriptSource` | T2 auto-pass, T3 cloud Nova, tier switching/revert (`promoteTier`)              | `transcribe/*`, `t2/*`         |
+| `useGeneratePhase`    | note generation, section edits, finalize/unfinalize                             | `generate/*`                   |
+| `useActionGuard`      | anti-double-tap cooldown only                                                   | —                              |
+
+**Lifetime caps** (`cloudTranscribeCount`, `generateCount`) live on the **persisted Session**, not in `useActionGuard` — so they survive reload/Revert/Unlock. Read them from `session?.*Count ?? 0`.
+
+**To add a new step/phase, touch these spots (the 4-step ripple):** (1) add the slice + phase enum + actions to `sessionMachine/types.ts`; (2) handle the actions in `sessionMachine/reducer.ts` (pure — no side effects); (3) put the side effect in the owning phase hook (a "runner" that dispatches start/success/error); (4) surface it on the `SessionMachine` interface in `useSessionMachine.ts`. Pure state in the reducer, side effects in the hooks — never mix.
+
+> **Coverage gap (tripwire wanted):** the reducer and each phase hook are unit-tested, but `useSessionMachine` (the composition) has **no integration test**. Before any non-trivial edit, add/extend a characterization test that pins the end-to-end transitions (record → transcribe → generate → finalize, plus revert and resume) so a cross-hook regression fails loudly. See `.scratch/session-machine-hardening/issues/01-characterization-test.md`.
+
 ### SessionClip status
 
 ```
