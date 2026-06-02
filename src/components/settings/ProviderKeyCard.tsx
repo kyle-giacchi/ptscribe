@@ -3,9 +3,9 @@ import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { TextInput } from '@/components/ui/Field';
 import type { ProviderDescriptor } from '@/services/ai/providerCatalog';
 import {
-  putUserKey,
-  deleteUserKey,
-  verifyUserKey,
+  keyOps,
+  type KeyOps,
+  type KeyScope,
   type KeyStatus,
   type KeyMutationResult,
 } from '@/services/ai/keysClient';
@@ -14,6 +14,8 @@ interface Props {
   descriptor: ProviderDescriptor;
   status: KeyStatus | undefined;
   onStatusChange: (status: KeyStatus) => void;
+  /** Whose key this card manages — personal (default) or the org's shared key. */
+  scope?: KeyScope;
 }
 
 type Busy = 'saving' | 'verifying' | 'removing' | null;
@@ -37,7 +39,8 @@ function reasonFor(code: string, fallback: string): string {
   }
 }
 
-export function ProviderKeyCard({ descriptor, status, onStatusChange }: Props) {
+export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'user' }: Props) {
+  const ops: KeyOps = keyOps(scope);
   const isSet = status?.set === true;
   const [editing, setEditing] = useState(!isSet);
   const [draft, setDraft] = useState('');
@@ -60,21 +63,21 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange }: Props) {
     if (!key) return;
     setBusy('saving');
     setFeedback(null);
-    apply(await putUserKey(descriptor.id, key), 'Key verified and saved.');
+    apply(await ops.put(descriptor.id, key), 'Key verified and saved.');
     setBusy(null);
   }
 
   async function handleVerify() {
     setBusy('verifying');
     setFeedback(null);
-    apply(await verifyUserKey(descriptor.id), 'Key re-verified.');
+    apply(await ops.verify(descriptor.id), 'Key re-verified.');
     setBusy(null);
   }
 
   async function handleRemove() {
     setBusy('removing');
     setFeedback(null);
-    const result = await deleteUserKey(descriptor.id);
+    const result = await ops.remove(descriptor.id);
     apply(result, 'Key removed.');
     if (result.ok) setEditing(true);
     setBusy(null);
