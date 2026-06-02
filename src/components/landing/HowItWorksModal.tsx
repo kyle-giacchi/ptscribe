@@ -233,7 +233,7 @@ function IntroChapter() {
         </span>
         <div className="price-card price-card--ours">
           <span className="price-card__kicker">PTScribe</span>
-          <span className="price-card__name">Estimated cloud spend · per clinician</span>
+          <span className="price-card__name">Your own provider spend · per clinician</span>
           <span className="price-card__v">
             <span className="approx">~</span>$5<span className="unit">/yr</span>
           </span>
@@ -495,13 +495,13 @@ function IntroChapter() {
       </ol>
 
       <p className="note" style={{ marginTop: 18 }}>
-        The <strong>~$5/yr PTScribe estimate</strong> is metered note-generation at a typical
-        caseload; local Whisper carries the transcript for $0 and the Nova-3 "Improve with AI" pass
-        is opt-in and capped 1× per session. The <strong>$89M</strong> is a cloud-only
-        counterfactual — what every minute of every visit would cost if you sent it all to Nova-3.
-        PTScribe doesn't pay that, because local Whisper carries the default load.{' '}
-        <strong>$162M</strong> is a straightforward revenue estimate at $1,800/yr × 90k PTs, not a
-        claim about any one vendor's margins.
+        The <strong>~$5/yr estimate</strong> is note-generation billed directly to your own provider
+        account (Anthropic, OpenAI, or Google) at a typical caseload — PTScribe takes no cut. Local
+        Whisper carries the transcript for $0 and the Nova-3 "Improve with AI" pass is opt-in and
+        capped 1× per session. The <strong>$89M</strong> is a cloud-only counterfactual — what every
+        minute of every visit would cost if you sent it all to Nova-3. PTScribe doesn't pay that,
+        because local Whisper carries the default load. <strong>$162M</strong> is a straightforward
+        revenue estimate at $1,800/yr × 90k PTs, not a claim about any one vendor's margins.
         <span className="note__sig">basis &amp; caveat</span>
       </p>
 
