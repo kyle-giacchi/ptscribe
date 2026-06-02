@@ -17,6 +17,7 @@
 import { createAuth } from './auth';
 import { handleOrgRoute } from './org';
 import { handleConfigRoute } from './config';
+import { handleKeysRoute } from './keys';
 
 /**
  * Workers Rate Limiting binding (GA). `limit()` is in-network, per-Cloudflare-
@@ -123,6 +124,10 @@ export default {
     } else if (url.pathname.startsWith('/api/config/')) {
       res = await withGate(request, env, { origin: 'lenient' }, () =>
         handleConfigRoute(request, env, ctx, url.pathname),
+      );
+    } else if (url.pathname.startsWith('/api/keys/')) {
+      res = await withGate(request, env, { origin: 'lenient' }, () =>
+        handleKeysRoute(request, env, ctx, url.pathname),
       );
     } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {
       res = await withGate(request, env, { origin: 'skip' }, () =>
