@@ -63,6 +63,30 @@ export interface AppDb {
     exercises: string;
     updatedAt: number;
   };
+  // BYOK provider keys (ADR-0009). Plaintext is never stored — only AES-256-GCM
+  // ciphertext + per-row iv (worker/keyCrypto.ts) plus a non-secret last4.
+  user_api_keys: {
+    userId: string;
+    provider: string;
+    ciphertext: string;
+    iv: string;
+    last4: string;
+    status: string;
+    verifiedAt: number | null;
+    createdAt: number;
+    updatedAt: number;
+  };
+  org_api_keys: {
+    orgId: string;
+    provider: string;
+    ciphertext: string;
+    iv: string;
+    last4: string;
+    status: string;
+    verifiedAt: number | null;
+    createdAt: number;
+    updatedAt: number;
+  };
 }
 
 export function makeDb(env: Env): Kysely<AppDb> {
