@@ -60,6 +60,11 @@ export interface Env {
   /** From-address for transactional email, e.g. "PTScribe <login@ptscribe.app>".
    *  Must be a domain verified in Resend (DKIM/SPF). Defaults to a ptscribe.app sender. */
   EMAIL_FROM?: string;
+  /** Secrets Store master key for BYOK provider-key encryption at rest
+   *  (worker/keyCrypto.ts, ADR-0009). Optional binding → keyCrypto FAILS CLOSED
+   *  (throws KeyCryptoError, never plaintext) when absent. Must be set before
+   *  BYOK generation works in prod. */
+  KEY_ENC_MASTER?: SecretsStoreSecret;
 }
 
 interface GenerateBody {
