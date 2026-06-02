@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { GlobalTopNav } from './GlobalTopNav';
+import { KeyReminderBanner } from './KeyReminderBanner';
 import { Toaster } from '@/components/ui/Toaster';
 import { OfflineIndicator } from './OfflineIndicator';
 import { duration, ease } from '@/lib/motion';
@@ -28,25 +29,31 @@ export function AppShell() {
       <OfflineIndicator />
       <div
         className="grid h-full w-full overflow-hidden"
-        style={{ ...shellBox, gridTemplateRows: isDemoMode() ? 'auto auto 1fr' : 'auto 1fr' }}
+        style={{ ...shellBox, gridTemplateRows: 'auto 1fr' }}
       >
-        <GlobalTopNav />
-        {isDemoMode() && (
-          <div
-            style={{
-              background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
-              borderBottom: '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
-              padding: '5px 22px',
-              fontSize: 11.5,
-              color: 'var(--color-caution)',
-              textAlign: 'center',
-              lineHeight: 1.4,
-            }}
-          >
-            Demo mode — data uses a shared passphrase embedded in the source code. Do not enter real
-            patient information.
-          </div>
-        )}
+        {/* Header stack — one grid row so any combination of banners (demo, key
+            reminder) renders without throwing off the main-content track. */}
+        <div>
+          <GlobalTopNav />
+          {isDemoMode() && (
+            <div
+              style={{
+                background: 'color-mix(in oklab, var(--color-caution) 12%, transparent)',
+                borderBottom:
+                  '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
+                padding: '5px 22px',
+                fontSize: 11.5,
+                color: 'var(--color-caution)',
+                textAlign: 'center',
+                lineHeight: 1.4,
+              }}
+            >
+              Demo mode — data uses a shared passphrase embedded in the source code. Do not enter
+              real patient information.
+            </div>
+          )}
+          <KeyReminderBanner />
+        </div>
         <main ref={mainRef} className="overflow-auto" style={mainStyle}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

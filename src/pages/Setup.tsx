@@ -5,14 +5,21 @@ import { toast } from 'sonner';
 import { ArrowRight, Check } from 'lucide-react';
 import { useClinician } from '@/contexts/ClinicianProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { Field, TextInput } from '@/components/ui/Field';
-import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
+import { Field, TextInput, Select } from '@/components/ui/Field';
+import { Eyebrow, PtButton, SurfaceCard, SegmentedControl } from '@/components/design';
 import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
+import { ProviderKeyCard } from '@/components/settings/ProviderKeyCard';
+import { useUsableKey } from '@/hooks/useUsableKey';
+import { PROVIDER_CATALOG, defaultModelFor } from '@/services/ai/providerCatalog';
+import { isDemoMode } from '@/lib/demoMode';
+import type { KeyProvider, KeyStatus } from '@/services/ai/keysClient';
 import { duration, ease } from '@/lib/motion';
 import { DISCLOSURE_VERSION, type FirstRunRole } from '@/types';
 
-type Step = 'welcome' | 'role' | 'profile' | 'owner-tips' | 'done';
-const FLOW: Step[] = ['role', 'profile', 'owner-tips', 'done'];
+type Step = 'welcome' | 'role' | 'profile' | 'connect-key' | 'owner-tips' | 'done';
+const FLOW: Step[] = ['role', 'profile', 'connect-key', 'owner-tips', 'done'];
+// BYOK key entry is meaningless in demo (shared key) — drop the step there.
+const SHOW_KEY_STEP = !isDemoMode();
 
 export function Setup() {
   const [step, setStep] = useState<Step>('welcome');
@@ -58,10 +65,19 @@ export function Setup() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // After profile, route to the (skippable) key step in non-demo, else straight on.
+  const afterProfile: Step = SHOW_KEY_STEP
+    ? 'connect-key'
+    : settings.firstRun.role === 'owner'
+      ? 'owner-tips'
+      : 'done';
+  const afterKey: Step = settings.firstRun.role === 'owner' ? 'owner-tips' : 'done';
+
   const flowIndex = FLOW.indexOf(step);
-  // Hide owner-tips from the stepper for clinicians.
-  const visibleSteps: Step[] =
-    role === 'owner' ? FLOW : (FLOW.filter((s) => s !== 'owner-tips') as Step[]);
+  // Hide owner-tips from clinicians and the key step from demo builds.
+  const visibleSteps: Step[] = FLOW.filter(
+    (s) => (s !== 'owner-tips' || role === 'owner') && (s !== 'connect-key' || SHOW_KEY_STEP),
+  ) as Step[];
   const visibleIndex = visibleSteps.indexOf(step);
   const stepperLabels = visibleSteps
     .filter((s) => s !== 'done')
@@ -137,18 +153,8 @@ export function Setup() {
                 }}
               />
             )}
-            {step === 'profile' && (
-              <ProfileStep
-                onNext={() => {
-                  // After profile, owners see tips; clinicians go straight to done.
-                  if (settings.firstRun.role === 'owner') {
-                    setStep('owner-tips');
-                  } else {
-                    setStep('done');
-                  }
-                }}
-              />
-            )}
+            {step === 'profile' && <ProfileStep onNext={() => setStep(afterProfile)} />}
+            {step === 'connect-key' && <ConnectKeyStep onNext={() => setStep(afterKey)} />}
             {step === 'owner-tips' && <OwnerTipsStep onContinue={() => setStep('done')} />}
             {step === 'done' && <DoneStep />}
           </motion.div>
@@ -164,6 +170,8 @@ function stepLabel(step: Step): string {
       return 'Role';
     case 'profile':
       return 'Profile';
+    case 'connect-key':
+      return 'AI key';
     case 'owner-tips':
       return 'Next steps';
     case 'done':
@@ -394,6 +402,99 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
           iconRight={<ArrowRight size={14} strokeWidth={2} />}
         >
           Finish setup
+        </PtButton>
+      </div>
+    </div>
+  );
+}
+
+const KEY_PROVIDERS: KeyProvider[] = ['anthropic', 'openai', 'google'];
+
+function ConnectKeyStep({ onNext }: { onNext: () => void }) {
+  const { settings, updateAi } = useSettings();
+  const { state, orgSet } = useUsableKey();
+  // The active generation provider; coerce 'none' to anthropic for the picker.
+  const provider: KeyProvider =
+    settings.ai.generation.provider === 'none' ? 'anthropic' : settings.ai.generation.provider;
+  const [keyStatus, setKeyStatus] = useState<KeyStatus | undefined>(undefined);
+
+  function pickProvider(next: KeyProvider) {
+    setKeyStatus(undefined);
+    updateAi({ generation: { provider: next, model: defaultModelFor(next) } });
+  }
+
+  const descriptor = PROVIDER_CATALOG[provider];
+  // Org key already covers this provider — the clinician is ready without a personal key.
+  const orgReady = state === 'ready' && orgSet;
+
+  return (
+    <div style={{ display: 'grid', gap: 20 }}>
+      <StepHeading
+        title="Connect your AI provider"
+        subtitle="Notes are generated with your own provider key, billed to your account. You can add or change this anytime in Settings."
+      />
+
+      {orgReady ? (
+        <SurfaceCard padding={18}>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-pt-text)' }}>
+              Your organization provides an AI key
+            </div>
+            <p
+              style={{ margin: 0, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}
+            >
+              You&apos;re ready to generate notes — no personal key needed. You can still add your
+              own key in Settings to use a different provider.
+            </p>
+          </div>
+        </SurfaceCard>
+      ) : (
+        <SurfaceCard padding={18}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <Field label="Provider">
+              <div>
+                <SegmentedControl<KeyProvider>
+                  value={provider}
+                  onChange={pickProvider}
+                  items={KEY_PROVIDERS.map((p) => ({ value: p, label: PROVIDER_CATALOG[p].label }))}
+                />
+              </div>
+            </Field>
+            <Field label="Model" className="max-w-sm">
+              <Select
+                value={settings.ai.generation.model}
+                onChange={(e) =>
+                  updateAi({ generation: { ...settings.ai.generation, model: e.target.value } })
+                }
+              >
+                {descriptor.models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <ProviderKeyCard
+              descriptor={descriptor}
+              status={keyStatus}
+              onStatusChange={setKeyStatus}
+            />
+          </div>
+        </SurfaceCard>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        {!orgReady && (
+          <PtButton variant="ghost" onClick={onNext}>
+            I&apos;ll add this later
+          </PtButton>
+        )}
+        <PtButton
+          variant="primary"
+          onClick={onNext}
+          iconRight={<ArrowRight size={14} strokeWidth={2} />}
+        >
+          {keyStatus?.set || orgReady ? 'Continue' : 'Skip for now'}
         </PtButton>
       </div>
     </div>
