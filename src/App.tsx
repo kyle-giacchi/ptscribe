@@ -19,6 +19,7 @@ import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
 import { AppGate } from '@/components/common/AppGate';
 import { ProfileResolver } from '@/components/common/ProfileResolver';
+import { RequireAuth } from '@/components/common/RequireAuth';
 import { VaultGate } from '@/components/vault/VaultGate';
 import { AppShell } from '@/components/common/AppShell';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -173,7 +174,12 @@ export default function App() {
                     <AppProviders />
                   </AppGate>
                 ) : (
-                  <AppProviders />
+                  // RequireAuth sits ABOVE AppProviders (and thus above
+                  // ProfileResolver/VaultGate) so an anonymous non-demo visit
+                  // redirects to /login before the `local` profile is committed.
+                  <RequireAuth>
+                    <AppProviders />
+                  </RequireAuth>
                 )
               }
             />
