@@ -137,14 +137,17 @@ describe('Origin allow/deny (handleApi strict mode)', () => {
     expect((await body(res)).code).toBe('FORBIDDEN');
   });
 
-  it('allowed Origin passes the origin check (reaches gate → 401, not 403)', async () => {
+  it('allowed Origin passes the origin check (reaches session gate → 401 SIGNIN_REQUIRED)', async () => {
+    // Post-BYOK (issue 03): generation is session-first. An allowed-origin call
+    // with no session and not in demo mode falls through to SIGNIN_REQUIRED — it
+    // got past the origin check (would be 403 otherwise).
     const res = await worker.fetch(
       req('/api/generate', { method: 'POST', headers: { Origin: ORIGIN } }),
       makeEnv(),
       ctx,
     );
     expect(res.status).toBe(401);
-    expect((await body(res)).code).toBe('UNAUTHORIZED');
+    expect((await body(res)).code).toBe('SIGNIN_REQUIRED');
   });
 
   it('honors a custom ALLOWED_ORIGINS CSV (in-list passes, default origin now denied)', async () => {
@@ -173,6 +176,9 @@ describe('Method guard', () => {
   });
 });
 
+// The x-ptscribe gate now guards only the demo/shared generation path (and
+// transcribe). These cases exercise it via /api/generate under DEMO_MODE=true,
+// where a sessionless call falls into the shared-key path.
 describe('Gate (sha256Hex + timingSafeEqual)', () => {
   it('allowed origin + wrong key → 401 UNAUTHORIZED', async () => {
     const res = await worker.fetch(
@@ -180,7 +186,7 @@ describe('Gate (sha256Hex + timingSafeEqual)', () => {
         method: 'POST',
         headers: { Origin: ORIGIN, 'x-ptscribe-key': 'wrong' },
       }),
-      makeEnv(),
+      makeEnv({ DEMO_MODE: 'true' }),
       ctx,
     );
     expect(res.status).toBe(401);
@@ -190,7 +196,7 @@ describe('Gate (sha256Hex + timingSafeEqual)', () => {
   it('correct key crosses the gate (generate w/o ANTHROPIC_API_KEY → 500 MISSING_API_KEY)', async () => {
     const res = await worker.fetch(
       req('/api/generate', { method: 'POST', headers: await gateHeaders() }),
-      makeEnv({ ANTHROPIC_API_KEY: '' }),
+      makeEnv({ ANTHROPIC_API_KEY: '', DEMO_MODE: 'true' }),
       ctx,
     );
     expect(res.status).toBe(500);
@@ -203,7 +209,7 @@ describe('Gate (sha256Hex + timingSafeEqual)', () => {
         method: 'POST',
         headers: { Origin: ORIGIN, 'x-ptscribe-key': '' },
       }),
-      makeEnv({ PTSCRIBE_GATE: '' }),
+      makeEnv({ PTSCRIBE_GATE: '', DEMO_MODE: 'true' }),
       ctx,
     );
     expect(res.status).toBe(401);
@@ -228,6 +234,7 @@ describe('Rate limiting (bindings + global KV daily cap)', () => {
     const env = makeEnv({
       PREGATE_RATE_LIMITER: fakeLimiter(true),
       API_RATE_LIMITER: fakeLimiter(false),
+      DEMO_MODE: 'true',
     });
     const res = await worker.fetch(
       req('/api/generate', { method: 'POST', headers: await gateHeaders() }),
@@ -240,7 +247,7 @@ describe('Rate limiting (bindings + global KV daily cap)', () => {
 
   it('global daily KV count ≥ 500 → 429 "Service daily limit reached"', async () => {
     const day = Math.floor(Date.now() / 86_400_000);
-    const env = makeEnv({ RATE_LIMIT: fakeKV({ [`rl:global:${day}`]: '500' }) });
+    const env = makeEnv({ RATE_LIMIT: fakeKV({ [`rl:global:${day}`]: '500' }), DEMO_MODE: 'true' });
     const res = await worker.fetch(
       req('/api/generate', { method: 'POST', headers: await gateHeaders() }),
       env,
@@ -253,10 +260,10 @@ describe('Rate limiting (bindings + global KV daily cap)', () => {
   it('no limiter bindings + no KV → fails open (reaches handler)', async () => {
     const res = await worker.fetch(
       req('/api/generate', { method: 'POST', headers: await gateHeaders() }),
-      makeEnv({ ANTHROPIC_API_KEY: '' }),
+      makeEnv({ ANTHROPIC_API_KEY: '', DEMO_MODE: 'true' }),
       ctx,
     );
-    // Crossed gate + rate limits, landed in handleGenerate.
+    // Crossed gate + rate limits, landed in the shared-key generation path.
     expect(res.status).toBe(500);
     expect((await body(res)).code).toBe('MISSING_API_KEY');
   });
@@ -369,7 +376,10 @@ describe('Transcribe model allowlist + size caps', () => {
 });
 
 describe('Generate validation', () => {
-  async function postGenerate(payload: unknown, env = makeEnv()) {
+  // These exercise the demo/shared-key generation path (no session, DEMO_MODE on,
+  // shared Anthropic key behind the gate). The session/user-key paths are covered
+  // in generate.test.ts.
+  async function postGenerate(payload: unknown, env = makeEnv({ DEMO_MODE: 'true' })) {
     return worker.fetch(
       req('/api/generate', {
         method: 'POST',
@@ -384,7 +394,7 @@ describe('Generate validation', () => {
   it('missing ANTHROPIC_API_KEY → 500 MISSING_API_KEY', async () => {
     const res = await postGenerate(
       { model: 'claude-sonnet-4-6', system: 's', user: 'u' },
-      makeEnv({ ANTHROPIC_API_KEY: '' }),
+      makeEnv({ ANTHROPIC_API_KEY: '', DEMO_MODE: 'true' }),
     );
     expect(res.status).toBe(500);
     expect((await body(res)).code).toBe('MISSING_API_KEY');
