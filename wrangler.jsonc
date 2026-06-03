@@ -58,6 +58,13 @@
       "simple": { "limit": 20, "period": 60 },
     },
   ],
+  // Demo/preview deployment toggle (worker/index.ts). DEMO_MODE=true hard-disables
+  // Nova transcribe (403 DEMO_DISABLED) and lets sessionless /api/generate use the
+  // shared PTScribe key. UNSET this for a real production BYOK deployment so
+  // sessionless generate returns 401 SIGNIN_REQUIRED.
+  "vars": {
+    "DEMO_MODE": "true",
+  },
   "observability": {
     "enabled": true,
   },
