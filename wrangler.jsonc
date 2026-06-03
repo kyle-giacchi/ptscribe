@@ -30,6 +30,17 @@
       "bucket_name": "ptnotes-models",
     },
   ],
+  // BYOK provider-key encryption master (ADR-0009). worker/keyCrypto.ts reads it
+  // via env.KEY_ENC_MASTER.get() and FAILS CLOSED if this binding is absent —
+  // every key save/use returns 5xx until it is present. The secret value lives in
+  // the account Secrets Store (store "ptscribe"); only the binding lives here.
+  "secrets_store_secrets": [
+    {
+      "binding": "KEY_ENC_MASTER",
+      "store_id": "1a8981cc326a4ce68ad6aa5cdf7c995b",
+      "secret_name": "KEY_ENC_MASTER",
+    },
+  ],
   // Per-IP rate limiting (GA Workers Rate Limiting binding). In-network and
   // per-Cloudflare-location — no KV reads/writes. The KV RATE_LIMIT namespace
   // above is now used only for the post-gate global daily Anthropic-spend
