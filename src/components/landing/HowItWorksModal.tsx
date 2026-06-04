@@ -7,7 +7,7 @@ interface Props {
   onClose: () => void;
 }
 
-type ChapterId = 'ch-intro' | 'ch-security' | 'ch-voice' | 'ch-notes' | 'ch-future';
+type ChapterId = 'ch-intro' | 'ch-market' | 'ch-security' | 'ch-voice' | 'ch-notes' | 'ch-future';
 
 const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
   { id: 'ch-intro', num: '00', name: 'Why I built this', desc: '$1,800/yr per clinician. Really?' },
@@ -205,17 +205,44 @@ function IntroChapter() {
       <h1 className="hiw__intro-h1 intro-h1--loud" id="hiw-title">
         I honestly couldn't believe what these tools cost.
       </h1>
-      <p className="hiw__intro-sub">
-        The leading SaaS clinical scribes run about{' '}
-        <strong>
-          <span className="intro-h1__amt">$1,800 a year per clinician</span>
-        </strong>{' '}
-        — roughly $150 a month, every month, for each clinician. From a personal-AI perspective, a
-        Claude Max subscription costs about the same and arguably gives you a lot more. I get it: AI
-        costs money, and running these models isn't free. But <em>$1,800-per-clinician-per-year</em>{' '}
-        money? Do we really need yet another payer (the clinician) and another provider (the SaaS
-        company) wedged into the healthcare stack?
-      </p>
+      <div className="hiw__intro-body">
+        <p className="hiw__intro-sub">
+          The leading SaaS clinical scribes run about{' '}
+          <strong>
+            <span className="intro-h1__amt">$1,800 a year per clinician</span>
+          </strong>
+          .
+        </p>
+
+        <p className="hiw__intro-sub">
+          The average PT earns about <strong>$100k a year</strong> (BLS, 2024), roughly{' '}
+          <strong>$74k</strong> is what they actually take home after taxes.
+        </p>
+
+        <p className="hiw__intro-sub hiw__intro-punch">
+          That&rsquo;s about <strong>2.5 weeks of their paychecks</strong>!{' '}
+          <strong>2.5% of their hard-earned money</strong>!
+        </p>
+
+        <p className="hiw__intro-sub">
+          I get it&hellip; AI costs money, and these software companies need to pay people to host
+          servers, secure them, get compliance audits, pay UI developers to center a div, and staff
+          multiple business units to ensure their software-masked-as-a-business keeps running.
+        </p>
+
+        <p className="hiw__intro-sub">So it begs the questions&hellip;</p>
+
+        <div className="hiw__intro-qs">
+          <p className="hiw__intro-q">
+            Do we really need another payer (the clinician) and another provider (the SaaS company)
+            wedged into the healthcare stack?
+          </p>
+          <p className="hiw__intro-q">
+            Can a solo product builder create a product that meets feature parity with some of the
+            leaders in the industry?
+          </p>
+        </div>
+      </div>
 
       <div className="market-strip__h">
         <span>Annual cost · per clinician</span>
@@ -240,8 +267,38 @@ function IntroChapter() {
         </div>
       </div>
 
+      <p className="hiw__intro-explore">
+        If you want to learn more, jump straight to{' '}
+        <a className="hiw__intro-explore-link" href="#ch-market" data-goto="ch-market">
+          <em>the market data</em>
+        </a>{' '}
+        <span className="hiw__intro-explore-sep">›</span>{' '}
+        <a className="hiw__intro-explore-link" href="#ch-security" data-goto="ch-security">
+          <em>how I handled security</em>
+        </a>{' '}
+        <span className="hiw__intro-explore-sep">›</span>{' '}
+        <a className="hiw__intro-explore-link" href="#ch-voice" data-goto="ch-voice">
+          <em>how I optimized voice transcription to cut cost</em>
+        </a>{' '}
+        <span className="hiw__intro-explore-sep">›</span>{' '}
+        <a className="hiw__intro-explore-link" href="#ch-notes" data-goto="ch-notes">
+          <em>the struggles of local note processing</em>
+        </a>{' '}
+        <span className="hiw__intro-explore-sep">›</span> and lastly,{' '}
+        <a className="hiw__intro-explore-link" href="#ch-future" data-goto="ch-future">
+          <em>how I intend to grow this solution</em>
+        </a>
+        .
+      </p>
+    </section>
+  );
+}
+
+function MarketChapter() {
+  return (
+    <section id="ch-market" className="ch hiw__page" data-page="ch-market">
       <h3 className="market-facts__title">
-        Market facts <span className="market-facts__title-sub">— the wider context</span>
+        Market facts <span className="market-facts__title-sub">· the wider context</span>
       </h3>
       <div className="market-facts" role="table" aria-label="Market facts">
         <div className="market-facts__head" role="row">
@@ -270,11 +327,11 @@ function IntroChapter() {
             Visits per clinician · year
           </span>
           <span className="market-facts__note" role="cell">
-            ~10 patients/day × ~225 working days. Roughly <strong>1,100 hours</strong> of session
+            ~15 patients/day × ~225 working days. Roughly <strong>1,650 hours</strong> of session
             audio per clinician, per year.
           </span>
           <span className="market-facts__v" role="cell">
-            <span className="approx">~</span>2,250<span className="unit">visits/yr</span>
+            <span className="approx">~</span>3,375<span className="unit">visits/yr</span>
           </span>
         </div>
 
@@ -296,11 +353,11 @@ function IntroChapter() {
             Manual note time · per year
           </span>
           <span className="market-facts__note" role="cell">
-            Hand-written documentation — <strong>10–15 min/visit</strong>, blended across a typical
-            caseload — multiplied across all ~2,250 visits a clinician logs in a year.
+            Hand-written documentation, about <strong>12 min/visit</strong>, blended across a
+            typical caseload, multiplied across all ~3,375 visits a clinician logs in a year.
           </span>
           <span className="market-facts__v" role="cell">
-            <span className="approx">~</span>375–560<span className="unit">hrs/yr</span>
+            <span className="approx">~</span>675<span className="unit">hrs/yr</span>
           </span>
         </div>
 
@@ -310,10 +367,11 @@ function IntroChapter() {
           </span>
           <span className="market-facts__note" role="cell">
             Record → generate → review &amp; finalize. Real-world ambient-scribe studies land at{' '}
-            <strong>~4–6 min/visit</strong> — the same caseload, a fraction of the desk time.
+            <strong>~5 min/visit</strong>, the same caseload, a fraction of the desk time. Against
+            the <strong>~675 hrs/yr</strong> above, that&rsquo;s roughly:
           </span>
           <span className="market-facts__v" role="cell">
-            <span className="approx">~</span>150–225<span className="unit">hrs/yr</span>
+            <span className="approx">~</span>60<span className="unit">% less</span>
           </span>
         </div>
 
@@ -322,7 +380,7 @@ function IntroChapter() {
             Industry-wide subs · half-adoption
           </span>
           <span className="market-facts__note" role="cell">
-            90,000 PTs × $1,800/yr — what would flow into SaaS subscription revenue if even{' '}
+            90,000 PTs × $1,800/yr, what would flow into SaaS subscription revenue if even{' '}
             <strong>half</strong> of US PTs subscribed.
           </span>
           <span className="market-facts__v" role="cell">
@@ -332,14 +390,16 @@ function IntroChapter() {
 
         <div className="market-facts__row" role="row">
           <span className="market-facts__k" role="cell">
-            Actual cloud compute · 100%
+            Estimated operating cost · half-adoption
           </span>
           <span className="market-facts__note" role="cell">
-            Nova-3 on every minute of every visit, all 180k PTs.{' '}
-            <strong>Barely half of what subscriptions collect.</strong> The gap is the markup.
+            What it actually costs to run a Heidi-style scribe for those same 90k subscribers:
+            Nova-3 transcription on every minute (<strong>~$45M</strong>), plus LLM note generation
+            and cloud infrastructure. Against the <strong>~$162M</strong> they pay in, the gap is
+            the markup.
           </span>
           <span className="market-facts__v" role="cell">
-            <span className="approx">~</span>$89M<span className="unit">/yr</span>
+            <span className="approx">~</span>$60M<span className="unit">/yr</span>
           </span>
         </div>
       </div>
@@ -347,7 +407,7 @@ function IntroChapter() {
       <div className="intro-bridge-block">
         <span className="intro-bridge-block__eyebrow">The question</span>
         <p className="intro-bridge">
-          So it begs the question —{' '}
+          So it begs the question:{' '}
           <strong>could I build a secure, local-first clinical scribe that holds its own?</strong>
         </p>
       </div>
@@ -385,7 +445,7 @@ function IntroChapter() {
             <span className="goal__body">
               <span className="goal__h">Covers the core features of the big-name scribes.</span>
               <span className="goal__teaser">
-                The same polished notes — for a fraction of the price.
+                The same polished notes, for a fraction of the price.
               </span>
             </span>
             <span className="goal__go">ch. 03 →</span>
@@ -429,8 +489,8 @@ function IntroChapter() {
                 </span>
               </span>
               <span className="hiw__idx-title">
-                Three ways to turn speech into text — and the audio-engineering tricks that make
-                Nova affordable.
+                Three ways to turn speech into text, and the audio-engineering tricks that make Nova
+                affordable.
               </span>
             </span>
             <span className="hiw__idx-leader" aria-hidden="true" />
@@ -454,7 +514,7 @@ function IntroChapter() {
                 </span>
               </span>
               <span className="hiw__idx-title">
-                The one critical-path feature I couldn't keep local — and the on-device PII model
+                The one critical-path feature I couldn't keep local, and the on-device PII model
                 that softens the blow.
               </span>
             </span>
@@ -479,7 +539,7 @@ function IntroChapter() {
                 </span>
               </span>
               <span className="hiw__idx-title">
-                If "local" didn't have to mean your laptop — just a machine inside the building.
+                If "local" didn't have to mean your laptop, just a machine inside the building.
               </span>
             </span>
             <span className="hiw__idx-leader" aria-hidden="true" />
@@ -496,9 +556,9 @@ function IntroChapter() {
 
       <p className="note" style={{ marginTop: 18 }}>
         The <strong>~$5/yr estimate</strong> is note-generation billed directly to your own provider
-        account (Anthropic, OpenAI, or Google) at a typical caseload — PTScribe takes no cut. Local
+        account (Anthropic, OpenAI, or Google) at a typical caseload. PTScribe takes no cut. Local
         Whisper carries the transcript for $0 and the Nova-3 "Improve with AI" pass is opt-in and
-        capped 1× per session. The <strong>$89M</strong> is a cloud-only counterfactual — what every
+        capped 1× per session. The <strong>$89M</strong> is a cloud-only counterfactual, what every
         minute of every visit would cost if you sent it all to Nova-3. PTScribe doesn't pay that,
         because local Whisper carries the default load. <strong>$162M</strong> is a straightforward
         revenue estimate at $1,800/yr × 90k PTs, not a claim about any one vendor's margins.
@@ -506,7 +566,10 @@ function IntroChapter() {
       </p>
 
       <div className="hiw__pager">
-        <span className="hiw__pager-hint mono">Pick a chapter, or step through with ← / →</span>
+        <a className="hiw__pager-link hiw__pager-prev" href="#ch-intro" data-goto="ch-intro">
+          <span className="hiw__pager-dir mono">← Back</span>
+          <span className="hiw__pager-label">Why I built this</span>
+        </a>
         <a className="btn btn--primary hiw__pager-next" href="#ch-security" data-goto="ch-security">
           Start with the security model
           <svg
@@ -538,7 +601,7 @@ function SecurityChapter() {
           <>
             Three layers enforce that. <strong>Everything lives on your machine, encrypted.</strong>{' '}
             The <strong>only thing that crosses the network is a thin proxy.</strong> And the{' '}
-            <strong>browser's CSP is the real local-first fence</strong> — a compromised dependency
+            <strong>browser's CSP is the real local-first fence</strong>, a compromised dependency
             can't phone home, because the browser refuses to open the connection.
           </>
         }
@@ -561,7 +624,7 @@ function SecurityChapter() {
             </div>
             <div className="node__name">Vault key (in memory)</div>
             <div className="node__desc">
-              Unlocked once when you open the app — passphrase or passkey. Held only in memory.
+              Unlocked once when you open the app, via passphrase or passkey. Held only in memory.
             </div>
             <div className="node__meta">tab-lifetime</div>
           </div>
@@ -639,7 +702,7 @@ function SecurityChapter() {
       <div className="note">
         <p>
           An MVP focused on clinical transcription didn't need a database. But the scaffolding is
-          already there — login, DB connections, even a way to deploy this across a whole company.
+          already there: login, DB connections, even a way to deploy this across a whole company.
           Maybe go check it out. <strong>Maybe hire me.</strong>
         </p>
         <span className="note__sig">github.com/kyle-giacchi/ptscribe</span>
@@ -724,7 +787,7 @@ export default {
         <div>
           <div className="takeaway__h">There is nothing to leak from my servers</div>
           <div className="takeaway__body">
-            If my Cloudflare account vanished tomorrow, no patient data would vanish with it —
+            If my Cloudflare account vanished tomorrow, no patient data would vanish with it,
             because no patient data was ever there. The flip side: the vault key is yours alone,
             with no recovery. That's the deal local-first asks you to take.
           </div>
@@ -750,7 +813,7 @@ function VoiceChapter() {
         lede={
           <>
             It turns out there's a whole spectrum. PTScribe uses several paths depending on the
-            moment — a <strong>fully-local Whisper</strong> as the canonical transcript, a{' '}
+            moment: a <strong>fully-local Whisper</strong> as the canonical transcript, a{' '}
             <strong>best-effort live preview</strong> while you record, and an{' '}
             <strong>opt-in cloud pass</strong> for the highest quality. Below: the options I
             explored, why I picked what I picked, and the audio-engineering trick that keeps the
@@ -855,12 +918,12 @@ function VoiceChapter() {
       </div>
 
       <p className="note">
-        But that's the <em>cloud-only</em> picture. In PTScribe, Nova isn't the default path at all
-        — local Whisper produces the transcript for free, and Nova is the capped, opt-in "Improve
-        with AI" pass. These optimizations apply to the <strong>fraction</strong> of audio you
-        choose to send to the cloud, on top of a default that's already $0. The numbers above are
-        what a Nova-for-everything service would pay; PTScribe's actual cloud bill is a sliver of
-        even the optimized figure.
+        But that's the <em>cloud-only</em> picture. In PTScribe, Nova isn't the default path at all,
+        local Whisper produces the transcript for free, and Nova is the capped, opt-in "Improve with
+        AI" pass. These optimizations apply to the <strong>fraction</strong> of audio you choose to
+        send to the cloud, on top of a default that's already $0. The numbers above are what a
+        Nova-for-everything service would pay; PTScribe's actual cloud bill is a sliver of even the
+        optimized figure.
       </p>
 
       <SectionHead tag="three paths" title="…and only one of them costs anything" />
@@ -884,7 +947,7 @@ function VoiceChapter() {
               <div className="tradeoff__col-h is-con">The catch</div>
               <p>
                 First transcription on a fresh browser pays a one-time model download. After that,
-                it's free and offline — but the wait is real, so I design loading states around it.
+                it's free and offline, but the wait is real, so I design loading states around it.
               </p>
             </div>
           </div>
@@ -925,14 +988,14 @@ function VoiceChapter() {
               <div className="tradeoff__col-h is-pro">When it wins</div>
               <p>
                 Speaker diarization (clinician vs. patient) and the cleanest dictation when accuracy
-                matters more than privacy by default. Always an explicit click — never automatic.
+                matters more than privacy by default. Always an explicit click, never automatic.
               </p>
             </div>
             <div className="tradeoff__col">
               <div className="tradeoff__col-h is-con">The catch</div>
               <p>
                 It's the only one that actually costs me money.{' '}
-                <strong>Please be gentle on my hosting bill</strong> — or just hire me so I can keep
+                <strong>Please be gentle on my hosting bill</strong>, or just hire me so I can keep
                 providing this for free.
               </p>
             </div>
@@ -956,7 +1019,7 @@ function VoiceChapter() {
         </li>
         <li>
           <b>1.5× pitch-corrected speed-up.</b> Phase-vocoder time-stretch keeps voices
-          intelligible. ASR handles it cleanly — verified on real session audio.
+          intelligible. ASR handles it cleanly, verified on real session audio.
         </li>
         <li>
           <b>Local Whisper (T2).</b> The canonical pass. A worker pool chunks audio at 2-min
@@ -964,7 +1027,7 @@ function VoiceChapter() {
         </li>
         <li>
           <b>Optional Nova-3 (T3).</b> An explicit click, capped 1× per session, lifetime. Receives
-          the trimmed + sped-up audio — never the raw recording.
+          the trimmed + sped-up audio, never the raw recording.
         </li>
       </ol>
 
@@ -1023,7 +1086,7 @@ function VoiceChapter() {
         <div>
           <div className="takeaway__h">Default path is free, private, and offline</div>
           <div className="takeaway__body">
-            You don't need to pay or trust the cloud to use PTScribe — local Whisper is the default.
+            You don't need to pay or trust the cloud to use PTScribe; local Whisper is the default.
             Nova is there <em>when you want it</em>, and even then you're sending a third of the
             audio you recorded. <strong>Local is the only path that stays at $0.</strong>
           </div>
@@ -1050,7 +1113,7 @@ function NotesChapter() {
           <>
             I haven't found the best solution for processing notes locally{' '}
             <em>for the average clinical user</em>. The CPU-bound models small enough to run in a
-            browser just aren't big enough for the job — especially when you throw a long transcript
+            browser just aren't big enough for the job, especially when you throw a long transcript
             at them. So this led me to the{' '}
             <strong>first "non-local feature" in the critical path</strong>. Ugh… I know. I hear
             your boos over the inter-webs.
@@ -1062,7 +1125,7 @@ function NotesChapter() {
         Let's be honest about what "only the transcript" means: <em>everything</em> in that
         transcript goes with it, including any patient name or identifier that was spoken aloud
         during the visit and never edited out. So this leaves one more bit of friction on you, the
-        clinician, to protect patient privacy — manually scrubbing PII before you hit generate.
+        clinician, to protect patient privacy, manually scrubbing PII before you hit generate.
       </p>
 
       <SectionHead tag="the model I'd love to ship" title="…and the model I actually ship today" />
@@ -1133,7 +1196,7 @@ const body: GenerateRequest = {
 
 // NEVER sent: MRN, ICD-10, prior notes, plan of care, prior sessions.
 // The clinician's last responsibility is to scrub anything spoken aloud
-// that doesn't belong in the cloud — assisted by the on-device NER + regex,
+// that doesn't belong in the cloud, assisted by the on-device NER + regex,
 // with a diff modal review before any edit is applied.`}</pre>
       </div>
 
@@ -1151,7 +1214,7 @@ const body: GenerateRequest = {
             </div>
             <div className="node__name">Curated transcript</div>
             <div className="node__desc">
-              Whatever tier is active — your edits beat T3 beats T2 beats T1.
+              Whatever tier is active, your edits beat T3 beats T2 beats T1.
             </div>
           </div>
           <div className="flow__arrow">
@@ -1249,7 +1312,7 @@ const body: GenerateRequest = {
             </div>
             <div className="spec__note">
               Reached via <code>POST /api/generate</code>. Provider credentials stay server-side.
-              One-shot — returns the full note atomically.
+              One-shot: returns the full note atomically.
             </div>
           </div>
           <div className="spec">
@@ -1274,9 +1337,9 @@ const body: GenerateRequest = {
           <div className="takeaway__body">
             The transcript and modifiers go to Anthropic. Nothing else does. On-device PII scrubbing
             closes most of the gap, and the bigger model is queued for the day the hardware is
-            there. That tension —{' '}
-            <em>what's ideal vs. what runs on the machine the clinician was actually issued</em> —
-            is the throughline of the whole project.
+            there. That tension,{' '}
+            <em>what's ideal vs. what runs on the machine the clinician was actually issued</em>, is
+            the throughline of the whole project.
           </div>
         </div>
       </div>
@@ -1297,22 +1360,22 @@ function FutureChapter() {
         eyebrow="Down the road · 90s read"
         eyebrowVariant="amber"
         title={
-          "What if “local” didn't have to mean your laptop — just a machine inside the building?"
+          "What if “local” didn't have to mean your laptop, just a machine inside the building?"
         }
         lede={
           <>
-            Right now, "local-first" means <em>your laptop</em>. Great for privacy — but it's also
+            Right now, "local-first" means <em>your laptop</em>. Great for privacy, but it's also
             why the heavy lifting (the big PII model, fully local note generation) keeps slamming
             into the "do you happen to own a 24 GB GPU?" wall. Most clinicians don't, and never
             will. So here's the idea I'm most excited about: a single capable box sitting in the
-            back office of a PT practice — <strong>the clinic's brain</strong>.
+            back office of a PT practice: <strong>the clinic's brain</strong>.
           </>
         }
       />
 
       <SectionHead
         tag="sketch"
-        title="Every device talks to a box on the LAN — never the public internet"
+        title="Every device talks to a box on the LAN, never the public internet"
       />
 
       <div className="lan">
@@ -1378,7 +1441,7 @@ function FutureChapter() {
             <span className="roadmap__card-h">↩ data residency</span>
             <span className="roadmap__card-v">Data never leaves the building</span>
             <span className="roadmap__card-sub">
-              Audio, transcripts, notes — all of it stays within the four walls. An easier story to
+              Audio, transcripts, notes, all of it stays within the four walls. An easier story to
               tell a compliance officer than "it's in a browser tab somewhere."
             </span>
           </div>
@@ -1392,7 +1455,7 @@ function FutureChapter() {
           </div>
           <div className="roadmap__card">
             <span className="roadmap__card-h">$ cloud bill</span>
-            <span className="roadmap__card-v">Goes to zero — for real</span>
+            <span className="roadmap__card-v">Goes to zero, for real</span>
             <span className="roadmap__card-sub">
               No Nova passes, no Anthropic in the critical path. The office owns its own compute, so
               the marginal cost per note is… electricity.
@@ -1411,7 +1474,7 @@ function FutureChapter() {
 
       <div className="note">
         <p>
-          There's real network engineering to work out — service discovery so a laptop can find the
+          There's real network engineering to work out, service discovery so a laptop can find the
           box, auth so only clinic-owned devices can reach it, and a graceful fallback for when the
           box is down or someone's charting from home. But the bones are already there: the app is
           just a static bundle talking to a proxy.{' '}
@@ -1438,13 +1501,13 @@ const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 .hiw-root {
-  /* surfaces — app palette: white panel on light blue-gray */
+  /* surfaces - app palette: white panel on light blue-gray */
   --bg:       #f4f6f9;
   --paper:    #ffffff;
   --paper-2:  #f4f6f9;
   --paper-3:  #edf0f4;
   --paper-4:  #e4e8ee;
-  /* ink — app navy */
+  /* ink - app navy */
   --ink:      #1a2030;
   --ink-2:    #5a6577;
   --ink-3:    #8893a5;
@@ -1453,16 +1516,16 @@ const STYLES = `
   --line:     rgba(26, 32, 48, 0.18);
   --line-2:   rgba(26, 32, 48, 0.10);
   --line-3:   rgba(26, 32, 48, 0.06);
-  /* accents — sage tokens remapped to app teal */
+  /* accents - sage tokens remapped to app teal */
   --sage:     #0ea5a8;
   --sage-deep:#0a6d70;
   --sage-soft:#cfe9ea;
   --sage-tint:#e6f7f6;
-  /* "record" (network/alarm) — app red */
+  /* "record" (network/alarm) - app red */
   --record:   #dc2942;
   --record-soft: #f3b6bf;
   --record-tint: #fde4e8;
-  /* amber (caveat/future) — app amber */
+  /* amber (caveat/future) - app amber */
   --amber:    #c47a09;
   --amber-soft:#f1d79b;
   --amber-tint:#fdf3df;
@@ -1495,7 +1558,7 @@ const STYLES = `
 .hiw-root .btn--primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .hiw-root .btn--primary:hover { background: #0f1320; }
 
-/* Keyboard focus — the scoped reset otherwise leaves only the UA default.
+/* Keyboard focus - the scoped reset otherwise leaves only the UA default.
    A clinical-app portfolio piece should be obviously keyboard-navigable. */
 .hiw-root a:focus-visible,
 .hiw-root button:focus-visible,
@@ -1647,6 +1710,47 @@ const STYLES = `
   font-size: 15.5px; color: var(--ink-2);
   line-height: 1.55; margin: 0; text-wrap: pretty;
 }
+/* Stacked intro paragraphs - the gap is the spacing rhythm of the pitch. */
+.hiw__intro-body {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.hiw__intro-punch {
+  font-size: 16.5px; color: var(--ink); font-weight: 500;
+}
+.hiw__intro-qs {
+  display: flex; flex-direction: column; gap: 10px;
+  margin: 2px 0; padding-left: 16px;
+  border-left: 2px solid var(--ch-accent, var(--ink-3));
+}
+.hiw__intro-q {
+  font-size: 15.5px; color: var(--ink); line-height: 1.5;
+  margin: 0; font-weight: 600; text-wrap: pretty;
+}
+.hiw__intro-explore {
+  font-size: 14px; color: var(--ink-2); line-height: 1.75;
+  margin: 4px 0 0; text-wrap: pretty;
+}
+.hiw__intro-explore em {
+  font-style: normal; color: var(--ink); font-weight: 600;
+}
+.hiw__intro-explore-link {
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.hiw__intro-explore-link em { color: var(--ink); }
+.hiw__intro-explore-link:hover {
+  border-bottom-color: var(--ink);
+}
+.hiw__intro-explore-link:hover em { color: var(--ink); }
+.hiw__intro-explore-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.hiw__intro-explore-sep {
+  color: var(--ink-3); margin: 0 1px; font-weight: 400;
+}
 
 /* ── Chapter ──────────────────────────────────────────────── */
 .ch {
@@ -1655,7 +1759,7 @@ const STYLES = `
   scroll-margin-top: 28px;
   --ch-accent: var(--ink);
 }
-/* Per-chapter dominant accent — structure stays identical across chapters,
+/* Per-chapter dominant accent - structure stays identical across chapters,
    so hue (plus copy) is what gives each one its own identity. */
 #ch-security { --ch-accent: var(--ink); }
 #ch-voice    { --ch-accent: var(--sage-deep); }
@@ -2322,7 +2426,7 @@ const STYLES = `
   font-family: "JetBrains Mono", monospace;
   font-size: 10.5px; letter-spacing: 0.04em; color: var(--ink-3);
 }
-.note__sig::before { content: "— "; opacity: 0.7; }
+.note__sig::before { content: "- "; opacity: 0.7; }
 .note strong { font-weight: 600; font-style: normal; color: var(--ink); }
 .note em { font-style: normal; }
 
@@ -2409,7 +2513,7 @@ const STYLES = `
   border-radius: 4px; border: 1px solid var(--line-3); overflow: hidden;
 }
 .cost-bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--sage-deep); border-radius: 3px; }
-/* Baseline split: speech (ink) vs. trimmed silence (neutral, not amber —
+/* Baseline split: speech (ink) vs. trimmed silence (neutral, not amber,
    dead air is neutral, not a warning; amber is reserved for caveat/future). */
 .cost-bar__fill--split { background: linear-gradient(90deg, var(--ink) 0 50%, var(--ink-4) 50%); }
 .cost-bar__value {
@@ -2666,6 +2770,7 @@ export function HowItWorksModal({ open, onClose }: Props) {
       const target = e.target as HTMLElement | null;
       if (target?.matches('input, textarea, [contenteditable="true"]')) return;
       const idx = CHAPTERS.findIndex((c) => c.id === active);
+      if (idx === -1) return; // sub-pages (e.g. ch-market) step via the pager, not arrow keys
       if (e.key === 'ArrowRight' && idx < CHAPTERS.length - 1) {
         e.preventDefault();
         setActive(CHAPTERS[idx + 1].id);
@@ -2683,12 +2788,15 @@ export function HowItWorksModal({ open, onClose }: Props) {
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-goto]');
     if (!el) return;
     const id = el.dataset.goto as ChapterId | undefined;
-    if (!id || !CHAPTERS.some((c) => c.id === id)) return;
+    if (!id || (id !== 'ch-market' && !CHAPTERS.some((c) => c.id === id))) return;
     e.preventDefault();
     setActive(id);
   }
 
-  const currentTitle = CHAPTERS.find((c) => c.id === active)?.name ?? '';
+  const currentTitle =
+    active === 'ch-market'
+      ? 'The market data'
+      : (CHAPTERS.find((c) => c.id === active)?.name ?? '');
 
   return (
     <AnimatePresence>
@@ -2789,6 +2897,7 @@ export function HowItWorksModal({ open, onClose }: Props) {
 
             <main className="hiw__main" ref={scrollRef} onClick={handleMainClick}>
               {active === 'ch-intro' && <IntroChapter />}
+              {active === 'ch-market' && <MarketChapter />}
               {active === 'ch-security' && <SecurityChapter />}
               {active === 'ch-voice' && <VoiceChapter />}
               {active === 'ch-notes' && <NotesChapter />}
