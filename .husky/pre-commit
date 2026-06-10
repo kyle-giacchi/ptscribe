@@ -15,20 +15,21 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Running tests..."
-test_output=$(npm run test -- --run 2>&1)
-echo "$test_output"
-
-# Parse the vitest summary rather than trusting exit code — vitest can exit
-# non-zero on worker-infrastructure crashes even when all tests pass.
-if echo "$test_output" | grep -qE "^ +Tests +[0-9]+ failed"; then
+# Use a temp file instead of $() to avoid POSIX sh exiting on non-zero vitest
+# exit code (worker infrastructure crashes exit non-zero even when tests pass).
+npm run test -- --run 2>&1 | tee .git/test_output.tmp || true
+if grep -qE "^ +Tests +[0-9]+ failed" .git/test_output.tmp; then
+  rm -f .git/test_output.tmp
   echo ""
   echo "Tests failed — commit blocked. Fix failing tests before committing."
   exit 1
 fi
-if echo "$test_output" | grep -qE "^ +Test Files +[0-9]+ failed"; then
+if grep -qE "^ +Test Files +[0-9]+ failed" .git/test_output.tmp; then
+  rm -f .git/test_output.tmp
   echo ""
   echo "Test files failed — commit blocked. Fix failing tests before committing."
   exit 1
 fi
+rm -f .git/test_output.tmp
 
 exit 0
