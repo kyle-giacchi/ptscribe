@@ -7,9 +7,15 @@ interface Props {
   onClose: () => void;
 }
 
-type ChapterId = 'ch-intro' | 'ch-market' | 'ch-security' | 'ch-voice' | 'ch-notes' | 'ch-future';
+export type ChapterId =
+  | 'ch-intro'
+  | 'ch-market'
+  | 'ch-security'
+  | 'ch-voice'
+  | 'ch-notes'
+  | 'ch-future';
 
-const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
+export const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
   { id: 'ch-intro', num: '00', name: 'Why I built this', desc: '$1,800/yr per clinician. Really?' },
   {
     id: 'ch-security',
@@ -27,11 +33,11 @@ const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
   { id: 'ch-future', num: '04', name: 'Down the road', desc: 'A clinic in a box.' },
 ];
 
-const REPO = 'https://github.com/kyle-giacchi/ptscribe';
+export const REPO = 'https://github.com/kyle-giacchi/ptscribe';
 
 // ─── Inline SVG glyphs for ch-security flow nodes ─────────────────────────────
 
-function VaultIcon() {
+export function VaultIcon() {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -50,7 +56,7 @@ function VaultIcon() {
   );
 }
 
-function StorageIcon() {
+export function StorageIcon() {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -71,7 +77,7 @@ function StorageIcon() {
   );
 }
 
-function CloudIcon() {
+export function CloudIcon() {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -86,7 +92,7 @@ function CloudIcon() {
   );
 }
 
-function GithubMark({ size = 11 }: { size?: number }) {
+export function GithubMark({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.08-2.7-1.08-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.22.83 1.22.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.66 7.66 0 014 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.74.54 1.49v2.21c0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -96,7 +102,7 @@ function GithubMark({ size = 11 }: { size?: number }) {
 
 // ─── Small reusable primitives ────────────────────────────────────────────────
 
-function SectionHead({ tag, title }: { tag: string; title: string }) {
+export function SectionHead({ tag, title }: { tag: string; title: string }) {
   return (
     <h3 className="ch__sec-head">
       <span className="ch__sec-tag">{tag}</span>
@@ -106,7 +112,7 @@ function SectionHead({ tag, title }: { tag: string; title: string }) {
   );
 }
 
-function ChapterHeader({
+export function ChapterHeader({
   num,
   eyebrow,
   eyebrowVariant,
@@ -142,7 +148,7 @@ function ChapterHeader({
   );
 }
 
-function Pager({
+export function Pager({
   prev,
   next,
   hint,
@@ -172,7 +178,15 @@ function Pager({
   );
 }
 
-function Disclose({ tag, title, children }: { tag: string; title: string; children: ReactNode }) {
+export function Disclose({
+  tag,
+  title,
+  children,
+}: {
+  tag: string;
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <details className="disclose">
       <summary className="disclose__sum">
@@ -196,7 +210,7 @@ function Disclose({ tag, title, children }: { tag: string; title: string; childr
 
 // ─── Chapter content ──────────────────────────────────────────────────────────
 
-function IntroChapter() {
+export function IntroChapter() {
   return (
     <section id="ch-intro" className="hiw__intro hiw__page is-active" data-page="ch-intro">
       <span className="eyebrow mono hiw__intro-eyebrow eyebrow--v3">
@@ -294,7 +308,7 @@ function IntroChapter() {
   );
 }
 
-function MarketChapter() {
+export function MarketChapter() {
   return (
     <section id="ch-market" className="ch hiw__page" data-page="ch-market">
       <h3 className="market-facts__title">
@@ -589,7 +603,7 @@ function MarketChapter() {
   );
 }
 
-function SecurityChapter() {
+export function SecurityChapter() {
   return (
     <section id="ch-security" className="ch hiw__page" data-page="ch-security">
       <ChapterHeader
@@ -802,7 +816,7 @@ export default {
   );
 }
 
-function VoiceChapter() {
+export function VoiceChapter() {
   return (
     <section id="ch-voice" className="ch hiw__page" data-page="ch-voice">
       <ChapterHeader
@@ -1101,7 +1115,7 @@ function VoiceChapter() {
   );
 }
 
-function NotesChapter() {
+export function NotesChapter() {
   return (
     <section id="ch-notes" className="ch hiw__page" data-page="ch-notes">
       <ChapterHeader
@@ -1352,7 +1366,7 @@ const body: GenerateRequest = {
   );
 }
 
-function FutureChapter() {
+export function FutureChapter() {
   return (
     <section id="ch-future" className="ch hiw__page" data-page="ch-future">
       <ChapterHeader
@@ -1497,7 +1511,7 @@ function FutureChapter() {
 
 // ─── Style sheet (scoped under .hiw root to avoid leaking the cream palette) ─
 
-const STYLES = `
+export const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 .hiw-root {
