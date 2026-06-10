@@ -18,9 +18,6 @@ export interface UseTranscriptSourceParams {
   silencedMergedBlob: Blob | null;
   settings: Settings;
   patchSession: (patch: Partial<Session>) => void;
-  setTranscript: (next: string) => void;
-  setEditedTranscript?: (next: string) => void;
-  setBusy: (busy: 'transcribing' | 'generating' | null) => void;
   dispatch: Dispatch<SessionMachineAction>;
   checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
@@ -47,17 +44,26 @@ export function useTranscriptSource({
   silencedMergedBlob,
   settings,
   patchSession,
-  setTranscript,
-  setEditedTranscript,
-  setBusy,
   dispatch,
   checkActionGuard,
   recordAction,
 }: UseTranscriptSourceParams): TranscriptSourceResult {
+  // The transcript document lives in the machine reducer; tier producers write
+  // the baseline through dispatch. useBackgroundTranscription keeps its narrow
+  // setTranscript param (internal seam) and receives a dispatch-backed adapter.
+  const setBaseline = useCallback(
+    (text: string) => dispatch({ type: 'transcript/setBaseline', text }),
+    [dispatch],
+  );
+  const clearEdited = useCallback(
+    () => dispatch({ type: 'transcript/setEdited', text: '' }),
+    [dispatch],
+  );
+
   const backgroundT2 = useBackgroundTranscription({
     session,
     patchSession,
-    setTranscript,
+    setTranscript: setBaseline,
     silencedMergedBlob,
   });
 
@@ -100,8 +106,9 @@ export function useTranscriptSource({
         return;
       }
 
+      // transcribe/start flips transcribe.phase to 'transcribing' — the
+      // machine's busy selector derives from it; no separate busy setter.
       dispatch({ type: 'transcribe/start' });
-      setBusy('transcribing');
       patchSession({ status: 'transcribing' });
 
       const controller = new AbortController();
@@ -140,8 +147,8 @@ export function useTranscriptSource({
 
         const text = result.text?.trim() ?? '';
         if (text) {
-          setTranscript(text);
-          setEditedTranscript?.('');
+          setBaseline(text);
+          clearEdited();
           // T3 is the top tier — promoteTier never blocks it; the fallback is
           // defensive only. t3Transcript frozen here; t2 preserved untouched.
           const promo = promoteTier(session, { tier: 't3', text }) ?? {
@@ -221,7 +228,6 @@ export function useTranscriptSource({
         patchSession({ status: 'draft', ...errorPatch });
       } finally {
         clearTimeout(abortTimer);
-        setBusy(null);
       }
     },
     [
@@ -231,9 +237,8 @@ export function useTranscriptSource({
       checkActionGuard,
       recordAction,
       patchSession,
-      setBusy,
-      setTranscript,
-      setEditedTranscript,
+      setBaseline,
+      clearEdited,
       dispatch,
     ],
   );
@@ -243,8 +248,8 @@ export function useTranscriptSource({
     const t1 = session?.t1Transcript;
     const text = t2 || t1;
     if (text?.trim()) {
-      setTranscript(text);
-      setEditedTranscript?.('');
+      setBaseline(text);
+      clearEdited();
       patchSession({
         transcript: text,
         activeTranscriptTier: t2 ? 't2' : 't1',
@@ -254,7 +259,7 @@ export function useTranscriptSource({
     } else {
       toast.error('No local transcription to revert to.');
     }
-  }, [session, setTranscript, setEditedTranscript, patchSession]);
+  }, [session, setBaseline, clearEdited, patchSession]);
 
   const clearTranscribeAiError = useCallback(() => {
     dispatch({ type: 'transcribe/clearAiError' });

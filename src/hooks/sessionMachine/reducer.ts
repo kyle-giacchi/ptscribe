@@ -1,4 +1,8 @@
-import type { SessionMachineAction, SessionMachineState } from './types';
+import {
+  createInitialSessionMachineState,
+  type SessionMachineAction,
+  type SessionMachineState,
+} from './types';
 
 /**
  * Pure reducer for the session lifecycle machine. Only owns local
@@ -140,6 +144,78 @@ export function sessionMachineReducer(
       return {
         ...state,
         capture: { ...state.capture, uploadStatus: action.status },
+      };
+
+    case 'view/setTab':
+      return { ...state, view: { ...state.view, tab: action.tab } };
+
+    case 'view/skipRecording':
+      return {
+        ...state,
+        view: { ...state.view, tab: 'review', recordingSkipped: true },
+      };
+
+    case 'view/dismissRecordWarning':
+      return { ...state, view: { ...state.view, recordWarnDismissed: true } };
+
+    case 'transcript/setBaseline':
+      return { ...state, transcript: { ...state.transcript, baseline: action.text } };
+
+    case 'transcript/setEdited':
+      return { ...state, transcript: { ...state.transcript, edited: action.text } };
+
+    // Single-gate invariant: opening while a gate is already open drops the
+    // triggering intent (no queueing). The runner relies on this no-op.
+    case 'gate/open':
+      return state.gate ? state : { ...state, gate: action.gate };
+
+    case 'gate/close':
+      return { ...state, gate: null };
+
+    case 'override/set':
+      return { ...state, providerOverride: action.value };
+
+    case 'error/set':
+      return { ...state, error: action.message };
+
+    case 'uploadFlow/begin':
+      return {
+        ...state,
+        uploadFlow: { active: true, clipId: null, startedAt: null, mergeStarted: false },
+      };
+
+    case 'uploadFlow/clipSaved':
+      return {
+        ...state,
+        uploadFlow: {
+          active: true,
+          clipId: action.clipId,
+          startedAt: action.startedAt,
+          mergeStarted: false,
+        },
+      };
+
+    case 'uploadFlow/mergeStarted':
+      return { ...state, uploadFlow: { ...state.uploadFlow, mergeStarted: true } };
+
+    case 'uploadFlow/clear':
+      return {
+        ...state,
+        uploadFlow: { active: false, clipId: null, startedAt: null, mergeStarted: false },
+      };
+
+    // Machine-state half of Reset Session. Entity wipes (audio blobs, note,
+    // session patch) happen in the runner before this dispatch. The provider
+    // override and the record-warning dismissal deliberately survive reset.
+    case 'machine/reset':
+      return {
+        ...createInitialSessionMachineState(),
+        view: {
+          tab: 'record',
+          recordingSkipped: false,
+          recordWarnDismissed: state.view.recordWarnDismissed,
+        },
+        providerOverride: state.providerOverride,
       };
 
     default:

@@ -29,9 +29,6 @@ export interface UseCapturePhaseParams {
   patchSession: (patch: Partial<Session>) => void;
   patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
   patchClip: (clipId: string, patch: Partial<SessionClip>) => void;
-  setTranscript: (next: string) => void;
-  setError: (msg: string | null) => void;
-  setActiveTab: (tab: 'record' | 'review') => void;
   uploadStatus: UploadStatus;
   dispatch: Dispatch<SessionMachineAction>;
 }
@@ -67,9 +64,6 @@ export function useCapturePhase({
   patchSession,
   patchClips,
   patchClip,
-  setTranscript,
-  setError,
-  setActiveTab,
   uploadStatus,
   dispatch,
 }: UseCapturePhaseParams): CapturePhaseResult {
@@ -180,7 +174,7 @@ export function useCapturePhase({
 
   // ── Recording controls ───────────────────────────────────────────────────
   async function handleStartRecording() {
-    setError(null);
+    dispatch({ type: 'error/set', message: null });
     if (!session) return;
 
     const clipId = newId();
@@ -317,7 +311,10 @@ export function useCapturePhase({
         try {
           await audioRepository.save(clipId, finalBlob);
         } catch (e) {
-          setError(`Could not save audio: ${(e as Error).message}`);
+          dispatch({
+            type: 'error/set',
+            message: `Could not save audio: ${(e as Error).message}`,
+          });
           patchClip(clipId, {
             status: 'failed',
             errorMessage: (e as Error).message,
@@ -564,14 +561,14 @@ export function useCapturePhase({
       // compiled baseline, so the producer still writes it itself.
       const promo = promoteTier(session ?? {}, { tier: 't1', text: merged });
       if (promo) {
-        setTranscript(merged);
+        dispatch({ type: 'transcript/setBaseline', text: merged });
         const patch: Partial<Session> = { ...promo };
         if (t1Texts.length > 0) patch.t1Transcript = t1Texts.join('\n\n');
         patchSession(patch);
       }
     }
 
-    if (!opts?.skipNav) setActiveTab('review');
+    if (!opts?.skipNav) dispatch({ type: 'view/setTab', tab: 'review' });
   }
 
   // Keep refs current so the auto-stop effect always invokes the latest closure.

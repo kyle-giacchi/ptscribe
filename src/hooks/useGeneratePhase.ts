@@ -26,8 +26,6 @@ export interface UseGeneratePhaseParams {
   transcript: string;
   settings: Settings;
   patchSession: (patch: Partial<Session>) => void;
-  setError: (msg: string | null) => void;
-  setBusy: (busy: 'transcribing' | 'generating' | null) => void;
   dispatch: Dispatch<SessionMachineAction>;
   checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
@@ -74,8 +72,6 @@ export function useGeneratePhase({
   transcript,
   settings,
   patchSession,
-  setError,
-  setBusy,
   dispatch,
   checkActionGuard,
   recordAction,
@@ -144,9 +140,10 @@ export function useGeneratePhase({
           return;
         }
 
-        setError(null);
+        dispatch({ type: 'error/set', message: null });
+        // generate/start flips generate.phase to 'generating' — the machine's
+        // busy selector derives from it; there is no separate busy setter.
         dispatch({ type: 'generate/start' });
-        setBusy('generating');
         patchSession({ status: 'generating' });
 
         const controller = new AbortController();
@@ -260,7 +257,7 @@ export function useGeneratePhase({
             };
           } else {
             dispatch({ type: 'generate/error', aiError: null });
-            setError((e as Error).message);
+            dispatch({ type: 'error/set', message: (e as Error).message });
             errorPatch = {
               aiErrors: appendAiError(session?.aiErrors, {
                 call: 'generate',
@@ -272,7 +269,6 @@ export function useGeneratePhase({
           patchSession({ status: 'draft', ...errorPatch });
         } finally {
           clearTimeout(abortTimer);
-          setBusy(null);
         }
       } finally {
         isGeneratingRef.current = false;
@@ -286,8 +282,6 @@ export function useGeneratePhase({
       patient,
       note,
       patchSession,
-      setError,
-      setBusy,
       checkActionGuard,
       recordAction,
       ensureNote,
