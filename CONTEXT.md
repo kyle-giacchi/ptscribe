@@ -293,6 +293,12 @@ An Inline alert is the source of truth for an actionable failure, but its host c
 
 A transient toast is never the _only_ indicator of a persistent error.
 
+### Workflow gate
+
+A [blocking dialog](#notification-and-error-surfaces) raised by the session workflow itself when an action needs explicit clinician confirmation before proceeding. The gate intercepts the action, holds the pending intent, and either resumes it (a confirm outcome) or discards it (cancel). At most one workflow gate is open at a time. The current gates: PHI confirm before Generate, stale-note confirm before Finalize (see [Note staleness](#note-staleness)), local-Whisper-unavailable before Recording (see [T2 failure handling](#t2-failure-handling)), template-change content-loss confirm (see [Template selection](#template-selection)), and session-reset confirm.
+
+_Avoid_: confusing with the Regenerate [soft-gate](#soft-gate) (a disabled control, not a dialog) or with access gates (AppGate code prompt, VaultGate passphrase prompt) — a workflow gate guards a single in-flight action, not entry to the app.
+
 ## Demo mode
 
 Demo mode (`VITE_DEMO_MODE=true`) is intended as a **fresh-patient experience** — a clinician trying the app should walk through the real workflow end-to-end against their own audio, not a canned scripted demo. The contract:

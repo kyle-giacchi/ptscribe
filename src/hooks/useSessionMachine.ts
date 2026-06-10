@@ -1,13 +1,25 @@
-import { useMemo, useReducer } from 'react';
-import { useActionGuard } from './useActionGuard';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { toast } from 'sonner';
+import { useNotes } from '@/contexts/NotesProvider';
+import { audioRepository } from '@/services/AudioRepository';
+import { noteMatchesInputs } from '@/services/note/staleness';
+import { appendAiError } from '@/lib/debug/aiErrorLog';
+import { isDemoMode } from '@/lib/demoMode';
+import {
+  MAX_GENERATES_PER_SESSION,
+  MAX_TRANSCRIBES_PER_SESSION,
+  useActionGuard,
+} from './useActionGuard';
 import { useCapturePhase } from './useCapturePhase';
 import { useTranscriptSource } from './useTranscriptSource';
 import { useGeneratePhase } from './useGeneratePhase';
+import { useAutoRotateClip } from './useAutoRotateClip';
+import { useWhisperLoading } from './useWhisperLoading';
 import { sessionMachineReducer } from './sessionMachine/reducer';
 import {
-  initialSessionMachineState,
+  createInitialSessionMachineState,
+  type GateResolution,
   type SessionMachineState,
-  type UploadStatus,
 } from './sessionMachine/types';
 import type { BackgroundT2State } from './useBackgroundTranscription';
 import type { UseRecorder } from './useRecorder';
@@ -19,101 +31,165 @@ import type {
   Patient,
   Session,
   SessionClip,
+  SessionModifiers,
   Settings,
 } from '@/types';
 
+export type { GateResolution, SessionGate } from './sessionMachine/types';
+
+/**
+ * Observational workflow outcomes. Cross-slice *policy* lives in the host —
+ * e.g. demo mode discharging the demo patient on `note/finalized` — so the
+ * machine never needs mutators for slices it does not own.
+ */
+export type SessionMachineEvent =
+  | { type: 'note/finalized'; sessionId: string; patientId: string }
+  | { type: 'session/reset'; sessionId: string };
+
 export interface UseSessionMachineParams {
+  // Entity inputs (live provider values)
   session: Session | undefined;
   patient: Patient | undefined;
   note: Note | undefined;
   template: NoteTemplate | undefined;
+  /** Local + org-shared templates, page-resolved (read-only). */
+  allTemplates: NoteTemplate[];
   settings: Settings;
-  transcript: string;
+
+  // Device modules (injected; they own hardware + wake lock)
   recorder: UseRecorder;
   webSpeech: UseWebSpeechTranscript;
-  webSpeechEnabled: boolean;
-  /**
-   * When set, overrides `settings.ai.transcription.provider` for this session only.
-   * `'webspeech'` forces Web Speech captions even if the user's default is Local Whisper;
-   * `'none'` suppresses live transcription entirely (record-now, transcribe-later);
-   * `null`/`undefined` falls back to `webSpeechEnabled`.
-   */
-  transcriptionProviderOverride?: 'webspeech' | 'none' | null;
-  sortedClips: SessionClip[];
+
+  // Single-write-path persistence — the ONLY Session-entity mutation callbacks
   patchSession: (patch: Partial<Session>) => void;
   patchClips: (mapper: (clips: SessionClip[]) => SessionClip[]) => void;
   patchClip: (clipId: string, patch: Partial<SessionClip>) => void;
-  setTranscript: (next: string) => void;
-  setEditedTranscript?: (next: string) => void;
-  setError: (msg: string | null) => void;
-  setBusy: (busy: 'transcribing' | 'generating' | null) => void;
-  setActiveTab: (tab: 'record' | 'review') => void;
+
+  /**
+   * Required port into the Settings slice: persist
+   * `settings.session.phiConfirmDismissed = true`. Called exactly once when
+   * the PHI gate resolves with `dontShowAgain`. The machine cannot reach the
+   * Settings slice itself.
+   */
+  persistPhiConfirmDismissed: () => void;
+
+  /** Mount-time intent from deep links. Read once; later changes are ignored.
+   *  The host owns URL hygiene (stripping the params). */
+  initial?: { quickMode?: boolean; autoRecord?: boolean };
+
+  /** Observational outcome channel. See SessionMachineEvent. */
+  onEvent?: (event: SessionMachineEvent) => void;
 }
 
-export interface SessionMachineGenerateApi {
-  run: (mode?: 'replace' | 'append', feedback?: string) => Promise<void>;
+export interface SessionMachineSelectors {
+  /** Edited overlay if non-blank, else the machine baseline. */
+  effectiveTranscript: string;
+  hasUserEdits: boolean;
+  busy: 'transcribing' | 'generating' | null;
+  /** Live generation inputs match the note's snapshot (Regenerate soft-gate). */
+  inputsUnchanged: boolean;
+  /** Inverse for an existing note — stale banner + Finalize gate. */
+  noteIsStale: boolean;
+  canGenerate: boolean;
+  isTranscriptLocked: boolean;
+  isRecording: boolean;
+  showRecordWarning: boolean;
+  showBackgroundWarning: boolean;
+  missingRequiredLabels: string[];
+  sortedClips: SessionClip[];
+  totalDurationSec: number;
+  hasT2Transcript: boolean;
+  hasT3Transcript: boolean;
+  canImproveWithAI: boolean;
+  cloudDisabledReason: string | undefined;
+  currentModifiers: SessionModifiers;
+  generateUsed: number;
+  transcribeUsed: number;
+}
+
+export interface SessionMachineActions {
+  // Capture
+  /** May open the whisper-unavailable gate instead of starting. */
+  startRecording: () => void;
+  pauseResume: () => void;
+  /** Stops, persists the clip, kicks merge + T2, navigates to review. */
+  stopAndFinish: () => void;
+  deleteClip: (clipId: string) => Promise<void>;
+  /** Owns the whole processing choreography incl. tab navigation. */
+  uploadAudio: (file: File) => Promise<void>;
+  /** "Go to notes" bail-out from the processing screen. */
+  dismissUploadProcessing: () => void;
+  skipRecording: () => void;
+  dismissBackgroundWarning: () => void;
+  dismissRecordWarning: () => void;
+  setTab: (tab: 'record' | 'review') => void;
+  // Transcript (Curate)
+  /** Overlay only — in-memory until commitTranscriptEdits/applyScrub. */
+  editTranscript: (text: string) => void;
+  commitTranscriptEdits: () => void;
+  revertEdits: () => void;
+  applyScrub: (scrubbed: string) => void;
+  logScrubFailure: (model: string, detail: string) => void;
+  /** T3 cloud Nova — capped per session, hard-disabled in demo mode. */
+  improveWithAI: () => Promise<void>;
+  revertToLocal: () => void;
+  clearTranscribeAiError: () => void;
+  copyTranscript: () => void;
+  // Note (Generate / Finalize)
+  /** May open the PHI gate instead of generating. */
+  generate: (mode?: 'replace' | 'append', feedback?: string) => void;
+  /** May open the stale-finalize gate instead of finalizing. */
   finalize: () => void;
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;
-  replaceSections: (sections: NoteSection[]) => void;
-  copyMarkdown: (markdown: string) => void;
-  clearAiError: () => void;
-  missingRequiredLabels: string[];
-}
-
-export interface SessionMachineTranscribeApi {
-  run: (clipId?: string) => Promise<void>;
-  revertToLocal: () => void;
-  clearAiError: () => void;
-  mergedAudioBlob: Blob | null;
-  setMergedAudioBlob: (b: Blob | null) => void;
-  silencedMergedBlob: Blob | null;
-  setSilencedMergedBlob: (b: Blob | null) => void;
-  isMerging: boolean;
-  setIsMerging: (v: boolean) => void;
-}
-
-export interface SessionMachineActionGuardApi {
-  checkActionGuard: ReturnType<typeof useActionGuard>['checkActionGuard'];
-  recordAction: ReturnType<typeof useActionGuard>['recordAction'];
-  transcribeUsed: number;
-  generateUsed: number;
-}
-
-export interface SessionMachineCaptureApi {
-  backgroundWarningDismissed: boolean;
-  setBackgroundWarningDismissed: (v: boolean) => void;
-  whisperBubbles: string[];
-  uploadStatus: UploadStatus;
-  handleStartRecording: () => Promise<void>;
-  handleFinishedRecording: () => Promise<void>;
-  handlePauseResume: () => void;
-  handleStopAndFinish: () => void;
-  handleUploadAudio: (file: File) => Promise<string | null>;
-  handleDeleteClip: (clipId: string) => Promise<void>;
-  buildMergedAudioForReview: (opts?: { skipNav?: boolean }) => Promise<void>;
+  /** May open the template-change gate when the note has content. */
+  changeTemplate: (templateId: string) => void;
+  setModifiers: (next: SessionModifiers) => void;
+  clearGenerateAiError: () => void;
+  // Session
+  /** Opens the reset-confirm gate (refused with a toast while recording). */
+  requestReset: () => void;
+  dismissError: () => void;
+  /** Resolve the currently open gate. Mismatched/absent gate → no-op. */
+  resolveGate: (resolution: GateResolution) => void;
 }
 
 export interface SessionMachine {
   state: SessionMachineState;
-  generate: SessionMachineGenerateApi;
-  transcribe: SessionMachineTranscribeApi;
-  capture: SessionMachineCaptureApi;
-  actionGuard: SessionMachineActionGuardApi;
+  selectors: SessionMachineSelectors;
+  actions: SessionMachineActions;
+  /** Live-preview bubbles for the active recording clip. */
+  whisperBubbles: string[];
+  /** Background T2 pass surface (phase, progress label, retry). */
   backgroundT2: BackgroundT2State;
 }
 
+const EMPTY_MODIFIERS: SessionModifiers = {
+  clinicalDetail: [],
+  codingBilling: [],
+  beyondNote: [],
+  customInstructions: [],
+};
+
 /**
- * Session lifecycle coordinator.
+ * The session workflow module — Capture → Curate → Generate → Finalize.
  *
- * Wires three phase hooks (capture → transcriptSource → generate) and the
- * shared reducer + action guard into the unified SessionMachine interface.
- * Each phase hook owns its own state and side effects; this coordinator only
- * holds the shared reducer and routes data between phases.
+ * Deep interface: callers send intents (`actions.*`), render `state` +
+ * `selectors`, and resolve the single open workflow gate (`state.gate`,
+ * CONTEXT.md §Workflow gate). The reducer owns all transient workflow state
+ * (transcript document, busy/error, view tab, gates, provider override,
+ * upload choreography); the three phase hooks are implementation.
  *
- *   useCapturePhase      — recording, upload, clip merge → silencedMergedBlob
- *   useTranscriptSource  — T2 auto-pass + T3 cloud + tier switching
- *   useGeneratePhase     — note generation, lock, finalize
+ * Invariants callers must know:
+ * - The host component MUST be keyed by sessionId. The transcript document
+ *   and `initial` intent are seeded once per mount and never re-read.
+ * - At most one gate is open; an intent that would open a second gate is
+ *   dropped, not queued. `resolveGate` with a mismatched kind is a no-op.
+ * - Workflow-owned Session fields (transcript/clips/status/templateId/
+ *   modifiers/noteId/aiErrors/counters) are written only through `actions`.
+ *   Patching them from the page desynchronizes the machine.
+ * - `stale-finalize → regenerate` re-enters the generate pipeline and may
+ *   legitimately open the PHI gate next.
  */
 export function useSessionMachine(params: UseSessionMachineParams): SessionMachine {
   const {
@@ -121,57 +197,84 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     patient,
     note,
     template,
+    allTemplates,
     settings,
-    transcript,
     recorder,
     webSpeech,
-    webSpeechEnabled: settingsWebSpeechEnabled,
-    transcriptionProviderOverride,
-    sortedClips,
     patchSession,
     patchClips,
     patchClip,
-    setTranscript,
-    setEditedTranscript,
-    setError,
-    setBusy,
-    setActiveTab,
+    persistPhiConfirmDismissed,
+    initial,
+    onEvent,
   } = params;
 
-  // Resolve the effective Web Speech state for this recording session. The
-  // override is in-memory only — it never mutates persisted settings.
-  const webSpeechEnabled =
-    transcriptionProviderOverride === 'webspeech'
-      ? true
-      : transcriptionProviderOverride === 'none'
-        ? false
-        : settingsWebSpeechEnabled;
+  // ── Reducer — seeded once per mount (host is keyed by sessionId) ─────────
+  const [state, dispatch] = useReducer(sessionMachineReducer, undefined, () =>
+    createInitialSessionMachineState({
+      quickMode: initial?.quickMode,
+      baseline: session?.transcript ?? '',
+      edited: session?.editedTranscript ?? '',
+    }),
+  );
 
-  // Shared reducer — owns lifecycle phase + transient AI surface for all three phases.
-  const [state, dispatch] = useReducer(sessionMachineReducer, initialSessionMachineState);
+  // Latest-value refs so event handlers and effects never read stale state.
+  // Assigned in an effect (not during render) per react-hooks/refs; handlers
+  // always run after the effect pass, so reads see the committed values.
+  const stateRef = useRef(state);
+  const sessionRef = useRef(session);
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    stateRef.current = state;
+    sessionRef.current = session;
+    onEventRef.current = onEvent;
+  });
+  const initialRef = useRef(initial);
 
-  // Shared action guard — owns only the anti-double-tap cooldown. Lifetime caps
-  // live on the persisted Session (see transcribeUsed/generateUsed below).
+  const emitEvent = useCallback((event: SessionMachineEvent) => {
+    onEventRef.current?.(event);
+  }, []);
+
+  // ── Shared guard + internal seams ────────────────────────────────────────
   const { checkActionGuard, recordAction } = useActionGuard();
+  const { removeNote } = useNotes();
+  const { exhausted: whisperExhausted } = useWhisperLoading();
 
-  // ── Phase hooks ──────────────────────────────────────────────────────────
+  // Effective Web Speech state — the whisper gate's override wins over settings.
+  const webSpeechEnabled =
+    state.providerOverride === 'webspeech'
+      ? true
+      : state.providerOverride === 'none'
+        ? false
+        : settings.session.webSpeechEnabled;
 
+  const sortedClips = useMemo(
+    () => (session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : []),
+    [session],
+  );
+
+  const effectiveTranscript = state.transcript.edited.trim()
+    ? state.transcript.edited
+    : state.transcript.baseline;
+
+  // ── Phase hooks (implementation) ─────────────────────────────────────────
   const capturePhase = useCapturePhase({
     session,
     recorder,
     webSpeech,
     webSpeechEnabled,
-    transcriptionProviderOverride,
+    transcriptionProviderOverride: state.providerOverride,
     sortedClips,
     settings,
     patchSession,
     patchClips,
     patchClip,
-    setTranscript,
-    setError,
-    setActiveTab,
     uploadStatus: state.capture.uploadStatus,
     dispatch,
+  });
+  const captureRef = useRef(capturePhase);
+  useEffect(() => {
+    captureRef.current = capturePhase;
   });
 
   const transcriptSource = useTranscriptSource({
@@ -179,9 +282,6 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     silencedMergedBlob: capturePhase.silencedMergedBlob,
     settings,
     patchSession,
-    setTranscript,
-    setEditedTranscript,
-    setBusy,
     dispatch,
     checkActionGuard,
     recordAction,
@@ -192,95 +292,474 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     patient,
     note,
     template,
-    transcript,
+    transcript: effectiveTranscript,
     settings,
     patchSession,
-    setError,
-    setBusy,
     dispatch,
     checkActionGuard,
     recordAction,
   });
 
-  // ── Public API assembly ──────────────────────────────────────────────────
+  // Mid-recording clip rotation restarts the recorder directly — no gate.
+  useAutoRotateClip(
+    recorder.status,
+    recorder.getDurationSec,
+    capturePhase.handleFinishedRecording,
+    capturePhase.handleStartRecording,
+  );
 
-  const generate = useMemo<SessionMachineGenerateApi>(
+  // ── Derived values ───────────────────────────────────────────────────────
+  const currentModifiers = session?.modifiers ?? EMPTY_MODIFIERS;
+  const generateUsed = session?.generateCount ?? 0;
+  const transcribeUsed = session?.cloudTranscribeCount ?? 0;
+
+  const inputsUnchanged = useMemo(() => {
+    if (!session) return false;
+    return noteMatchesInputs(note, {
+      transcript: effectiveTranscript,
+      templateId: session.templateId,
+      modifiers: currentModifiers,
+    });
+  }, [note, session, effectiveTranscript, currentModifiers]);
+  const noteIsStale = !!note && !inputsUnchanged;
+
+  // ── Generate / Finalize (PHI + stale gates) ──────────────────────────────
+  const generate = useCallback(
+    (mode: 'replace' | 'append' = 'replace', feedback?: string) => {
+      if (settings.session.phiConfirmDismissed) {
+        void generatePhase.run(mode, feedback);
+      } else {
+        dispatch({ type: 'gate/open', gate: { kind: 'phi-confirm', intent: { mode, feedback } } });
+      }
+    },
+    [settings.session.phiConfirmDismissed, generatePhase],
+  );
+
+  const doFinalize = useCallback(() => {
+    // generatePhase.finalize blocks (with a toast) when required sections are
+    // empty — only emit the outcome event when it actually finalized.
+    const blocked = generatePhase.missingRequiredLabels.length > 0;
+    generatePhase.finalize();
+    if (!blocked && session && patient) {
+      emitEvent({ type: 'note/finalized', sessionId: session.id, patientId: patient.id });
+    }
+  }, [generatePhase, session, patient, emitEvent]);
+
+  const finalize = useCallback(() => {
+    if (noteIsStale) {
+      dispatch({ type: 'gate/open', gate: { kind: 'stale-finalize' } });
+      return;
+    }
+    doFinalize();
+  }, [noteIsStale, doFinalize]);
+
+  // ── Recording (whisper gate) ─────────────────────────────────────────────
+  const startRecording = useCallback(() => {
+    const provider = state.providerOverride ?? settings.ai.transcription.provider;
+    if (provider === 'local' && whisperExhausted) {
+      dispatch({ type: 'gate/open', gate: { kind: 'whisper-unavailable' } });
+      return;
+    }
+    void captureRef.current.handleStartRecording();
+  }, [state.providerOverride, settings.ai.transcription.provider, whisperExhausted]);
+  const startRecordingRef = useRef(startRecording);
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
+  });
+
+  // A continue-outcome from the whisper gate sets the override and parks a
+  // pending start; the start fires only after the override has committed, so
+  // the capture phase wires live transcription against the chosen provider.
+  const pendingStartRef = useRef(false);
+  useEffect(() => {
+    if (!pendingStartRef.current) return;
+    if (state.providerOverride === null) return;
+    pendingStartRef.current = false;
+    void captureRef.current.handleStartRecording();
+  }, [state.providerOverride]);
+
+  // ?autoRecord=1 deep link: fires once, only when idle with zero clips.
+  // Goes through startRecording, so it respects the whisper gate (deliberate
+  // change — the old page path bypassed it).
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!initialRef.current?.autoRecord) return;
+    if (autoStartedRef.current) return;
+    if (!session || !patient) return;
+    if (recorder.status !== 'idle') return;
+    if (session.clips.length > 0) return;
+    autoStartedRef.current = true;
+    startRecordingRef.current();
+  }, [session, patient, recorder.status]);
+
+  // ── Template change (content-loss gate + section cache) ─────────────────
+  const sectionCacheRef = useRef(new Map<string, NoteSection[]>());
+
+  const applyTemplateChange = useCallback(
+    (newTemplateId: string) => {
+      const newTpl = allTemplates.find((t) => t.id === newTemplateId);
+      if (!newTpl) return;
+      // Snapshot sections for the template we're leaving.
+      const leavingTemplateId = sessionRef.current?.templateId;
+      if (note?.sections && leavingTemplateId) {
+        sectionCacheRef.current.set(leavingTemplateId, note.sections);
+      }
+      patchSession({ templateId: newTemplateId });
+      // Restore cached sections for the incoming template, or reset to empty.
+      const cached = sectionCacheRef.current.get(newTemplateId);
+      const targetSections =
+        cached ?? newTpl.sections.map((s) => ({ key: s.key, label: s.label, body: '' }));
+      if (note) generatePhase.replaceSections(targetSections);
+    },
+    [allTemplates, note, patchSession, generatePhase],
+  );
+
+  const changeTemplate = useCallback(
+    (templateId: string) => {
+      if (!session || templateId === session.templateId) return;
+      const hasNoteContent = !!note?.sections.some((s) => s.body.trim().length > 0);
+      if (hasNoteContent) {
+        dispatch({
+          type: 'gate/open',
+          gate: { kind: 'template-change', targetTemplateId: templateId },
+        });
+        return;
+      }
+      applyTemplateChange(templateId);
+    },
+    [session, note, applyTemplateChange],
+  );
+
+  // ── Reset session (reset-confirm gate) ───────────────────────────────────
+  const requestReset = useCallback(() => {
+    if (recorder.status === 'recording' || recorder.status === 'paused') {
+      toast.error('Stop recording before resetting the session.');
+      return;
+    }
+    dispatch({ type: 'gate/open', gate: { kind: 'reset-confirm' } });
+  }, [recorder.status]);
+
+  const doResetSession = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current) return;
+    await Promise.allSettled(current.clips.map((c) => audioRepository.remove(c.id)));
+    if (current.noteId) removeNote(current.noteId);
+    patchSession({
+      status: 'draft',
+      clips: [],
+      transcript: undefined,
+      t1Transcript: undefined,
+      t2Transcript: undefined,
+      t3Transcript: undefined,
+      editedTranscript: undefined,
+      activeTranscriptTier: undefined,
+      noteId: undefined,
+      durationMin: undefined,
+    });
+    captureRef.current.setMergedAudioBlob(null);
+    captureRef.current.setSilencedMergedBlob(null);
+    captureRef.current.setIsMerging(false);
+    dispatch({ type: 'machine/reset' });
+    emitEvent({ type: 'session/reset', sessionId: current.id });
+  }, [removeNote, patchSession, emitEvent]);
+
+  // ── Gate resolution ──────────────────────────────────────────────────────
+  const resolveGate = useCallback(
+    (resolution: GateResolution) => {
+      const gate = stateRef.current.gate;
+      if (!gate || gate.kind !== resolution.kind) {
+        if (import.meta.env.DEV) {
+          console.warn('[useSessionMachine] resolveGate ignored — no matching open gate:', {
+            open: gate?.kind ?? null,
+            resolution,
+          });
+        }
+        return;
+      }
+      dispatch({ type: 'gate/close' });
+
+      if (gate.kind === 'phi-confirm' && resolution.kind === 'phi-confirm') {
+        if (resolution.outcome === 'confirm') {
+          if (resolution.dontShowAgain) persistPhiConfirmDismissed();
+          void generatePhase.run(gate.intent.mode, gate.intent.feedback);
+        }
+      } else if (resolution.kind === 'stale-finalize') {
+        if (resolution.outcome === 'regenerate') generate('replace');
+        else if (resolution.outcome === 'finalize-anyway') doFinalize();
+      } else if (resolution.kind === 'whisper-unavailable') {
+        if (resolution.outcome === 'use-web-speech') {
+          pendingStartRef.current = true;
+          dispatch({ type: 'override/set', value: 'webspeech' });
+        } else if (resolution.outcome === 'record-without-transcription') {
+          pendingStartRef.current = true;
+          dispatch({ type: 'override/set', value: 'none' });
+        }
+      } else if (gate.kind === 'template-change' && resolution.kind === 'template-change') {
+        if (resolution.outcome === 'confirm') applyTemplateChange(gate.targetTemplateId);
+      } else if (resolution.kind === 'reset-confirm') {
+        if (resolution.outcome === 'confirm') void doResetSession();
+      }
+    },
+    [
+      persistPhiConfirmDismissed,
+      generatePhase,
+      generate,
+      doFinalize,
+      applyTemplateChange,
+      doResetSession,
+    ],
+  );
+
+  // ── Upload-processing choreography ───────────────────────────────────────
+  const uploadAudio = useCallback(async (file: File) => {
+    dispatch({ type: 'uploadFlow/begin' });
+    dispatch({ type: 'view/setTab', tab: 'record' });
+    const clipId = await captureRef.current.handleUploadAudio(file);
+    if (clipId) {
+      dispatch({ type: 'uploadFlow/clipSaved', clipId, startedAt: Date.now() });
+    } else {
+      dispatch({ type: 'uploadFlow/clear' });
+    }
+  }, []);
+
+  const t2Phase = transcriptSource.backgroundT2.phase;
+  useEffect(() => {
+    const { active, clipId, mergeStarted, startedAt } = state.uploadFlow;
+    if (!active || !clipId) return;
+    const clip = session?.clips.find((c) => c.id === clipId);
+    if (!clip) return;
+
+    const audioSaved =
+      clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed';
+
+    // Once audio is saved: kick off merge+T2 once (skipNav keeps the
+    // processing screen up until T2 lands).
+    if (audioSaved && !mergeStarted) {
+      dispatch({ type: 'uploadFlow/mergeStarted' });
+      void captureRef.current.buildMergedAudioForReview({ skipNav: true });
+      return;
+    }
+
+    // T2 finished — navigate to review after a brief minimum display time.
+    if (mergeStarted && t2Phase === 'done') {
+      const elapsed = Date.now() - (startedAt ?? Date.now());
+      const delay = Math.max(0, 2000 - elapsed);
+      const t = setTimeout(() => {
+        dispatch({ type: 'uploadFlow/clear' });
+        dispatch({ type: 'view/setTab', tab: 'review' });
+      }, delay);
+      return () => clearTimeout(t);
+    }
+    // t2Phase === 'error': stay on the processing screen; retry / go-to-notes
+    // (dismissUploadProcessing) handle it.
+  }, [session?.clips, state.uploadFlow, t2Phase]);
+
+  const dismissUploadProcessing = useCallback(() => {
+    dispatch({ type: 'uploadFlow/clear' });
+    dispatch({ type: 'view/setTab', tab: 'review' });
+  }, []);
+
+  // ── Transcript document actions ──────────────────────────────────────────
+  const editTranscript = useCallback(
+    (text: string) => dispatch({ type: 'transcript/setEdited', text }),
+    [],
+  );
+
+  const commitTranscriptEdits = useCallback(() => {
+    const edited = stateRef.current.transcript.edited;
+    if (edited.trim()) {
+      patchSession({ editedTranscript: edited, activeTranscriptTier: 'edited' });
+    } else if (sessionRef.current?.editedTranscript) {
+      patchSession({ editedTranscript: undefined });
+    }
+  }, [patchSession]);
+
+  const revertEdits = useCallback(() => {
+    dispatch({ type: 'transcript/setEdited', text: '' });
+    patchSession({ editedTranscript: undefined });
+  }, [patchSession]);
+
+  const applyScrub = useCallback(
+    (scrubbed: string) => {
+      dispatch({ type: 'transcript/setEdited', text: scrubbed });
+      patchSession({ editedTranscript: scrubbed, activeTranscriptTier: 'edited' });
+    },
+    [patchSession],
+  );
+
+  const logScrubFailure = useCallback(
+    (model: string, detail: string) => {
+      patchSession({
+        aiErrors: appendAiError(sessionRef.current?.aiErrors, {
+          call: 'pii',
+          kind: 'parse',
+          detail: `PII deep scan failed (${model}): ${detail}`,
+        }),
+      });
+    },
+    [patchSession],
+  );
+
+  const copyTranscript = useCallback(() => {
+    const doc = stateRef.current.transcript;
+    const text = doc.edited.trim() ? doc.edited : doc.baseline;
+    navigator.clipboard.writeText(text).then(
+      () => toast.success('Transcript copied'),
+      () => toast.error('Copy failed'),
+    );
+  }, []);
+
+  // ── Simple delegations / dispatches ──────────────────────────────────────
+  const stopAndFinish = useCallback(() => {
+    captureRef.current.handleStopAndFinish();
+    dispatch({ type: 'view/setTab', tab: 'review' });
+  }, []);
+
+  const setTab = useCallback(
+    (tab: 'record' | 'review') => dispatch({ type: 'view/setTab', tab }),
+    [],
+  );
+  const skipRecording = useCallback(() => dispatch({ type: 'view/skipRecording' }), []);
+  const dismissRecordWarning = useCallback(
+    () => dispatch({ type: 'view/dismissRecordWarning' }),
+    [],
+  );
+  const dismissError = useCallback(() => dispatch({ type: 'error/set', message: null }), []);
+  const setModifiers = useCallback(
+    (next: SessionModifiers) => patchSession({ modifiers: next }),
+    [patchSession],
+  );
+
+  // ── Public API assembly ──────────────────────────────────────────────────
+  const actions = useMemo<SessionMachineActions>(
     () => ({
-      run: generatePhase.run,
-      finalize: generatePhase.finalize,
+      startRecording,
+      pauseResume: capturePhase.handlePauseResume,
+      stopAndFinish,
+      deleteClip: capturePhase.handleDeleteClip,
+      uploadAudio,
+      dismissUploadProcessing,
+      skipRecording,
+      dismissBackgroundWarning: () => capturePhase.setBackgroundWarningDismissed(true),
+      dismissRecordWarning,
+      setTab,
+      editTranscript,
+      commitTranscriptEdits,
+      revertEdits,
+      applyScrub,
+      logScrubFailure,
+      improveWithAI: () => transcriptSource.runT3(),
+      revertToLocal: transcriptSource.revertToLocal,
+      clearTranscribeAiError: transcriptSource.clearTranscribeAiError,
+      copyTranscript,
+      generate,
+      finalize,
       unfinalize: generatePhase.unfinalize,
       sectionChange: generatePhase.sectionChange,
-      replaceSections: generatePhase.replaceSections,
-      copyMarkdown: generatePhase.copyMarkdown,
-      clearAiError: generatePhase.clearAiError,
+      changeTemplate,
+      setModifiers,
+      clearGenerateAiError: generatePhase.clearAiError,
+      requestReset,
+      dismissError,
+      resolveGate,
+    }),
+    [
+      startRecording,
+      capturePhase,
+      stopAndFinish,
+      uploadAudio,
+      dismissUploadProcessing,
+      skipRecording,
+      dismissRecordWarning,
+      setTab,
+      editTranscript,
+      commitTranscriptEdits,
+      revertEdits,
+      applyScrub,
+      logScrubFailure,
+      transcriptSource,
+      copyTranscript,
+      generate,
+      finalize,
+      generatePhase,
+      changeTemplate,
+      setModifiers,
+      requestReset,
+      dismissError,
+      resolveGate,
+    ],
+  );
+
+  const busy: 'transcribing' | 'generating' | null =
+    state.generate.phase === 'generating'
+      ? 'generating'
+      : state.transcribe.phase === 'transcribing'
+        ? 'transcribing'
+        : null;
+
+  const selectors = useMemo<SessionMachineSelectors>(
+    () => ({
+      effectiveTranscript,
+      hasUserEdits: state.transcript.edited.trim().length > 0,
+      busy,
+      inputsUnchanged,
+      noteIsStale,
+      canGenerate:
+        effectiveTranscript.trim().length > 0 &&
+        settings.ai.generation.provider !== 'none' &&
+        generateUsed < MAX_GENERATES_PER_SESSION,
+      isTranscriptLocked:
+        sortedClips.length === 0 && !effectiveTranscript.trim() && !state.view.recordingSkipped,
+      isRecording: recorder.status === 'recording' || recorder.status === 'paused',
+      showRecordWarning: state.view.tab === 'record' && !state.view.recordWarnDismissed && !!note,
+      showBackgroundWarning: recorder.wasBackgrounded && !capturePhase.backgroundWarningDismissed,
       missingRequiredLabels: generatePhase.missingRequiredLabels,
-    }),
-    [generatePhase],
-  );
-
-  const transcribeApi = useMemo<SessionMachineTranscribeApi>(
-    () => ({
-      run: transcriptSource.runT3,
-      revertToLocal: transcriptSource.revertToLocal,
-      clearAiError: transcriptSource.clearTranscribeAiError,
-      mergedAudioBlob: capturePhase.mergedAudioBlob,
-      setMergedAudioBlob: capturePhase.setMergedAudioBlob,
-      silencedMergedBlob: capturePhase.silencedMergedBlob,
-      setSilencedMergedBlob: capturePhase.setSilencedMergedBlob,
-      isMerging: capturePhase.isMerging,
-      setIsMerging: capturePhase.setIsMerging,
+      sortedClips,
+      totalDurationSec: sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0),
+      hasT2Transcript: !!session?.t2Transcript,
+      hasT3Transcript: !!session?.t3Transcript,
+      canImproveWithAI: !session?.t3Transcript,
+      cloudDisabledReason: isDemoMode()
+        ? 'Cloud transcription is disabled in demo mode.'
+        : transcribeUsed >= MAX_TRANSCRIBES_PER_SESSION
+          ? 'Cloud transcription was already used for this session.'
+          : undefined,
+      currentModifiers,
+      generateUsed,
+      transcribeUsed,
     }),
     [
-      transcriptSource.runT3,
-      transcriptSource.revertToLocal,
-      transcriptSource.clearTranscribeAiError,
-      capturePhase.mergedAudioBlob,
-      capturePhase.silencedMergedBlob,
-      capturePhase.isMerging,
-    ],
-  );
-
-  // Lifetime usage is read from the persisted Session, not from in-memory guard
-  // state, so the counts survive reload/Revert/Unlock. Absent reads as 0.
-  const transcribeUsed = session?.cloudTranscribeCount ?? 0;
-  const generateUsed = session?.generateCount ?? 0;
-  const actionGuard = useMemo<SessionMachineActionGuardApi>(
-    () => ({ checkActionGuard, recordAction, transcribeUsed, generateUsed }),
-    [checkActionGuard, recordAction, transcribeUsed, generateUsed],
-  );
-
-  const capture = useMemo<SessionMachineCaptureApi>(
-    () => ({
-      backgroundWarningDismissed: capturePhase.backgroundWarningDismissed,
-      setBackgroundWarningDismissed: capturePhase.setBackgroundWarningDismissed,
-      whisperBubbles: capturePhase.whisperBubbles,
-      uploadStatus: capturePhase.uploadStatus,
-      handleStartRecording: capturePhase.handleStartRecording,
-      handleFinishedRecording: capturePhase.handleFinishedRecording,
-      handlePauseResume: capturePhase.handlePauseResume,
-      handleStopAndFinish: capturePhase.handleStopAndFinish,
-      handleUploadAudio: capturePhase.handleUploadAudio,
-      handleDeleteClip: capturePhase.handleDeleteClip,
-      buildMergedAudioForReview: capturePhase.buildMergedAudioForReview,
-    }),
-    // Handlers are stable closures over refs — only re-memo when UI-visible values change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
+      effectiveTranscript,
+      state.transcript.edited,
+      state.view.tab,
+      state.view.recordWarnDismissed,
+      state.view.recordingSkipped,
+      busy,
+      inputsUnchanged,
+      noteIsStale,
+      settings.ai.generation.provider,
+      generateUsed,
+      transcribeUsed,
+      sortedClips,
+      recorder.status,
+      recorder.wasBackgrounded,
       capturePhase.backgroundWarningDismissed,
-      capturePhase.whisperBubbles,
-      capturePhase.uploadStatus,
+      generatePhase.missingRequiredLabels,
+      note,
+      session?.t2Transcript,
+      session?.t3Transcript,
+      currentModifiers,
     ],
   );
 
-  return useMemo(
+  return useMemo<SessionMachine>(
     () => ({
       state,
-      generate,
-      transcribe: transcribeApi,
-      capture,
-      actionGuard,
+      selectors,
+      actions,
+      whisperBubbles: capturePhase.whisperBubbles,
       backgroundT2: transcriptSource.backgroundT2,
     }),
-    [state, generate, transcribeApi, capture, actionGuard, transcriptSource.backgroundT2],
+    [state, selectors, actions, capturePhase.whisperBubbles, transcriptSource.backgroundT2],
   );
 }
