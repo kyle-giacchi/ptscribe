@@ -5,6 +5,7 @@ import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
 import { CompareModal } from '@/components/landing/CompareModal';
 import { HowItWorksModal } from '@/components/landing/HowItWorksModal';
+import { HowItWorksModalV2 } from '@/components/landing/HowItWorksModalV2';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -194,6 +195,7 @@ export function Landing({ onSignIn }: LandingProps) {
   const [whyVisible, setWhyVisible] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [hiwOpen, setHiwOpen] = useState(false);
+  const [hiwV2Open, setHiwV2Open] = useState(false); // TEMP: v2 exploration toggle
 
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinel1 = useRef<HTMLDivElement>(null);
@@ -1344,6 +1346,84 @@ export function Landing({ onSignIn }: LandingProps) {
               A 5-chapter builder's journal
             </div>
           </button>
+
+          {/* TEMP — v2 exploration: opens the re-imagined HowItWorksModalV2 */}
+          <button
+            onClick={() => setHiwV2Open(true)}
+            style={{
+              textAlign: 'left',
+              fontFamily: 'inherit',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              background: '#ffffff',
+              borderRadius: 16,
+              padding: '24px 24px 22px',
+              border: '1px dashed #c47a09',
+              cursor: 'pointer',
+              transition:
+                'transform 220ms cubic-bezier(0.22,1,0.36,1), border-color 220ms, box-shadow 220ms',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.borderColor = '#c47a09';
+              e.currentTarget.style.boxShadow = '0 16px 34px rgba(196,122,9,0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.borderColor = '#c47a09';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Network size={22} color="#c47a09" strokeWidth={1.75} />
+              <span
+                style={{
+                  fontSize: 10,
+                  color: '#c47a09',
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  border: '1px solid #f1d79b',
+                  borderRadius: 6,
+                  padding: '3px 7px',
+                }}
+              >
+                v2 · preview
+              </span>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  color: '#1a2030',
+                  letterSpacing: '-0.01em',
+                  marginBottom: 6,
+                }}
+              >
+                Architecture, explained — v2
+              </div>
+              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+                The re-imagined journal: progress-spine rail, hero chapter openers, accent
+                threading.
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 'auto',
+                paddingTop: 4,
+                fontSize: 11.5,
+                color: '#c47a09',
+                fontWeight: 600,
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Refined builder's journal
+            </div>
+          </button>
         </div>
       </div>
 
@@ -1746,6 +1826,7 @@ export function Landing({ onSignIn }: LandingProps) {
         onTryDemo={handleDemo}
       />
       <HowItWorksModal open={hiwOpen} onClose={() => setHiwOpen(false)} />
+      <HowItWorksModalV2 open={hiwV2Open} onClose={() => setHiwV2Open(false)} />
     </div>
   );
 }
