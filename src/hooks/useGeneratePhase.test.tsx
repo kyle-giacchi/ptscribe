@@ -79,8 +79,6 @@ function makeParams(overrides: Partial<UseGeneratePhaseParams> = {}): UseGenerat
     transcript: 'A real transcript with content.',
     settings,
     patchSession: vi.fn(),
-    setError: vi.fn(),
-    setBusy: vi.fn(),
     dispatch: vi.fn(),
     checkActionGuard: vi.fn(allowGuard),
     recordAction: vi.fn(),
