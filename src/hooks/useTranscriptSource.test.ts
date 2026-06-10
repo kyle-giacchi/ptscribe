@@ -19,8 +19,6 @@ function makeParams(overrides: Record<string, unknown> = {}): UseTranscriptSourc
     silencedMergedBlob: new Blob(['x'], { type: 'audio/webm' }),
     settings: { audio: { speedUp: { enabled: false, speed: 1.25 } } } as never,
     patchSession: vi.fn(),
-    setTranscript: vi.fn(),
-    setBusy: vi.fn(),
     dispatch: vi.fn(),
     checkActionGuard: vi.fn(() => ({ allowed: true as const })),
     recordAction: vi.fn(),

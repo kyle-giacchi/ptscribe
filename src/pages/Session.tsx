@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { toast } from 'sonner';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { SessionResetContext } from '@/contexts/SessionResetContext';
-import { audioRepository } from '@/services/AudioRepository';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
@@ -15,26 +13,21 @@ import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import { useSessionPatcher } from '@/hooks/useSessionPatcher';
-import type { NoteSection } from '@/types';
+import { useMemo } from 'react';
 import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
-import { useAutoRotateClip } from '@/hooks/useAutoRotateClip';
-import { useSessionMachine } from '@/hooks/useSessionMachine';
-import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/hooks/useActionGuard';
+import { useSessionMachine, type SessionMachineEvent } from '@/hooks/useSessionMachine';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
-import { noteMatchesInputs } from '@/services/note/staleness';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
 import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
 import { AiCallError } from '@/components/ai/AiCallError';
 import { AiCallRetryStatus } from '@/components/ai/AiCallRetryStatus';
-import { useWhisperLoading } from '@/hooks/useWhisperLoading';
 import { useDebugDrawer, type PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
-import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
 import { DemoCompleteModal } from '@/components/common/DemoCompleteModal';
@@ -46,8 +39,6 @@ import { UploadProcessingView } from '@/components/sessions/UploadProcessingView
 import { ErrorBanner } from '@/components/common/ErrorBanner';
 import { Modal } from '@/components/ui/Modal';
 
-type Busy = null | 'transcribing' | 'generating';
-
 export function SessionPage() {
   const { id = '' } = useParams<{ id: string }>();
   return <SessionRoute key={id} sessionId={id} />;
@@ -56,7 +47,7 @@ export function SessionPage() {
 function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getSession } = useSessions();
   const { getPatient, updatePatient } = usePatients();
-  const { forSession, removeNote } = useNotes();
+  const { forSession } = useNotes();
   const { templates, getTemplate } = useTemplates();
   const { sharedTemplates } = useOrgConfig();
   const { settings, updateSession } = useSettings();
@@ -87,26 +78,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const quickMode = searchParams.get('mode') === 'quick';
 
-  // Initial transcript captured ONCE per session (component is keyed on sessionId).
-  const [transcript, setTranscript] = useState(session?.transcript ?? '');
-  const [editedTranscript, setEditedTranscript] = useState(session?.editedTranscript ?? '');
-  const effectiveTranscript = editedTranscript.trim() ? editedTranscript : transcript;
-  const [busy, setBusy] = useState<Busy>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [recordingSkipped, setRecordingSkipped] = useState(quickMode);
-  const [resetModalOpen, setResetModalOpen] = useState(false);
-
-  const [activeTab, setActiveTab] = useState<'record' | 'review'>(quickMode ? 'review' : 'record');
-  // Once dismissed per session, the re-record warning does not resurface.
-  const [recordWarnDismissed, setRecordWarnDismissed] = useState(false);
-
-  // ── Whisper recovery: session-scoped transcription provider override ─────
-  const [transcriptionProviderOverride, setTranscriptionProviderOverride] = useState<
-    'webspeech' | 'none' | null
-  >(null);
-  const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
-  const [pendingStartRecording, setPendingStartRecording] = useState(false);
-  const { exhausted: whisperExhausted } = useWhisperLoading();
+  // ── Layout state (page-owned; never affects workflow correctness) ────────
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
   // Note/transcript split as a percentage of the note column. Live-drag only; resets to 50/50 on mount.
@@ -134,133 +106,60 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [piiScrub, setPiiScrub] = useState<PiiScrubDebug | null>(null);
   const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
   const [clipsOpen, setClipsOpen] = useState(false);
-  const { setActiveSessionId, setSessionDebug } = useDebugDrawer();
-  const [sectionCache, setSectionCache] = useState<Map<string, NoteSection[]>>(new Map());
-  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
-  const [processingUploadClipId, setProcessingUploadClipId] = useState<string | null>(null);
-  const processingStartedAtRef = useRef<number | null>(null);
-  const [isUploadInProgress, setIsUploadInProgress] = useState(false);
+  const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
+  const { setActiveSessionId, setSessionDebug } = useDebugDrawer();
 
   useAudioRecovery(sessionId, session, patchClips);
 
-  const sortedClips = session ? [...session.clips].sort((a, b) => a.createdAt - b.createdAt) : [];
+  // ── Cross-slice policy (machine emits outcomes; the page applies them) ───
+  const persistPhiConfirmDismissed = useCallback(
+    () => updateSession({ phiConfirmDismissed: true }),
+    [updateSession],
+  );
+  const handleMachineEvent = useCallback(
+    (event: SessionMachineEvent) => {
+      if (event.type === 'note/finalized') {
+        // Demo policy is host policy: finalizing the demo patient's session
+        // discharges them and shows the demo-complete modal.
+        if (isDemoMode() && event.patientId === DEMO_PATIENT_ID) {
+          updatePatient(DEMO_PATIENT_ID, { status: 'discharged', updatedAt: Date.now() });
+          setDemoCompleteOpen(true);
+        }
+      }
+    },
+    [updatePatient],
+  );
 
-  // ── Session lifecycle machine (owns generate, transcribe, AND capture slices) ──
-  const sessionMachine = useSessionMachine({
+  // ── The session workflow module (CONTEXT.md: Capture → Curate → Generate → Finalize) ──
+  const { state, selectors, actions, whisperBubbles, backgroundT2 } = useSessionMachine({
     session,
     patient,
     note,
     template,
+    allTemplates,
     settings,
-    transcript: effectiveTranscript,
     recorder,
     webSpeech,
-    webSpeechEnabled: settings.session.webSpeechEnabled,
-    transcriptionProviderOverride,
-    sortedClips,
     patchSession,
     patchClips,
     patchClip,
-    setTranscript,
-    setEditedTranscript,
-    setError,
-    setBusy,
-    setActiveTab,
+    persistPhiConfirmDismissed,
+    initial: { quickMode, autoRecord: searchParams.get('autoRecord') === '1' },
+    onEvent: handleMachineEvent,
   });
-  const handleCreateTranscript = sessionMachine.transcribe.run;
-  const handleRevertToLocal = sessionMachine.transcribe.revertToLocal;
-  const clearTranscribeAiError = sessionMachine.transcribe.clearAiError;
-  const { setMergedAudioBlob, setIsMerging } = sessionMachine.transcribe;
-  const {
-    aiError: transcribeAiError,
-    retryStatus: transcribeRetryStatus,
-    debugStats,
-  } = sessionMachine.state.transcribe;
-  const { generateUsed } = sessionMachine.actionGuard;
-  const {
-    backgroundWarningDismissed,
-    setBackgroundWarningDismissed,
-    whisperBubbles,
-    uploadStatus,
-    handleStartRecording,
-    handleFinishedRecording,
-    handlePauseResume,
-    handleStopAndFinish,
-    handleUploadAudio,
-    handleDeleteClip,
-    buildMergedAudioForReview,
-  } = sessionMachine.capture;
-  const { phase: t2Phase, progressLabel: t2Label, retry: retryT2 } = sessionMachine.backgroundT2;
 
-  // Ref so effects can call the latest handler without re-firing when its
-  // identity changes each render.
-  const handleStartRecordingRef = useRef(handleStartRecording);
+  // The machine consumed the deep-link intent at mount; strip the param so a
+  // refresh doesn't re-trigger it.
   useEffect(() => {
-    handleStartRecordingRef.current = handleStartRecording;
-  });
-
-  useAutoRotateClip(
-    recorder.status,
-    recorder.getDurationSec,
-    handleFinishedRecording,
-    handleStartRecording,
-  );
-
-  // ── Whisper recovery: gate Start Recording behind dialog when preload failed ──
-  function handleStartRecordingWithGate() {
-    const provider = transcriptionProviderOverride ?? settings.ai.transcription.provider;
-    if (provider === 'local' && whisperExhausted) {
-      setPendingStartRecording(true);
-      setWhisperDialogOpen(true);
-      return;
-    }
-    void handleStartRecording();
-  }
-
-  function handleUseWebSpeech() {
-    setTranscriptionProviderOverride('webspeech');
-    setWhisperDialogOpen(false);
-    if (pendingStartRecording) {
-      setPendingStartRecording(false);
-      void handleStartRecording();
-    }
-  }
-
-  function handleRecordWithoutTranscription() {
-    setTranscriptionProviderOverride('none');
-    setWhisperDialogOpen(false);
-    if (pendingStartRecording) {
-      setPendingStartRecording(false);
-      void handleStartRecording();
-    }
-  }
-
-  function handleCancelWhisperDialog() {
-    setWhisperDialogOpen(false);
-    setPendingStartRecording(false);
-  }
-
-  // ── Note/generation flow — sourced from the same sessionMachine above ────
-  const handleGenerateRaw = sessionMachine.generate.run;
-  const handleSectionChange = sessionMachine.generate.sectionChange;
-  const handleReplaceSections = sessionMachine.generate.replaceSections;
-  const handleFinalize = sessionMachine.generate.finalize;
-  const handleUnfinalize = sessionMachine.generate.unfinalize;
-  const { missingRequiredLabels } = sessionMachine.generate;
-  const {
-    lastRawPayload,
-    lastAiPrompts,
-    lastKeyReport,
-    aiError: generationAiError,
-    retryStatus: generationRetryStatus,
-  } = sessionMachine.state.generate;
-  const clearGenerationAiError = sessionMachine.generate.clearAiError;
+    if (searchParams.get('autoRecord') !== '1') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('autoRecord');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Register this session with the app-global Debug drawer ──────────────
-  // The drawer lives at the app shell, so we push the session id (for panel
-  // scoping) and the live debug payload up to the provider. Clear both on
-  // unmount so off-session opens show the "no active session" placeholder.
   const speedFactor = settings.audio.speedUp.speed;
   useEffect(() => {
     setActiveSessionId(sessionId);
@@ -271,287 +170,42 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   }, [sessionId, setActiveSessionId, setSessionDebug]);
   useEffect(() => {
     setSessionDebug({
-      debugStats,
+      debugStats: state.transcribe.debugStats,
       speedFactor,
-      lastRawPayload,
-      lastAiPrompts,
-      lastKeyReport,
+      lastRawPayload: state.generate.lastRawPayload,
+      lastAiPrompts: state.generate.lastAiPrompts,
+      lastKeyReport: state.generate.lastKeyReport,
       lastPiiScrub: piiScrub,
     });
   }, [
-    debugStats,
+    state.transcribe.debugStats,
     speedFactor,
-    lastRawPayload,
-    lastAiPrompts,
-    lastKeyReport,
+    state.generate.lastRawPayload,
+    state.generate.lastAiPrompts,
+    state.generate.lastKeyReport,
     piiScrub,
     setSessionDebug,
   ]);
 
-  // ── PHI confirmation gate before generation ─────────────────────────────
-  // Always shown (regardless of PII filter state) unless user has dismissed it
-  // via the "Don't show this again" checkbox.
-  const [phiConfirmOpen, setPhiConfirmOpen] = useState(false);
-  const pendingGenerateMode = useRef<'replace' | 'append'>('replace');
-  const pendingFeedback = useRef<string | undefined>(undefined);
-  function handleGenerate(mode: 'replace' | 'append', feedback?: string) {
-    pendingGenerateMode.current = mode;
-    pendingFeedback.current = feedback;
-    if (settings.session.phiConfirmDismissed) {
-      handleGenerateRaw(mode, feedback);
-    } else {
-      setPhiConfirmOpen(true);
-    }
-  }
-  function handlePhiConfirm(dontShowAgain: boolean) {
-    setPhiConfirmOpen(false);
-    if (dontShowAgain) updateSession({ phiConfirmDismissed: true });
-    handleGenerateRaw(pendingGenerateMode.current, pendingFeedback.current);
-  }
-
-  const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
-  const [staleFinalizeOpen, setStaleFinalizeOpen] = useState(false);
-
-  function runFinalize() {
-    handleFinalize();
-    if (isDemoMode() && patient?.id === DEMO_PATIENT_ID) {
-      updatePatient(DEMO_PATIENT_ID, { status: 'discharged', updatedAt: Date.now() });
-      setDemoCompleteOpen(true);
-    }
-  }
-
-  function handleFinalizeWrapped() {
-    // Block finalizing a note that no longer reflects the current transcript /
-    // template / modifiers (B2 stale-tracking — CONTEXT.md §Note staleness). The
-    // clinician must Regenerate to sync, or explicitly choose to finalize as-is.
-    if (noteIsStale) {
-      setStaleFinalizeOpen(true);
-      return;
-    }
-    runFinalize();
-  }
-
-  // ── ?autoRecord=1 deep link auto-start ──────────────────────────────────
-  // Lets Dashboard / NewSession links jump straight into recording with one tap.
-  // Guards: only fires once per mount, only when recorder is idle and no clips
-  // exist yet (so refreshing a populated session never re-records).
-  const autoRecordRequested = searchParams.get('autoRecord') === '1';
-  const autoStartedRef = useRef(false);
-  useEffect(() => {
-    if (!autoRecordRequested) return;
-    if (autoStartedRef.current) return;
-    if (!session || !patient) return;
-    if (recorder.status !== 'idle') return;
-    if (session.clips.length > 0) return;
-    autoStartedRef.current = true;
-    // Strip the param so a refresh doesn't re-trigger.
-    const next = new URLSearchParams(searchParams);
-    next.delete('autoRecord');
-    setSearchParams(next, { replace: true });
-    void handleStartRecordingRef.current();
-  }, [autoRecordRequested, recorder.status, session, patient, searchParams, setSearchParams]);
-
-  // Tracks whether buildMergedAudioForReview has been called for the current upload.
-  // Reset when processingUploadClipId clears so a subsequent upload re-triggers it.
-  const mergeStartedRef = useRef(false);
-  useEffect(() => {
-    if (!processingUploadClipId) {
-      mergeStartedRef.current = false;
-      return;
-    }
-    const clip = session?.clips.find((c) => c.id === processingUploadClipId);
-    if (!clip) return;
-
-    const audioSaved =
-      clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed';
-
-    // Once audio is saved: kick off merge+T2 once (skipNav keeps us on the processing screen).
-    if (audioSaved && !mergeStartedRef.current) {
-      mergeStartedRef.current = true;
-      void buildMergedAudioForReview({ skipNav: true });
-      return;
-    }
-
-    // T2 finished — navigate to review after a brief minimum display time.
-    if (mergeStartedRef.current && t2Phase === 'done') {
-      const elapsed = Date.now() - (processingStartedAtRef.current ?? Date.now());
-      const delay = Math.max(0, 2000 - elapsed);
-      const t = setTimeout(() => {
-        setProcessingUploadClipId(null);
-        setActiveTab('review');
-      }, delay);
-      return () => clearTimeout(t);
-    }
-    // t2Phase === 'error': stay on processing screen; retry/go-to-notes buttons handle it
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.clips, processingUploadClipId, t2Phase]);
-
   if (!session || !patient) return <NotFound />;
 
-  function handleCopyTranscript() {
-    navigator.clipboard.writeText(effectiveTranscript).then(
-      () => toast.success('Transcript copied'),
-      () => toast.error('Copy failed'),
-    );
-  }
-
-  function handleApplyScrub(scrubbed: string) {
-    setEditedTranscript(scrubbed);
-    patchSession({ editedTranscript: scrubbed, activeTranscriptTier: 'edited' });
-  }
+  const gate = state.gate;
+  const sortedClips = selectors.sortedClips;
 
   // Mirror PII scrub runs into the Debug Menu (live) and, on a deep-scan
   // failure, persist it to the session's error log so it survives reload.
   function handleScrubDebug(debug: PiiScrubDebug) {
     setPiiScrub(debug);
-    if (debug.error && session) {
-      patchSession({
-        aiErrors: appendAiError(session.aiErrors, {
-          call: 'pii',
-          kind: 'parse',
-          detail: `PII deep scan failed (${debug.model}): ${debug.error}`,
-        }),
-      });
-    }
-  }
-
-  function handleRevertEdits() {
-    setEditedTranscript('');
-    patchSession({ editedTranscript: undefined });
-  }
-
-  function handleTemplateChange(newTemplateId: string) {
-    if (newTemplateId === session?.templateId) return;
-    // Warn before discarding hand-written note content when switching templates.
-    const hasNoteContent = !!note?.sections.some((s) => s.body.trim().length > 0);
-    if (hasNoteContent) {
-      setPendingTemplateId(newTemplateId);
-      return;
-    }
-    applyTemplateChange(newTemplateId);
-  }
-
-  function applyTemplateChange(newTemplateId: string) {
-    const newTpl = allTemplates.find((t) => t.id === newTemplateId);
-    if (!newTpl) return;
-    // Snapshot sections for the template we're leaving
-    if (note?.sections && session?.templateId) {
-      setSectionCache((prev) => {
-        const next = new Map(prev);
-        next.set(session!.templateId!, note!.sections);
-        return next;
-      });
-    }
-    patchSession({ templateId: newTemplateId });
-    // Restore cached sections for the incoming template, or reset to empty
-    const cached = sectionCache.get(newTemplateId);
-    const targetSections =
-      cached ?? newTpl.sections.map((s) => ({ key: s.key, label: s.label, body: '' }));
-    if (note) handleReplaceSections(targetSections);
-  }
-
-  // ── Derived display values ────────────────────────────────────────────────
-  const canGenerate =
-    effectiveTranscript.trim().length > 0 &&
-    settings.ai.generation.provider !== 'none' &&
-    generateUsed < MAX_GENERATES_PER_SESSION;
-
-  const emptyModifiers = {
-    clinicalDetail: [],
-    codingBilling: [],
-    beyondNote: [],
-    customInstructions: [],
-  };
-  const currentModifiers = session.modifiers ?? emptyModifiers;
-
-  // Compare the live generation inputs against the snapshot the note was generated
-  // from (services/note/staleness). `inputsUnchanged` drives the Regenerate soft-gate
-  // (regenerating an unchanged note is a no-op, so it requires feedback). `noteIsStale`
-  // is the inverse for an existing note — it drives the stale banner and the Finalize
-  // gate (the note no longer reflects the current transcript/template/modifiers).
-  // noteMatchesInputs short-circuits the modifier comparison behind the cheap
-  // string/equality checks, so the JSON work only runs when the rest already matches.
-  const noteInputs = {
-    transcript: effectiveTranscript,
-    templateId: session.templateId,
-    modifiers: currentModifiers,
-  };
-  const inputsUnchanged = noteMatchesInputs(note, noteInputs);
-  const noteIsStale = !!note && !inputsUnchanged;
-
-  function handleModifiersChange(next: import('@/types').SessionModifiers) {
-    patchSession({ modifiers: next });
-  }
-
-  const isTranscriptLocked =
-    sortedClips.length === 0 && !effectiveTranscript.trim() && !recordingSkipped;
-  const isRecording = recorder.status === 'recording' || recorder.status === 'paused';
-
-  const hasT2Transcript = !!session.t2Transcript;
-
-  const hasUserEdits = editedTranscript.trim().length > 0;
-
-  // Show a strong warning when the user navigates back to Record after a note has been generated.
-  const showRecordWarning = activeTab === 'record' && !recordWarnDismissed && !!note;
-
-  const totalDurationSec = sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0);
-
-  // ── Skip recording step ───────────────────────────────────────────────────
-  function handleSkipRecording() {
-    setRecordingSkipped(true);
-    setActiveTab('review');
-  }
-
-  // ── Reset session — wipe all recordings, transcripts, and the generated note ──
-  async function handleResetSession() {
-    setResetModalOpen(false);
-    if (!session) return;
-    if (isRecording) {
-      toast.error('Stop recording before resetting the session.');
-      return;
-    }
-    await Promise.allSettled(session.clips.map((c) => audioRepository.remove(c.id)));
-    if (session.noteId) removeNote(session.noteId);
-    patchSession({
-      status: 'draft',
-      clips: [],
-      transcript: undefined,
-      t1Transcript: undefined,
-      t2Transcript: undefined,
-      t3Transcript: undefined,
-      editedTranscript: undefined,
-      activeTranscriptTier: undefined,
-      noteId: undefined,
-      durationMin: undefined,
-    });
-    setTranscript('');
-    setActiveTab('record');
-    setMergedAudioBlob(null);
-    setIsMerging(false);
-    setError(null);
-    setBusy(null);
-    setRecordingSkipped(false);
-  }
-
-  // ── Upload audio + auto-transcribe ────────────────────────────────────────
-  async function handleUpload(file: File) {
-    setIsUploadInProgress(true);
-    setActiveTab('record');
-    const clipId = await handleUploadAudio(file);
-    setIsUploadInProgress(false);
-    if (clipId) {
-      processingStartedAtRef.current = Date.now();
-      setProcessingUploadClipId(clipId);
-    }
+    if (debug.error) actions.logScrubFailure(debug.model, debug.error);
   }
 
   return (
-    <SessionResetContext.Provider value={{ onResetSession: () => setResetModalOpen(true) }}>
+    <SessionResetContext.Provider value={{ onResetSession: actions.requestReset }}>
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
         {/* ── Error banner ──────────────────────────────────── */}
-        {error && (
+        {state.error && (
           <div style={{ padding: '12px 22px 0' }}>
-            <ErrorBanner message={error} onDismiss={() => setError(null)} />
+            <ErrorBanner message={state.error} onDismiss={actions.dismissError} />
           </div>
         )}
 
@@ -560,24 +214,24 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           patient={patient}
           session={session}
           note={note}
-          totalDurationSec={totalDurationSec}
+          totalDurationSec={selectors.totalDurationSec}
           clipsCount={sortedClips.length}
           clipsOpen={clipsOpen}
           onToggleClips={() => setClipsOpen((o) => !o)}
-          onRecord={() => setActiveTab('record')}
+          onRecord={() => actions.setTab('record')}
           onUpload={(file) => {
-            void handleUpload(file);
+            void actions.uploadAudio(file);
           }}
-          missingRequiredLabels={missingRequiredLabels}
-          onFinalize={handleFinalizeWrapped}
-          onUnfinalize={handleUnfinalize}
-          showNoteActions={activeTab === 'review'}
+          missingRequiredLabels={selectors.missingRequiredLabels}
+          onFinalize={actions.finalize}
+          onUnfinalize={actions.unfinalize}
+          showNoteActions={state.view.tab === 'review'}
         />
 
         {/* Collapsed transcript: a zero-height sticky bar pins the reopen pill to the top of
           the scroll area (its nearest scroll ancestor is <main>, not the content div below
           which has its own overflow). Lives outside the scroll content so it can't ride off. */}
-        {activeTab === 'review' && !isTranscriptLocked && transcriptCollapsed && (
+        {state.view.tab === 'review' && !selectors.isTranscriptLocked && transcriptCollapsed && (
           <div
             style={{
               position: 'sticky',
@@ -608,7 +262,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           }}
         >
           {/* ① Record tab */}
-          {activeTab === 'record' && (
+          {state.view.tab === 'record' && (
             <div
               role="tabpanel"
               id="panel-record"
@@ -622,37 +276,32 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 gap: 10,
               }}
             >
-              {(sortedClips.length > 0 || effectiveTranscript.trim().length > 0) && (
+              {(sortedClips.length > 0 || selectors.effectiveTranscript.trim().length > 0) && (
                 <div>
                   <button
                     type="button"
                     className="btn btn-ghost py-1 text-xs"
-                    onClick={() => setActiveTab('review')}
+                    onClick={() => actions.setTab('review')}
                   >
                     <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
                   </button>
                 </div>
               )}
-              {showRecordWarning && (
+              {selectors.showRecordWarning && (
                 <RecordWarningBanner
-                  onBackToReview={() => setActiveTab('review')}
-                  onDismiss={() => setRecordWarnDismissed(true)}
+                  onBackToReview={() => actions.setTab('review')}
+                  onDismiss={actions.dismissRecordWarning}
                 />
               )}
-              {processingUploadClipId || isUploadInProgress ? (
+              {state.uploadFlow.active ? (
                 <UploadProcessingView
                   durationSec={
-                    sortedClips.find((c) => c.id === processingUploadClipId)?.durationSec
+                    sortedClips.find((c) => c.id === state.uploadFlow.clipId)?.durationSec
                   }
-                  t2Phase={t2Phase}
-                  t2Label={t2Label}
-                  onRetry={() => {
-                    retryT2();
-                  }}
-                  onGoToNotes={() => {
-                    setProcessingUploadClipId(null);
-                    setActiveTab('review');
-                  }}
+                  t2Phase={backgroundT2.phase}
+                  t2Label={backgroundT2.progressLabel}
+                  onRetry={backgroundT2.retry}
+                  onGoToNotes={actions.dismissUploadProcessing}
                 />
               ) : (
                 <RecordingPanel
@@ -660,25 +309,24 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   webSpeech={webSpeech}
                   clips={sortedClips}
                   whisperBubbles={whisperBubbles}
-                  uploadStatus={uploadStatus}
-                  onStart={handleStartRecordingWithGate}
-                  onStopAndFinish={() => {
-                    void handleStopAndFinish();
-                    setActiveTab('review');
+                  uploadStatus={state.capture.uploadStatus}
+                  onStart={actions.startRecording}
+                  onStopAndFinish={actions.stopAndFinish}
+                  onPauseResume={actions.pauseResume}
+                  onUpload={(file) => {
+                    void actions.uploadAudio(file);
                   }}
-                  onPauseResume={handlePauseResume}
-                  onUpload={handleUpload}
-                  onSkip={handleSkipRecording}
-                  wasBackgrounded={recorder.wasBackgrounded && !backgroundWarningDismissed}
-                  onDismissBackgroundWarning={() => setBackgroundWarningDismissed(true)}
+                  onSkip={actions.skipRecording}
+                  wasBackgrounded={selectors.showBackgroundWarning}
+                  onDismissBackgroundWarning={actions.dismissBackgroundWarning}
                 />
               )}
             </div>
           )}
 
           {/* ② Review tab */}
-          {activeTab === 'review' &&
-            (isTranscriptLocked ? (
+          {state.view.tab === 'review' &&
+            (selectors.isTranscriptLocked ? (
               <ReviewEmptyState />
             ) : (
               <div
@@ -731,7 +379,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       </h1>
                       {note && (
                         <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
-                          {busy === 'generating'
+                          {selectors.busy === 'generating'
                             ? 'Generating…'
                             : `last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
                         </span>
@@ -742,39 +390,39 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       template={template}
                       templates={allTemplates}
                       hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
-                      canGenerate={canGenerate}
-                      requiresFeedback={inputsUnchanged}
-                      isGenerating={busy === 'generating'}
+                      canGenerate={selectors.canGenerate}
+                      requiresFeedback={selectors.inputsUnchanged}
+                      isGenerating={selectors.busy === 'generating'}
                       note={note}
-                      patient={patient!}
-                      modifiers={currentModifiers}
-                      onTemplateChange={handleTemplateChange}
+                      patient={patient}
+                      modifiers={selectors.currentModifiers}
+                      onTemplateChange={actions.changeTemplate}
                       onManageTemplates={() => setManageTemplatesOpen(true)}
-                      onGenerate={handleGenerate}
-                      onModifiersChange={handleModifiersChange}
+                      onGenerate={actions.generate}
+                      onModifiersChange={actions.setModifiers}
                     />
 
                     <NotePanel
                       patient={patient}
                       note={note}
                       template={template}
-                      isStale={noteIsStale}
-                      onSectionChange={handleSectionChange}
+                      isStale={selectors.noteIsStale}
+                      onSectionChange={actions.sectionChange}
                     />
-                    {generationRetryStatus ? (
+                    {state.generate.retryStatus ? (
                       <div style={{ marginTop: 8 }}>
-                        <AiCallRetryStatus {...generationRetryStatus} />
+                        <AiCallRetryStatus {...state.generate.retryStatus} />
                       </div>
                     ) : null}
-                    {generationAiError ? (
+                    {state.generate.aiError ? (
                       <div style={{ marginTop: 8 }}>
                         <AiCallError
-                          error={generationAiError}
+                          error={state.generate.aiError}
                           onRetry={() => {
-                            clearGenerationAiError();
-                            void handleGenerateRaw();
+                            actions.clearGenerateAiError();
+                            actions.generate();
                           }}
-                          onDismiss={clearGenerationAiError}
+                          onDismiss={actions.clearGenerateAiError}
                         />
                       </div>
                     ) : null}
@@ -811,53 +459,43 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   {!transcriptCollapsed && (
                     <div style={{ position: 'relative' }}>
                       <TranscriptPanel
-                        transcript={effectiveTranscript}
+                        transcript={selectors.effectiveTranscript}
                         clips={sortedClips}
-                        transcribing={busy === 'transcribing'}
-                        hasUserEdits={hasUserEdits}
-                        hasT2Transcript={hasT2Transcript}
-                        hasT3Transcript={!!session.t3Transcript}
-                        totalDurationSec={totalDurationSec}
+                        transcribing={selectors.busy === 'transcribing'}
+                        hasUserEdits={selectors.hasUserEdits}
+                        hasT2Transcript={selectors.hasT2Transcript}
+                        hasT3Transcript={selectors.hasT3Transcript}
+                        totalDurationSec={selectors.totalDurationSec}
                         collapsed={transcriptCollapsed}
                         onCollapse={() => setTranscriptCollapsed(true)}
-                        onChange={setEditedTranscript}
-                        onCommit={() => {
-                          if (editedTranscript.trim()) {
-                            patchSession({ editedTranscript, activeTranscriptTier: 'edited' });
-                          } else if (session.editedTranscript) {
-                            patchSession({ editedTranscript: undefined });
-                          }
+                        onChange={actions.editTranscript}
+                        onCommit={actions.commitTranscriptEdits}
+                        onCreateTranscript={() => {
+                          void actions.improveWithAI();
                         }}
-                        onCreateTranscript={handleCreateTranscript}
-                        canImproveWithAI={!session.t3Transcript}
-                        cloudDisabledReason={
-                          isDemoMode()
-                            ? 'Cloud transcription is disabled in demo mode.'
-                            : (session.cloudTranscribeCount ?? 0) >= MAX_TRANSCRIBES_PER_SESSION
-                              ? 'Cloud transcription was already used for this session.'
-                              : undefined
-                        }
-                        onRevertToLocal={handleRevertToLocal}
-                        onCopyTranscript={handleCopyTranscript}
+                        canImproveWithAI={selectors.canImproveWithAI}
+                        cloudDisabledReason={selectors.cloudDisabledReason}
+                        onRevertToLocal={actions.revertToLocal}
+                        onCopyTranscript={actions.copyTranscript}
                         onOpenPIIScrub={() => setPiiScrubOpen(true)}
-                        hasEditedTranscript={hasUserEdits}
-                        onRevertEdits={handleRevertEdits}
+                        hasEditedTranscript={selectors.hasUserEdits}
+                        onRevertEdits={actions.revertEdits}
                         seekSignal={seekSignal}
                       />
-                      {transcribeRetryStatus ? (
+                      {state.transcribe.retryStatus ? (
                         <div style={{ marginTop: 8 }}>
-                          <AiCallRetryStatus {...transcribeRetryStatus} />
+                          <AiCallRetryStatus {...state.transcribe.retryStatus} />
                         </div>
                       ) : null}
-                      {transcribeAiError ? (
+                      {state.transcribe.aiError ? (
                         <div style={{ marginTop: 8 }}>
                           <AiCallError
-                            error={transcribeAiError}
+                            error={state.transcribe.aiError}
                             onRetry={() => {
-                              clearTranscribeAiError();
-                              void handleCreateTranscript();
+                              actions.clearTranscribeAiError();
+                              void actions.improveWithAI();
                             }}
-                            onDismiss={clearTranscribeAiError}
+                            onDismiss={actions.clearTranscribeAiError}
                           />
                         </div>
                       ) : null}
@@ -872,45 +510,55 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       if (transcriptCollapsed) setTranscriptCollapsed(false);
                       setSeekSignal({ seconds: t, id: Date.now() });
                     }}
-                    onDelete={handleDeleteClip}
+                    onDelete={(clipId) => {
+                      void actions.deleteClip(clipId);
+                    }}
                     onRecord={() => {
                       setClipsOpen(false);
-                      setActiveTab('record');
+                      actions.setTab('record');
                     }}
                     onUpload={(file) => {
                       setClipsOpen(false);
-                      void handleUpload(file);
+                      void actions.uploadAudio(file);
                     }}
-                    t2Phase={t2Phase}
-                    t2Label={t2Label}
+                    t2Phase={backgroundT2.phase}
+                    t2Label={backgroundT2.progressLabel}
                   />
                 </div>
               </div>
             ))}
         </div>
 
-        {/* ── PHI confirmation before sending transcript to Anthropic ── */}
+        {/* ── Workflow gates (CONTEXT.md §Workflow gate) — rendered from state.gate ── */}
+
+        {/* PHI confirmation before sending transcript to the generation provider */}
         <PhiConfirmDialog
-          open={phiConfirmOpen}
-          onCancel={() => setPhiConfirmOpen(false)}
-          onConfirm={handlePhiConfirm}
+          open={gate?.kind === 'phi-confirm'}
+          onCancel={() => actions.resolveGate({ kind: 'phi-confirm', outcome: 'cancel' })}
+          onConfirm={(dontShowAgain) =>
+            actions.resolveGate({ kind: 'phi-confirm', outcome: 'confirm', dontShowAgain })
+          }
         />
 
-        {/* ── Local Whisper unavailable recovery dialog ───── */}
+        {/* Local Whisper unavailable recovery */}
         <WhisperUnavailableDialog
-          open={whisperDialogOpen}
-          onUseWebSpeech={handleUseWebSpeech}
-          onRecordWithoutTranscription={handleRecordWithoutTranscription}
-          onCancel={handleCancelWhisperDialog}
+          open={gate?.kind === 'whisper-unavailable'}
+          onUseWebSpeech={() =>
+            actions.resolveGate({ kind: 'whisper-unavailable', outcome: 'use-web-speech' })
+          }
+          onRecordWithoutTranscription={() =>
+            actions.resolveGate({
+              kind: 'whisper-unavailable',
+              outcome: 'record-without-transcription',
+            })
+          }
+          onCancel={() => actions.resolveGate({ kind: 'whisper-unavailable', outcome: 'cancel' })}
         />
 
-        {/* ── Demo complete modal ──────────────────────────── */}
-        <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
-
-        {/* ── Stale-note finalize confirmation (B2 stale-tracking) ── */}
+        {/* Stale-note finalize confirmation (B2 stale-tracking) */}
         <Modal
-          open={staleFinalizeOpen}
-          onClose={() => setStaleFinalizeOpen(false)}
+          open={gate?.kind === 'stale-finalize'}
+          onClose={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'cancel' })}
           title="Finalize an out-of-date note?"
           size="sm"
         >
@@ -923,38 +571,78 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => setStaleFinalizeOpen(false)}
+              onClick={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'cancel' })}
             >
               Cancel
             </button>
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => {
-                setStaleFinalizeOpen(false);
-                handleGenerate('replace');
-              }}
+              onClick={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'regenerate' })}
             >
               Regenerate
             </button>
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => {
-                setStaleFinalizeOpen(false);
-                runFinalize();
-              }}
+              onClick={() =>
+                actions.resolveGate({ kind: 'stale-finalize', outcome: 'finalize-anyway' })
+              }
             >
               Finalize anyway
             </button>
           </div>
         </Modal>
 
+        {/* Template-change confirmation (note has content) */}
+        <Modal
+          open={gate?.kind === 'template-change'}
+          onClose={() => actions.resolveGate({ kind: 'template-change', outcome: 'cancel' })}
+          title="Change template?"
+          size="sm"
+        >
+          <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+            Switching to{' '}
+            <strong>
+              {(gate?.kind === 'template-change' &&
+                allTemplates.find((t) => t.id === gate.targetTemplateId)?.name) ||
+                'another template'}
+            </strong>{' '}
+            will clear the text you've written in this note.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => actions.resolveGate({ kind: 'template-change', outcome: 'cancel' })}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => actions.resolveGate({ kind: 'template-change', outcome: 'confirm' })}
+            >
+              Change template
+            </button>
+          </div>
+        </Modal>
+
+        {/* Reset session confirmation */}
+        <ResetSessionModal
+          open={gate?.kind === 'reset-confirm'}
+          onClose={() => actions.resolveGate({ kind: 'reset-confirm', outcome: 'cancel' })}
+          onConfirm={() => actions.resolveGate({ kind: 'reset-confirm', outcome: 'confirm' })}
+        />
+
+        {/* ── Demo complete modal (host-applied demo policy) ── */}
+        <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
+
         {/* ── PII scrub modal ──────────────────────────────── */}
         <PIIScrubModal
           open={piiScrubOpen}
-          transcript={effectiveTranscript}
-          onApply={handleApplyScrub}
+          transcript={selectors.effectiveTranscript}
+          onApply={actions.applyScrub}
           onClose={() => setPiiScrubOpen(false)}
           onScrubDebug={handleScrubDebug}
         />
@@ -965,51 +653,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           onClose={() => setManageTemplatesOpen(false)}
         />
 
-        {/* ── Template-change confirmation (note has content) ── */}
-        <Modal
-          open={pendingTemplateId !== null}
-          onClose={() => setPendingTemplateId(null)}
-          title="Change template?"
-          size="sm"
-        >
-          <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-            Switching to{' '}
-            <strong>
-              {allTemplates.find((t) => t.id === pendingTemplateId)?.name ?? 'another template'}
-            </strong>{' '}
-            will clear the text you've written in this note.
-          </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setPendingTemplateId(null)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                const target = pendingTemplateId;
-                setPendingTemplateId(null);
-                if (target) applyTemplateChange(target);
-              }}
-            >
-              Change template
-            </button>
-          </div>
-        </Modal>
-
         {/* Debug drawer is rendered app-globally (GlobalDebugDrawer); this page
           only registers its session id + live debug data with the provider. */}
-
-        {/* ── Reset session confirmation ────────────────────── */}
-        <ResetSessionModal
-          open={resetModalOpen}
-          onClose={() => setResetModalOpen(false)}
-          onConfirm={() => void handleResetSession()}
-        />
       </div>
     </SessionResetContext.Provider>
   );
