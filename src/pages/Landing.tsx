@@ -269,25 +269,31 @@ export function Landing({ onSignIn }: LandingProps) {
   }, []);
 
   useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-    (
-      [
-        [sentinel1, 1],
-        [sentinel2, 2],
-        [sentinel3, 3],
-      ] as [React.RefObject<HTMLDivElement>, number][]
-    ).forEach(([ref, step]) => {
-      if (!ref.current) return;
-      const obs = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) setWorkflowStep(step);
-        },
-        { threshold: 0.5 },
-      );
-      obs.observe(ref.current);
-      observers.push(obs);
-    });
-    return () => observers.forEach((o) => o.disconnect());
+    const sentinels = [sentinel1, sentinel2, sentinel3];
+    let raf = 0;
+    // Step = how many sentinels have scrolled at/above the viewport center line.
+    // Rises 0→3 scrolling down, falls back symmetrically scrolling up (so the reel
+    // rewinds band-by-band and Record reappears at the top of the reel).
+    const recompute = () => {
+      raf = 0;
+      const mid = window.innerHeight / 2;
+      let count = 0;
+      for (const ref of sentinels) {
+        if (ref.current && ref.current.getBoundingClientRect().top <= mid) count++;
+      }
+      setWorkflowStep(count);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(recompute);
+    };
+    recompute(); // initial state on mount
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   useEffect(() => {
@@ -738,7 +744,10 @@ export function Landing({ onSignIn }: LandingProps) {
                     Sarah M. — Follow-up Visit
                   </div>
                   <div style={{ position: 'relative', width: 80, height: 80 }}>
-                    <div className="ldg-record-ring" />
+                    <div
+                      className="ldg-record-ring"
+                      style={{ animationPlayState: workflowStep === 0 ? 'running' : 'paused' }}
+                    />
                     <div
                       style={{
                         width: 80,
@@ -837,6 +846,7 @@ export function Landing({ onSignIn }: LandingProps) {
                           borderRadius: 999,
                           transformOrigin: 'bottom center',
                           animation: `ldg-wave 0.8s ease-in-out ${delay}ms infinite`,
+                          animationPlayState: workflowStep === 1 ? 'running' : 'paused',
                           display: 'inline-block',
                         }}
                       />
@@ -898,7 +908,11 @@ export function Landing({ onSignIn }: LandingProps) {
                       stroke="#6f5acc"
                       strokeWidth="2.5"
                       strokeLinecap="round"
-                      style={{ animation: 'ldg-spin 1s linear infinite', flexShrink: 0 }}
+                      style={{
+                        animation: 'ldg-spin 1s linear infinite',
+                        animationPlayState: workflowStep === 2 ? 'running' : 'paused',
+                        flexShrink: 0,
+                      }}
                     >
                       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
@@ -982,19 +996,20 @@ export function Landing({ onSignIn }: LandingProps) {
             </div>
           </div>
 
-          {/* Spacer with sentinels */}
-          <div style={{ height: 4800, position: 'relative' }}>
+          {/* Spacer with sentinels — evenly spaced ~850px bands (Record · Transcribe ·
+              Generate · Ready). The trailing ~850px below sentinel3 is step 3's tail. */}
+          <div style={{ height: 3400, position: 'relative' }}>
             <div
               ref={sentinel1}
-              style={{ position: 'absolute', top: 1200, height: 1, pointerEvents: 'none' }}
+              style={{ position: 'absolute', top: 850, height: 1, pointerEvents: 'none' }}
             />
             <div
               ref={sentinel2}
-              style={{ position: 'absolute', top: 2400, height: 1, pointerEvents: 'none' }}
+              style={{ position: 'absolute', top: 1700, height: 1, pointerEvents: 'none' }}
             />
             <div
               ref={sentinel3}
-              style={{ position: 'absolute', top: 3600, height: 1, pointerEvents: 'none' }}
+              style={{ position: 'absolute', top: 2550, height: 1, pointerEvents: 'none' }}
             />
           </div>
         </div>
