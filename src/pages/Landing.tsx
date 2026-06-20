@@ -21,7 +21,7 @@ const STEP_TITLES = [
 const STEP_DESCS = [
   'No extra hardware — just your browser and a microphone.',
   'Whisper AI converts the session to text while you wrap up.',
-  'Claude writes the SOAP structure from the transcript. You review, edit, and sign.',
+  "AI structures your notes the way you want them, in seconds. Yours to refine before it's final.",
   'Edit any section, then finalize. Your note stays on your device, encrypted.',
 ];
 
