@@ -5,6 +5,7 @@ import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
 import { CompareModal } from '@/components/landing/CompareModal';
 import { HowItWorksModal } from '@/components/landing/HowItWorksModal';
+import { HowItWorksModalV2 } from '@/components/landing/HowItWorksModalV2';
 
 interface LandingProps {
   onSignIn?: (code: string) => Promise<{ ok: boolean; error?: string }>;
@@ -189,17 +190,16 @@ export function Landing({ onSignIn }: LandingProps) {
   const [codeError, setCodeError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [workflowStep, setWorkflowStep] = useState(0);
-  const [cardsVisible, setCardsVisible] = useState(false);
   const [section6Visible, setSection6Visible] = useState(false);
   const [whyVisible, setWhyVisible] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [hiwOpen, setHiwOpen] = useState(false);
+  const [hiwV2Open, setHiwV2Open] = useState(false); // TEMP: v2 exploration toggle
 
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinel1 = useRef<HTMLDivElement>(null);
   const sentinel2 = useRef<HTMLDivElement>(null);
   const sentinel3 = useRef<HTMLDivElement>(null);
-  const cards5Ref = useRef<HTMLDivElement>(null);
   const section6Ref = useRef<HTMLDivElement>(null);
   const whyRef = useRef<HTMLDivElement>(null);
 
@@ -267,37 +267,31 @@ export function Landing({ onSignIn }: LandingProps) {
   }, []);
 
   useEffect(() => {
-    const observers: IntersectionObserver[] = [];
-    (
-      [
-        [sentinel1, 1],
-        [sentinel2, 2],
-        [sentinel3, 3],
-      ] as [React.RefObject<HTMLDivElement>, number][]
-    ).forEach(([ref, step]) => {
-      if (!ref.current) return;
-      const obs = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) setWorkflowStep(step);
-        },
-        { threshold: 0.5 },
-      );
-      obs.observe(ref.current);
-      observers.push(obs);
-    });
-    return () => observers.forEach((o) => o.disconnect());
-  }, []);
-
-  useEffect(() => {
-    if (!cards5Ref.current) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setCardsVisible(true);
-      },
-      { threshold: 0.2 },
-    );
-    obs.observe(cards5Ref.current);
-    return () => obs.disconnect();
+    const sentinels = [sentinel1, sentinel2, sentinel3];
+    let raf = 0;
+    // Step = how many sentinels have scrolled at/above the viewport center line.
+    // Rises 0→3 scrolling down, falls back symmetrically scrolling up (so the reel
+    // rewinds band-by-band and Record reappears at the top of the reel).
+    const recompute = () => {
+      raf = 0;
+      const mid = window.innerHeight / 2;
+      let count = 0;
+      for (const ref of sentinels) {
+        if (ref.current && ref.current.getBoundingClientRect().top <= mid) count++;
+      }
+      setWorkflowStep(count);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(recompute);
+    };
+    recompute(); // initial state on mount
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   useEffect(() => {
@@ -491,7 +485,7 @@ export function Landing({ onSignIn }: LandingProps) {
             marginBottom: 24,
           }}
         >
-          For Physical Therapists
+          Voice Transcription & Note Generation for Physical Therapists
         </div>
 
         <h1
@@ -521,8 +515,8 @@ export function Landing({ onSignIn }: LandingProps) {
             maxWidth: 480,
           }}
         >
-          PTScribe writes your notes while you treat — so you finish the day with your patients, not
-          your paperwork.
+          PTScribe saves clinicians time and money by transcribing clinical sessions into structured
+          notes — so you finish the day with your patients, not your paperwork.
         </p>
 
         {!showCode ? (
@@ -693,7 +687,7 @@ export function Landing({ onSignIn }: LandingProps) {
               margin: '0 0 64px',
             }}
           >
-            PTScribe turns every visit into a finished note.
+            See how it works.
           </h2>
 
           <div
@@ -736,7 +730,10 @@ export function Landing({ onSignIn }: LandingProps) {
                     Sarah M. — Follow-up Visit
                   </div>
                   <div style={{ position: 'relative', width: 80, height: 80 }}>
-                    <div className="ldg-record-ring" />
+                    <div
+                      className="ldg-record-ring"
+                      style={{ animationPlayState: workflowStep === 0 ? 'running' : 'paused' }}
+                    />
                     <div
                       style={{
                         width: 80,
@@ -835,6 +832,7 @@ export function Landing({ onSignIn }: LandingProps) {
                           borderRadius: 999,
                           transformOrigin: 'bottom center',
                           animation: `ldg-wave 0.8s ease-in-out ${delay}ms infinite`,
+                          animationPlayState: workflowStep === 1 ? 'running' : 'paused',
                           display: 'inline-block',
                         }}
                       />
@@ -896,7 +894,11 @@ export function Landing({ onSignIn }: LandingProps) {
                       stroke="#6f5acc"
                       strokeWidth="2.5"
                       strokeLinecap="round"
-                      style={{ animation: 'ldg-spin 1s linear infinite', flexShrink: 0 }}
+                      style={{
+                        animation: 'ldg-spin 1s linear infinite',
+                        animationPlayState: workflowStep === 2 ? 'running' : 'paused',
+                        flexShrink: 0,
+                      }}
                     >
                       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
@@ -980,90 +982,22 @@ export function Landing({ onSignIn }: LandingProps) {
             </div>
           </div>
 
-          {/* Spacer with sentinels */}
-          <div style={{ height: 4800, position: 'relative' }}>
+          {/* Spacer with sentinels — evenly spaced ~850px bands (Record · Transcribe ·
+              Generate · Ready). The trailing ~850px below sentinel3 is step 3's tail. */}
+          <div style={{ height: 3400, position: 'relative' }}>
             <div
               ref={sentinel1}
-              style={{ position: 'absolute', top: 1200, height: 1, pointerEvents: 'none' }}
+              style={{ position: 'absolute', top: 850, height: 1, pointerEvents: 'none' }}
             />
             <div
               ref={sentinel2}
-              style={{ position: 'absolute', top: 2400, height: 1, pointerEvents: 'none' }}
+              style={{ position: 'absolute', top: 1700, height: 1, pointerEvents: 'none' }}
             />
             <div
               ref={sentinel3}
-              style={{ position: 'absolute', top: 3600, height: 1, pointerEvents: 'none' }}
+              style={{ position: 'absolute', top: 2550, height: 1, pointerEvents: 'none' }}
             />
           </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 40,
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            onClick={() => setCompareOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '14px 28px',
-              borderRadius: 12,
-              fontFamily: 'inherit',
-              border: '1.5px solid #d6dce5',
-              background: '#ffffff',
-              color: '#1a2030',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'border-color 150ms ease-out, box-shadow 150ms ease-out',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#0ea5a8';
-              e.currentTarget.style.boxShadow = '0 8px 22px rgba(14,165,168,0.12)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#d6dce5';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            How does PTScribe compare to leading SaaS scribes?
-            <span style={{ color: '#0ea5a8' }}>→</span>
-          </button>
-          <button
-            onClick={() => setHiwOpen(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '14px 28px',
-              borderRadius: 12,
-              fontFamily: 'inherit',
-              border: '1.5px solid #d6dce5',
-              background: '#ffffff',
-              color: '#1a2030',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'border-color 150ms ease-out, box-shadow 150ms ease-out',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#0ea5a8';
-              e.currentTarget.style.boxShadow = '0 8px 22px rgba(14,165,168,0.12)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#d6dce5';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            Why I built this
-            <span style={{ color: '#0ea5a8' }}>→</span>
-          </button>
         </div>
       </div>
 
@@ -1076,6 +1010,10 @@ export function Landing({ onSignIn }: LandingProps) {
           padding: '80px 48px',
           boxSizing: 'border-box',
           width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
         }}
       >
         <div style={{ maxWidth: 680 }}>
@@ -1135,9 +1073,12 @@ export function Landing({ onSignIn }: LandingProps) {
         <div
           style={{
             marginTop: 44,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(248px, 1fr))',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             gap: 16,
+            width: '100%',
+            maxWidth: 480,
             opacity: whyVisible ? 1 : 0,
             transform: whyVisible ? 'none' : 'translateY(18px)',
             transition:
@@ -1154,6 +1095,7 @@ export function Landing({ onSignIn }: LandingProps) {
               display: 'flex',
               flexDirection: 'column',
               gap: 14,
+              width: '100%',
               background: '#1a2030',
               borderRadius: 16,
               padding: '24px 24px 22px',
@@ -1214,6 +1156,7 @@ export function Landing({ onSignIn }: LandingProps) {
               display: 'flex',
               flexDirection: 'column',
               gap: 14,
+              width: '100%',
               background: '#ffffff',
               borderRadius: 16,
               padding: '24px 24px 22px',
@@ -1289,6 +1232,7 @@ export function Landing({ onSignIn }: LandingProps) {
               display: 'flex',
               flexDirection: 'column',
               gap: 14,
+              width: '100%',
               background: '#ffffff',
               borderRadius: 16,
               padding: '24px 24px 22px',
@@ -1344,250 +1288,84 @@ export function Landing({ onSignIn }: LandingProps) {
               A 5-chapter builder's journal
             </div>
           </button>
-        </div>
-      </div>
 
-      {/* ── SECTION 4: The Practice at a Glance ──────────────── */}
-      <div
-        style={{
-          maxWidth: 1040,
-          margin: '0 auto',
-          padding: '0 24px 80px',
-          boxSizing: 'border-box',
-          width: '100%',
-        }}
-      >
-        <div style={{ background: '#f4f6f9', borderRadius: 24, padding: '64px 48px' }}>
-          <h2
+          {/* TEMP — v2 exploration: opens the re-imagined HowItWorksModalV2 */}
+          <button
+            onClick={() => setHiwV2Open(true)}
             style={{
-              fontSize: 'clamp(28px, 4vw, 40px)',
-              fontWeight: 700,
-              color: '#1a2030',
-              letterSpacing: '-0.02em',
-              textAlign: 'center',
-              margin: '0 0 48px',
-            }}
-          >
-            Seamless practice.
-          </h2>
-
-          <div
-            style={{
-              width: 560,
-              maxWidth: '100%',
-              margin: '0 auto',
-              background: '#1a2030',
+              textAlign: 'left',
+              fontFamily: 'inherit',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              background: '#ffffff',
               borderRadius: 16,
-              boxShadow: '0 24px 64px rgba(26,32,48,0.24)',
-              overflow: 'hidden',
+              padding: '24px 24px 22px',
+              border: '1px dashed #c47a09',
+              cursor: 'pointer',
+              transition:
+                'transform 220ms cubic-bezier(0.22,1,0.36,1), border-color 220ms, box-shadow 220ms',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-3px)';
+              e.currentTarget.style.borderColor = '#c47a09';
+              e.currentTarget.style.boxShadow = '0 16px 34px rgba(196,122,9,0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.borderColor = '#c47a09';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            <BrowserChrome url="ptscribe.app/today" />
-            <div style={{ background: '#f4f6f9', padding: 20 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#1a2030' }}>
-                Today's Sessions
-              </div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-                {['All', 'Draft', 'Ready', 'Finalized'].map((tab, i) => (
-                  <div
-                    key={tab}
-                    style={{
-                      fontSize: 12,
-                      padding: '4px 12px',
-                      borderRadius: 999,
-                      cursor: 'default',
-                      background: i === 0 ? '#0ea5a8' : 'transparent',
-                      color: i === 0 ? 'white' : '#5a6577',
-                    }}
-                  >
-                    {tab}
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 16 }}>
-                {[
-                  {
-                    dot: '#0ea5a8',
-                    name: 'Sarah M.',
-                    type: 'Follow-up',
-                    duration: '03:42',
-                    badge: 'Ready',
-                    badgeColor: '#0a6d70',
-                    badgeBg: '#e6f7f6',
-                  },
-                  {
-                    dot: '#c47a09',
-                    name: 'James K.',
-                    type: 'Evaluation',
-                    duration: '01:12',
-                    badge: 'Draft',
-                    badgeColor: '#c47a09',
-                    badgeBg: '#fef3e2',
-                  },
-                  {
-                    dot: '#4caf72',
-                    name: 'Linda T.',
-                    type: 'Progress',
-                    duration: '05:20',
-                    badge: 'Finalized',
-                    badgeColor: '#7c8699',
-                    badgeBg: '#f0f2f5',
-                  },
-                ].map(({ dot, name, type, duration, badge, badgeColor, badgeBg }) => (
-                  <div
-                    key={name}
-                    style={{
-                      padding: '12px 0',
-                      borderBottom: '1px solid #e4e8ee',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 999,
-                        background: dot,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#1a2030' }}>{name}</div>
-                    <div style={{ fontSize: 12, color: '#8893a5' }}>{type}</div>
-                    <div
-                      style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: '#8893a5',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {duration}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: badgeColor,
-                          background: badgeBg,
-                          padding: '2px 8px',
-                          borderRadius: 999,
-                        }}
-                      >
-                        {badge}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 48, textAlign: 'center' }}>
-            <h3 style={{ fontSize: 24, fontWeight: 700, color: '#1a2030', margin: '0 0 12px' }}>
-              Completely yours.
-            </h3>
-            <p
-              style={{
-                fontSize: 16,
-                color: '#5a6577',
-                maxWidth: 400,
-                margin: '0 auto',
-                lineHeight: 1.6,
-              }}
-            >
-              Customize templates, rename sections, and add your clinical voice.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── SECTION 5: The Three Promises ────────────────────── */}
-      <div
-        style={{
-          maxWidth: 1040,
-          margin: '0 auto',
-          padding: '0 24px 80px',
-          boxSizing: 'border-box',
-          width: '100%',
-        }}
-      >
-        <div style={{ background: '#f4f6f9', borderRadius: 24, padding: '64px 48px' }}>
-          <h2
-            style={{
-              fontSize: 'clamp(28px, 4vw, 36px)',
-              fontWeight: 700,
-              color: '#1a2030',
-              letterSpacing: '-0.02em',
-              textAlign: 'center',
-              margin: '0 0 12px',
-            }}
-          >
-            The complete picture, on your terms.
-          </h2>
-          <p style={{ fontSize: 18, color: '#5a6577', textAlign: 'center', margin: '0 0 48px' }}>
-            PTScribe keeps things simple — by design.
-          </p>
-
-          <div
-            ref={cards5Ref}
-            className="ldg-cards-grid"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}
-          >
-            {[
-              {
-                dot: '#6f5acc',
-                title: 'On your device.',
-                body: 'Everything encrypted locally. Zero servers store your notes — ever.',
-                delay: 0,
-              },
-              {
-                dot: '#0ea5a8',
-                title: '90 seconds.',
-                body: 'From recording to a signed SOAP note in under two minutes.',
-                delay: 80,
-              },
-              {
-                dot: '#c47a09',
-                title: 'Any visit type.',
-                body: 'Evaluation, SOAP, progress note, discharge — PTScribe handles all of them.',
-                delay: 160,
-              },
-            ].map(({ dot, title, body, delay }) => (
-              <div
-                key={title}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Network size={22} color="#c47a09" strokeWidth={1.75} />
+              <span
                 style={{
-                  background: '#1a2030',
-                  borderRadius: 16,
-                  padding: '28px 24px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
-                  opacity: cardsVisible ? 1 : 0,
-                  transform: cardsVisible ? 'translateY(0)' : 'translateY(24px)',
-                  transition: `opacity 600ms cubic-bezier(0.22,1,0.36,1) ${delay}ms, transform 600ms cubic-bezier(0.22,1,0.36,1) ${delay}ms`,
+                  fontSize: 10,
+                  color: '#c47a09',
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  border: '1px solid #f1d79b',
+                  borderRadius: 6,
+                  padding: '3px 7px',
                 }}
               >
-                <div style={{ width: 10, height: 10, borderRadius: 999, background: dot }} />
-                <div
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: 'white',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  {title}
-                </div>
-                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.65 }}>
-                  {body}
-                </div>
+                v2 · preview
+              </span>
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 17,
+                  fontWeight: 700,
+                  color: '#1a2030',
+                  letterSpacing: '-0.01em',
+                  marginBottom: 6,
+                }}
+              >
+                Architecture, explained — v2
               </div>
-            ))}
-          </div>
+              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+                The re-imagined journal: progress-spine rail, hero chapter openers, accent
+                threading.
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 'auto',
+                paddingTop: 4,
+                fontSize: 11.5,
+                color: '#c47a09',
+                fontWeight: 600,
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Refined builder's journal
+            </div>
+          </button>
         </div>
       </div>
 
@@ -1640,9 +1418,11 @@ export function Landing({ onSignIn }: LandingProps) {
               'opacity 700ms cubic-bezier(0.22,1,0.36,1) 80ms, transform 700ms cubic-bezier(0.22,1,0.36,1) 80ms',
           }}
         >
-          That note took 90 seconds.
+          PTs spend 2–3 hours a day on notes.
           <br />
-          Imagine a full week.
+          That's time you're not billing —
+          <br />
+          and not living.
         </h2>
 
         <button
@@ -1691,8 +1471,9 @@ export function Landing({ onSignIn }: LandingProps) {
             <strong style={{ color: '#5a6577', fontWeight: 600 }}>
               PTScribe is not HIPAA-certified.
             </strong>{' '}
-            Treat anything you record as PHI and confirm BAA terms with Cloudflare and Anthropic
-            before using real patient data. Full disclosure is shown during setup.
+            Treat anything you record as PHI. PTScribe routes AI calls through Cloudflare and
+            Anthropic — you'll need to obtain your own BAA with each provider before using real
+            patient data. Full disclosure is shown during setup.
           </p>
           <p style={{ margin: 0, fontSize: 12, color: '#8893a5', lineHeight: 1.65 }}>
             <strong style={{ color: '#5a6577', fontWeight: 600 }}>Patient consent required</strong>{' '}
@@ -1746,6 +1527,7 @@ export function Landing({ onSignIn }: LandingProps) {
         onTryDemo={handleDemo}
       />
       <HowItWorksModal open={hiwOpen} onClose={() => setHiwOpen(false)} />
+      <HowItWorksModalV2 open={hiwV2Open} onClose={() => setHiwV2Open(false)} />
     </div>
   );
 }

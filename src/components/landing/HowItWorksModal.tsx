@@ -7,9 +7,15 @@ interface Props {
   onClose: () => void;
 }
 
-type ChapterId = 'ch-intro' | 'ch-market' | 'ch-security' | 'ch-voice' | 'ch-notes' | 'ch-future';
+export type ChapterId =
+  | 'ch-intro'
+  | 'ch-market'
+  | 'ch-security'
+  | 'ch-voice'
+  | 'ch-notes'
+  | 'ch-future';
 
-const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
+export const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
   { id: 'ch-intro', num: '00', name: 'Why I built this', desc: '$1,800/yr per clinician. Really?' },
   {
     id: 'ch-security',
@@ -27,11 +33,11 @@ const CHAPTERS: { id: ChapterId; num: string; name: string; desc: string }[] = [
   { id: 'ch-future', num: '04', name: 'Down the road', desc: 'A clinic in a box.' },
 ];
 
-const REPO = 'https://github.com/kyle-giacchi/ptscribe';
+export const REPO = 'https://github.com/kyle-giacchi/ptscribe';
 
 // ─── Inline SVG glyphs for ch-security flow nodes ─────────────────────────────
 
-function VaultIcon() {
+export function VaultIcon() {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -50,7 +56,7 @@ function VaultIcon() {
   );
 }
 
-function StorageIcon() {
+export function StorageIcon() {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -71,7 +77,7 @@ function StorageIcon() {
   );
 }
 
-function CloudIcon() {
+export function CloudIcon() {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -86,7 +92,7 @@ function CloudIcon() {
   );
 }
 
-function GithubMark({ size = 11 }: { size?: number }) {
+export function GithubMark({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.48-2.7-1.08-2.7-1.08-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.22.83 1.22.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.66 7.66 0 014 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.74.54 1.49v2.21c0 .21.15.46.55.38A8 8 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -96,7 +102,7 @@ function GithubMark({ size = 11 }: { size?: number }) {
 
 // ─── Small reusable primitives ────────────────────────────────────────────────
 
-function SectionHead({ tag, title }: { tag: string; title: string }) {
+export function SectionHead({ tag, title }: { tag: string; title: string }) {
   return (
     <h3 className="ch__sec-head">
       <span className="ch__sec-tag">{tag}</span>
@@ -106,7 +112,7 @@ function SectionHead({ tag, title }: { tag: string; title: string }) {
   );
 }
 
-function ChapterHeader({
+export function ChapterHeader({
   num,
   eyebrow,
   eyebrowVariant,
@@ -142,7 +148,7 @@ function ChapterHeader({
   );
 }
 
-function Pager({
+export function Pager({
   prev,
   next,
   hint,
@@ -172,7 +178,15 @@ function Pager({
   );
 }
 
-function Disclose({ tag, title, children }: { tag: string; title: string; children: ReactNode }) {
+export function Disclose({
+  tag,
+  title,
+  children,
+}: {
+  tag: string;
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <details className="disclose">
       <summary className="disclose__sum">
@@ -196,7 +210,7 @@ function Disclose({ tag, title, children }: { tag: string; title: string; childr
 
 // ─── Chapter content ──────────────────────────────────────────────────────────
 
-function IntroChapter() {
+export function IntroChapter() {
   return (
     <section id="ch-intro" className="hiw__intro hiw__page is-active" data-page="ch-intro">
       <span className="eyebrow mono hiw__intro-eyebrow eyebrow--v3">
@@ -294,7 +308,7 @@ function IntroChapter() {
   );
 }
 
-function MarketChapter() {
+export function MarketChapter() {
   return (
     <section id="ch-market" className="ch hiw__page" data-page="ch-market">
       <h3 className="market-facts__title">
@@ -589,209 +603,66 @@ function MarketChapter() {
   );
 }
 
-function SecurityChapter() {
+export function SecurityChapter() {
   return (
     <section id="ch-security" className="ch hiw__page" data-page="ch-security">
       <ChapterHeader
         num="01"
         eyebrow="Secure, local-first strategy · 90s read"
         eyebrowVariant="sec"
-        title="Your data stays on your device unless you explicitly send it."
+        title="Can I create a secure application?"
         lede={
           <>
-            Three layers enforce that. <strong>Everything lives on your machine, encrypted.</strong>{' '}
-            The <strong>only thing that crosses the network is a thin proxy.</strong> And the{' '}
-            <strong>browser's CSP is the real local-first fence</strong>, a compromised dependency
-            can't phone home, because the browser refuses to open the connection.
+            Security is table stakes in healthcare. As much as I wanted to start building features,{' '}
+            <strong>
+              the strategy for how data gets stored and moved would constrain everything else.
+            </strong>
           </>
         }
       />
 
-      <SectionHead tag="anatomy" title="Where every byte lives, and what's allowed to cross" />
+      <SectionHead tag="principles" title="A few things I knew had to be true" />
 
-      <div
-        className="flow"
-        role="group"
-        aria-label="Data flow: the vault key is held only in memory, encrypts every byte into localStorage and IndexedDB at rest, and the only thing that crosses the network is a thin Cloudflare Worker proxy that never stores clinical data."
-      >
-        <div className="flow__strip" style={{ ['--cols' as string]: 5 } as CSSProperties}>
-          <div className="node node--ink">
-            <div className="node__top">
-              <span className="node__tag">browser tab</span>
-              <span className="node__glyph" aria-hidden="true">
-                <VaultIcon />
-              </span>
-            </div>
-            <div className="node__name">Vault key (in memory)</div>
-            <div className="node__desc">
-              Unlocked once when you open the app, via passphrase or passkey. Held only in memory.
-            </div>
-            <div className="node__meta">tab-lifetime</div>
-          </div>
-          <div className="flow__arrow">
-            <span className="flow__arrow-lbl">AES-GCM</span>
-          </div>
-          <div className="node node--sage">
-            <div className="node__top">
-              <span className="node__tag">at-rest</span>
-              <span className="node__glyph" aria-hidden="true">
-                <StorageIcon />
-              </span>
-            </div>
-            <div className="node__name">localStorage + IndexedDB</div>
-            <div className="node__desc">
-              Patients, sessions, notes, templates in <code>localStorage</code>. Audio Blobs in
-              IndexedDB. Every byte sealed at rest.
-            </div>
-            <div className="node__meta">no server-side DB</div>
-          </div>
-          <div className="flow__arrow flow__arrow--rec">
-            <span className="flow__arrow-lbl">explicit</span>
-          </div>
-          <div className="node">
-            <div className="node__top">
-              <span className="node__tag">network boundary</span>
-              <span className="node__glyph" aria-hidden="true">
-                <CloudIcon />
-              </span>
-            </div>
-            <div className="node__name">Cloudflare Worker</div>
-            <div className="node__desc">
-              A proxy and nothing else. Forwards AI calls.{' '}
-              <strong>Never stores or logs clinical data.</strong> Provider credentials stay
-              server-side.
-            </div>
-            <div className="node__meta">/api/transcribe · /api/generate</div>
-          </div>
+      <ol className="sec-principles">
+        <li>
+          <strong>Keep data local-first.</strong> The server doesn't need to hold patient
+          information. The tradeoff: data lives on your device, so you're responsible for backing it
+          up.
+        </li>
+        <li>
+          <strong>Encrypt everything at rest.</strong> Every byte of clinical data is sealed before
+          it touches storage.
+        </li>
+        <li>
+          <strong>Flag every AI call in the UX — and scrub PII before data leaves.</strong> Any time
+          we send data outside the system, the interface makes it visible and we take every measure
+          to strip identifying information first.
+        </li>
+      </ol>
+
+      <div className="sec-compare" role="table" aria-label="Security tradeoffs">
+        <div className="sec-compare__head">
+          <span>The good</span>
+          <span>The tradeoffs</span>
         </div>
-
-        <div className="flow__branch">
-          <div className="flow__branch-stems">
-            <span />
-            <span />
-          </div>
-          <div className="flow__branch-row">
-            <div className="node node--ghost">
-              <div className="node__top">
-                <span className="node__tag">worker enforces</span>
-                <span className="node__glyph" />
-              </div>
-              <div className="node__name">The cloud worker is locked to this app</div>
-              <div className="node__desc">
-                It only accepts requests coming from PTScribe, caps how many anyone can send, and
-                forwards to a fixed short list of AI models. It can't be turned into a free open
-                proxy.
-              </div>
-            </div>
-            <div className="node node--ghost">
-              <div className="node__top">
-                <span className="node__tag">the real fence</span>
-                <span className="node__glyph" />
-              </div>
-              <div className="node__name">The browser blocks outside connections</div>
-              <div className="node__desc">
-                Even if a piece of code in PTScribe were tampered with, the browser refuses to let
-                it talk to anywhere except PTScribe's own worker and the model download site.
-                There's nowhere for stolen data to go.
-              </div>
-            </div>
-          </div>
+        <div className="sec-compare__row">
+          <span>If my server was compromised, no patient data would be exposed</span>
+          <span>No cloud storage — you're in control of your own backups</span>
+        </div>
+        <div className="sec-compare__row">
+          <span>Local-first processing means data never leaves your device</span>
+          <span>
+            You're limited by your device's power — a phone isn't going to match a laptop, let alone
+            a desktop GPU
+          </span>
         </div>
       </div>
 
       <div className="note">
         <p>
-          An MVP focused on clinical transcription didn't need a database. But the scaffolding is
-          already there: login, DB connections, even a way to deploy this across a whole company.
-          Maybe go check it out. <strong>Maybe hire me.</strong>
+          #3 was the hardest challenge. We'll talk more about the tradeoffs with note processing in
+          the next chapter.
         </p>
-        <span className="note__sig">github.com/kyle-giacchi/ptscribe</span>
-      </div>
-
-      <SectionHead tag="proof" title="The Worker forwards, gates, and forgets" />
-
-      <div className="snippet" role="region" aria-label="The Worker is a proxy only">
-        <div className="snippet__head">
-          <span className="snippet__head-l">
-            <span className="snippet__head-dot" /> worker/index.ts
-          </span>
-          <span>"proxy and nothing else"</span>
-        </div>
-        <pre>{`// No persistence. No body is ever stored.
-export default {
-  async fetch(req, env) {
-    if (!req.headers.get("Origin"))         return deny(403);
-    if (!gateOk(req, env.GATE_HASH))         return deny(401);
-    if (!(await rateLimitOk(req, env.KV)))   return deny(429);
-
-    const route = match(req.url);              // /api/transcribe | /api/generate | /api/model/*
-    if (!route)                                return deny(404);
-    if (!ALLOWED_MODELS.has(route.model))      return deny(400);
-
-    return forward(route, req, env);           // streams provider response
-  }
-}`}</pre>
-      </div>
-
-      <Disclose
-        tag="implementer detail"
-        title="Cipher, key lifecycle, gate ordering, and the CSP value"
-      >
-        <div className="specs">
-          <div className="spec">
-            <div className="spec__k">at-rest cipher</div>
-            <div className="spec__v">
-              <code>AES-GCM</code>
-            </div>
-            <div className="spec__note">
-              Web Crypto. Every byte of clinical data sealed before it touches storage.
-            </div>
-          </div>
-          <div className="spec">
-            <div className="spec__k">key lifecycle</div>
-            <div className="spec__v">
-              <code>tab-lifetime</code>
-            </div>
-            <div className="spec__note">
-              Unlocked at cold open. Held in memory. Evicted when the tab closes. No idle timeout,
-              no recovery.
-            </div>
-          </div>
-          <div className="spec">
-            <div className="spec__k">worker gates</div>
-            <div className="spec__v">
-              <code>Origin · sha256 · rate limit · allowlist</code>
-            </div>
-            <div className="spec__note">
-              No <code>Origin</code> → rejected. Pre-gate per-IP throttle, then post-gate per-IP and
-              per-day, then global daily ceiling.
-            </div>
-          </div>
-          <div className="spec">
-            <div className="spec__k">CSP</div>
-            <div className="spec__v">
-              <code>connect-src 'self' + HF</code>
-            </div>
-            <div className="spec__note">
-              A compromised dep can't open a socket to an attacker server. The browser is the
-              enforcer.
-            </div>
-          </div>
-        </div>
-      </Disclose>
-
-      <div className="takeaway">
-        <span className="takeaway__icon" aria-hidden="true">
-          ✓
-        </span>
-        <div>
-          <div className="takeaway__h">There is nothing to leak from my servers</div>
-          <div className="takeaway__body">
-            If my Cloudflare account vanished tomorrow, no patient data would vanish with it,
-            because no patient data was ever there. The flip side: the vault key is yours alone,
-            with no recovery. That's the deal local-first asks you to take.
-          </div>
-        </div>
       </div>
 
       <Pager
@@ -802,7 +673,7 @@ export default {
   );
 }
 
-function VoiceChapter() {
+export function VoiceChapter() {
   return (
     <section id="ch-voice" className="ch hiw__page" data-page="ch-voice">
       <ChapterHeader
@@ -1101,7 +972,7 @@ function VoiceChapter() {
   );
 }
 
-function NotesChapter() {
+export function NotesChapter() {
   return (
     <section id="ch-notes" className="ch hiw__page" data-page="ch-notes">
       <ChapterHeader
@@ -1352,7 +1223,7 @@ const body: GenerateRequest = {
   );
 }
 
-function FutureChapter() {
+export function FutureChapter() {
   return (
     <section id="ch-future" className="ch hiw__page" data-page="ch-future">
       <ChapterHeader
@@ -1497,7 +1368,7 @@ function FutureChapter() {
 
 // ─── Style sheet (scoped under .hiw root to avoid leaking the cream palette) ─
 
-const STYLES = `
+export const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 .hiw-root {
@@ -1762,6 +1633,57 @@ const STYLES = `
 /* Per-chapter dominant accent - structure stays identical across chapters,
    so hue (plus copy) is what gives each one its own identity. */
 #ch-security { --ch-accent: var(--ink); }
+.sec-principles {
+  margin: 4px 0 18px; padding: 0; list-style: none;
+  display: grid; gap: 10px;
+}
+.sec-principles li {
+  display: grid; grid-template-columns: 22px 1fr;
+  gap: 10px; align-items: start;
+  font-size: 14px; line-height: 1.55; color: var(--ink-2);
+  counter-increment: sec-step;
+}
+.sec-principles { counter-reset: sec-step; }
+.sec-principles li::before {
+  content: counter(sec-step);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px; font-weight: 700;
+  color: var(--paper); background: var(--ink);
+  border-radius: 50%; width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-top: 2px; flex-shrink: 0;
+}
+.sec-principles li strong { color: var(--ink); font-weight: 600; }
+.sec-compare {
+  margin: 4px 0 0; border: 1px solid var(--line-2);
+  border-radius: 10px; overflow: hidden;
+  font-size: 13.5px;
+}
+.sec-compare__head {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--paper-2); border-bottom: 1px solid var(--line-2);
+}
+.sec-compare__head span {
+  padding: 8px 14px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.sec-compare__head span:first-child {
+  border-right: 1px solid var(--line-2);
+}
+.sec-compare__head span:first-child::before { content: "+ "; color: var(--sage-deep); }
+.sec-compare__head span:last-child::before  { content: "− "; color: var(--amber); }
+.sec-compare__row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--line-2);
+}
+.sec-compare__row:first-of-type { border-top: none; }
+.sec-compare__row span {
+  padding: 11px 14px; line-height: 1.5; color: var(--ink-2);
+}
+.sec-compare__row span:first-child {
+  border-right: 1px solid var(--line-2); color: var(--ink);
+}
 #ch-voice    { --ch-accent: var(--sage-deep); }
 #ch-notes    { --ch-accent: var(--record); }
 #ch-future   { --ch-accent: var(--amber); }
