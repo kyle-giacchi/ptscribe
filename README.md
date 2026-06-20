@@ -13,7 +13,7 @@
 
 ## What it does
 
-PTScribe cuts charting time for physical therapists. Open a session, hit record during (or after) a visit, and get a structured SOAP note. The AI handles transcription and note generation — you review, edit, and copy into your EMR. All patient data stays on your device.
+PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1,500–$2,000/yr and store your session data on their servers. PTScribe is the open-source alternative: record the visit, get a structured SOAP note, copy it into your EMR. The AI runs through a thin proxy that stores nothing — all recordings and notes stay encrypted on your device.
 
 ---
 
@@ -103,8 +103,6 @@ Vite proxies all `/api/*` requests to `http://127.0.0.1:8787`, so both must be r
 
 On first visit to a session the app downloads the Whisper ONNX model (~150 MB) and caches it in IndexedDB. The "Start Recording" button is disabled until the model is ready.
 
-You'll see 429 errors in the wrangler log while this happens — this is expected. The Worker tries to serve the file from R2 (empty locally) and falls back to HuggingFace, which rate-limits server-side requests. The browser then fetches from HuggingFace directly and caches the model. After the first run, the 429s stop.
-
 **To skip this on future setups**, seed R2 once after `wrangler dev` is running:
 
 ```bash
@@ -164,6 +162,8 @@ See [`docs/architecture.md`](docs/architecture.md) and [`docs/invariants.md`](do
 All patient data is stored locally in your browser. Audio and session notes never leave your device except through the AI proxy calls (transcription and note generation). No analytics, no telemetry, no backend database.
 
 PHI never touches a server. The Cloudflare Worker is a proxy only.
+
+**PTScribe is not HIPAA-certified.** AI calls are routed through Cloudflare (transcription) and Anthropic (note generation). Before using real patient data, you are responsible for obtaining a BAA with each provider under your own account.
 
 ---
 
