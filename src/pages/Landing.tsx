@@ -485,7 +485,7 @@ export function Landing({ onSignIn }: LandingProps) {
             marginBottom: 24,
           }}
         >
-          Voice Transcription & Note Generation for Physical Therapists
+          Clinical Note Transcription for Physical Therapists
         </div>
 
         <h1
@@ -732,7 +732,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   <div style={{ position: 'relative', width: 80, height: 80 }}>
                     <div
                       className="ldg-record-ring"
-                      style={{ animationPlayState: workflowStep === 0 ? 'running' : 'paused' }}
+                      style={{ animationName: workflowStep === 0 ? 'ldg-pulse-ring' : 'none' }}
                     />
                     <div
                       style={{
@@ -831,8 +831,10 @@ export function Landing({ onSignIn }: LandingProps) {
                           background: '#0ea5a8',
                           borderRadius: 999,
                           transformOrigin: 'bottom center',
-                          animation: `ldg-wave 0.8s ease-in-out ${delay}ms infinite`,
-                          animationPlayState: workflowStep === 1 ? 'running' : 'paused',
+                          animation:
+                            workflowStep === 1
+                              ? `ldg-wave 0.8s ease-in-out ${delay}ms infinite`
+                              : 'none',
                           display: 'inline-block',
                         }}
                       />
@@ -895,8 +897,7 @@ export function Landing({ onSignIn }: LandingProps) {
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       style={{
-                        animation: 'ldg-spin 1s linear infinite',
-                        animationPlayState: workflowStep === 2 ? 'running' : 'paused',
+                        animation: workflowStep === 2 ? 'ldg-spin 1s linear infinite' : 'none',
                         flexShrink: 0,
                       }}
                     >
@@ -1126,10 +1127,10 @@ export function Landing({ onSignIn }: LandingProps) {
                   marginBottom: 6,
                 }}
               >
-                Read the source
+                See the Code
               </div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.5 }}>
-                Every line is public. Audit the encryption, the proxy, all of it.
+                Open source. Audit the encryption, proxy, and AI calls yourself.
               </div>
             </div>
             <div
@@ -1192,10 +1193,10 @@ export function Landing({ onSignIn }: LandingProps) {
                   marginBottom: 6,
                 }}
               >
-                Compare to leading SaaS
+                Compare Features to Overpriced Alternative
               </div>
               <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
-                An honest, feature-by-feature scorecard against the leading SaaS scribes.
+                Feature-by-feature vs the $1,800/yr SaaS scribes.
               </div>
             </div>
             <div
@@ -1268,10 +1269,10 @@ export function Landing({ onSignIn }: LandingProps) {
                   marginBottom: 6,
                 }}
               >
-                Architecture, explained
+                Why I built this
               </div>
               <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
-                Why I built this — local-first, encrypted at rest, with the AI on a leash.
+                Architecture, decisions, trade-offs, and what's next.
               </div>
             </div>
             <div
@@ -1289,7 +1290,7 @@ export function Landing({ onSignIn }: LandingProps) {
             </div>
           </button>
 
-          {/* TEMP — v2 exploration: opens the re-imagined HowItWorksModalV2 */}
+          {/* v2 exploration: opens the re-imagined HowItWorksModalV2 */}
           <button
             onClick={() => setHiwV2Open(true)}
             style={{
@@ -1298,41 +1299,30 @@ export function Landing({ onSignIn }: LandingProps) {
               display: 'flex',
               flexDirection: 'column',
               gap: 14,
+              width: '100%',
               background: '#ffffff',
               borderRadius: 16,
               padding: '24px 24px 22px',
-              border: '1px dashed #c47a09',
+              border: '1px solid #e4e8ee',
               cursor: 'pointer',
               transition:
                 'transform 220ms cubic-bezier(0.22,1,0.36,1), border-color 220ms, box-shadow 220ms',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-3px)';
-              e.currentTarget.style.borderColor = '#c47a09';
-              e.currentTarget.style.boxShadow = '0 16px 34px rgba(196,122,9,0.15)';
+              e.currentTarget.style.borderColor = '#0ea5a8';
+              e.currentTarget.style.boxShadow = '0 16px 34px rgba(14,165,168,0.15)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.borderColor = '#c47a09';
+              e.currentTarget.style.borderColor = '#e4e8ee';
               e.currentTarget.style.boxShadow = 'none';
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Network size={22} color="#c47a09" strokeWidth={1.75} />
-              <span
-                style={{
-                  fontSize: 10,
-                  color: '#c47a09',
-                  fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  border: '1px solid #f1d79b',
-                  borderRadius: 6,
-                  padding: '3px 7px',
-                }}
-              >
-                v2 · preview
+              <Network size={22} color="#0ea5a8" strokeWidth={1.75} />
+              <span style={{ fontSize: 16, color: '#8893a5', fontWeight: 600, lineHeight: 1 }}>
+                →
               </span>
             </div>
             <div>
@@ -1345,11 +1335,10 @@ export function Landing({ onSignIn }: LandingProps) {
                   marginBottom: 6,
                 }}
               >
-                Architecture, explained — v2
+                Why I built this — v2
               </div>
               <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
-                The re-imagined journal: progress-spine rail, hero chapter openers, accent
-                threading.
+                Architecture, decisions, trade-offs, and what's next.
               </div>
             </div>
             <div
@@ -1357,13 +1346,13 @@ export function Landing({ onSignIn }: LandingProps) {
                 marginTop: 'auto',
                 paddingTop: 4,
                 fontSize: 11.5,
-                color: '#c47a09',
+                color: '#0a6d70',
                 fontWeight: 600,
                 fontFamily: "'JetBrains Mono', ui-monospace, monospace",
                 letterSpacing: '-0.01em',
               }}
             >
-              Refined builder's journal
+              A 5-chapter builder's journal
             </div>
           </button>
         </div>
