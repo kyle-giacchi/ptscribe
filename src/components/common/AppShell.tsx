@@ -34,7 +34,7 @@ export function AppShell() {
         {/* Header stack — one grid row so any combination of banners (demo, key
             reminder) renders without throwing off the main-content track. */}
         <div>
-          <GlobalTopNav />
+          {!isDemoMode() && <GlobalTopNav />}
           {isDemoMode() && (
             <div
               style={{

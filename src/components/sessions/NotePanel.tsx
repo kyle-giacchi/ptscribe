@@ -90,8 +90,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
                   borderBottom: '1px dashed var(--color-pt-border)',
                   paddingBottom: 16,
                   marginBottom: 16,
-                  paddingLeft: isAssessment ? 10 : 0,
-                  borderLeft: isAssessment ? '3px solid var(--color-pt-accent-border)' : undefined,
+                  paddingLeft: 0,
                 }}
               >
                 <div className="mb-2 flex items-center gap-2">

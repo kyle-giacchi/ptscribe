@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Mic, Upload, AlertTriangle, Info, PenLine, ChevronRight, Loader2 } from 'lucide-react';
 import { useWhisperLoading } from '@/hooks/useWhisperLoading';
 import type { UploadStatus } from '@/hooks/sessionMachine/types';
@@ -72,6 +72,13 @@ export function IdleRecordingCard({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { loading: whisperLoading } = useWhisperLoading();
+
+  const [tabHidden, setTabHidden] = useState(false);
+  useEffect(() => {
+    const onVisibility = () => setTabHidden(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
   const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
   const hasStatusMessage = uploadStatus.phase !== 'idle';
 
@@ -149,12 +156,6 @@ export function IdleRecordingCard({
     <div className="flex flex-col items-center gap-6 py-12">
       {/* Eyebrow + headings */}
       <div className="flex flex-col items-center gap-1.5">
-        <span
-          className="text-[11px] font-semibold uppercase"
-          style={{ letterSpacing: '0.08em', color: 'var(--color-pt-text-3)' }}
-        >
-          {isAddingClip ? 'add to session' : 'start the session'}
-        </span>
         <h1
           style={{
             fontSize: 28,
@@ -167,11 +168,11 @@ export function IdleRecordingCard({
         >
           {isAddingClip ? 'Record another clip' : 'Tap to start recording'}
         </h1>
-        <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
-          {isAddingClip
-            ? 'Add another clip to this session'
-            : 'or pick another way to capture this visit'}
-        </p>
+        {isAddingClip && (
+          <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+            Add another clip to this session
+          </p>
+        )}
       </div>
 
       {/* Hero record button */}
@@ -182,7 +183,8 @@ export function IdleRecordingCard({
               className="absolute inset-0 rounded-full"
               style={{
                 background: 'var(--color-pt-accent)',
-                animation: 'pts-pulse-calm 2.8s ease-out infinite',
+                animation: 'pts-pulse-calm 3.5s ease-in infinite',
+                animationPlayState: tabHidden ? 'paused' : 'running',
               }}
             />
           )}
@@ -240,7 +242,10 @@ export function IdleRecordingCard({
       )}
 
       {/* "or" divider */}
-      <div className="flex items-center gap-3" style={{ width: 360, maxWidth: '100%' }}>
+      <div
+        className="flex items-center gap-3"
+        style={{ width: 360, maxWidth: '100%', marginTop: 12, marginBottom: 12 }}
+      >
         <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
         <span
           className="text-[10px] font-semibold uppercase"
