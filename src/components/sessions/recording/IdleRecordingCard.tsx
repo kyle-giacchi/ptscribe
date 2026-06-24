@@ -288,8 +288,8 @@ export function IdleRecordingCard({
         {!isAddingClip && (
           <RouteTile
             icon={<PenLine size={22} strokeWidth={2} />}
-            title="Skip — edit manually"
-            subtitle="Type the note from a blank SOAP"
+            title="Skip / Edit Manually"
+            subtitle="Type the note manually or add audio later!"
             disabled={isUploading}
             onClick={onSkip}
           />
