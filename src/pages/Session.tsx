@@ -31,7 +31,7 @@ import { useDebugDrawer, type PiiScrubDebug } from '@/contexts/DebugDrawerProvid
 import { SessionTopBar } from '@/components/sessions/SessionTopBar';
 import { ManageTemplatesModal } from '@/components/sessions/ManageTemplatesModal';
 import { DemoCompleteModal } from '@/components/common/DemoCompleteModal';
-import { RecordWarningBanner } from '@/components/sessions/RecordWarningBanner';
+
 import { ReviewEmptyState } from '@/components/sessions/ReviewEmptyState';
 import { TranscriptCollapsedTab } from '@/components/sessions/TranscriptCollapsedTab';
 import { ResetSessionModal } from '@/components/sessions/ResetSessionModal';
@@ -45,7 +45,7 @@ export function SessionPage() {
 }
 
 function SessionRoute({ sessionId }: { sessionId: string }) {
-  const { getSession } = useSessions();
+  const { getSession, sessions } = useSessions();
   const { getPatient, updatePatient } = usePatients();
   const { forSession } = useNotes();
   const { templates, getTemplate } = useTemplates();
@@ -108,6 +108,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [clipsOpen, setClipsOpen] = useState(false);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
+  const [recordWarnOpen, setRecordWarnOpen] = useState(false);
   const { setActiveSessionId, setSessionDebug } = useDebugDrawer();
 
   useAudioRecovery(sessionId, session, patchClips);
@@ -190,7 +191,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   if (!session || !patient) return <NotFound />;
 
   const gate = state.gate;
+
+  function handleRecordStart() {
+    if (selectors.hasGeneratedNote) {
+      setRecordWarnOpen(true);
+    } else {
+      actions.startRecording();
+    }
+  }
   const sortedClips = selectors.sortedClips;
+  const hasEverRecorded = sessions.some((s) => s.clips.length > 0);
 
   // Mirror PII scrub runs into the Debug Menu (live) and, on a deep-scan
   // failure, persist it to the session's error log so it survives reload.
@@ -276,23 +286,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 gap: 10,
               }}
             >
-              {(sortedClips.length > 0 || selectors.effectiveTranscript.trim().length > 0) && (
-                <div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost py-1 text-xs"
-                    onClick={() => actions.setTab('review')}
-                  >
-                    <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
-                  </button>
-                </div>
-              )}
-              {selectors.showRecordWarning && (
-                <RecordWarningBanner
-                  onBackToReview={() => actions.setTab('review')}
-                  onDismiss={actions.dismissRecordWarning}
-                />
-              )}
+              {hasEverRecorded &&
+                (sortedClips.length > 0 || selectors.effectiveTranscript.trim().length > 0) && (
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost py-1 text-xs"
+                      onClick={() => actions.setTab('review')}
+                    >
+                      <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
+                    </button>
+                  </div>
+                )}
+
               {state.uploadFlow.active ? (
                 <UploadProcessingView
                   durationSec={
@@ -310,7 +316,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   clips={sortedClips}
                   whisperBubbles={whisperBubbles}
                   uploadStatus={state.capture.uploadStatus}
-                  onStart={actions.startRecording}
+                  onStart={handleRecordStart}
                   onStopAndFinish={actions.stopAndFinish}
                   onPauseResume={actions.pauseResume}
                   onUpload={(file) => {
@@ -333,7 +339,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                 role="tabpanel"
                 id="panel-review"
                 aria-labelledby="tab-review"
-                style={{ position: 'relative' }}
+                style={{
+                  position: 'relative',
+                  maxWidth: transcriptCollapsed ? 860 : '100%',
+                  width: '100%',
+                  margin: '0 auto',
+                  transition: 'max-width 0.55s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
               >
                 <div
                   ref={reviewGridRef}
@@ -637,6 +649,39 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
         {/* ── Demo complete modal (host-applied demo policy) ── */}
         <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
+
+        {/* ── New-recording warning (existing generated note will become stale) ── */}
+        <Modal
+          open={recordWarnOpen}
+          onClose={() => setRecordWarnOpen(false)}
+          title="Recording more will invalidate your generated note"
+          size="sm"
+        >
+          <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
+            Any new clips will be added to your transcript, but your note was generated from the
+            previous transcript. You&apos;ll need to re-run transcription and regenerate before the
+            note reflects this recording.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setRecordWarnOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setRecordWarnOpen(false);
+                actions.startRecording();
+              }}
+            >
+              Continue recording
+            </button>
+          </div>
+        </Modal>
 
         {/* ── PII scrub modal ──────────────────────────────── */}
         <PIIScrubModal

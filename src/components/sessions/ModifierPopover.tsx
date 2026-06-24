@@ -539,7 +539,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     resize: 'none',
                     borderRadius: 6,
                     border: '1px solid var(--color-pt-border)',
-                    background: 'var(--color-pt-bg, var(--color-pt-surface))',
+                    background: '#ffffff',
                     color: 'var(--color-pt-text)',
                     fontSize: 12.5,
                     lineHeight: 1.5,
