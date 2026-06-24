@@ -270,11 +270,15 @@ body {
     transform: scale(1);
     opacity: 0;
   }
-  12% {
+  10% {
     opacity: 0.28;
   }
+  70% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
   100% {
-    transform: scale(1.4);
+    transform: scale(1.5);
     opacity: 0;
   }
 }
