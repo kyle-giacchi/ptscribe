@@ -183,8 +183,9 @@ export function IdleRecordingCard({
               className="absolute inset-0 rounded-full"
               style={{
                 background: 'var(--color-pt-accent)',
-                animation: 'pts-pulse-calm 3.5s ease-in infinite',
+                animation: 'pts-pulse-calm 3.2s linear infinite',
                 animationPlayState: tabHidden ? 'paused' : 'running',
+                willChange: 'transform, opacity',
               }}
             />
           )}
