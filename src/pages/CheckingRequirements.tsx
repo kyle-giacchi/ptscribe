@@ -48,10 +48,9 @@ function fmtMb(bytes: number): string {
 }
 
 // Rendering engines the local Whisper + MediaRecorder pipeline is tested against.
-// Anything outside this set still runs if it passes feature detection, but the
-// gate flags it as untested (warn) rather than green (pass).
+// Firefox is included — it passes feature detection and works in practice.
 type BrowserFamily = 'chromium' | 'firefox' | 'webkit' | 'unknown';
-const TESTED_FAMILIES: ReadonlySet<BrowserFamily> = new Set(['chromium']);
+const TESTED_FAMILIES: ReadonlySet<BrowserFamily> = new Set(['chromium', 'firefox']);
 
 interface BrowserInfo {
   name: string;
@@ -99,6 +98,42 @@ async function detectBrowser(): Promise<BrowserInfo> {
 
 function browserLabel(info: BrowserInfo): string {
   return info.version ? `${info.name} ${info.version}` : info.name;
+}
+
+// ── Mic waveform ───────────────────────────────────────────────────────────────
+
+const BAR_COUNT = 28;
+
+function MicWaveform({ bars }: { bars: number[] }) {
+  return (
+    <div
+      aria-hidden
+      style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        gap: 2,
+        height: 18,
+        marginTop: 5,
+      }}
+    >
+      {Array.from({ length: BAR_COUNT }, (_, i) => {
+        const v = bars[i] ?? 0;
+        return (
+          <div
+            key={i}
+            style={{
+              width: 3,
+              height: `${Math.max(8, v * 100)}%`,
+              background: 'var(--color-pt-accent)',
+              borderRadius: 2,
+              opacity: 0.55 + v * 0.45,
+              transition: 'height 80ms linear',
+            }}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Status pip ──────────────────────────────────────────────────────────────────
@@ -179,7 +214,17 @@ function Pip({ status }: { status: CheckStatus }) {
 
 // ── Check row ─────────────────────────────────────────────────────────────────
 
-function CheckRow({ id, result, last }: { id: CheckId; result: CheckResult; last: boolean }) {
+function CheckRow({
+  id,
+  result,
+  last,
+  extra,
+}: {
+  id: CheckId;
+  result: CheckResult;
+  last: boolean;
+  extra?: ReactNode;
+}) {
   const { status, detail, fix } = result;
   const pending = status === 'pending';
   return (
@@ -216,6 +261,7 @@ function CheckRow({ id, result, last }: { id: CheckId; result: CheckResult; last
         {detail && (
           <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{detail}</span>
         )}
+        {extra}
         {fix && (
           <button
             onClick={fix.onClick}
@@ -268,8 +314,12 @@ export function CheckingRequirements() {
   const demo = isDemoMode();
 
   const [state, setState] = useState<GateState>(INITIAL);
+  const [micBars, setMicBars] = useState<number[]>([]);
   // Don't auto-advance if the user signals intent to stay by hovering Cancel.
   const cancelHoveredRef = useRef(false);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micAudioCtxRef = useRef<AudioContext | null>(null);
+  const micAnimRef = useRef<number>(0);
 
   const update = useCallback((id: CheckId, patch: Partial<CheckResult>) => {
     setState((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -277,25 +327,63 @@ export function CheckingRequirements() {
 
   // ── Individual checks ──────────────────────────────────────────────────────
   const runMicCheck = useCallback(async () => {
-    // Inner declaration so the "try again" fix can recurse without the callback
-    // referencing itself before it is initialised.
     async function attempt(): Promise<void> {
+      // Clean up any prior attempt before starting fresh.
+      cancelAnimationFrame(micAnimRef.current);
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      void micAudioCtxRef.current?.close();
+      micStreamRef.current = null;
+      micAudioCtxRef.current = null;
+      setMicBars([]);
+
       update('mic', { status: 'active', detail: 'Requesting access…', fix: undefined });
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = stream;
+
         const track = stream.getAudioTracks()[0];
         const s = track?.getSettings?.() ?? {};
         const label = track?.label?.trim() || 'Default microphone';
         const sr = s.sampleRate ? `${Math.round(s.sampleRate / 1000)} kHz` : '';
         const ch = s.channelCount === 1 ? 'mono' : s.channelCount === 2 ? 'stereo' : '';
-        const dBFS = await sampleRms(stream).catch(() => null);
-        stream.getTracks().forEach((t) => t.stop());
         const detail = [label, [sr, ch].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-        if (dBFS != null && dBFS < -60) {
-          update('mic', { status: 'warn', detail: `${detail} · input is very quiet` });
-        } else {
-          update('mic', { status: 'pass', detail });
+
+        const ctx = new AudioContext();
+        micAudioCtxRef.current = ctx;
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        source.connect(analyser);
+        const freq = new Uint8Array(analyser.frequencyBinCount);
+
+        let hadSound = false;
+
+        function tick() {
+          analyser.getByteFrequencyData(freq);
+          const bars = Array.from(freq).map((v) => v / 255);
+          setMicBars(bars.slice(0, BAR_COUNT));
+          const peak = Math.max(...bars);
+          if (!hadSound && peak > 0.05) {
+            hadSound = true;
+            update('mic', { status: 'pass', detail });
+          }
+          micAnimRef.current = requestAnimationFrame(tick);
         }
+
+        // Wait briefly then classify pass/warn before starting the animation loop.
+        await new Promise<void>((r) => setTimeout(r, 400));
+        analyser.getByteFrequencyData(freq);
+        const peak = Math.max(...Array.from(freq).map((v) => v / 255));
+        if (peak > 0.05) {
+          hadSound = true;
+          update('mic', { status: 'pass', detail });
+        } else {
+          update('mic', {
+            status: 'warn',
+            detail: `${detail} · speak to confirm mic is active`,
+          });
+        }
+        tick();
       } catch {
         update('mic', {
           status: 'fail',
@@ -361,10 +449,23 @@ export function CheckingRequirements() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Release mic resources when navigating away or unmounting.
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(micAnimRef.current);
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      void micAudioCtxRef.current?.close();
+    };
+  }, []);
+
   const allPass = CHECK_ORDER.every((id) => state[id].status === 'pass');
 
   const finishGate = useCallback(
     (target: string) => {
+      // Stop mic stream before navigating so it doesn't stay open in the background.
+      cancelAnimationFrame(micAnimRef.current);
+      micStreamRef.current?.getTracks().forEach((t) => t.stop());
+      void micAudioCtxRef.current?.close();
       updateFirstRun({ setupCheckDoneAt: Date.now() });
       navigate(target, { replace: true });
     },
@@ -445,7 +546,15 @@ export function CheckingRequirements() {
         <SurfaceCard padding={0} style={{ width: 560, maxWidth: '100%' }}>
           <ul aria-label="Setup checks" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {CHECK_ORDER.map((id, i) => (
-              <CheckRow key={id} id={id} result={state[id]} last={i === CHECK_ORDER.length - 1} />
+              <CheckRow
+                key={id}
+                id={id}
+                result={state[id]}
+                last={i === CHECK_ORDER.length - 1}
+                extra={
+                  id === 'mic' && micBars.length > 0 ? <MicWaveform bars={micBars} /> : undefined
+                }
+              />
             ))}
           </ul>
         </SurfaceCard>
@@ -504,7 +613,7 @@ async function runBrowserCheck(update: UpdateFn) {
       status: 'fail',
       detail: `${label} is missing ${missing.join(', ')} — use Chrome, Edge or Brave`,
       fix: {
-        label: 'Copy this page’s URL',
+        label: "Copy this page's URL",
         onClick: () => void navigator.clipboard?.writeText(window.location.href),
       },
     });
@@ -542,25 +651,5 @@ async function runStorageCheck(update: UpdateFn) {
     }
   } catch {
     update('storage', { status: 'pass', detail: 'Storage available' });
-  }
-}
-
-/** Sample the live mic for ~300 ms and return a rough peak level in dBFS. */
-async function sampleRms(stream: MediaStream): Promise<number> {
-  const ctx = new AudioContext();
-  try {
-    const source = ctx.createMediaStreamSource(stream);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-    const buf = new Float32Array(analyser.fftSize);
-    await new Promise((r) => setTimeout(r, 300));
-    analyser.getFloatTimeDomainData(buf);
-    let sum = 0;
-    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-    const rms = Math.sqrt(sum / buf.length);
-    return 20 * Math.log10(rms || 1e-7);
-  } finally {
-    void ctx.close();
   }
 }

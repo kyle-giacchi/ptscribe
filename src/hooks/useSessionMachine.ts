@@ -93,7 +93,7 @@ export interface SessionMachineSelectors {
   canGenerate: boolean;
   isTranscriptLocked: boolean;
   isRecording: boolean;
-  showRecordWarning: boolean;
+  hasGeneratedNote: boolean;
   showBackgroundWarning: boolean;
   missingRequiredLabels: string[];
   sortedClips: SessionClip[];
@@ -321,7 +321,8 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       modifiers: currentModifiers,
     });
   }, [note, session, effectiveTranscript, currentModifiers]);
-  const noteIsStale = !!note && !inputsUnchanged;
+  const noteHasContent = !!note && note.sections.some((s) => s.body.trim().length > 0);
+  const noteIsStale = noteHasContent && !inputsUnchanged;
 
   // ── Generate / Finalize (PHI + stale gates) ──────────────────────────────
   const generate = useCallback(
@@ -711,7 +712,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       isTranscriptLocked:
         sortedClips.length === 0 && !effectiveTranscript.trim() && !state.view.recordingSkipped,
       isRecording: recorder.status === 'recording' || recorder.status === 'paused',
-      showRecordWarning: state.view.tab === 'record' && !state.view.recordWarnDismissed && !!note,
+      hasGeneratedNote: !!note,
       showBackgroundWarning: recorder.wasBackgrounded && !capturePhase.backgroundWarningDismissed,
       missingRequiredLabels: generatePhase.missingRequiredLabels,
       sortedClips,

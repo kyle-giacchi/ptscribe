@@ -165,8 +165,7 @@ export function LiveTranscriptView({
                 className="text-center text-xs leading-relaxed"
                 style={{ color: 'var(--color-pt-text-3)' }}
               >
-                Transcription starts after the first audio chunk (~5 s). First run downloads the
-                model (~150 MB).
+                Transcription starts after the first audio chunk (~5 s).
               </p>
             )}
           </div>
