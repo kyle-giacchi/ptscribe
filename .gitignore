@@ -12,6 +12,10 @@ groupfinanceapp.xlsx
 # Internal planning / analysis docs (not for public repo)
 docs/superpowers/
 docs/analysis/
+docs/agents/
+
+# Design planning artifacts
+plans/
 
 # Build & deps
 node_modules/
