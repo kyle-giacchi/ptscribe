@@ -4,7 +4,7 @@ import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { vault } from '@/lib/vault/vault';
 import { PASSPHRASE_MIN_CHARS } from '@/lib/vault/crypto';
 import { migrateLegacyPlaintext } from '@/lib/vault/migration';
-import { isDemoMode, getDemoPassphrase } from '@/lib/demoMode';
+import { isDemoMode, DEMO_VAULT_PASSPHRASE } from '@/lib/demoMode';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
@@ -32,7 +32,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
     if (!demoMode || unlocked || autoUnlockTried) return;
     let cancelled = false;
     void (async () => {
-      const demoPass = getDemoPassphrase();
+      const demoPass = DEMO_VAULT_PASSPHRASE;
       try {
         if (vault.isInitialized()) {
           const result = await vault.unlock(demoPass);

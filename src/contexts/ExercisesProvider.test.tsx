@@ -4,7 +4,6 @@ import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
 import { ExercisesProvider, useExercises } from './ExercisesProvider';
 import { defaultAppData } from '@/schemas';
-import { newId } from '@/utils/ids';
 import type { Exercise } from '@/types';
 
 type Api = ReturnType<typeof useExercises>;
@@ -12,7 +11,7 @@ type Api = ReturnType<typeof useExercises>;
 function makeExercise(overrides: Partial<Exercise> = {}): Exercise {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     name: 'Quad Set',
     region: 'knee',
     category: 'strength',

@@ -79,6 +79,23 @@ export function IdleRecordingCard({
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
+
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const onStartRef = useRef(onStart);
+  useEffect(() => {
+    onStartRef.current = onStart;
+  });
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      onStartRef.current();
+      const t = setTimeout(() => setCountdown(null), 0);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setCountdown((c) => (c ?? 0) - 1), 850);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
   const isUploading = uploadStatus.phase === 'reading' || uploadStatus.phase === 'saving';
   const hasStatusMessage = uploadStatus.phase !== 'idle';
 
@@ -87,6 +104,15 @@ export function IdleRecordingCard({
   const recordBlocked = micBlocked || noRecorder;
   const whisperGate = !!(capabilities?.wasmSupported && whisperLoading);
   const buttonDisabled = isUploading || recordBlocked || whisperGate;
+
+  const handleMicClick = () => {
+    if (buttonDisabled || countdown !== null) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      onStart();
+      return;
+    }
+    setCountdown(3);
+  };
 
   // Helper text shown beneath the mic — mirrors the blocked/preparing states.
   const micHelper = micBlocked
@@ -153,7 +179,32 @@ export function IdleRecordingCard({
       (capabilities.wasmSupported && whisperLoading));
 
   return (
-    <div className="flex flex-col items-center gap-6 py-12">
+    <div className="relative flex flex-col items-center gap-6 py-12">
+      {countdown !== null && (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: 'var(--color-pt-bg)', zIndex: 20 }}
+        >
+          <span
+            key={countdown}
+            aria-live="polite"
+            aria-label={`Recording starts in ${countdown}`}
+            style={{
+              fontSize: 128,
+              fontWeight: 700,
+              lineHeight: 1,
+              letterSpacing: '-0.04em',
+              color: 'var(--color-pt-accent)',
+              animation: 'pts-countdown-num 0.82s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              display: 'block',
+              userSelect: 'none',
+              willChange: 'transform, opacity',
+            }}
+          >
+            {countdown}
+          </span>
+        </div>
+      )}
       {/* Eyebrow + headings */}
       <div className="flex flex-col items-center gap-1.5">
         <h1
@@ -178,7 +229,7 @@ export function IdleRecordingCard({
       {/* Hero record button */}
       <div className="flex flex-col items-center gap-3" style={{ marginTop: 2 }}>
         <div className="relative">
-          {!recordBlocked && !whisperGate && (
+          {!recordBlocked && !whisperGate && countdown === null && (
             <span
               className="absolute inset-0 rounded-full"
               style={{
@@ -191,9 +242,9 @@ export function IdleRecordingCard({
           )}
           <button
             type="button"
-            onClick={onStart}
+            onClick={handleMicClick}
             aria-label={isAddingClip ? 'Record another clip' : 'Start recording'}
-            disabled={buttonDisabled}
+            disabled={buttonDisabled || countdown !== null}
             className="relative flex items-center justify-center rounded-full transition-opacity"
             style={{
               width: 168,

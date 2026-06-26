@@ -16,10 +16,8 @@ import {
 } from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
-import { newId } from '@/utils/ids';
 import { parseIsoDate, fmtIsoDateOptional, relativeFromNow } from '@/utils/dates';
 import { ageFromDob } from '@/utils/patients';
-import { useToggle } from '@/hooks/useToggle';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { Patient, Sex } from '@/types';
 
@@ -75,7 +73,7 @@ export function Patients() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
-  const [open, openModal, closeModal] = useToggle();
+  const [open, setOpen] = useState(false);
   const [now] = useState(() => Date.now());
   const debouncedQuery = useDebounce(query, 250);
 
@@ -149,11 +147,11 @@ export function Patients() {
         onQuery={setQuery}
         filter={filter}
         onFilter={setFilter}
-        onAdd={() => openModal()}
+        onAdd={() => setOpen(true)}
       />
 
       {patients.length === 0 ? (
-        <EmptyState onAdd={() => openModal()} />
+        <EmptyState onAdd={() => setOpen(true)} />
       ) : (
         <SurfaceCard padding={0}>
           <TableHeader />
@@ -200,10 +198,10 @@ export function Patients() {
 
       <AddPatientModal
         open={open}
-        onClose={() => closeModal()}
+        onClose={() => setOpen(false)}
         onSave={(patient) => {
           addPatient(patient);
-          closeModal();
+          setOpen(false);
         }}
       />
     </div>
@@ -505,7 +503,7 @@ function AddPatientModal({
   function handleSave() {
     const now = Date.now();
     const patient: Patient = {
-      id: newId(),
+      id: crypto.randomUUID(),
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       dob: parseIsoDate(dob),

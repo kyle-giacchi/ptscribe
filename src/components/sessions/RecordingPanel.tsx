@@ -169,18 +169,20 @@ export function RecordingPanel({
       )}
 
       {recording ? (
-        <ActiveRecordingCard
-          subscribeDuration={recorder.subscribeDuration}
-          getDurationSec={recorder.getDurationSec}
-          paused={recorder.status === 'paused'}
-          chainActive={false}
-          analyser={recorder.analyser}
-          webSpeech={webSpeech}
-          whisperBubbles={whisperBubbles}
-          wasmSupported={capabilities?.wasmSupported}
-          onPauseResume={onPauseResume}
-          onStopAndFinish={onStopAndFinish}
-        />
+        <div style={{ animation: 'pts-recording-reveal 0.38s cubic-bezier(0.16, 1, 0.3, 1) both' }}>
+          <ActiveRecordingCard
+            subscribeDuration={recorder.subscribeDuration}
+            getDurationSec={recorder.getDurationSec}
+            paused={recorder.status === 'paused'}
+            chainActive={false}
+            analyser={recorder.analyser}
+            webSpeech={webSpeech}
+            whisperBubbles={whisperBubbles}
+            wasmSupported={capabilities?.wasmSupported}
+            onPauseResume={onPauseResume}
+            onStopAndFinish={onStopAndFinish}
+          />
+        </div>
       ) : (
         <IdleRecordingCard
           onStart={onStart}

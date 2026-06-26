@@ -7,7 +7,6 @@ import {
   type Exercise,
   type Patient,
 } from '@/types';
-import { newId } from '@/utils/ids';
 import { BUILTIN_TEMPLATES } from '@/lib/clinical/templates';
 import { BUILTIN_EXERCISES } from '@/lib/clinical/exercises';
 
@@ -353,14 +352,14 @@ export function defaultAppData(): AppData {
   const now = Date.now();
   const templates: NoteTemplate[] = BUILTIN_TEMPLATES.map((t) => ({
     ...t,
-    id: newId(),
+    id: crypto.randomUUID(),
     builtin: true,
     createdAt: now,
     updatedAt: now,
   }));
   const exercises: Exercise[] = BUILTIN_EXERCISES.map((e) => ({
     ...e,
-    id: newId(),
+    id: crypto.randomUUID(),
     builtin: true,
     createdAt: now,
     updatedAt: now,
