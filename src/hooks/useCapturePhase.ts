@@ -12,7 +12,6 @@ import {
   LOCAL_WHISPER_DEFAULT_MODEL,
 } from '@/services/ai/client/localWhisper';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
-import { newId } from '@/utils/ids';
 import type { SessionMachineAction, UploadStatus } from './sessionMachine/types';
 import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
@@ -177,7 +176,7 @@ export function useCapturePhase({
     dispatch({ type: 'error/set', message: null });
     if (!session) return;
 
-    const clipId = newId();
+    const clipId = crypto.randomUUID();
     const now = Date.now();
     activeClipIdRef.current = clipId;
     patchClips((clips) => [
@@ -390,7 +389,7 @@ export function useCapturePhase({
       return null;
     }
 
-    const clipId = newId();
+    const clipId = crypto.randomUUID();
     const now = Date.now();
     patchClips((clips) => [
       ...clips,

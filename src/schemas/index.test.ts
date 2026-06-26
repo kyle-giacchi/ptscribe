@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { AppDataSchema, defaultAppData } from './index';
-import { newId } from '@/utils/ids';
 
 describe('AppDataSchema', () => {
   it('parses the default AppData', () => {
@@ -20,7 +19,7 @@ describe('AppDataSchema', () => {
       ...data,
       patients: [
         {
-          id: newId(),
+          id: crypto.randomUUID(),
           firstName: 'Alex',
           lastName: 'Rivera',
           status: 'active',

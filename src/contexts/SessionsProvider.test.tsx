@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
 import { SessionsProvider, useSessions } from './SessionsProvider';
-import { newId } from '@/utils/ids';
 import type { Session, SessionClip } from '@/types';
 
 type Api = ReturnType<typeof useSessions>;
@@ -11,7 +10,7 @@ type Api = ReturnType<typeof useSessions>;
 function makeSession(overrides: Partial<Session> = {}): Session {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     patientId: 'patient-1',
     type: 'follow_up',
     date: now,
@@ -26,7 +25,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 function makeClip(overrides: Partial<SessionClip> = {}): SessionClip {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     index: 0,
     durationSec: 120,
     status: 'ready',

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useToggle } from '@/hooks/useToggle';
 import { Building2, Copy, Lock, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
@@ -7,7 +6,6 @@ import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { useExercises } from '@/contexts/ExercisesProvider';
 import { useOrgConfig } from '@/contexts/OrgConfigProvider';
-import { newId } from '@/utils/ids';
 import {
   BODY_REGIONS,
   CATEGORY_LABEL,
@@ -24,7 +22,7 @@ export function Exercises() {
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState<'all' | BodyRegion>('all');
   const [editing, setEditing] = useState<Exercise | null>(null);
-  const [creating, startCreating, stopCreating] = useToggle();
+  const [creating, setCreating] = useState(false);
 
   // Org shared exercises are read-only and live only in OrgConfig context (never
   // in AppData). We merge them in for display; cloning copies one into the
@@ -39,7 +37,7 @@ export function Exercises() {
       const now = Date.now();
       addExercise({
         ...src,
-        id: newId(),
+        id: crypto.randomUUID(),
         name: `${src.name} (copy)`,
         builtin: false,
         createdAt: now,
@@ -76,7 +74,7 @@ export function Exercises() {
         <PtButton
           variant="primary"
           iconLeft={<Plus size={14} strokeWidth={2} />}
-          onClick={startCreating}
+          onClick={() => setCreating(true)}
         >
           New exercise
         </PtButton>
@@ -296,7 +294,7 @@ export function Exercises() {
           exercise={editing}
           onClose={() => {
             setEditing(null);
-            stopCreating();
+            setCreating(false);
           }}
           onSave={(payload) => {
             if (editing) {
@@ -306,7 +304,7 @@ export function Exercises() {
               const now = Date.now();
               addExercise({
                 ...payload,
-                id: newId(),
+                id: crypto.randomUUID(),
                 builtin: false,
                 createdAt: now,
                 updatedAt: now,
@@ -314,7 +312,7 @@ export function Exercises() {
               toast.success('Exercise added');
             }
             setEditing(null);
-            stopCreating();
+            setCreating(false);
           }}
         />
       )}

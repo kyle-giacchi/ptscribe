@@ -8,9 +8,7 @@ import { useSessions } from '@/contexts/SessionsProvider';
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { newId } from '@/utils/ids';
 import { isSameDay } from '@/utils/dates';
-import { useToggle } from '@/hooks/useToggle';
 import { PatientRow } from '@/components/new-session/PatientRow';
 import { TemplateSection } from '@/components/new-session/TemplateSection';
 import { StartBar } from '@/components/new-session/StartBar';
@@ -55,8 +53,8 @@ export function NewSession() {
     if (!tpl) return '';
     return tpl.format === TYPE_TO_FORMAT['follow_up'] ? tpl.id : '';
   });
-  const [showAllTemplates, showAllTemplatesOn, showAllTemplatesOff] = useToggle();
-  const [creatingTemplate, openCreatingTemplate, closeCreatingTemplate] = useToggle();
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
   const [query, setQuery] = useState('');
   // Pinned at mount — same-day filter only needs today's date once per visit
   // to this page; remount on navigation re-pins it.
@@ -107,13 +105,13 @@ export function NewSession() {
     if (next === sessionType) return;
     setSessionType(next);
     setTemplateId('');
-    showAllTemplatesOff();
+    setShowAllTemplates(false);
   }
 
   function doCreateSession() {
     const now = Date.now();
     const session: Session = {
-      id: newId(),
+      id: crypto.randomUUID(),
       patientId,
       type: sessionType,
       date: now,
@@ -136,7 +134,7 @@ export function NewSession() {
     if (!patientId) return;
     const now = Date.now();
     const session: Session = {
-      id: newId(),
+      id: crypto.randomUUID(),
       patientId,
       type: sessionType,
       date: now,
@@ -153,7 +151,7 @@ export function NewSession() {
   function handleRecordWithoutPatient() {
     const now = Date.now();
     const session: Session = {
-      id: newId(),
+      id: crypto.randomUUID(),
       patientId: UNASSIGNED_PATIENT_ID,
       type: sessionType,
       date: now,
@@ -175,7 +173,7 @@ export function NewSession() {
     const lastName = parts.slice(1).join(' ');
     const now = Date.now();
     const patient: Patient = {
-      id: newId(),
+      id: crypto.randomUUID(),
       firstName,
       lastName,
       status: 'active',
@@ -193,7 +191,7 @@ export function NewSession() {
     if (!trimmed) return;
     const now = Date.now();
     const tpl: NoteTemplate = {
-      id: newId(),
+      id: crypto.randomUUID(),
       name: trimmed,
       format: TYPE_TO_FORMAT[sessionType],
       sections: [{ key: 'body', label: 'Body', promptHint: '' }],
@@ -205,8 +203,8 @@ export function NewSession() {
     };
     addTemplate(tpl);
     setTemplateId(tpl.id);
-    showAllTemplatesOn();
-    closeCreatingTemplate();
+    setShowAllTemplates(true);
+    setCreatingTemplate(false);
     toast.success('Template created — refine it any time on the Templates page.');
   }
 
@@ -434,8 +432,8 @@ export function NewSession() {
                 orgTemplateIds={orgTemplateIds}
                 showAllTemplates={showAllTemplates}
                 onPickTemplate={setTemplateId}
-                onShowAll={showAllTemplatesOn}
-                onCreate={openCreatingTemplate}
+                onShowAll={() => setShowAllTemplates(true)}
+                onCreate={() => setCreatingTemplate(true)}
               />
             </div>
           </SurfaceCard>
@@ -493,7 +491,7 @@ export function NewSession() {
       <NewTemplateModal
         open={creatingTemplate}
         visitTypeLabel={VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''}
-        onClose={closeCreatingTemplate}
+        onClose={() => setCreatingTemplate(false)}
         onCreate={handleCreateTemplate}
       />
     </div>

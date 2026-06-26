@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
-import { newId } from '@/utils/ids';
 
 export interface AppNotification {
   id: string;
@@ -24,7 +23,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   const addNotification = useCallback((level: 'warning' | 'error', message: string) => {
     setNotifications((prev) => [
-      { id: newId(), level, message, timestamp: Date.now(), read: false },
+      { id: crypto.randomUUID(), level, message, timestamp: Date.now(), read: false },
       ...prev,
     ]);
   }, []);
