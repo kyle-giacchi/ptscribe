@@ -2,16 +2,20 @@ import { useEffect, useState } from 'react';
 
 export function useBelowBreakpoint(maxWidthPx: number): boolean {
   const [matches, setMatches] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < maxWidthPx,
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia(`(max-width: ${maxWidthPx - 1}px)`).matches,
   );
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    function onResize() {
-      setMatches(window.innerWidth < maxWidthPx);
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(`(max-width: ${maxWidthPx - 1}px)`);
+    function onChange(e: MediaQueryListEvent) {
+      setMatches(e.matches);
     }
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, [maxWidthPx]);
 
   return matches;

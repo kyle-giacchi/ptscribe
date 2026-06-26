@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
 import { PlansProvider, usePlans } from './PlansProvider';
-import { newId } from '@/utils/ids';
 import type { PlanOfCare } from '@/types';
 
 type Api = ReturnType<typeof usePlans>;
@@ -11,8 +10,8 @@ type Api = ReturnType<typeof usePlans>;
 function makePlan(overrides: Partial<PlanOfCare> = {}): PlanOfCare {
   const now = Date.now();
   return {
-    id: newId(),
-    patientId: newId(),
+    id: crypto.randomUUID(),
+    patientId: crypto.randomUUID(),
     startDate: now,
     goals: [],
     prescriptions: [],
@@ -91,7 +90,7 @@ describe('PlansProvider', () => {
 
   it('activePlanForPatient: returns active plan for patient', async () => {
     const ref = await renderAndWait();
-    const patientId = newId();
+    const patientId = crypto.randomUUID();
     const plan = makePlan({ patientId, active: true });
     await act(async () => ref.current.addPlan(plan));
     await waitFor(() => expect(ref.current.plans).toHaveLength(1));
@@ -100,12 +99,12 @@ describe('PlansProvider', () => {
 
   it('activePlanForPatient: returns undefined when no active plan exists', async () => {
     const ref = await renderAndWait();
-    expect(ref.current.activePlanForPatient(newId())).toBeUndefined();
+    expect(ref.current.activePlanForPatient(crypto.randomUUID())).toBeUndefined();
   });
 
   it('activePlanForPatient: returns undefined for inactive plan', async () => {
     const ref = await renderAndWait();
-    const patientId = newId();
+    const patientId = crypto.randomUUID();
     const plan = makePlan({ patientId, active: false });
     await act(async () => ref.current.addPlan(plan));
     await waitFor(() => expect(ref.current.plans).toHaveLength(1));

@@ -1,4 +1,3 @@
-import { newId } from '@/utils/ids';
 import type { AiErrorEntry } from '@/types';
 
 /**
@@ -25,7 +24,7 @@ export function appendAiError(
   input: Omit<AiErrorEntry, 'id' | 'ts'>,
 ): AiErrorEntry[] {
   const entry: AiErrorEntry = {
-    id: newId(),
+    id: crypto.randomUUID(),
     ts: Date.now(),
     ...input,
     rawSnippet: input.rawSnippet?.slice(0, AI_ERROR_SNIPPET_MAX),

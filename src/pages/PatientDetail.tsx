@@ -7,10 +7,8 @@ import { useSessions } from '@/contexts/SessionsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { usePlans } from '@/contexts/PlansProvider';
 import { useExercises } from '@/contexts/ExercisesProvider';
-import { newId } from '@/utils/ids';
 import { isSameDay } from '@/utils/dates';
 import { ageFromDob } from '@/utils/patients';
-import { useToggle } from '@/hooks/useToggle';
 import { EditPatientModal } from '@/components/patients/EditPatientModal';
 import { PatientSameDayModal } from '@/components/patients/PatientSameDayModal';
 import { derivePatientBadge } from '@/utils/patientMetrics';
@@ -28,7 +26,7 @@ export function PatientDetail() {
   const { exercises } = useExercises();
 
   const patient = getPatient(id);
-  const [editing, startEditing, stopEditing] = useToggle();
+  const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
   const [sameDaySessions, setSameDaySessions] = useState<Session[] | null>(null);
 
@@ -77,7 +75,7 @@ export function PatientDetail() {
     if (!patient) return;
     const now = Date.now();
     const newPlan: PlanOfCare = {
-      id: newId(),
+      id: crypto.randomUUID(),
       patientId: patient.id,
       startDate: now,
       goals: [],
@@ -118,7 +116,7 @@ export function PatientDetail() {
         status={status}
         tab={tab}
         onTab={setTab}
-        onEdit={() => startEditing()}
+        onEdit={() => setEditing(true)}
         onStartSession={handleStartSession}
       />
 
@@ -164,10 +162,10 @@ export function PatientDetail() {
       <EditPatientModal
         open={editing}
         patient={patient}
-        onClose={() => stopEditing()}
+        onClose={() => setEditing(false)}
         onSave={(patch) => {
           updatePatient(patient.id, patch);
-          stopEditing();
+          setEditing(false);
         }}
       />
 

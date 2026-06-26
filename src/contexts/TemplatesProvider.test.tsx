@@ -4,7 +4,6 @@ import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
 import { TemplatesProvider, useTemplates } from './TemplatesProvider';
 import { defaultAppData } from '@/schemas';
-import { newId } from '@/utils/ids';
 import type { NoteTemplate } from '@/types';
 
 type Api = ReturnType<typeof useTemplates>;
@@ -12,7 +11,7 @@ type Api = ReturnType<typeof useTemplates>;
 function makeCustomTemplate(overrides: Partial<NoteTemplate> = {}): NoteTemplate {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     name: 'My Custom Template',
     format: 'soap',
     sections: [{ key: 'subjective', label: 'Subjective' }],

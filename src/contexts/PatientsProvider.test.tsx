@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
 import { PatientsProvider, usePatients } from './PatientsProvider';
-import { newId } from '@/utils/ids';
 import { UNASSIGNED_PATIENT_ID, type Patient } from '@/types';
 
 type Api = ReturnType<typeof usePatients>;
@@ -11,7 +10,7 @@ type Api = ReturnType<typeof usePatients>;
 function makePatient(overrides: Partial<Patient> = {}): Patient {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     firstName: 'Test',
     lastName: 'Patient',
     status: 'active',

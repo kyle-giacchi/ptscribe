@@ -9,7 +9,6 @@ import { Field, TextInput } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { duration, ease } from '@/lib/motion';
 import { parseCsvInvites } from '@/lib/csvParser';
-import { newId } from '@/utils/ids';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,7 +59,7 @@ export function OrgNew() {
     phone: '',
   });
   const [invites, setInvites] = useState<InviteRow[]>([
-    { id: newId(), email: '', role: 'standard' },
+    { id: crypto.randomUUID(), email: '', role: 'standard' },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -351,12 +350,12 @@ function StepInviteTeam({
   const canProceed = allValid;
 
   function addRow() {
-    onChange([...invites, { id: newId(), email: '', role: 'standard' }]);
+    onChange([...invites, { id: crypto.randomUUID(), email: '', role: 'standard' }]);
   }
 
   function removeRow(id: string) {
     const next = invites.filter((r) => r.id !== id);
-    onChange(next.length > 0 ? next : [{ id: newId(), email: '', role: 'standard' }]);
+    onChange(next.length > 0 ? next : [{ id: crypto.randomUUID(), email: '', role: 'standard' }]);
   }
 
   function updateRow(id: string, patch: Partial<InviteRow>) {
@@ -378,7 +377,7 @@ function StepInviteTeam({
       }
       const existingNonEmpty = invites.filter((r) => r.email.trim().length > 0);
       const newRows: InviteRow[] = parsed.map((p) => ({
-        id: newId(),
+        id: crypto.randomUUID(),
         email: p.email,
         role: 'standard' as InviteRole,
       }));

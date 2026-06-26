@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Plus, Pencil, Trash2, Check } from 'lucide-react';
-import { newId } from '@/utils/ids';
 import type {
   SessionModifiers,
   CustomInstruction,
@@ -295,7 +294,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
         ),
       }));
     } else {
-      const next: CustomInstruction = { id: newId(), text, active: true };
+      const next: CustomInstruction = { id: crypto.randomUUID(), text, active: true };
       setDraft((d) => ({
         ...d,
         customInstructions: [...d.customInstructions, next],

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { TextInput, Select } from '@/components/ui/Field';
 import { PtButton } from '@/components/design';
-import { newId } from '@/utils/ids';
 import type { Exercise, PlanGoal, PlanOfCare, Prescription } from '@/types';
 
 export function PlanEditor({
@@ -20,7 +19,7 @@ export function PlanEditor({
 
   function addGoal() {
     if (!goalText.trim()) return;
-    const g: PlanGoal = { id: newId(), text: goalText.trim(), met: false };
+    const g: PlanGoal = { id: crypto.randomUUID(), text: goalText.trim(), met: false };
     onChange({ goals: [...plan.goals, g] });
     setGoalText('');
   }
@@ -35,7 +34,7 @@ export function PlanEditor({
   function addPrescription() {
     if (!exerciseId) return;
     const p: Prescription = {
-      id: newId(),
+      id: crypto.randomUUID(),
       exerciseId,
       dosage: dosage.trim() || '3 sets x 10 reps',
     };
