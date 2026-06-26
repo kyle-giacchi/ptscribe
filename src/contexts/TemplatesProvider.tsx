@@ -1,5 +1,4 @@
 import { createListSliceContext } from './createListSliceContext';
-import { newId } from '@/utils/ids';
 import type { NoteTemplate } from '@/types';
 
 export interface TemplatesContextValue {
@@ -28,7 +27,7 @@ const { Provider, useSlice } = createListSliceContext<NoteTemplate, TemplatesCon
       const now = Date.now();
       const clone: NoteTemplate = {
         ...src,
-        id: newId(),
+        id: crypto.randomUUID(),
         name: `${src.name} (copy)`,
         builtin: false,
         createdAt: now,

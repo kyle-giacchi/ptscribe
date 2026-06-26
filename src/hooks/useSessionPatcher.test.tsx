@@ -4,13 +4,12 @@ import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from '@/contexts/AppDataProvider';
 import { SessionsProvider, useSessions } from '@/contexts/SessionsProvider';
 import { useSessionPatcher, type SessionPatcher } from './useSessionPatcher';
-import { newId } from '@/utils/ids';
 import type { Session, SessionClip } from '@/types';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     patientId: 'patient-1',
     type: 'follow_up',
     date: now,
@@ -25,7 +24,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 function makeClip(overrides: Partial<SessionClip> = {}): SessionClip {
   const now = Date.now();
   return {
-    id: newId(),
+    id: crypto.randomUUID(),
     index: 0,
     durationSec: 120,
     status: 'ready',

@@ -5,7 +5,6 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { generateNote } from '@/services/ai/generate';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
-import { newId } from '@/utils/ids';
 import { MAX_GENERATES_PER_SESSION, type useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
 import type {
@@ -88,7 +87,7 @@ export function useGeneratePhase({
         template?.sections.map((s) => ({ key: s.key, label: s.label, body: '' })) ??
         [];
       const created: Note = {
-        id: newId(),
+        id: crypto.randomUUID(),
         sessionId: session!.id,
         patientId: patient!.id,
         format: (template?.format ?? 'custom') as NoteFormat,

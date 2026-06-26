@@ -8,8 +8,6 @@ import { DIARIZATION_NOTE, NO_DIARIZATION_NOTE, NO_PII_RULE } from '@/lib/clinic
 import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { newId } from '@/utils/ids';
-import { useToggle } from '@/hooks/useToggle';
 import type { NoteFormat, NoteTemplate, NoteTemplateSection } from '@/types';
 
 const FORMAT_LABEL: Record<NoteFormat, string> = {
@@ -29,7 +27,7 @@ export function Templates() {
   const { settings, updateOrgPolicy } = useSettings();
   const orgDefaultId = settings.orgPolicy.activeTemplateId;
   const [editing, setEditing] = useState<NoteTemplate | null>(null);
-  const [creating, startCreating, stopCreating] = useToggle();
+  const [creating, setCreating] = useState(false);
 
   // Org shared templates are read-only and live only in OrgConfig context (never
   // in AppData) — like built-ins, but sourced from the org. We merge them into
@@ -44,7 +42,7 @@ export function Templates() {
       const now = Date.now();
       const clone: NoteTemplate = {
         ...src,
-        id: newId(),
+        id: crypto.randomUUID(),
         name: `${src.name} (copy)`,
         builtin: false,
         createdAt: now,
@@ -84,7 +82,7 @@ export function Templates() {
     if (!trimmed) return;
     const now = Date.now();
     const blank: NoteTemplate = {
-      id: newId(),
+      id: crypto.randomUUID(),
       name: trimmed,
       format,
       sections: [{ key: 'body', label: 'Body', promptHint: '' }],
@@ -96,7 +94,7 @@ export function Templates() {
     };
     addTemplate(blank);
     setEditing(blank);
-    stopCreating();
+    setCreating(false);
   }
 
   return (
@@ -123,7 +121,7 @@ export function Templates() {
         <PtButton
           variant="primary"
           iconLeft={<Plus size={14} strokeWidth={2} />}
-          onClick={() => startCreating()}
+          onClick={() => setCreating(true)}
         >
           New template
         </PtButton>
@@ -325,7 +323,9 @@ export function Templates() {
         })}
       </div>
 
-      {creating && <CreateTemplateModal onClose={() => stopCreating()} onCreate={handleCreate} />}
+      {creating && (
+        <CreateTemplateModal onClose={() => setCreating(false)} onCreate={handleCreate} />
+      )}
 
       {editing && (
         <TemplateEditorModal

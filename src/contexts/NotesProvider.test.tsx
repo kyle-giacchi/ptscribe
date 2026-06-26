@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { render, waitFor, act } from '@testing-library/react';
 import { AppDataProvider } from './AppDataProvider';
 import { NotesProvider, useNotes } from './NotesProvider';
-import { newId } from '@/utils/ids';
 import type { Note } from '@/types';
 
 type Api = ReturnType<typeof useNotes>;
@@ -11,8 +10,8 @@ type Api = ReturnType<typeof useNotes>;
 function makeNote(overrides: Partial<Note> = {}): Note {
   const now = Date.now();
   return {
-    id: newId(),
-    sessionId: newId(),
+    id: crypto.randomUUID(),
+    sessionId: crypto.randomUUID(),
     patientId: 'patient-1',
     format: 'soap',
     sections: [{ key: 'subjective', label: 'Subjective', body: 'Initial entry.' }],
@@ -99,7 +98,7 @@ describe('NotesProvider', () => {
 
   it('forSession: returns the note for a given sessionId', async () => {
     const ref = await renderAndWait();
-    const sessionId = newId();
+    const sessionId = crypto.randomUUID();
     const note = makeNote({ sessionId });
     await act(async () => ref.current.addNote(note));
     await waitFor(() => expect(ref.current.notes).toHaveLength(1));

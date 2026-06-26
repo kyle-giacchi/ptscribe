@@ -24,11 +24,7 @@ export function isDemoMode(): boolean {
   return true;
 }
 
-const DEMO_VAULT_PASSPHRASE = 'ptscribe-demo-mode/no-secrets-on-this-device';
-
-export function getDemoPassphrase(): string {
-  return DEMO_VAULT_PASSPHRASE;
-}
+export const DEMO_VAULT_PASSPHRASE = 'ptscribe-demo-mode/no-secrets-on-this-device';
 
 export const DEMO_PATIENT_ID = 'demo-patient';
 export const DEMO_SESSION_ID = 'demo-session';

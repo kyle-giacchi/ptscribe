@@ -21,7 +21,6 @@ import {
   type StatusTone,
 } from '@/components/design';
 import { shortLabelForType } from '@/utils/labels';
-import { newId } from '@/utils/ids';
 import { relativeFromNow } from '@/utils/dates';
 import {
   UNASSIGNED_PATIENT_ID,
@@ -69,7 +68,7 @@ export function Dashboard() {
   function handleQuickRecord() {
     const now = Date.now();
     const session: Session = {
-      id: newId(),
+      id: crypto.randomUUID(),
       patientId: UNASSIGNED_PATIENT_ID,
       type: 'follow_up',
       date: now,
