@@ -1,6 +1,6 @@
 # PTScribe
 
-> A clinical scribe for physical therapists — record the visit, get a structured note. 100% local-first. No accounts. No backend.
+> A clinical scribe for physical therapists — record the visit, get a structured note.
 
 ![React](https://img.shields.io/badge/React_19-20232A?style=flat&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
@@ -13,7 +13,7 @@
 
 ## What it does
 
-PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1,500–$2,000/yr and store your session data on their servers. PTScribe is the open-source alternative: record the visit, get a structured SOAP note, copy it into your EMR. The AI runs through a thin proxy that stores nothing — all recordings and notes stay encrypted on your device.
+PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1,500–$2,000/yr and store your session data on their servers. PTScribe is the open-source alternative: record the visit, get a structured clinical note, copy it into your EMR. The AI runs through a thin proxy that stores nothing — all recordings and notes stay encrypted on your device.
 
 ---
 
@@ -44,7 +44,7 @@ PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1
 | 1. **Start a session** | Select a patient and visit type                    |
 | 2. **Record**          | Capture audio during the visit or dictate after    |
 | 3. **Transcribe**      | Whisper converts audio to text with speaker labels |
-| 4. **Generate**        | Claude produces a structured SOAP-style note       |
+| 4. **Generate**        | Claude produces a structured clinical note         |
 | 5. **Finalize**        | Review, edit, and copy into your EMR               |
 
 ---
@@ -73,7 +73,6 @@ PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1
 | AI proxy        | Cloudflare Worker — provider credentials never reach the browser   |
 | Transcription   | Deepgram Nova-3 (cloud) · Whisper tiny (on-device, via Web Worker) |
 | Note generation | Claude (Anthropic) via `/api/generate`                             |
-| Auth            | BetterAuth — passkey + magic link, served by the Worker            |
 | Storage         | localStorage (app data) · IndexedDB (audio + model cache)          |
 | Encryption      | AES-GCM via Web Crypto API                                         |
 | Testing         | Vitest · Playwright                                                |
