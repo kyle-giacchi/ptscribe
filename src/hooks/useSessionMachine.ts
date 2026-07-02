@@ -5,11 +5,7 @@ import { audioRepository } from '@/services/AudioRepository';
 import { noteMatchesInputs } from '@/services/note/staleness';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { isDemoMode } from '@/lib/demoMode';
-import {
-  MAX_GENERATES_PER_SESSION,
-  MAX_TRANSCRIBES_PER_SESSION,
-  useActionGuard,
-} from './useActionGuard';
+import { useActionGuard } from './useActionGuard';
 import { useCapturePhase } from './useCapturePhase';
 import { useTranscriptSource } from './useTranscriptSource';
 import { useGeneratePhase } from './useGeneratePhase';
@@ -24,6 +20,7 @@ import {
 import type { BackgroundT2State } from './useBackgroundTranscription';
 import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
+import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 import type {
   Note,
   NoteSection,
@@ -457,9 +454,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       noteId: undefined,
       durationMin: undefined,
     });
-    captureRef.current.setMergedAudioBlob(null);
-    captureRef.current.setSilencedMergedBlob(null);
-    captureRef.current.setIsMerging(false);
+    captureRef.current.reset();
     dispatch({ type: 'machine/reset' });
     emitEvent({ type: 'session/reset', sessionId: current.id });
   }, [removeNote, patchSession, emitEvent]);
