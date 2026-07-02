@@ -283,38 +283,6 @@ body {
   }
 }
 
-/* Start-recording countdown: digit pops in then fades out; key-change re-triggers per digit */
-@keyframes pts-countdown-num {
-  0% {
-    transform: scale(1.6);
-    opacity: 0;
-  }
-  20% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  72% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.75);
-    opacity: 0;
-  }
-}
-
-/* ActiveRecordingCard fade-slide reveal after countdown */
-@keyframes pts-recording-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* Pulse ring for live status dots */
 @keyframes pts-pulse {
   0% {
