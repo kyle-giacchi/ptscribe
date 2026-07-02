@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import type { Dispatch } from 'react';
 import { toast } from 'sonner';
 import { transcribe } from '@/services/ai/transcribe';
@@ -9,8 +9,9 @@ import { speedUpAudio, type SpeedFactor } from '@/lib/audio/timeStretch';
 import { isDemoMode } from '@/lib/demoMode';
 import { useBackgroundTranscription } from './useBackgroundTranscription';
 import type { BackgroundT2State } from './useBackgroundTranscription';
-import { MAX_TRANSCRIBES_PER_SESSION, type useActionGuard } from './useActionGuard';
+import type { useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
+import { MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 import type { Session, Settings } from '@/types';
 
 export interface UseTranscriptSourceParams {
@@ -36,8 +37,8 @@ export interface TranscriptSourceResult {
  *   - T3: cloud Nova on explicit user action ("Improve with AI")
  *   - Revert: falls back to T2 → T1
  *
- * Mirrors T2 phase into the machine reducer so T2 errors are part of
- * the testable machine state, not just notification side-effects.
+ * T2 status lives solely in backgroundT2.phase (useBackgroundTranscription) —
+ * read it directly rather than a reducer mirror.
  */
 export function useTranscriptSource({
   session,
@@ -66,17 +67,6 @@ export function useTranscriptSource({
     setTranscript: setBaseline,
     silencedMergedBlob,
   });
-
-  // Mirror T2 phase into the reducer so machine state is testable.
-  // 'retrying' maps to 'running' — it's still an active pipeline pass.
-  useEffect(() => {
-    const { phase } = backgroundT2;
-    if (phase === 'transcribing' || phase === 'retrying') dispatch({ type: 't2/start' });
-    else if (phase === 'done') dispatch({ type: 't2/done' });
-    else if (phase === 'error') dispatch({ type: 't2/error' });
-    // backgroundT2 object is recreated each render; depend only on phase.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backgroundT2.phase, dispatch]);
 
   const runT3 = useCallback(
     async (_clipId?: string) => {

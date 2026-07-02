@@ -1,8 +1,5 @@
 import { useRef } from 'react';
 
-export const MAX_TRANSCRIBES_PER_SESSION = 1;
-export const MAX_GENERATES_PER_SESSION = 10;
-
 const ACTION_COOLDOWN_MS = 3000;
 
 type ActionKind = 'transcribe' | 'generate';
@@ -11,11 +8,12 @@ type GuardResult = { allowed: true } | { allowed: false; reason: string };
 /**
  * Anti-double-tap cooldown for the transcribe/generate actions. This hook owns
  * **only** the 3-second cooldown — it deliberately does NOT track lifetime
- * per-session counts. The lifetime caps (1 cloud transcribe, MAX_GENERATES
- * generates) are enforced from the persisted Session fields
- * (`cloudTranscribeCount` in `useTranscriptSource`, `generateCount` in
- * `useGeneratePhase`) so they survive reload, Revert, and Unlock. An in-memory
- * count here would reset on reload and silently contradict that invariant.
+ * per-session counts. The lifetime caps (`MAX_TRANSCRIBES_PER_SESSION`,
+ * `MAX_GENERATES_PER_SESSION` in `@/types`) are enforced from the persisted
+ * Session fields (`cloudTranscribeCount` in `useTranscriptSource`,
+ * `generateCount` in `useGeneratePhase`) so they survive reload, Revert, and
+ * Unlock. An in-memory count here would reset on reload and silently
+ * contradict that invariant.
  */
 export function useActionGuard() {
   const lastTranscribeAtRef = useRef(0);

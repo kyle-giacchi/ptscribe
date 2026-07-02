@@ -1,4 +1,24 @@
 import type { SessionClip } from '@/types';
+import type { T2Phase } from '@/hooks/useBackgroundTranscription';
+
+export type ClipStatusTone = 'accent' | 'negative' | 'amber';
+
+/** Status pill shown on a clip card — own status wins; 'ready'/'transcribing' fall through to the T2 pipeline phase. */
+export function clipStatusTone(
+  clip: Pick<SessionClip, 'status'>,
+  t2Phase: T2Phase,
+  t2Label: string,
+): { statusTone: ClipStatusTone; statusLabel: string } {
+  if (clip.status === 'transcribed') return { statusTone: 'accent', statusLabel: 'Transcribed' };
+  if (clip.status === 'failed') return { statusTone: 'negative', statusLabel: 'Failed' };
+  if (clip.status === 'pending') return { statusTone: 'amber', statusLabel: 'Recording…' };
+  if (t2Phase === 'transcribing')
+    return { statusTone: 'amber', statusLabel: t2Label || 'Transcribing…' };
+  if (t2Phase === 'retrying') return { statusTone: 'amber', statusLabel: 'Retrying…' };
+  if (t2Phase === 'done') return { statusTone: 'accent', statusLabel: 'Transcribed' };
+  if (t2Phase === 'error') return { statusTone: 'negative', statusLabel: 'Failed' };
+  return { statusTone: 'amber', statusLabel: 'Queued' };
+}
 
 export function getTranscribableClips(clips: SessionClip[]): SessionClip[] {
   return clips.filter(

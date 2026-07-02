@@ -53,15 +53,6 @@ export interface CaptureState {
   uploadStatus: UploadStatus;
 }
 
-// ── T2 slice (background local-Whisper pass) ──────────────────────────────
-
-/** Reducer-managed mirror of T2Phase for testable machine state. */
-export type T2ReducerPhase = 'idle' | 'running' | 'done' | 'error';
-
-export interface T2State {
-  phase: T2ReducerPhase;
-}
-
 // ── Workflow gates (CONTEXT.md §Workflow gate) ────────────────────────────
 // A gate is a blocking dialog raised by the workflow itself: it intercepts an
 // action, holds the pending intent, and either resumes it (confirm outcome)
@@ -131,7 +122,6 @@ export interface SessionMachineState {
   generate: GenerateState;
   transcribe: TranscribeState;
   capture: CaptureState;
-  t2: T2State;
   view: ViewState;
   transcript: TranscriptDocState;
   gate: SessionGate | null;
@@ -164,10 +154,6 @@ export type SessionMachineAction =
   | { type: 'transcribe/error'; aiError: AiCallError | null }
   | { type: 'transcribe/abort' }
   | { type: 'transcribe/clearAiError' }
-  // t2 (background local-Whisper pass)
-  | { type: 't2/start' }
-  | { type: 't2/done' }
-  | { type: 't2/error' }
   // capture
   | { type: 'capture/upload'; status: UploadStatus }
   // view
@@ -220,7 +206,6 @@ export function createInitialSessionMachineState(init?: SessionMachineInit): Ses
     capture: {
       uploadStatus: { phase: 'idle', message: '' },
     },
-    t2: { phase: 'idle' },
     view: {
       tab: init?.quickMode ? 'review' : 'record',
       recordingSkipped: init?.quickMode ?? false,

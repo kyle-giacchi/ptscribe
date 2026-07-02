@@ -5,8 +5,9 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { generateNote } from '@/services/ai/generate';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
-import { MAX_GENERATES_PER_SESSION, type useActionGuard } from './useActionGuard';
+import type { useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
+import { MAX_GENERATES_PER_SESSION } from '@/types';
 import type {
   Note,
   NoteFormat,

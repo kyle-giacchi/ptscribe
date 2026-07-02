@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGeneratePhase, type UseGeneratePhaseParams } from './useGeneratePhase';
-import { MAX_GENERATES_PER_SESSION } from './useActionGuard';
 import type { GenerateNoteResult } from '@/services/ai/generate';
+import { MAX_GENERATES_PER_SESSION } from '@/types';
 import type { NoteTemplate, Patient, Session, Settings } from '@/types';
 
 const updateNote = vi.fn();
