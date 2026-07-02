@@ -72,11 +72,7 @@ function makeRecorder(overrides: Partial<UseRecorder> = {}): UseRecorder {
     pause: vi.fn(),
     resume: vi.fn(),
     reset: vi.fn(),
-    wasBackgrounded: false,
-    hardCapStopped: false,
-    idleAutoStopped: false,
-    recorderInterrupted: false,
-    micDisconnected: false,
+    subscribeEvents: vi.fn(() => () => {}),
     ...overrides,
   } as unknown as UseRecorder;
 }

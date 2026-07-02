@@ -255,37 +255,49 @@ describe('useRecorder — exit paths release all three resources', () => {
 });
 
 describe('useRecorder — backgrounding (Page Visibility)', () => {
-  it('marks wasBackgrounded when the tab is hidden mid-recording', async () => {
+  function latestVisibilityHandler(): () => void {
+    const calls = (addSpy.mock.calls as unknown[][]).filter((c) => c[0] === 'visibilitychange');
+    return calls[calls.length - 1][1] as () => void;
+  }
+
+  it('emits a backgrounded event when the tab is hidden mid-recording, once per clip', async () => {
     const { result } = renderHook(() => useRecorder());
     await startRecording(result);
 
-    // Grab the visibilitychange handler the hook registered.
-    const call = (addSpy.mock.calls as unknown[][]).find((c) => c[0] === 'visibilitychange');
-    const handler = call?.[1] as () => void;
+    const handler = latestVisibilityHandler();
     expect(handler).toBeTypeOf('function');
 
-    expect(result.current.wasBackgrounded).toBe(false);
+    const events: string[] = [];
+    result.current.subscribeEvents((e) => events.push(e.type));
 
     const hiddenSpy = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
     act(() => handler());
+    // A second hide (e.g. a hide/show/hide cycle) must not re-emit within the same clip.
+    act(() => handler());
     hiddenSpy.mockRestore();
 
-    expect(result.current.wasBackgrounded).toBe(true);
+    expect(events).toEqual(['backgrounded']);
   });
 
-  it('reset() clears the sticky wasBackgrounded flag', async () => {
+  it('re-arms the one-shot guard on the next start(), so a fresh clip can emit again', async () => {
     const { result } = renderHook(() => useRecorder());
     await startRecording(result);
 
-    const handler = (addSpy.mock.calls as unknown[][]).find(
-      (c) => c[0] === 'visibilitychange',
-    )?.[1] as () => void;
+    const events: string[] = [];
+    result.current.subscribeEvents((e) => events.push(e.type));
+
     const hiddenSpy = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
-    act(() => handler());
+    act(() => latestVisibilityHandler()());
     hiddenSpy.mockRestore();
-    expect(result.current.wasBackgrounded).toBe(true);
+    expect(events).toEqual(['backgrounded']);
 
     act(() => result.current.reset());
-    expect(result.current.wasBackgrounded).toBe(false);
+    await startRecording(result);
+
+    const hiddenSpy2 = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    act(() => latestVisibilityHandler()());
+    hiddenSpy2.mockRestore();
+
+    expect(events).toEqual(['backgrounded', 'backgrounded']);
   });
 });

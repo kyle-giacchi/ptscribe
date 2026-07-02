@@ -417,7 +417,24 @@ function ClipCard({
       {/* Action row */}
       <div className="flex items-center gap-2">
         {playing && url ? (
-          <audio controls autoPlay src={url} style={{ flex: 1, height: 28 }} />
+          <audio
+            controls
+            autoPlay
+            src={url}
+            style={{ flex: 1, height: 28 }}
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              // ponytail: Chrome reports Infinity duration for MediaRecorder webm blobs
+              // until seeked once; this forces it to index the real length.
+              if (el.duration === Infinity) {
+                el.currentTime = 1e101;
+                el.ontimeupdate = () => {
+                  el.ontimeupdate = null;
+                  el.currentTime = 0;
+                };
+              }
+            }}
+          />
         ) : (
           <button
             type="button"
