@@ -6,6 +6,24 @@ import type { RecordingLimitsSettings } from '@/types';
 
 export type RecorderStatus = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
 
+/**
+ * Discrete, semantically-classified things that can happen during a clip.
+ * `stopped.reason` explains why `status` became `'stopped'` (mutually
+ * exclusive — exactly one reason per stop). The other variants are
+ * advisories that can coexist with each other and with a stop reason (e.g.
+ * a tab can be backgrounded *and* hit the hard cap), which is why they're
+ * emitted on a stream rather than folded into a single snapshot field.
+ */
+export type RecorderEvent =
+  | {
+      type: 'stopped';
+      reason: 'manual' | 'hardCap' | 'idleAuto' | 'interrupted' | 'micDisconnected';
+    }
+  | { type: 'backgrounded' }
+  | { type: 'softWarn' }
+  | { type: 'silenceStart' }
+  | { type: 'silenceEnd' };
+
 export interface UseRecorderOptions {
   limits?: RecordingLimitsSettings;
   /**
@@ -27,25 +45,6 @@ export interface UseRecorder {
   resume: () => void;
   stop: () => Promise<Blob | null>;
   reset: () => void;
-  /**
-   * True if the tab was hidden (Page Visibility API) at any point since the last
-   * `start`. Sticky for the lifetime of the current recording session and
-   * cleared by `reset`. Recording continues while hidden, but on mobile the OS
-   * may have throttled/killed the recorder; clinicians should verify duration.
-   */
-  wasBackgrounded: boolean;
-  /** Sticky once duration crosses softWarnAtMinutes; reset on `reset`. */
-  softWarnReached: boolean;
-  /** Set when the recorder auto-stopped because duration crossed maxMinutes. */
-  hardCapStopped: boolean;
-  /** Set when the recorder auto-stopped after sustained silence past idleAutoStopMinutes. */
-  idleAutoStopped: boolean;
-  /** Set when the MediaRecorder was killed unexpectedly (OS suspended the tab). Audio from in-memory chunks is saved automatically. */
-  recorderInterrupted: boolean;
-  /** Set when the microphone track ended mid-recording (device disconnected, permission revoked). Audio from in-memory chunks is saved automatically. */
-  micDisconnected: boolean;
-  /** True while the mic has been continuously silent for ≥ 30 s during active recording — possible muted or disconnected mic. Clears automatically when voice is detected again. */
-  silenceWarning: boolean;
   /** Live AnalyserNode from the voice detector — non-null while recording, null otherwise. */
   analyser: AnalyserNode | null;
   /**
@@ -66,6 +65,13 @@ export interface UseRecorder {
    */
   subscribeDuration: (cb: () => void) => () => void;
   getDurationSec: () => number;
+  /**
+   * Subscribe to discrete recorder events (stop reasons + advisories). Same
+   * multi-subscriber shape as `subscribeDuration` — add a callback, get back
+   * a remove function. Not coalesced or replayed: callers must subscribe
+   * before the event they care about can fire.
+   */
+  subscribeEvents: (cb: (event: RecorderEvent) => void) => () => void;
 }
 
 const PREFERRED_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
@@ -102,13 +108,21 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const [error, setError] = useState<string | null>(null);
   const [durationSec, setDurationSec] = useState(0);
   const [blob, setBlob] = useState<Blob | null>(null);
-  const [softWarnReached, setSoftWarnReached] = useState(false);
-  const [hardCapStopped, setHardCapStopped] = useState(false);
-  const [idleAutoStopped, setIdleAutoStopped] = useState(false);
-  const [recorderInterrupted, setRecorderInterrupted] = useState(false);
-  const [micDisconnected, setMicDisconnected] = useState(false);
-  const [silenceWarning, setSilenceWarning] = useState(false);
   const silenceWarnActiveRef = useRef(false);
+
+  // ── Event stream ─────────────────────────────────────────────────────────
+  // Same Set<callback> shape as the duration store below: multiple
+  // subscribers, no coalescing, no re-render forced on the host component.
+  const eventSubscribersRef = useRef(new Set<(e: RecorderEvent) => void>());
+  const emitEvent = useCallback((e: RecorderEvent) => {
+    for (const cb of eventSubscribersRef.current) cb(e);
+  }, []);
+  const subscribeEvents = useCallback((cb: (e: RecorderEvent) => void) => {
+    eventSubscribersRef.current.add(cb);
+    return () => {
+      eventSubscribersRef.current.delete(cb);
+    };
+  }, []);
 
   // ── Live duration external store ────────────────────────────────────────────
   // The tick writes the live elapsed seconds here and notifies subscribers; this
@@ -140,6 +154,16 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** True while we expect the recorder to be active; guards unexpected-stop detection. */
   const shouldBeRecordingRef = useRef(false);
+  /**
+   * Set right before we call `r.stop()` ourselves (tick-triggered hard-cap /
+   * idle-auto, or the public `stop()`), consumed once in `recorder.onstop` to
+   * build the `stopped` event's reason. Null means either a not-yet-realized
+   * stop or an unexpected one (browser killed the recorder without us asking).
+   */
+  const pendingStopReasonRef = useRef<'manual' | 'hardCap' | 'idleAuto' | null>(null);
+  /** One-shot guards so repeated ticks / hide-show cycles don't re-emit the same advisory all recording long. */
+  const softWarnEmittedRef = useRef(false);
+  const backgroundedEmittedRef = useRef(false);
   /** Mime type of the current recording, saved for blob reconstruction in interruption paths. */
   const currentMimeRef = useRef('audio/webm');
 
@@ -172,7 +196,6 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   // Exposed so callers can subscribe to accumulated-audio callbacks without re-creating the recorder.
   const onChunkRef = useRef<((blob: Blob, mimeType: string) => void) | null>(null);
 
-  const [wasBackgrounded, setWasBackgrounded] = useState(false);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const visibilityHandlerRef = useRef<(() => void) | null>(null);
 
@@ -299,22 +322,23 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       if (silenceMs >= SILENCE_WARN_SEC * 1000) {
         if (!silenceWarnActiveRef.current) {
           silenceWarnActiveRef.current = true;
-          setSilenceWarning(true);
+          emitEvent({ type: 'silenceStart' });
         }
       } else if (silenceMs < 500 && silenceWarnActiveRef.current) {
         silenceWarnActiveRef.current = false;
-        setSilenceWarning(false);
+        emitEvent({ type: 'silenceEnd' });
       }
 
       if (!limits) return;
       const totalMin = total / 60;
-      if (totalMin >= limits.softWarnAtMinutes) {
-        setSoftWarnReached(true);
+      if (totalMin >= limits.softWarnAtMinutes && !softWarnEmittedRef.current) {
+        softWarnEmittedRef.current = true;
+        emitEvent({ type: 'softWarn' });
       }
       if (totalMin >= limits.maxMinutes) {
         const r = recorderRef.current;
         if (r && r.state !== 'inactive') {
-          setHardCapStopped(true);
+          pendingStopReasonRef.current = 'hardCap';
           r.stop();
         }
         return;
@@ -324,13 +348,13 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         if (idleMin >= limits.idleAutoStopMinutes) {
           const r = recorderRef.current;
           if (r && r.state !== 'inactive') {
-            setIdleAutoStopped(true);
+            pendingStopReasonRef.current = 'idleAuto';
             r.stop();
           }
         }
       }
     }, 250);
-  }, [notifyDuration]);
+  }, [notifyDuration, emitEvent]);
 
   const tickPause = useCallback(() => {
     if (tickRef.current) {
@@ -354,11 +378,11 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       if (!shouldBeRecordingRef.current) return;
       shouldBeRecordingRef.current = false;
       tickPause();
-      if (micEnded) {
-        setMicDisconnected(true);
-      } else {
-        setRecorderInterrupted(true);
-      }
+      // ponytail: doesn't consult pendingStopReasonRef, so a hardCap/idleAuto
+      // stop that's preempted by a heartbeat/visibility teardown before its
+      // async onstop fires reports as 'interrupted' instead of the more
+      // precise reason — narrow race, upgrade if it's ever observed.
+      emitEvent({ type: 'stopped', reason: micEnded ? 'micDisconnected' : 'interrupted' });
       const chunks = chunksRef.current;
       const mime = currentMimeRef.current;
       if (chunks.length > 0) {
@@ -375,7 +399,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       setStatus('stopped');
       teardown();
     },
-    [tickPause, teardown],
+    [tickPause, teardown, emitEvent],
   );
 
   const attachVisibilityHandler = useCallback(() => {
@@ -383,7 +407,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     detachVisibilityHandler();
     const handler = () => {
       if (document.hidden) {
-        setWasBackgrounded(true);
+        if (!backgroundedEmittedRef.current) {
+          backgroundedEmittedRef.current = true;
+          emitEvent({ type: 'backgrounded' });
+        }
         return;
       }
       // Returned to foreground.
@@ -410,7 +437,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     };
     visibilityHandlerRef.current = handler;
     document.addEventListener('visibilitychange', handler);
-  }, [detachVisibilityHandler, finalizeInterrupted]);
+  }, [detachVisibilityHandler, finalizeInterrupted, emitEvent]);
 
   const start = useCallback(
     async (clipId: string) => {
@@ -471,16 +498,19 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           });
           setBlob(finalBlob);
           setStatus('stopped');
+          const reason = pendingStopReasonRef.current;
+          pendingStopReasonRef.current = null;
           if (stopResolveRef.current) {
             // Intentional stop via our stop() call — resolve the waiting promise.
             stopResolveRef.current(finalBlob);
             stopResolveRef.current = null;
+            emitEvent({ type: 'stopped', reason: reason ?? 'manual' });
           } else if (shouldBeRecordingRef.current) {
             // Browser stopped the recorder unexpectedly before the visibility
             // handler or heartbeat could catch it. Mark as interrupted so
             // useRecordingFlow can finalize the clip.
             shouldBeRecordingRef.current = false;
-            setRecorderInterrupted(true);
+            emitEvent({ type: 'stopped', reason: reason ?? 'interrupted' });
           }
           teardown();
         };
@@ -494,12 +524,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         setDurationSec(0);
         notifyDuration(0);
         setBlob(null);
-        setSoftWarnReached(false);
-        setHardCapStopped(false);
-        setIdleAutoStopped(false);
-        setRecorderInterrupted(false);
-        setMicDisconnected(false);
-        setSilenceWarning(false);
+        pendingStopReasonRef.current = null;
+        softWarnEmittedRef.current = false;
+        backgroundedEmittedRef.current = false;
         silenceWarnActiveRef.current = false;
         recorder.start(CHUNK_TIMESLICE_MS);
         shouldBeRecordingRef.current = true;
@@ -520,7 +547,6 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           wakeLockRef.current = sentinel;
         });
         attachVisibilityHandler();
-        setWasBackgrounded(false);
         tickStart();
         // Heartbeat: periodically verify the recorder is still alive. Catches
         // silent death on desktop (OOM, unusual browser behavior) that neither
@@ -540,7 +566,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         return false;
       }
     },
-    [teardown, tickStart, attachVisibilityHandler, finalizeInterrupted, notifyDuration],
+    [teardown, tickStart, attachVisibilityHandler, finalizeInterrupted, notifyDuration, emitEvent],
   );
 
   const pause = useCallback(() => {
@@ -575,6 +601,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     if (!r || r.state === 'inactive') return Promise.resolve(blob);
     return new Promise<Blob | null>((resolve) => {
       stopResolveRef.current = resolve;
+      pendingStopReasonRef.current = 'manual';
       tickPause();
       r.stop();
       // Safety net: if onstop never fires (browser bug, unusual state), resolve
@@ -601,13 +628,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     setBlob(null);
     setError(null);
     setStatus('idle');
-    setWasBackgrounded(false);
-    setSoftWarnReached(false);
-    setHardCapStopped(false);
-    setIdleAutoStopped(false);
-    setRecorderInterrupted(false);
-    setMicDisconnected(false);
-    setSilenceWarning(false);
+    pendingStopReasonRef.current = null;
+    softWarnEmittedRef.current = false;
+    backgroundedEmittedRef.current = false;
     silenceWarnActiveRef.current = false;
   }, [teardown, notifyDuration]);
 
@@ -621,16 +644,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     resume,
     stop,
     reset,
-    wasBackgrounded,
-    softWarnReached,
-    hardCapStopped,
-    idleAutoStopped,
-    recorderInterrupted,
-    micDisconnected,
-    silenceWarning,
     analyser,
     onChunk: onChunkRef,
     subscribeDuration,
     getDurationSec,
+    subscribeEvents,
   };
 }

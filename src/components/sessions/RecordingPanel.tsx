@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { AlertTriangle } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities';
+import { duration, ease } from '@/lib/motion';
 import type { UseRecorder } from '@/hooks/useRecorder';
 import type { UseWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import type { UploadStatus } from '@/hooks/sessionMachine/types';
@@ -50,25 +52,13 @@ export function RecordingPanel({
 }: RecordingPanelProps) {
   const { settings } = useSettings();
   const capabilities = useDeviceCapabilities();
+  const reduceMotion = useReducedMotion();
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
   const activelyRecording = recorder.status === 'recording';
 
   const [silenceWarnDismissed, setSilenceWarnDismissed] = useState(false);
-
-  // Play chime once each time the silence warning fires.
-  useEffect(() => {
-    if (recorder.silenceWarning && activelyRecording) playAlertChime();
-    // activelyRecording excluded from deps — we only want to react to silenceWarning transitions.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.silenceWarning]);
-
-  // Auto-clear the dismiss flag when voice resumes so the next silence period warns again.
-  // Legitimate external-state mirror — silenceWarning is owned by the recorder
-  // state machine and we need to reset our dismiss snapshot at its falling edge.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!recorder.silenceWarning) setSilenceWarnDismissed(false);
-  }, [recorder.silenceWarning]);
+  const [silenceActive, setSilenceActive] = useState(false);
+  const [softWarnActive, setSoftWarnActive] = useState(false);
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
@@ -76,35 +66,42 @@ export function RecordingPanel({
   const [wasAutoStopped, setWasAutoStopped] = useState(false);
 
   useEffect(() => {
-    if (recorder.hardCapStopped) {
-      toast.warning(
-        `Hit recording length cap (${settings.recordingLimits.maxMinutes} min) — auto-stopped.`,
-      );
-    }
-  }, [recorder.hardCapStopped, settings.recordingLimits.maxMinutes]);
-
-  // Legitimate external-state mirrors — recorder.idleAutoStopped and
-  // recorder.status are owned by the recorder state machine; this component
-  // latches its own "was auto-stopped" flag in response.
-  useEffect(() => {
-    if (recorder.idleAutoStopped) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setWasAutoStopped(true);
-    }
-  }, [recorder.idleAutoStopped]);
-
-  // recorderInterrupted is covered by the wasBackgrounded StatusBanner above.
-
-  useEffect(() => {
-    if (recorder.micDisconnected) {
-      toast.warning('Microphone disconnected — recording stopped and audio saved.');
-    }
-  }, [recorder.micDisconnected]);
+    return recorder.subscribeEvents((e) => {
+      switch (e.type) {
+        case 'silenceStart':
+          if (activelyRecording) playAlertChime();
+          setSilenceActive(true);
+          break;
+        case 'silenceEnd':
+          setSilenceActive(false);
+          setSilenceWarnDismissed(false);
+          break;
+        case 'softWarn':
+          setSoftWarnActive(true);
+          break;
+        case 'stopped':
+          if (e.reason === 'hardCap') {
+            toast.warning(
+              `Hit recording length cap (${settings.recordingLimits.maxMinutes} min) — auto-stopped.`,
+            );
+          } else if (e.reason === 'idleAuto') {
+            setWasAutoStopped(true);
+          } else if (e.reason === 'micDisconnected') {
+            toast.warning('Microphone disconnected — recording stopped and audio saved.');
+          }
+          break;
+      }
+    });
+  }, [recorder.subscribeEvents, activelyRecording, settings.recordingLimits.maxMinutes]);
 
   useEffect(() => {
     if (recorder.status === 'recording') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setWasAutoStopped(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSilenceActive(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSoftWarnActive(false);
     }
   }, [recorder.status]);
 
@@ -133,7 +130,7 @@ export function RecordingPanel({
         </StatusBanner>
       )}
 
-      {activelyRecording && recorder.silenceWarning && !silenceWarnDismissed && (
+      {activelyRecording && silenceActive && !silenceWarnDismissed && (
         <StatusBanner
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
           color="negative"
@@ -168,31 +165,62 @@ export function RecordingPanel({
         </StatusBanner>
       )}
 
-      {recording ? (
-        <div style={{ animation: 'pts-recording-reveal 0.38s cubic-bezier(0.16, 1, 0.3, 1) both' }}>
-          <ActiveRecordingCard
-            subscribeDuration={recorder.subscribeDuration}
-            getDurationSec={recorder.getDurationSec}
-            paused={recorder.status === 'paused'}
-            chainActive={false}
-            analyser={recorder.analyser}
-            webSpeech={webSpeech}
-            whisperBubbles={whisperBubbles}
-            wasmSupported={capabilities?.wasmSupported}
-            onPauseResume={onPauseResume}
-            onStopAndFinish={onStopAndFinish}
-          />
-        </div>
-      ) : (
-        <IdleRecordingCard
-          onStart={onStart}
-          onUpload={onUpload}
-          onSkip={onSkip}
-          uploadStatus={uploadStatus}
-          isAddingClip={clips.length > 0}
-          capabilities={capabilities}
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        {recording ? (
+          <motion.div
+            key="active"
+            className="relative"
+            initial={{ opacity: 0, y: 12, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: reduceMotion ? 0 : duration.slow, ease: ease.enter }}
+          >
+            {!reduceMotion && (
+              <motion.div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  borderRadius: 16,
+                  background:
+                    'radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--color-pt-red) 30%, transparent), transparent 65%)',
+                }}
+                initial={{ opacity: 0.5 }}
+                animate={{ opacity: 0 }}
+                transition={{ duration: 0.7, ease: ease.exit }}
+              />
+            )}
+            <ActiveRecordingCard
+              subscribeDuration={recorder.subscribeDuration}
+              getDurationSec={recorder.getDurationSec}
+              paused={recorder.status === 'paused'}
+              chainActive={false}
+              analyser={recorder.analyser}
+              webSpeech={webSpeech}
+              whisperBubbles={whisperBubbles}
+              wasmSupported={capabilities?.wasmSupported}
+              onPauseResume={onPauseResume}
+              onStopAndFinish={onStopAndFinish}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0, y: 12, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: reduceMotion ? 0 : duration.base, ease: ease.enter }}
+          >
+            <IdleRecordingCard
+              onStart={onStart}
+              onUpload={onUpload}
+              onSkip={onSkip}
+              uploadStatus={uploadStatus}
+              isAddingClip={clips.length > 0}
+              capabilities={capabilities}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {recording && (
         <RecordingSizeHint
@@ -201,7 +229,7 @@ export function RecordingPanel({
         />
       )}
 
-      {recording && recorder.softWarnReached && (
+      {recording && softWarnActive && (
         <StatusBanner icon={<AlertTriangle className="h-3.5 w-3.5" />} color="caution">
           This take has been recording for{' '}
           <RecordingElapsedMinutes

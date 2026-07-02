@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, AudioLines, CheckCircle2, LockOpen } from 'lucide-react';
+import { ArrowLeft, AudioLines, CheckCircle2, Home, LockOpen } from 'lucide-react';
 import type { Patient, Session, Note } from '@/types';
+import { isDemoMode } from '@/lib/demoMode';
 import { AddClipButton } from './AddClipButton';
 
 export interface SessionTopBarProps {
@@ -69,10 +70,11 @@ export function SessionTopBar({
         borderBottom: '1px solid var(--color-pt-border)',
       }}
     >
-      {/* Left cluster */}
+      {/* Left cluster — demo mode has no patient chart to return to (nav is
+          locked to this session), so it exits to the marketing page instead. */}
       <Link
-        to={`/patients/${patient.id}`}
-        aria-label="Back to patient chart"
+        to={isDemoMode() ? '/home' : `/patients/${patient.id}`}
+        aria-label={isDemoMode() ? 'Go home' : 'Back to patient chart'}
         className="inline-flex items-center gap-1.5"
         style={{
           height: 30,
@@ -86,7 +88,15 @@ export function SessionTopBar({
           flexShrink: 0,
         }}
       >
-        <ArrowLeft size={13} strokeWidth={2} /> Chart
+        {isDemoMode() ? (
+          <>
+            <Home size={13} strokeWidth={2} /> Go Home
+          </>
+        ) : (
+          <>
+            <ArrowLeft size={13} strokeWidth={2} /> Chart
+          </>
+        )}
       </Link>
 
       <div style={{ width: 1, height: 24, background: 'var(--color-pt-border)' }} aria-hidden />
