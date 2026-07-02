@@ -35,6 +35,7 @@ export interface UseCapturePhaseParams {
 export interface CapturePhaseResult {
   backgroundWarningDismissed: boolean;
   setBackgroundWarningDismissed: (v: boolean) => void;
+  backgrounded: boolean;
   whisperBubbles: string[];
   uploadStatus: UploadStatus;
   handleStartRecording: () => Promise<void>;
@@ -69,6 +70,7 @@ export function useCapturePhase({
   const { addNotification } = useNotifications();
 
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
+  const [backgrounded, setBackgrounded] = useState(false);
   const [whisperBubbles, setWhisperBubbles] = useState<string[]>([]);
   const [mergedAudioBlob, setMergedAudioBlob] = useState<Blob | null>(null);
   const [silencedMergedBlob, setSilencedMergedBlob] = useState<Blob | null>(null);
@@ -97,8 +99,6 @@ export function useCapturePhase({
   // Used by the auto-stop finalization effect to always call the latest closure.
   const handleFinishedRecordingRef = useRef<() => Promise<void>>(async () => {});
   const buildMergedAudioForReviewRef = useRef<() => Promise<void>>(async () => {});
-  // Guards against calling finalization twice for the same auto-stop event.
-  const autoStopFinalizedRef = useRef(false);
 
   // Auto-clear terminal upload states after 3 s.
   useEffect(() => {
@@ -121,7 +121,10 @@ export function useCapturePhase({
   // Re-arm the dismiss flag every time a new recording starts.
   useEffect(() => {
     if (recorder.status !== 'recording') return;
-    const id = window.setTimeout(() => setBackgroundWarningDismissed(false), 0);
+    const id = window.setTimeout(() => {
+      setBackgroundWarningDismissed(false);
+      setBackgrounded(false);
+    }, 0);
     return () => window.clearTimeout(id);
   }, [recorder.status]);
 
@@ -578,32 +581,20 @@ export function useCapturePhase({
   // internally — handleFinishedRecording is never called by user action, so the
   // clip stays 'pending' and audio is never persisted to IDB.
   useEffect(() => {
-    const autoStopped =
-      recorder.hardCapStopped ||
-      recorder.idleAutoStopped ||
-      recorder.recorderInterrupted ||
-      recorder.micDisconnected;
-    if (!autoStopped) {
-      autoStopFinalizedRef.current = false;
-      return;
-    }
-    if (autoStopFinalizedRef.current) return;
-    if (recorder.status !== 'stopped') return;
-    autoStopFinalizedRef.current = true;
-    void handleFinishedRecordingRef.current().then(() => {
-      setTimeout(() => void buildMergedAudioForReviewRef.current(), 0);
+    return recorder.subscribeEvents((e) => {
+      if (e.type === 'backgrounded') setBackgrounded(true);
+      if (e.type === 'stopped' && e.reason !== 'manual') {
+        void handleFinishedRecordingRef.current().then(() => {
+          setTimeout(() => void buildMergedAudioForReviewRef.current(), 0);
+        });
+      }
     });
-  }, [
-    recorder.hardCapStopped,
-    recorder.idleAutoStopped,
-    recorder.recorderInterrupted,
-    recorder.micDisconnected,
-    recorder.status,
-  ]);
+  }, [recorder.subscribeEvents]);
 
   return {
     backgroundWarningDismissed,
     setBackgroundWarningDismissed,
+    backgrounded,
     whisperBubbles,
     uploadStatus,
     handleStartRecording,
