@@ -5,7 +5,7 @@
 // Routing + key resolution are issue 03 — this module only exposes the adapters
 // and a couple of pure lookups.
 
-import type { ProviderAdapter, ProviderId } from './types';
+import type { ProviderAdapter, ProviderId, ProviderModelDescriptor } from './types';
 import { anthropicAdapter } from './anthropic';
 import { openaiAdapter } from './openai';
 import { googleAdapter } from './google';
@@ -36,13 +36,15 @@ export function isModelAllowed(provider: string, model: string): boolean {
 /** Non-secret provider descriptors for the client key-entry UI (issue 05). */
 export function providerCatalog(): Array<{
   id: ProviderId;
-  models: string[];
+  label: string;
+  models: ProviderModelDescriptor[];
   consoleUrl: string;
   keyHint: string;
 }> {
   return (Object.values(REGISTRY) as ProviderAdapter[]).map((a) => ({
     id: a.id,
-    models: [...a.modelAllowlist],
+    label: a.label,
+    models: a.models,
     consoleUrl: a.consoleUrl,
     keyHint: a.keyHint,
   }));

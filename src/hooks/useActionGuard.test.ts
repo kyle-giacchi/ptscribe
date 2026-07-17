@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useActionGuard, MAX_GENERATES_PER_SESSION } from './useActionGuard';
+import { useActionGuard } from './useActionGuard';
+import { MAX_GENERATES_PER_SESSION } from '@/types';
 
 afterEach(() => {
   vi.restoreAllMocks();

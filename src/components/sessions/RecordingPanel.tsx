@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useReducer, useEffect } from 'react';
 import { toast } from 'sonner';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { AlertTriangle } from 'lucide-react';
@@ -19,6 +19,7 @@ import {
   RecordingElapsedMinutes,
 } from './recording/RecordingNotices';
 import { playAlertChime } from './recording/playAlertChime';
+import { advisoriesReducer, initialAdvisories } from './recordingAdvisories';
 
 export interface RecordingPanelProps {
   recorder: UseRecorder;
@@ -56,28 +57,24 @@ export function RecordingPanel({
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
   const activelyRecording = recorder.status === 'recording';
 
-  const [silenceWarnDismissed, setSilenceWarnDismissed] = useState(false);
-  const [silenceActive, setSilenceActive] = useState(false);
-  const [softWarnActive, setSoftWarnActive] = useState(false);
+  const [advisories, dispatchAdvisory] = useReducer(advisoriesReducer, initialAdvisories);
+  const { silenceActive, silenceWarnDismissed, softWarnActive, wasAutoStopped } = advisories;
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
-
-  const [wasAutoStopped, setWasAutoStopped] = useState(false);
 
   useEffect(() => {
     return recorder.subscribeEvents((e) => {
       switch (e.type) {
         case 'silenceStart':
           if (activelyRecording) playAlertChime();
-          setSilenceActive(true);
+          dispatchAdvisory({ type: 'silenceStart' });
           break;
         case 'silenceEnd':
-          setSilenceActive(false);
-          setSilenceWarnDismissed(false);
+          dispatchAdvisory({ type: 'silenceEnd' });
           break;
         case 'softWarn':
-          setSoftWarnActive(true);
+          dispatchAdvisory({ type: 'softWarn' });
           break;
         case 'stopped':
           if (e.reason === 'hardCap') {
@@ -85,7 +82,7 @@ export function RecordingPanel({
               `Hit recording length cap (${settings.recordingLimits.maxMinutes} min) — auto-stopped.`,
             );
           } else if (e.reason === 'idleAuto') {
-            setWasAutoStopped(true);
+            dispatchAdvisory({ type: 'autoStopped' });
           } else if (e.reason === 'micDisconnected') {
             toast.warning('Microphone disconnected — recording stopped and audio saved.');
           }
@@ -96,12 +93,7 @@ export function RecordingPanel({
 
   useEffect(() => {
     if (recorder.status === 'recording') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setWasAutoStopped(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSilenceActive(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSoftWarnActive(false);
+      dispatchAdvisory({ type: 'reset' });
     }
   }, [recorder.status]);
 
@@ -134,7 +126,7 @@ export function RecordingPanel({
         <StatusBanner
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
           color="negative"
-          onDismiss={() => setSilenceWarnDismissed(true)}
+          onDismiss={() => dispatchAdvisory({ type: 'dismissSilenceWarn' })}
         >
           No audio detected for 30 seconds — microphone may be muted or disconnected. Check your mic
           and try speaking.
@@ -151,14 +143,14 @@ export function RecordingPanel({
               className="btn btn-ghost shrink-0 py-0.5 text-xs font-medium"
               style={{ color: 'var(--color-pt-amber-fg)', touchAction: 'manipulation' }}
               onClick={() => {
-                setWasAutoStopped(false);
+                dispatchAdvisory({ type: 'clearAutoStopped' });
                 void onStart();
               }}
             >
               Resume
             </button>
           }
-          onDismiss={() => setWasAutoStopped(false)}
+          onDismiss={() => dispatchAdvisory({ type: 'clearAutoStopped' })}
         >
           Recording auto-stopped after {settings.recordingLimits.idleAutoStopMinutes} min of
           inactivity.

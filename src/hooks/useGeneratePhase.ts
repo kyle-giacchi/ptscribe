@@ -5,8 +5,10 @@ import { useNotes } from '@/contexts/NotesProvider';
 import { generateNote } from '@/services/ai/generate';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
-import { MAX_GENERATES_PER_SESSION, type useActionGuard } from './useActionGuard';
+import { runAiCall } from './ai/runAiCall';
+import type { useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
+import { MAX_GENERATES_PER_SESSION } from '@/types';
 import type {
   Note,
   NoteFormat,
@@ -139,136 +141,138 @@ export function useGeneratePhase({
           return;
         }
 
-        dispatch({ type: 'error/set', message: null });
         // generate/start flips generate.phase to 'generating' — the machine's
         // busy selector derives from it; there is no separate busy setter.
-        dispatch({ type: 'generate/start' });
-        patchSession({ status: 'generating' });
-
-        const controller = new AbortController();
-        const abortTimer = setTimeout(() => controller.abort(), 180_000);
-        try {
-          const result = await generateNote({
-            provider: genProvider,
-            model: settings.ai.generation.model,
-            template,
-            transcript,
-            patient: patient!,
-            sessionType: session!.type,
-            modifiers: session!.modifiers,
-            activeTranscriptTier: session!.activeTranscriptTier,
-            regenerationDraft: note,
-            regenerationFeedback: feedback,
-            signal: controller.signal,
-            onRetry: (info) =>
-              dispatch({
-                type: 'generate/retry',
-                status: { provider: genProvider, attempt: info.attempt, max: info.max },
-              }),
-          });
-
-          const modifierSnapshot = session!.modifiers;
-          const transcriptSnapshot = transcript;
-          if (note) {
-            const nextSections =
-              mode === 'append' ? appendSections(note.sections, result.sections) : result.sections;
-            updateNote(note.id, {
-              sections: nextSections,
-              templateId: template.id,
-              format: template.format,
-              modifiers: modifierSnapshot,
-              generatedFromTranscript: transcriptSnapshot,
+        await runAiCall({
+          session,
+          dispatch,
+          patchSession,
+          startActions: [{ type: 'error/set', message: null }, { type: 'generate/start' }],
+          busyStatus: 'generating',
+          errorStatus: 'draft',
+          execute: (signal) =>
+            generateNote({
+              provider: genProvider,
+              model: settings.ai.generation.model,
+              template,
+              transcript,
+              patient: patient!,
+              sessionType: session!.type,
+              modifiers: session!.modifiers,
+              activeTranscriptTier: session!.activeTranscriptTier,
+              regenerationDraft: note,
+              regenerationFeedback: feedback,
+              signal,
+              onRetry: (info) =>
+                dispatch({
+                  type: 'generate/retry',
+                  status: { provider: genProvider, attempt: info.attempt, max: info.max },
+                }),
+            }),
+          onSuccess: (result) => {
+            const modifierSnapshot = session!.modifiers;
+            const transcriptSnapshot = transcript;
+            if (note) {
+              const nextSections =
+                mode === 'append'
+                  ? appendSections(note.sections, result.sections)
+                  : result.sections;
+              updateNote(note.id, {
+                sections: nextSections,
+                templateId: template.id,
+                format: template.format,
+                modifiers: modifierSnapshot,
+                generatedFromTranscript: transcriptSnapshot,
+              });
+            } else {
+              ensureNote(result.sections, {
+                modifiers: modifierSnapshot,
+                generatedFromTranscript: transcriptSnapshot,
+              });
+            }
+            recordAction('generate');
+            dispatch({
+              type: 'generate/success',
+              rawText: result.rawText,
+              prompts: result.debugPrompts,
+              keyReport: result.keyReport,
             });
-          } else {
-            ensureNote(result.sections, {
-              modifiers: modifierSnapshot,
-              generatedFromTranscript: transcriptSnapshot,
-            });
-          }
-          recordAction('generate');
-          dispatch({
-            type: 'generate/success',
-            rawText: result.rawText,
-            prompts: result.debugPrompts,
-            keyReport: result.keyReport,
-          });
-          const hasContent = result.sections.some((s) => s.body.trim().length > 0);
-          const { matched, returned } = result.keyReport;
-          // A successful HTTP call can still produce a blank note. Record those
-          // content failures to the per-session error log, folded into the SAME
-          // status patch (a second patchSession would clobber it — see
-          // appendAiError docs / the makeListMutators double-write footgun).
-          let errorPatch: Partial<Session> = {};
-          if (hasContent) {
-            toast.success('Draft note generated');
-          } else if (returned.length > 0 && matched.length === 0) {
-            // The model replied with a JSON object, but none of its keys match
-            // the template's section keys — so every section fell back to "".
-            // This is a template/response mismatch, not an empty transcript.
-            toast.error(
-              `Note couldn't be filled: the AI returned sections (${returned.join(', ')}) that don't match this template (${result.keyReport.expected.join(', ')}). See Debug → Section mapping.`,
-            );
-            errorPatch = {
-              aiErrors: appendAiError(session!.aiErrors, {
-                call: 'generate',
-                provider: 'anthropic',
-                kind: 'key_mismatch',
-                detail: `Returned [${returned.join(', ')}] vs expected [${result.keyReport.expected.join(', ')}]`,
-                rawSnippet: result.rawText ?? undefined,
-                keyReport: result.keyReport,
-              }),
-            };
-          } else {
-            toast.warning(
-              'Note generated, but all sections are empty — try using a more detailed transcript.',
-            );
-            errorPatch = {
-              aiErrors: appendAiError(session!.aiErrors, {
-                call: 'generate',
-                provider: 'anthropic',
-                kind: 'blank',
-                detail: 'All sections empty after generation.',
-                rawSnippet: result.rawText ?? undefined,
-                keyReport: result.keyReport,
-              }),
-            };
-          }
-          // Fold the persisted generate-cap increment into the SAME success patch as
-          // status + any errorPatch. A separate patchSession here would clobber those
-          // fields (makeListMutators double-write footgun). A successful HTTP call
-          // counts against the cap regardless of whether the note came back blank.
-          patchSession({ status: 'ready', generateCount: spentGen + 1, ...errorPatch });
-        } catch (e) {
-          let errorPatch: Partial<Session> = {};
-          if (e instanceof AiCallError) {
-            dispatch({ type: 'generate/error', aiError: e });
-            toast.error(friendlyAiError(e).title);
-            errorPatch = {
-              aiErrors: appendAiError(session?.aiErrors, {
-                call: 'generate',
-                provider: e.provider,
-                kind: e.kind,
-                status: e.status,
-                attempts: e.attemptsMade,
-                detail: e.message,
-                rawSnippet: e.rawDetail,
-              }),
-            };
-          } else {
-            dispatch({ type: 'generate/error', aiError: null });
-            dispatch({ type: 'error/set', message: (e as Error).message });
-            errorPatch = {
-              aiErrors: appendAiError(session?.aiErrors, {
+            const hasContent = result.sections.some((s) => s.body.trim().length > 0);
+            const { matched, returned } = result.keyReport;
+            // A successful HTTP call can still produce a blank note. Record those
+            // content failures to the per-session error log, folded into the SAME
+            // status patch (a second patchSession would clobber it — see
+            // appendAiError docs / the makeListMutators double-write footgun).
+            let errorPatch: Partial<Session> = {};
+            if (hasContent) {
+              toast.success('Draft note generated');
+            } else if (returned.length > 0 && matched.length === 0) {
+              // The model replied with a JSON object, but none of its keys match
+              // the template's section keys — so every section fell back to "".
+              // This is a template/response mismatch, not an empty transcript.
+              toast.error(
+                `Note couldn't be filled: the AI returned sections (${returned.join(', ')}) that don't match this template (${result.keyReport.expected.join(', ')}). See Debug → Section mapping.`,
+              );
+              errorPatch = {
+                aiErrors: appendAiError(session!.aiErrors, {
+                  call: 'generate',
+                  provider: 'anthropic',
+                  kind: 'key_mismatch',
+                  detail: `Returned [${returned.join(', ')}] vs expected [${result.keyReport.expected.join(', ')}]`,
+                  rawSnippet: result.rawText ?? undefined,
+                  keyReport: result.keyReport,
+                }),
+              };
+            } else {
+              toast.warning(
+                'Note generated, but all sections are empty — try using a more detailed transcript.',
+              );
+              errorPatch = {
+                aiErrors: appendAiError(session!.aiErrors, {
+                  call: 'generate',
+                  provider: 'anthropic',
+                  kind: 'blank',
+                  detail: 'All sections empty after generation.',
+                  rawSnippet: result.rawText ?? undefined,
+                  keyReport: result.keyReport,
+                }),
+              };
+            }
+            // Fold the persisted generate-cap increment into the SAME success patch as
+            // status + any errorPatch. A separate patchSession here would clobber those
+            // fields (makeListMutators double-write footgun). A successful HTTP call
+            // counts against the cap regardless of whether the note came back blank.
+            patchSession({ status: 'ready', generateCount: spentGen + 1, ...errorPatch });
+          },
+          classifyError: (e) => {
+            if (e instanceof AiCallError) {
+              toast.error(friendlyAiError(e).title);
+              return {
+                dispatchActions: [{ type: 'generate/error', aiError: e }],
+                entry: {
+                  call: 'generate',
+                  provider: e.provider,
+                  kind: e.kind,
+                  status: e.status,
+                  attempts: e.attemptsMade,
+                  detail: e.message,
+                  rawSnippet: e.rawDetail,
+                },
+              };
+            }
+            return {
+              dispatchActions: [
+                { type: 'generate/error', aiError: null },
+                { type: 'error/set', message: (e as Error).message },
+              ],
+              entry: {
                 call: 'generate',
                 kind: 'parse',
                 detail: (e as Error).message,
-              }),
+              },
             };
-          }
-          patchSession({ status: 'draft', ...errorPatch });
-        } finally {
-          clearTimeout(abortTimer);
-        }
+          },
+        });
       } finally {
         isGeneratingRef.current = false;
       }

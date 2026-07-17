@@ -10,6 +10,7 @@
  *   GET|PUT /api/config/** → User/org config sync (no gate required, session auth)
  *   POST /api/transcribe   body = audio/* (the actual MIME, e.g. audio/webm) → { text }
  *   GET|PUT|DELETE /api/keys/** → BYOK provider-key management (session auth)
+ *   GET /api/providers     → non-secret BYOK provider/model catalog (no gate required)
  *   POST /api/generate     body = JSON {provider, model, system, user, ...}   → { text }
  *
  * /api/transcribe requires `x-ptscribe-key: <env.PTSCRIBE_GATE>`. /api/generate is
@@ -26,6 +27,7 @@ import {
   getProvider,
   isProviderId,
   isModelAllowed,
+  providerCatalog,
   type BuildRequestInput,
   type ProviderAdapter,
 } from './providers';
@@ -155,6 +157,14 @@ export default {
       } else {
         res = await withGate(request, env, { origin: 'strict' }, () =>
           handleGenerate(request, env, ctx),
+        );
+      }
+    } else if (url.pathname === '/api/providers') {
+      if (request.method !== 'GET') {
+        res = apiError('METHOD_NOT_ALLOWED', 'Method not allowed', 405);
+      } else {
+        res = await withGate(request, env, { origin: 'lenient' }, () =>
+          Promise.resolve(json({ providers: providerCatalog() })),
         );
       }
     } else if (url.pathname.startsWith('/api/model/') && request.method === 'GET') {

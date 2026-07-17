@@ -9,6 +9,7 @@ import { AudioFileInput, type AudioFileInputHandle } from '@/components/common/A
 import type { T2Phase } from '@/hooks/useBackgroundTranscription';
 import type { SessionClip } from '@/types';
 import { formatDuration } from '@/utils/format';
+import { clipStatusTone } from '@/utils/clips';
 
 interface ClipsDrawerProps {
   open: boolean;
@@ -319,18 +320,7 @@ function ClipCard({
     minute: '2-digit',
   });
   const source = 'in-room mic';
-  const { statusTone, statusLabel } = (() => {
-    if (clip.status === 'transcribed') return { statusTone: 'accent', statusLabel: 'Transcribed' };
-    if (clip.status === 'failed') return { statusTone: 'negative', statusLabel: 'Failed' };
-    if (clip.status === 'pending') return { statusTone: 'amber', statusLabel: 'Recording…' };
-    // 'ready' or 'transcribing' — reflect T2 pipeline state
-    if (t2Phase === 'transcribing')
-      return { statusTone: 'amber', statusLabel: t2Label || 'Transcribing…' };
-    if (t2Phase === 'retrying') return { statusTone: 'amber', statusLabel: 'Retrying…' };
-    if (t2Phase === 'done') return { statusTone: 'accent', statusLabel: 'Transcribed' };
-    if (t2Phase === 'error') return { statusTone: 'negative', statusLabel: 'Failed' };
-    return { statusTone: 'amber', statusLabel: 'Queued' };
-  })();
+  const { statusTone, statusLabel } = clipStatusTone(clip, t2Phase, t2Label);
 
   return (
     <div

@@ -1,11 +1,14 @@
 /**
- * Non-secret, client-side descriptor for the BYOK generation providers
- * (ADR-0009, issue 05). Mirrors the Worker's per-provider model allowlists,
- * console URLs, and key hints (worker/providers/*). Kept in sync by hand — the
- * Worker remains the authority (it re-checks `isModelAllowed` before any spend),
- * so a drift here can only narrow the UI, never bypass a server guard.
+ * Client-side mirror of the Worker's provider/model catalog (worker/providers/*).
+ * The Worker's per-adapter `models` list is the single source of truth for
+ * ordering/labels; we fetch it once at module load via GET /api/providers and
+ * cache it through a tiny useSyncExternalStore. FALLBACK_CATALOG (today's
+ * known-good values) seeds the store immediately so nothing renders empty
+ * while the fetch is in flight, and is kept if the fetch fails.
  */
 
+import { useSyncExternalStore } from 'react';
+import { apiFetch } from '@/lib/apiClient';
 import type { KeyProvider } from './keysClient';
 
 export interface ProviderModel {
@@ -23,7 +26,7 @@ export interface ProviderDescriptor {
   keyHint: string;
 }
 
-export const PROVIDER_CATALOG: Record<KeyProvider, ProviderDescriptor> = {
+const FALLBACK_CATALOG: Record<KeyProvider, ProviderDescriptor> = {
   anthropic: {
     id: 'anthropic',
     label: 'Anthropic',
@@ -58,7 +61,53 @@ export const PROVIDER_CATALOG: Record<KeyProvider, ProviderDescriptor> = {
   },
 };
 
-/** The default model for a provider (first entry — the "recommended" one). */
+let catalog: Record<KeyProvider, ProviderDescriptor> = FALLBACK_CATALOG;
+const listeners = new Set<() => void>();
+
+function isDescriptor(v: unknown): v is ProviderDescriptor {
+  const d = v as Partial<ProviderDescriptor> | null;
+  return (
+    !!d &&
+    typeof d.id === 'string' &&
+    typeof d.label === 'string' &&
+    Array.isArray(d.models) &&
+    d.models.length > 0
+  );
+}
+
+async function load() {
+  try {
+    const res = await apiFetch('/api/providers', { method: 'GET' }, { interceptGate: false });
+    if (!res.ok) return;
+    const body = (await res.json()) as { providers?: unknown };
+    if (!Array.isArray(body.providers)) return;
+    const next: Partial<Record<KeyProvider, ProviderDescriptor>> = {};
+    for (const p of body.providers) {
+      if (isDescriptor(p)) next[p.id as KeyProvider] = p;
+    }
+    // Only replace once every known provider resolved cleanly — a partial
+    // response would otherwise silently drop a provider from the UI.
+    if (Object.keys(next).length === Object.keys(FALLBACK_CATALOG).length) {
+      catalog = next as Record<KeyProvider, ProviderDescriptor>;
+      listeners.forEach((l) => l());
+    }
+  } catch {
+    // keep FALLBACK_CATALOG
+  }
+}
+void load();
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** Live provider/model catalog, kept in sync with the Worker's registry. */
+export function useProviderCatalog(): Record<KeyProvider, ProviderDescriptor> {
+  return useSyncExternalStore(subscribe, () => catalog);
+}
+
+/** Plain (non-hook) read for event-handler callbacks, e.g. onChange provider pickers. */
 export function defaultModelFor(provider: KeyProvider): string {
-  return PROVIDER_CATALOG[provider].models[0].id;
+  return catalog[provider].models[0].id;
 }

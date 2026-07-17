@@ -46,11 +46,9 @@ export interface CapturePhaseResult {
   handleDeleteClip: (clipId: string) => Promise<void>;
   buildMergedAudioForReview: (opts?: { skipNav?: boolean }) => Promise<void>;
   mergedAudioBlob: Blob | null;
-  setMergedAudioBlob: (b: Blob | null) => void;
   silencedMergedBlob: Blob | null;
-  setSilencedMergedBlob: (b: Blob | null) => void;
   isMerging: boolean;
-  setIsMerging: (v: boolean) => void;
+  reset: () => void;
 }
 
 export function useCapturePhase({
@@ -364,6 +362,12 @@ export function useCapturePhase({
     });
   }
 
+  function reset() {
+    setMergedAudioBlob(null);
+    setSilencedMergedBlob(null);
+    setIsMerging(false);
+  }
+
   function handleStopAndFinish() {
     // buildMergedAudioForReview produces silencedMergedBlob (which triggers T2)
     // and sets activeTab to 'review' itself. Defer via setTimeout(0) so React
@@ -605,10 +609,8 @@ export function useCapturePhase({
     handleDeleteClip,
     buildMergedAudioForReview,
     mergedAudioBlob,
-    setMergedAudioBlob,
     silencedMergedBlob,
-    setSilencedMergedBlob,
     isMerging,
-    setIsMerging,
+    reset,
   };
 }
