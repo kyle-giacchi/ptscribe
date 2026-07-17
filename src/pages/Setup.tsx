@@ -10,7 +10,7 @@ import { Eyebrow, PtButton, SurfaceCard, SegmentedControl } from '@/components/d
 import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { ProviderKeyCard } from '@/components/settings/ProviderKeyCard';
 import { useUsableKey } from '@/hooks/useUsableKey';
-import { PROVIDER_CATALOG, defaultModelFor } from '@/services/ai/providerCatalog';
+import { useProviderCatalog, defaultModelFor } from '@/services/ai/providerCatalog';
 import { isDemoMode } from '@/lib/demoMode';
 import type { KeyProvider, KeyStatus } from '@/services/ai/keysClient';
 import { duration, ease } from '@/lib/motion';
@@ -423,7 +423,8 @@ function ConnectKeyStep({ onNext }: { onNext: () => void }) {
     updateAi({ generation: { provider: next, model: defaultModelFor(next) } });
   }
 
-  const descriptor = PROVIDER_CATALOG[provider];
+  const catalog = useProviderCatalog();
+  const descriptor = catalog[provider];
   // Org key already covers this provider — the clinician is ready without a personal key.
   const orgReady = state === 'ready' && orgSet;
 
@@ -456,7 +457,7 @@ function ConnectKeyStep({ onNext }: { onNext: () => void }) {
                 <SegmentedControl<KeyProvider>
                   value={provider}
                   onChange={pickProvider}
-                  items={KEY_PROVIDERS.map((p) => ({ value: p, label: PROVIDER_CATALOG[p].label }))}
+                  items={KEY_PROVIDERS.map((p) => ({ value: p, label: catalog[p].label }))}
                 />
               </div>
             </Field>

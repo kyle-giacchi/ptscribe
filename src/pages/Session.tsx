@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useSessions } from '@/contexts/SessionsProvider';
@@ -16,6 +16,7 @@ import { useSessionPatcher } from '@/hooks/useSessionPatcher';
 import { useMemo } from 'react';
 import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
+import { useResizablePanes } from '@/hooks/useResizablePanes';
 import { useSessionMachine, type SessionMachineEvent } from '@/hooks/useSessionMachine';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
@@ -25,6 +26,8 @@ import { NotePanel } from '@/components/sessions/NotePanel';
 import { NoteToolbar } from '@/components/sessions/NoteToolbar';
 import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
+import { StaleFinalizeDialog } from '@/components/sessions/StaleFinalizeDialog';
+import { TemplateChangeDialog } from '@/components/sessions/TemplateChangeDialog';
 import { AiCallError } from '@/components/ai/AiCallError';
 import { AiCallRetryStatus } from '@/components/ai/AiCallRetryStatus';
 import { useDebugDrawer, type PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
@@ -81,27 +84,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ── Layout state (page-owned; never affects workflow correctness) ────────
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
-  // Note/transcript split as a percentage of the note column. Live-drag only; resets to 50/50 on mount.
-  const [notePct, setNotePct] = useState(50);
-  const reviewGridRef = useRef<HTMLDivElement>(null);
-  function startResize(e: React.PointerEvent) {
-    e.preventDefault();
-    const grid = reviewGridRef.current;
-    if (!grid) return;
-    const rect = grid.getBoundingClientRect();
-    function onMove(ev: PointerEvent) {
-      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
-      setNotePct(Math.min(70, Math.max(30, pct)));
-    }
-    function onUp() {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      document.body.style.userSelect = '';
-    }
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    document.body.style.userSelect = 'none';
-  }
+  const { notePct, containerRef: reviewGridRef, startResize } = useResizablePanes();
   const [piiScrubOpen, setPiiScrubOpen] = useState(false);
   const [piiScrub, setPiiScrub] = useState<PiiScrubDebug | null>(null);
   const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
@@ -568,77 +551,28 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         />
 
         {/* Stale-note finalize confirmation (B2 stale-tracking) */}
-        <Modal
+        <StaleFinalizeDialog
           open={gate?.kind === 'stale-finalize'}
-          onClose={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'cancel' })}
-          title="Finalize an out-of-date note?"
-          size="sm"
-        >
-          <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-            This note was generated from an earlier version of the transcript, template, or
-            modifiers. Finalizing now records a note that doesn't match the current transcript —
-            regenerate to sync them, or finalize as-is if the note is already what you want.
-          </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'cancel' })}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'regenerate' })}
-            >
-              Regenerate
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() =>
-                actions.resolveGate({ kind: 'stale-finalize', outcome: 'finalize-anyway' })
-              }
-            >
-              Finalize anyway
-            </button>
-          </div>
-        </Modal>
+          onCancel={() => actions.resolveGate({ kind: 'stale-finalize', outcome: 'cancel' })}
+          onRegenerate={() =>
+            actions.resolveGate({ kind: 'stale-finalize', outcome: 'regenerate' })
+          }
+          onFinalizeAnyway={() =>
+            actions.resolveGate({ kind: 'stale-finalize', outcome: 'finalize-anyway' })
+          }
+        />
 
         {/* Template-change confirmation (note has content) */}
-        <Modal
+        <TemplateChangeDialog
           open={gate?.kind === 'template-change'}
-          onClose={() => actions.resolveGate({ kind: 'template-change', outcome: 'cancel' })}
-          title="Change template?"
-          size="sm"
-        >
-          <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-            Switching to{' '}
-            <strong>
-              {(gate?.kind === 'template-change' &&
-                allTemplates.find((t) => t.id === gate.targetTemplateId)?.name) ||
-                'another template'}
-            </strong>{' '}
-            will clear the text you've written in this note.
-          </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => actions.resolveGate({ kind: 'template-change', outcome: 'cancel' })}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => actions.resolveGate({ kind: 'template-change', outcome: 'confirm' })}
-            >
-              Change template
-            </button>
-          </div>
-        </Modal>
+          targetTemplateName={
+            (gate?.kind === 'template-change' &&
+              allTemplates.find((t) => t.id === gate.targetTemplateId)?.name) ||
+            'another template'
+          }
+          onCancel={() => actions.resolveGate({ kind: 'template-change', outcome: 'cancel' })}
+          onConfirm={() => actions.resolveGate({ kind: 'template-change', outcome: 'confirm' })}
+        />
 
         {/* Reset session confirmation */}
         <ResetSessionModal

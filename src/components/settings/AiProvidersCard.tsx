@@ -3,7 +3,7 @@ import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, SurfaceCard, SegmentedControl } from '@/components/design';
 import { HipaaDisclosure } from '@/components/disclosures/HipaaDisclosure';
 import { useSettings } from '@/contexts/SettingsProvider';
-import { PROVIDER_CATALOG, defaultModelFor } from '@/services/ai/providerCatalog';
+import { useProviderCatalog, defaultModelFor } from '@/services/ai/providerCatalog';
 import { getUserKeys, type KeyProvider, type KeyStatus } from '@/services/ai/keysClient';
 import { useUsableKey } from '@/hooks/useUsableKey';
 import { ProviderKeyCard } from './ProviderKeyCard';
@@ -60,7 +60,8 @@ export function AiProvidersCard() {
     setKeys((prev) => ({ ...(prev ?? {}), [provider]: status }));
   }
 
-  const activeDescriptor = genProvider !== 'none' ? PROVIDER_CATALOG[genProvider] : null;
+  const catalog = useProviderCatalog();
+  const activeDescriptor = genProvider !== 'none' ? catalog[genProvider] : null;
 
   return (
     <SurfaceCard padding={18}>
@@ -153,7 +154,7 @@ export function AiProvidersCard() {
                     })
                   }
                 >
-                  {PROVIDER_CATALOG[genProvider].models.map((m) => (
+                  {catalog[genProvider].models.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.label}
                     </option>

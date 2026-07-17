@@ -44,8 +44,20 @@ export interface ValidateResult {
   reason?: ValidateReason;
 }
 
+/** One selectable model in the client key-entry UI (issue 05). */
+export interface ProviderModelDescriptor {
+  id: string;
+  label: string;
+}
+
 export interface ProviderAdapter {
   id: ProviderId;
+  /** Display name for the client key-entry UI (issue 05). */
+  label: string;
+  /** Allowlisted generation models, ordered recommended-first — the client's
+   *  "default model" picks models[0]. This ordering is the single source of
+   *  truth; do not hand-duplicate it client-side (see providerCatalog()). */
+  models: ProviderModelDescriptor[];
   /** Allowlisted generation model IDs. Replaces the single ALLOWED_GENERATE_MODELS. */
   modelAllowlist: Set<string>;
   /** Where the client sends the user to mint a key. */

@@ -9,6 +9,11 @@ export type AppDataVersion = typeof APP_DATA_VERSION;
  */
 export const DISCLOSURE_VERSION = 1;
 
+/** Lifetime cap on cloud (Nova) transcription runs per session — see {@link Session.cloudTranscribeCount}. */
+export const MAX_TRANSCRIBES_PER_SESSION = 1;
+/** Lifetime cap on Anthropic note-generation runs per session — see {@link Session.generateCount}. */
+export const MAX_GENERATES_PER_SESSION = 10;
+
 // ─── Clinician ──────────────────────────────────────────────────────────────
 
 export interface Clinician {
@@ -160,14 +165,14 @@ export interface Session {
   aiErrors?: AiErrorEntry[];
   /**
    * Lifetime count of cloud (Nova) transcription runs for this session. Capped at
-   * MAX_TRANSCRIBES_PER_SESSION. Persisted so the cap survives reload, Revert, and
+   * {@link MAX_TRANSCRIBES_PER_SESSION}. Persisted so the cap survives reload, Revert, and
    * Unlock — never reset by any client action. Absent is treated as 0 at read time.
    * See CONTEXT.md §Cloud-transcription cap.
    */
   cloudTranscribeCount?: number;
   /**
    * Lifetime count of Anthropic note-generation runs for this session. Capped at
-   * MAX_GENERATES_PER_SESSION. Persisted so the cap survives reload, Revert, and
+   * {@link MAX_GENERATES_PER_SESSION}. Persisted so the cap survives reload, Revert, and
    * Unlock — never reset by any client action. Absent is treated as 0 at read time.
    */
   generateCount?: number;

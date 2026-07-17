@@ -4,6 +4,7 @@ import {
   mergeClipTranscripts,
   mergeClipTranscriptsWithMarkers,
   stripClipMarkers,
+  clipStatusTone,
 } from './clips';
 import type { SessionClip } from '@/types';
 
@@ -128,5 +129,70 @@ describe('stripClipMarkers', () => {
 
   it('trims leading/trailing whitespace', () => {
     expect(stripClipMarkers('\n\nhello\n\n')).toBe('hello');
+  });
+});
+
+describe('clipStatusTone', () => {
+  it('transcribed clip status wins regardless of T2 phase', () => {
+    expect(clipStatusTone({ status: 'transcribed' }, 'error', '')).toEqual({
+      statusTone: 'accent',
+      statusLabel: 'Transcribed',
+    });
+  });
+
+  it('failed clip status wins regardless of T2 phase', () => {
+    expect(clipStatusTone({ status: 'failed' }, 'done', '')).toEqual({
+      statusTone: 'negative',
+      statusLabel: 'Failed',
+    });
+  });
+
+  it('pending clip status wins regardless of T2 phase', () => {
+    expect(clipStatusTone({ status: 'pending' }, 'done', '')).toEqual({
+      statusTone: 'amber',
+      statusLabel: 'Recording…',
+    });
+  });
+
+  it('ready clip falls through to T2 transcribing phase, using the progress label', () => {
+    expect(clipStatusTone({ status: 'ready' }, 'transcribing', 'Chunk 2/3')).toEqual({
+      statusTone: 'amber',
+      statusLabel: 'Chunk 2/3',
+    });
+  });
+
+  it('ready clip falls back to a default label when T2 transcribing has no progress label', () => {
+    expect(clipStatusTone({ status: 'ready' }, 'transcribing', '')).toEqual({
+      statusTone: 'amber',
+      statusLabel: 'Transcribing…',
+    });
+  });
+
+  it('ready clip falls through to T2 retrying phase', () => {
+    expect(clipStatusTone({ status: 'ready' }, 'retrying', '')).toEqual({
+      statusTone: 'amber',
+      statusLabel: 'Retrying…',
+    });
+  });
+
+  it('ready clip falls through to T2 done phase', () => {
+    expect(clipStatusTone({ status: 'ready' }, 'done', '')).toEqual({
+      statusTone: 'accent',
+      statusLabel: 'Transcribed',
+    });
+  });
+
+  it('ready clip falls through to T2 error phase', () => {
+    expect(clipStatusTone({ status: 'ready' }, 'error', '')).toEqual({
+      statusTone: 'negative',
+      statusLabel: 'Failed',
+    });
+  });
+
+  it('ready clip defaults to Queued when T2 is idle', () => {
+    expect(clipStatusTone({ status: 'ready' }, 'idle', '')).toEqual({
+      statusTone: 'amber',
+      statusLabel: 'Queued',
+    });
   });
 });

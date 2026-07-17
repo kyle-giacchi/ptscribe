@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { toast } from 'sonner';
 import * as demo from '@/lib/demoMode';
 import { useTranscriptSource, type UseTranscriptSourceParams } from './useTranscriptSource';
-import { MAX_TRANSCRIBES_PER_SESSION } from './useActionGuard';
+import { MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/services/ai/transcribe', () => ({ transcribe: vi.fn() }));
