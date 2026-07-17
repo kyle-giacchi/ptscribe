@@ -4,11 +4,21 @@
 // handleGenerate: /v1/messages, x-api-key, anthropic-version, top-level `system`
 // blocks with an ephemeral cache_control when cacheSystem is on.
 
-import type { BuildRequestInput, ProviderAdapter, ProviderRequest } from './types';
+import type {
+  BuildRequestInput,
+  ProviderAdapter,
+  ProviderModelDescriptor,
+  ProviderRequest,
+} from './types';
 import { composeSystem, probeValidate } from './shared';
 
-// MODEL CATALOG — confirmed (this is the pre-BYOK ALLOWED_GENERATE_MODELS list).
-const MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6', 'claude-opus-4-7'];
+// MODEL CATALOG — confirmed (this is the pre-BYOK ALLOWED_GENERATE_MODELS list),
+// ordered recommended-first.
+const MODELS: ProviderModelDescriptor[] = [
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (recommended)' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest)' },
+  { id: 'claude-opus-4-7', label: 'Claude Opus 4.7 (most capable)' },
+];
 
 function buildRequest(input: BuildRequestInput): ProviderRequest {
   const finalSystem = composeSystem(input.system, input.modifierBlock);
@@ -45,7 +55,9 @@ function extractText(json: unknown): string {
 
 export const anthropicAdapter: ProviderAdapter = {
   id: 'anthropic',
-  modelAllowlist: new Set(MODELS),
+  label: 'Anthropic',
+  models: MODELS,
+  modelAllowlist: new Set(MODELS.map((m) => m.id)),
   consoleUrl: 'https://console.anthropic.com/settings/keys',
   keyHint: 'sk-ant-…',
   buildRequest,

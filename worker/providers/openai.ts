@@ -3,12 +3,21 @@
 // OpenAI Chat Completions adapter. System prompt rides as a `system` role
 // message; OpenAI caches prompts automatically, so `cacheSystem` is a no-op.
 
-import type { BuildRequestInput, ProviderAdapter, ProviderRequest } from './types';
+import type {
+  BuildRequestInput,
+  ProviderAdapter,
+  ProviderModelDescriptor,
+  ProviderRequest,
+} from './types';
 import { composeSystem, probeValidate } from './shared';
 
 // MODEL CATALOG — confirmed 2026-06-02 (owner: flagship tiers only, no mini).
-// General-purpose chat models; adjust the list, not the adapter, to change it.
-const MODELS = ['gpt-4o', 'gpt-4.1'];
+// General-purpose chat models, ordered recommended-first; adjust the list,
+// not the adapter, to change it.
+const MODELS: ProviderModelDescriptor[] = [
+  { id: 'gpt-4.1', label: 'GPT-4.1 (recommended)' },
+  { id: 'gpt-4o', label: 'GPT-4o' },
+];
 
 function buildRequest(input: BuildRequestInput): ProviderRequest {
   const finalSystem = composeSystem(input.system, input.modifierBlock);
@@ -37,7 +46,9 @@ function extractText(json: unknown): string {
 
 export const openaiAdapter: ProviderAdapter = {
   id: 'openai',
-  modelAllowlist: new Set(MODELS),
+  label: 'OpenAI',
+  models: MODELS,
+  modelAllowlist: new Set(MODELS.map((m) => m.id)),
   consoleUrl: 'https://platform.openai.com/api-keys',
   keyHint: 'sk-…',
   buildRequest,

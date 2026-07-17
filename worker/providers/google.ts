@@ -4,11 +4,21 @@
 // `systemInstruction`; the key is a query param. No ephemeral cache flag for v1,
 // so `cacheSystem` is a no-op.
 
-import type { BuildRequestInput, ProviderAdapter, ProviderRequest } from './types';
+import type {
+  BuildRequestInput,
+  ProviderAdapter,
+  ProviderModelDescriptor,
+  ProviderRequest,
+} from './types';
 import { composeSystem, mapValidateStatus } from './shared';
 
-// MODEL CATALOG — confirmed 2026-06-02 (owner: 2.5 pro/flash + 2.0 flash).
-const MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+// MODEL CATALOG — confirmed 2026-06-02 (owner: 2.5 pro/flash + 2.0 flash),
+// ordered recommended-first.
+const MODELS: ProviderModelDescriptor[] = [
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (recommended)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (fastest)' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+];
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -38,7 +48,9 @@ function extractText(json: unknown): string {
 
 export const googleAdapter: ProviderAdapter = {
   id: 'google',
-  modelAllowlist: new Set(MODELS),
+  label: 'Google',
+  models: MODELS,
+  modelAllowlist: new Set(MODELS.map((m) => m.id)),
   consoleUrl: 'https://aistudio.google.com/app/apikey',
   keyHint: 'AIza…',
   buildRequest,

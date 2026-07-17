@@ -11,6 +11,8 @@ import { useTranscriptSource } from './useTranscriptSource';
 import { useGeneratePhase } from './useGeneratePhase';
 import { useAutoRotateClip } from './useAutoRotateClip';
 import { useWhisperLoading } from './useWhisperLoading';
+import { useUploadPhase } from './useUploadPhase';
+import { useTemplateChangePhase } from './useTemplateChangePhase';
 import { sessionMachineReducer } from './sessionMachine/reducer';
 import {
   createInitialSessionMachineState,
@@ -23,7 +25,6 @@ import type { UseWebSpeechTranscript } from './useLiveTranscript';
 import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 import type {
   Note,
-  NoteSection,
   NoteTemplate,
   Patient,
   Session,
@@ -391,42 +392,14 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   }, [session, patient, recorder.status]);
 
   // ── Template change (content-loss gate + section cache) ─────────────────
-  const sectionCacheRef = useRef(new Map<string, NoteSection[]>());
-
-  const applyTemplateChange = useCallback(
-    (newTemplateId: string) => {
-      const newTpl = allTemplates.find((t) => t.id === newTemplateId);
-      if (!newTpl) return;
-      // Snapshot sections for the template we're leaving.
-      const leavingTemplateId = sessionRef.current?.templateId;
-      if (note?.sections && leavingTemplateId) {
-        sectionCacheRef.current.set(leavingTemplateId, note.sections);
-      }
-      patchSession({ templateId: newTemplateId });
-      // Restore cached sections for the incoming template, or reset to empty.
-      const cached = sectionCacheRef.current.get(newTemplateId);
-      const targetSections =
-        cached ?? newTpl.sections.map((s) => ({ key: s.key, label: s.label, body: '' }));
-      if (note) generatePhase.replaceSections(targetSections);
-    },
-    [allTemplates, note, patchSession, generatePhase],
-  );
-
-  const changeTemplate = useCallback(
-    (templateId: string) => {
-      if (!session || templateId === session.templateId) return;
-      const hasNoteContent = !!note?.sections.some((s) => s.body.trim().length > 0);
-      if (hasNoteContent) {
-        dispatch({
-          type: 'gate/open',
-          gate: { kind: 'template-change', targetTemplateId: templateId },
-        });
-        return;
-      }
-      applyTemplateChange(templateId);
-    },
-    [session, note, applyTemplateChange],
-  );
+  const { changeTemplate, applyTemplateChange } = useTemplateChangePhase({
+    session,
+    note,
+    allTemplates,
+    patchSession,
+    replaceSections: generatePhase.replaceSections,
+    dispatch,
+  });
 
   // ── Reset session (reset-confirm gate) ───────────────────────────────────
   const requestReset = useCallback(() => {
@@ -507,53 +480,14 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   );
 
   // ── Upload-processing choreography ───────────────────────────────────────
-  const uploadAudio = useCallback(async (file: File) => {
-    dispatch({ type: 'uploadFlow/begin' });
-    dispatch({ type: 'view/setTab', tab: 'record' });
-    const clipId = await captureRef.current.handleUploadAudio(file);
-    if (clipId) {
-      dispatch({ type: 'uploadFlow/clipSaved', clipId, startedAt: Date.now() });
-    } else {
-      dispatch({ type: 'uploadFlow/clear' });
-    }
-  }, []);
-
   const t2Phase = transcriptSource.backgroundT2.phase;
-  useEffect(() => {
-    const { active, clipId, mergeStarted, startedAt } = state.uploadFlow;
-    if (!active || !clipId) return;
-    const clip = session?.clips.find((c) => c.id === clipId);
-    if (!clip) return;
-
-    const audioSaved =
-      clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed';
-
-    // Once audio is saved: kick off merge+T2 once (skipNav keeps the
-    // processing screen up until T2 lands).
-    if (audioSaved && !mergeStarted) {
-      dispatch({ type: 'uploadFlow/mergeStarted' });
-      void captureRef.current.buildMergedAudioForReview({ skipNav: true });
-      return;
-    }
-
-    // T2 finished — navigate to review after a brief minimum display time.
-    if (mergeStarted && t2Phase === 'done') {
-      const elapsed = Date.now() - (startedAt ?? Date.now());
-      const delay = Math.max(0, 2000 - elapsed);
-      const t = setTimeout(() => {
-        dispatch({ type: 'uploadFlow/clear' });
-        dispatch({ type: 'view/setTab', tab: 'review' });
-      }, delay);
-      return () => clearTimeout(t);
-    }
-    // t2Phase === 'error': stay on the processing screen; retry / go-to-notes
-    // (dismissUploadProcessing) handle it.
-  }, [session?.clips, state.uploadFlow, t2Phase]);
-
-  const dismissUploadProcessing = useCallback(() => {
-    dispatch({ type: 'uploadFlow/clear' });
-    dispatch({ type: 'view/setTab', tab: 'review' });
-  }, []);
+  const { uploadAudio, dismissUploadProcessing } = useUploadPhase({
+    session,
+    uploadFlow: state.uploadFlow,
+    t2Phase,
+    dispatch,
+    captureRef,
+  });
 
   // ── Transcript document actions ──────────────────────────────────────────
   const editTranscript = useCallback(
