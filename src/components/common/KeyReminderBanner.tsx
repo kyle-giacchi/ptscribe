@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KeyRound, X } from 'lucide-react';
 import { useUsableKey } from '@/hooks/useUsableKey';
-import { PROVIDER_CATALOG } from '@/services/ai/providerCatalog';
+import { useProviderCatalog } from '@/services/ai/providerCatalog';
 
 /**
  * Dismissible reminder shown when the active generation provider has no usable
@@ -19,10 +19,11 @@ export function KeyReminderBanner() {
   const [dismissed, setDismissed] = useState<boolean>(() =>
     dismissKey ? sessionStorage.getItem(dismissKey) === '1' : false,
   );
+  const catalog = useProviderCatalog();
 
   if (state !== 'missing' || !provider || dismissed) return null;
 
-  const label = PROVIDER_CATALOG[provider].label;
+  const label = catalog[provider].label;
 
   function dismiss() {
     if (dismissKey) sessionStorage.setItem(dismissKey, '1');

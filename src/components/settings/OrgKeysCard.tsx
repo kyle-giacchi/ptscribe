@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import { Eyebrow, SurfaceCard } from '@/components/design';
 import { ProviderKeyCard } from './ProviderKeyCard';
-import { PROVIDER_CATALOG } from '@/services/ai/providerCatalog';
+import { useProviderCatalog, type ProviderDescriptor } from '@/services/ai/providerCatalog';
 import { getOrgKeys, type KeyProvider, type KeyStatus } from '@/services/ai/keysClient';
-
-const PROVIDERS = Object.values(PROVIDER_CATALOG);
 
 /**
  * Org-level AI provider keys (issue 09). Managers set/replace/remove the org's
@@ -16,6 +14,8 @@ const PROVIDERS = Object.values(PROVIDER_CATALOG);
  * Billing for an org key lands on the org owner's provider account — stated in copy.
  */
 export function OrgKeysCard({ canManage }: { canManage: boolean }) {
+  const catalog = useProviderCatalog();
+  const PROVIDERS = Object.values(catalog);
   const [keys, setKeys] = useState<Record<string, KeyStatus> | null>(null);
 
   useEffect(() => {
@@ -63,15 +63,21 @@ export function OrgKeysCard({ canManage }: { canManage: boolean }) {
             ))}
           </div>
         ) : (
-          <ReadOnlyOrgKeys keys={keys} />
+          <ReadOnlyOrgKeys keys={keys} providers={PROVIDERS} />
         )}
       </div>
     </SurfaceCard>
   );
 }
 
-function ReadOnlyOrgKeys({ keys }: { keys: Record<string, KeyStatus> }) {
-  const present = PROVIDERS.filter((p) => keys[p.id]?.set);
+function ReadOnlyOrgKeys({
+  keys,
+  providers,
+}: {
+  keys: Record<string, KeyStatus>;
+  providers: ProviderDescriptor[];
+}) {
+  const present = providers.filter((p) => keys[p.id]?.set);
   if (present.length === 0) {
     return (
       <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)', fontStyle: 'italic' }}>
