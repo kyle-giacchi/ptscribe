@@ -1,7 +1,8 @@
 // Derived from useRecorder's event stream (see useRecorder.ts's RecorderEvent
 // doc comment for why events are separate advisories rather than one snapshot
-// field). A reducer keeps that derivation as one pure function instead of
-// four hand-synced useState mirrors in RecordingPanel.
+// field). A sub-reducer of the session machine's capture slice: the machine
+// owns the state (so `wasAutoStopped` is visible to it), and
+// `sessionMachineReducer` delegates `capture/advisory` here.
 export interface RecordingAdvisories {
   silenceActive: boolean;
   silenceWarnDismissed: boolean;

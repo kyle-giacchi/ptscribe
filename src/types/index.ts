@@ -272,8 +272,38 @@ export interface Note {
   editedAfterFinalizedCount?: number;
   modifiers?: SessionModifiers;
   generatedFromTranscript?: string;
+  /**
+   * Per-visit exercise log. Never sent to the AI, never part of staleness, and
+   * never written into `sections`. Survives regeneration because generation
+   * patches only sections/templateId/format/modifiers/generatedFromTranscript.
+   */
+  activities?: NoteActivities;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * One logged exercise on a Note. Extends {@link Prescription} so write-back to
+ * PlanOfCare is a field-for-field map with no translation layer.
+ */
+export interface ActivityEntry extends Prescription {
+  /**
+   * Denormalized at add-time. Built-in exercises are delete-protected, but custom
+   * ones are not — without this snapshot, deleting a custom exercise would corrupt
+   * the exercise name in every finalized note that referenced it.
+   */
+  exerciseName: string;
+}
+
+/**
+ * Per-visit activity log (CONTEXT.md workflow: documentation artifact only).
+ * Deliberately NOT part of note staleness — see `src/services/note/staleness.ts`.
+ */
+export interface NoteActivities {
+  /** Exercises the patient performed in clinic this visit. */
+  performed: ActivityEntry[];
+  /** Take-home program assigned this visit. */
+  home: ActivityEntry[];
 }
 
 // ─── Template ───────────────────────────────────────────────────────────────

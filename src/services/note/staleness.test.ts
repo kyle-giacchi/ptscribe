@@ -107,3 +107,18 @@ describe('isNoteStale', () => {
     expect(isNoteStale(note(), { ...baseInputs, transcript: 'edited' })).toBe(true);
   });
 });
+
+describe('activities are outside staleness', () => {
+  it('a note with logged activities is not stale when the real inputs are unchanged', () => {
+    const n = note({
+      generatedFromTranscript: 'hello',
+      activities: {
+        performed: [{ id: 'a1', exerciseId: 'e1', dosage: '2x10', exerciseName: 'Pendulums' }],
+        home: [{ id: 'a2', exerciseId: 'e2', dosage: '3x10', exerciseName: 'Sleeper Stretch' }],
+      },
+    });
+    const inputs = { transcript: 'hello', templateId: 'tpl-1', modifiers: EMPTY };
+    expect(isNoteStale(n, inputs)).toBe(false);
+    expect(noteMatchesInputs(n, inputs)).toBe(true);
+  });
+});

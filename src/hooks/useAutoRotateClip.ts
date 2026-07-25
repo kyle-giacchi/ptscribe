@@ -14,7 +14,7 @@ import { MAX_CLIP_DURATION_SEC } from '@/lib/audioLimits';
 export function useAutoRotateClip(
   recorderStatus: string,
   getDurationSec: () => number,
-  onStop: () => Promise<void>,
+  onStop: () => Promise<unknown>,
   onStart: () => Promise<void>,
 ) {
   const rotatingRef = useRef(false);

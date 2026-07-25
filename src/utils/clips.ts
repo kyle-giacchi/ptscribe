@@ -3,6 +3,47 @@ import type { T2Phase } from '@/hooks/useBackgroundTranscription';
 
 export type ClipStatusTone = 'accent' | 'negative' | 'amber';
 
+// ── "Is this clip usable?" — four different questions ──────────────────────
+// These are deliberately not one predicate. Each answers a different question
+// about a clip (CONTEXT.md §Clips); two of them will always disagree. Naming
+// them here makes the difference visible and turns a new SessionClip['status']
+// value into a one-file audit.
+
+/**
+ * Audio is persisted and readable — safe to load and merge.
+ * `failed` and `pending` clips have no bytes in the repository.
+ */
+export function isMergeable(clip: Pick<SessionClip, 'status'>): boolean {
+  return clip.status === 'ready' || clip.status === 'transcribed';
+}
+
+/**
+ * The audio-save attempt has finished, success or failure — an upload wait can
+ * stop waiting. Deliberately includes `failed`: a failed save still settles.
+ */
+export function isSettled(clip: Pick<SessionClip, 'status'>): boolean {
+  return isMergeable(clip) || clip.status === 'failed';
+}
+
+/** Carries non-blank transcript text worth showing or merging. */
+export function hasTranscriptText(clip: Pick<SessionClip, 'status' | 'transcript'>): boolean {
+  return clip.status === 'transcribed' && !!clip.transcript && clip.transcript.trim().length > 0;
+}
+
+/**
+ * No clinician edit would be lost by re-transcribing: either the clip has no
+ * transcript yet, or its transcript is still exactly the T2 output.
+ */
+export function isPristineT2(
+  clip: Pick<SessionClip, 'status' | 'transcript' | 't2Transcript'>,
+): boolean {
+  return (
+    clip.status === 'ready' ||
+    clip.status === 'failed' ||
+    (clip.status === 'transcribed' && !!clip.t2Transcript && clip.transcript === clip.t2Transcript)
+  );
+}
+
 /** Status pill shown on a clip card — own status wins; 'ready'/'transcribing' fall through to the T2 pipeline phase. */
 export function clipStatusTone(
   clip: Pick<SessionClip, 'status'>,
@@ -21,17 +62,12 @@ export function clipStatusTone(
 }
 
 export function getTranscribableClips(clips: SessionClip[]): SessionClip[] {
-  return clips.filter(
-    (c) =>
-      c.status === 'ready' ||
-      c.status === 'failed' ||
-      (c.status === 'transcribed' && !!c.t2Transcript && c.transcript === c.t2Transcript),
-  );
+  return clips.filter(isPristineT2);
 }
 
 export function mergeClipTranscripts(clips: SessionClip[]): string {
   return clips
-    .filter((c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0)
+    .filter(hasTranscriptText)
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((c) => c.transcript!.trim())
     .join('\n\n');
@@ -43,9 +79,7 @@ export function mergeClipTranscripts(clips: SessionClip[]): string {
  * Display-only — never stored.
  */
 export function mergeClipTranscriptsWithMarkers(clips: SessionClip[]): string {
-  const transcribed = clips
-    .filter((c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0)
-    .sort((a, b) => a.createdAt - b.createdAt);
+  const transcribed = clips.filter(hasTranscriptText).sort((a, b) => a.createdAt - b.createdAt);
 
   if (transcribed.length <= 1) {
     return transcribed.map((c) => c.transcript!.trim()).join('\n\n');

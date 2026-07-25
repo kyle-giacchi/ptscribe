@@ -12,7 +12,11 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
-import { mergeClipTranscriptsWithMarkers, stripClipMarkers } from '@/utils/clips';
+import {
+  hasTranscriptText,
+  mergeClipTranscriptsWithMarkers,
+  stripClipMarkers,
+} from '@/utils/clips';
 import { parseTranscriptSegments, parseChunkedTranscript } from '@/utils/transcriptGrouping';
 import { ConfirmBanner } from './ConfirmBanner';
 
@@ -94,9 +98,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
   const [replaceStr, setReplaceStr] = useState('');
   const [replaceCount, setReplaceCount] = useState<number | null>(null);
 
-  const transcribedClips = clips.filter(
-    (c) => c.status === 'transcribed' && c.transcript && c.transcript.trim().length > 0,
-  );
+  const transcribedClips = clips.filter(hasTranscriptText);
   const showClipMarkers = transcribedClips.length > 1 && !hasUserEdits;
   const displayTranscript = showClipMarkers ? mergeClipTranscriptsWithMarkers(clips) : transcript;
 

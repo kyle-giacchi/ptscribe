@@ -1,5 +1,3 @@
-import { useReducer, useEffect } from 'react';
-import { toast } from 'sonner';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { AlertTriangle } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsProvider';
@@ -18,8 +16,10 @@ import {
   LiveTranscriptPreview,
   RecordingElapsedMinutes,
 } from './recording/RecordingNotices';
-import { playAlertChime } from './recording/playAlertChime';
-import { advisoriesReducer, initialAdvisories } from './recordingAdvisories';
+import type {
+  AdvisoryAction,
+  RecordingAdvisories,
+} from '@/hooks/sessionMachine/recordingAdvisories';
 
 export interface RecordingPanelProps {
   recorder: UseRecorder;
@@ -34,6 +34,9 @@ export interface RecordingPanelProps {
   onSkip: () => void;
   wasBackgrounded: boolean;
   onDismissBackgroundWarning: () => void;
+  /** Owned by the session machine; useCapturePhase is the only event subscriber. */
+  advisories: RecordingAdvisories;
+  dispatchAdvisory: (advisory: AdvisoryAction) => void;
 }
 
 // ── Main panel ─────────────────────────────────────────────────────────────────
@@ -50,6 +53,8 @@ export function RecordingPanel({
   onSkip,
   wasBackgrounded,
   onDismissBackgroundWarning,
+  advisories,
+  dispatchAdvisory,
 }: RecordingPanelProps) {
   const { settings } = useSettings();
   const capabilities = useDeviceCapabilities();
@@ -57,45 +62,10 @@ export function RecordingPanel({
   const recording = recorder.status === 'recording' || recorder.status === 'paused';
   const activelyRecording = recorder.status === 'recording';
 
-  const [advisories, dispatchAdvisory] = useReducer(advisoriesReducer, initialAdvisories);
   const { silenceActive, silenceWarnDismissed, softWarnActive, wasAutoStopped } = advisories;
   const idle =
     recorder.status === 'idle' || recorder.status === 'stopped' || recorder.status === 'error';
   const webspeechProvider = settings.ai.transcription.provider === 'webspeech';
-
-  useEffect(() => {
-    return recorder.subscribeEvents((e) => {
-      switch (e.type) {
-        case 'silenceStart':
-          if (activelyRecording) playAlertChime();
-          dispatchAdvisory({ type: 'silenceStart' });
-          break;
-        case 'silenceEnd':
-          dispatchAdvisory({ type: 'silenceEnd' });
-          break;
-        case 'softWarn':
-          dispatchAdvisory({ type: 'softWarn' });
-          break;
-        case 'stopped':
-          if (e.reason === 'hardCap') {
-            toast.warning(
-              `Hit recording length cap (${settings.recordingLimits.maxMinutes} min) — auto-stopped.`,
-            );
-          } else if (e.reason === 'idleAuto') {
-            dispatchAdvisory({ type: 'autoStopped' });
-          } else if (e.reason === 'micDisconnected') {
-            toast.warning('Microphone disconnected — recording stopped and audio saved.');
-          }
-          break;
-      }
-    });
-  }, [recorder.subscribeEvents, activelyRecording, settings.recordingLimits.maxMinutes]);
-
-  useEffect(() => {
-    if (recorder.status === 'recording') {
-      dispatchAdvisory({ type: 'reset' });
-    }
-  }, [recorder.status]);
 
   if (idle && !wasAutoStopped) {
     return (
@@ -185,7 +155,6 @@ export function RecordingPanel({
               subscribeDuration={recorder.subscribeDuration}
               getDurationSec={recorder.getDurationSec}
               paused={recorder.status === 'paused'}
-              chainActive={false}
               analyser={recorder.analyser}
               webSpeech={webSpeech}
               whisperBubbles={whisperBubbles}

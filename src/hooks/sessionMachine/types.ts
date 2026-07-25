@@ -1,5 +1,10 @@
 import type { AiCallError } from '@/services/ai/errors';
 import type { AiDebugPrompts, GenerateKeyReport } from '@/types';
+import {
+  initialAdvisories,
+  type AdvisoryAction,
+  type RecordingAdvisories,
+} from './recordingAdvisories';
 
 // ── Shared ────────────────────────────────────────────────────────────────
 
@@ -51,6 +56,8 @@ export interface UploadStatus {
 
 export interface CaptureState {
   uploadStatus: UploadStatus;
+  /** Recorder advisories (silence, soft warn, auto-stop) — see recordingAdvisories.ts. */
+  advisories: RecordingAdvisories;
 }
 
 // ── Workflow gates (CONTEXT.md §Workflow gate) ────────────────────────────
@@ -89,8 +96,6 @@ export interface ViewState {
   tab: 'record' | 'review';
   /** "Skip — edit manually" entry: review tab is reachable with zero clips. */
   recordingSkipped: boolean;
-  /** Once dismissed per session, the re-record warning does not resurface. */
-  recordWarnDismissed: boolean;
 }
 
 // ── Transcript document slice ─────────────────────────────────────────────
@@ -156,10 +161,10 @@ export type SessionMachineAction =
   | { type: 'transcribe/clearAiError' }
   // capture
   | { type: 'capture/upload'; status: UploadStatus }
+  | { type: 'capture/advisory'; advisory: AdvisoryAction }
   // view
   | { type: 'view/setTab'; tab: 'record' | 'review' }
   | { type: 'view/skipRecording' }
-  | { type: 'view/dismissRecordWarning' }
   // transcript document
   | { type: 'transcript/setBaseline'; text: string }
   | { type: 'transcript/setEdited'; text: string }
@@ -205,11 +210,11 @@ export function createInitialSessionMachineState(init?: SessionMachineInit): Ses
     },
     capture: {
       uploadStatus: { phase: 'idle', message: '' },
+      advisories: initialAdvisories,
     },
     view: {
       tab: init?.quickMode ? 'review' : 'record',
       recordingSkipped: init?.quickMode ?? false,
-      recordWarnDismissed: false,
     },
     transcript: {
       baseline: init?.baseline ?? '',

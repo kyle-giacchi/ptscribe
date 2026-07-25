@@ -167,6 +167,25 @@ const NoteSectionSchema = z.object({
   body: z.string(),
 });
 
+// Declared here rather than beside PlanOfCareSchema because NoteSchema below
+// references NoteActivitiesSchema, and schemas are plain values evaluated in
+// source order.
+const PrescriptionSchema = z.object({
+  id: z.string().min(1),
+  exerciseId: z.string().min(1),
+  dosage: z.string(),
+  notes: z.string().optional(),
+});
+
+const ActivityEntrySchema = PrescriptionSchema.extend({
+  exerciseName: z.string(),
+});
+
+const NoteActivitiesSchema = z.object({
+  performed: z.array(ActivityEntrySchema),
+  home: z.array(ActivityEntrySchema),
+});
+
 const NoteSchema = z.object({
   id: z.string().min(1),
   sessionId: z.string().min(1),
@@ -180,6 +199,7 @@ const NoteSchema = z.object({
   editedAfterFinalizedCount: z.number().int().optional(),
   modifiers: SessionModifiersSchema.optional(),
   generatedFromTranscript: z.string().optional(),
+  activities: NoteActivitiesSchema.optional(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
@@ -251,13 +271,6 @@ const PlanGoalSchema = z.object({
   text: z.string(),
   targetDate: z.number().int().optional(),
   met: z.boolean(),
-});
-
-const PrescriptionSchema = z.object({
-  id: z.string().min(1),
-  exerciseId: z.string().min(1),
-  dosage: z.string(),
-  notes: z.string().optional(),
 });
 
 const PlanOfCareSchema = z.object({

@@ -11,6 +11,7 @@ import type { SessionMachineAction } from './sessionMachine/types';
 import { MAX_GENERATES_PER_SESSION } from '@/types';
 import type {
   Note,
+  NoteActivities,
   NoteFormat,
   NoteSection,
   NoteTemplate,
@@ -40,6 +41,7 @@ export interface GeneratePhaseResult {
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;
   replaceSections: (sections: NoteSection[]) => void;
+  activitiesChange: (next: NoteActivities) => void;
   copyMarkdown: (markdown: string) => void;
   clearAiError: () => void;
   missingRequiredLabels: string[];
@@ -309,6 +311,23 @@ export function useGeneratePhase({
     [ensureNote, updateNote],
   );
 
+  const activitiesChange = useCallback(
+    (next: NoteActivities) => {
+      const target = ensureNote();
+      // Same audit-trail rule as sectionChange: editing a note that was unlocked
+      // after finalization is recorded.
+      const wasFinalized = !target.finalized && target.finalizedAt !== undefined;
+      const auditPatch = wasFinalized
+        ? {
+            editedAfterFinalizedAt: target.editedAfterFinalizedAt ?? Date.now(),
+            editedAfterFinalizedCount: (target.editedAfterFinalizedCount ?? 0) + 1,
+          }
+        : {};
+      updateNote(target.id, { activities: next, ...auditPatch });
+    },
+    [ensureNote, updateNote],
+  );
+
   const replaceSections = useCallback(
     (sections: NoteSection[]) => {
       if (!note) return;
@@ -363,6 +382,7 @@ export function useGeneratePhase({
       unfinalize,
       sectionChange,
       replaceSections,
+      activitiesChange,
       copyMarkdown,
       clearAiError,
       missingRequiredLabels,
@@ -373,6 +393,7 @@ export function useGeneratePhase({
       unfinalize,
       sectionChange,
       replaceSections,
+      activitiesChange,
       copyMarkdown,
       clearAiError,
       missingRequiredLabels,

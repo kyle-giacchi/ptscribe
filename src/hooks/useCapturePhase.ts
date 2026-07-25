@@ -4,14 +4,15 @@ import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
 import { promoteTier } from '@/services/transcript/promoteTier';
-import { mergeAudioBlobs } from '@/lib/audio/merge';
-import { trimSilence } from '@/lib/audio/silenceTrim';
+import { runCaptureEnd } from '@/services/capture/runCaptureEnd';
 import {
   transcribeLocally,
   whisperLoader,
   LOCAL_WHISPER_DEFAULT_MODEL,
 } from '@/services/ai/client/localWhisper';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
+import { playAlertChime } from '@/components/sessions/recording/playAlertChime';
+import type { AdvisoryAction } from './sessionMachine/recordingAdvisories';
 import type { SessionMachineAction, UploadStatus } from './sessionMachine/types';
 import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
@@ -32,6 +33,13 @@ export interface UseCapturePhaseParams {
   dispatch: Dispatch<SessionMachineAction>;
 }
 
+/**
+ * Mirrors the clip mutations a call already sent through `patchClips`, so the
+ * caller can bring its own (render-stale) clip list current without waiting for
+ * a React commit. This is what removes the `setTimeout(…, 0)` frame hacks.
+ */
+type ClipsPatch = (clips: SessionClip[]) => SessionClip[];
+
 export interface CapturePhaseResult {
   backgroundWarningDismissed: boolean;
   setBackgroundWarningDismissed: (v: boolean) => void;
@@ -39,15 +47,14 @@ export interface CapturePhaseResult {
   whisperBubbles: string[];
   uploadStatus: UploadStatus;
   handleStartRecording: () => Promise<void>;
-  handleFinishedRecording: () => Promise<void>;
+  handleFinishedRecording: () => Promise<ClipsPatch>;
   handlePauseResume: () => void;
   handleStopAndFinish: () => void;
   handleUploadAudio: (file: File) => Promise<string | null>;
   handleDeleteClip: (clipId: string) => Promise<void>;
-  buildMergedAudioForReview: (opts?: { skipNav?: boolean }) => Promise<void>;
-  mergedAudioBlob: Blob | null;
+  /** Runs the Capture-end pipeline and applies its result. Never navigates. */
+  endCapture: (clipsPatch?: ClipsPatch) => Promise<void>;
   silencedMergedBlob: Blob | null;
-  isMerging: boolean;
   reset: () => void;
 }
 
@@ -70,9 +77,7 @@ export function useCapturePhase({
   const [backgroundWarningDismissed, setBackgroundWarningDismissed] = useState(false);
   const [backgrounded, setBackgrounded] = useState(false);
   const [whisperBubbles, setWhisperBubbles] = useState<string[]>([]);
-  const [mergedAudioBlob, setMergedAudioBlob] = useState<Blob | null>(null);
   const [silencedMergedBlob, setSilencedMergedBlob] = useState<Blob | null>(null);
-  const [isMerging, setIsMerging] = useState(false);
 
   // Sync ref so processWhisperChunk can persist t1Transcript without waiting for state.
   const whisperTextRef = useRef<string[]>([]);
@@ -82,6 +87,10 @@ export function useCapturePhase({
   // the low-frequency `durationSec` state, which now only commits on pause/stop.
   const durationSecRef = useRef(0);
   durationSecRef.current = recorder.getDurationSec();
+
+  // Always-current status so the (subscribe-once) event handler can guard on it.
+  const recorderStatusRef = useRef(recorder.status);
+  recorderStatusRef.current = recorder.status;
 
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
@@ -95,8 +104,8 @@ export function useCapturePhase({
   const isSavingRef = useRef<Set<string>>(new Set());
 
   // Used by the auto-stop finalization effect to always call the latest closure.
-  const handleFinishedRecordingRef = useRef<() => Promise<void>>(async () => {});
-  const buildMergedAudioForReviewRef = useRef<() => Promise<void>>(async () => {});
+  const handleFinishedRecordingRef = useRef<() => Promise<ClipsPatch>>(async () => (c) => c);
+  const endCaptureRef = useRef<(clipsPatch?: ClipsPatch) => Promise<void>>(async () => {});
 
   // Auto-clear terminal upload states after 3 s.
   useEffect(() => {
@@ -116,15 +125,17 @@ export function useCapturePhase({
     void whisperLoader.ensureReady().catch(() => {});
   }, []);
 
-  // Re-arm the dismiss flag every time a new recording starts.
+  // Re-arm the dismiss flag and clear last take's advisories every time a new
+  // recording starts.
   useEffect(() => {
     if (recorder.status !== 'recording') return;
+    dispatch({ type: 'capture/advisory', advisory: { type: 'reset' } });
     const id = window.setTimeout(() => {
       setBackgroundWarningDismissed(false);
       setBackgrounded(false);
     }, 0);
     return () => window.clearTimeout(id);
-  }, [recorder.status]);
+  }, [recorder.status, dispatch]);
 
   // When Web Speech is enabled, persist live captions to t1Transcript continuously.
   useEffect(() => {
@@ -253,8 +264,24 @@ export function useCapturePhase({
     void handlePauseResumeAsync();
   }
 
-  async function handleFinishedRecording() {
-    if (!session) return;
+  async function handleFinishedRecording(): Promise<ClipsPatch> {
+    // Every clip mutation below goes through `stage`, which both persists it and
+    // records it into `staged`. The returned patch lets the Capture-end caller
+    // work from a clip list that is current *now*, rather than deferring a frame
+    // and hoping React committed in between.
+    let staged: ClipsPatch = (c) => c;
+    const stage = (fn: ClipsPatch) => {
+      const prev = staged;
+      staged = (c) => fn(prev(c));
+      patchClips(fn);
+    };
+    // Mirrors patchClip exactly, updatedAt bump included.
+    const stageClip = (id: string, patch: Partial<SessionClip>) =>
+      stage((clips) =>
+        clips.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)),
+      );
+
+    if (!session) return staged;
     const clipId = activeClipIdRef.current;
 
     // Stop accepting new chunks immediately, then drain any in-flight Whisper
@@ -285,11 +312,11 @@ export function useCapturePhase({
             const est = await navigator.storage.estimate();
             const available = (est.quota ?? 0) - (est.usage ?? 0);
             if (available > 0 && finalBlob.size > available * 0.9) {
-              patchClip(clipId, {
+              stageClip(clipId, {
                 status: 'failed',
                 errorMessage: 'Not enough device storage to save this recording.',
               });
-              return;
+              return staged;
             }
             if (available > 0 && finalBlob.size > available * 0.8) {
               addNotification(
@@ -305,7 +332,7 @@ export function useCapturePhase({
           if (import.meta.env.DEV) {
             console.warn(`[useCapturePhase] Skipping duplicate save for clip ${clipId}`);
           }
-          return;
+          return staged;
         }
         isSavingRef.current.add(clipId);
         try {
@@ -315,11 +342,11 @@ export function useCapturePhase({
             type: 'error/set',
             message: `Could not save audio: ${(e as Error).message}`,
           });
-          patchClip(clipId, {
+          stageClip(clipId, {
             status: 'failed',
             errorMessage: (e as Error).message,
           });
-          return;
+          return staged;
         } finally {
           isSavingRef.current.delete(clipId);
         }
@@ -328,16 +355,14 @@ export function useCapturePhase({
             console.warn('[useCapturePhase] clearChunks failed:', e);
           }
         });
-        patchClip(clipId, { status: 'ready', durationSec });
+        stageClip(clipId, { status: 'ready', durationSec });
       } else {
         try {
           await audioRepository.remove(clipId);
         } catch {
           /* ignore */
         }
-        patchClips((clips) =>
-          clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })),
-        );
+        stage((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
       }
     }
 
@@ -346,7 +371,7 @@ export function useCapturePhase({
     const currentClipT1 = webSpeechT1 || whisperT1;
 
     if (webSpeechEnabled && clipId && webSpeechT1) {
-      patchClip(clipId, { t1Transcript: webSpeechT1 });
+      stageClip(clipId, { t1Transcript: webSpeechT1 });
     }
     webSpeech.reset();
     whisperTextRef.current = [];
@@ -360,23 +385,17 @@ export function useCapturePhase({
       status: 'draft',
       ...(allT1Texts.length > 0 ? { t1Transcript: allT1Texts.join('\n\n') } : {}),
     });
+    return staged;
   }
 
   function reset() {
-    setMergedAudioBlob(null);
     setSilencedMergedBlob(null);
-    setIsMerging(false);
   }
 
   function handleStopAndFinish() {
-    // buildMergedAudioForReview produces silencedMergedBlob (which triggers T2)
-    // and sets activeTab to 'review' itself. Defer via setTimeout(0) so React
-    // commits the patchClip({status:'ready'}) update inside handleFinishedRecording
-    // before the merge reads sortedClips — otherwise the just-recorded clip is
-    // still 'pending' in the captured closure and gets filtered out.
-    void handleFinishedRecording().then(() => {
-      setTimeout(() => void buildMergedAudioForReviewRef.current(), 0);
-    });
+    // Navigation is the caller's (useSessionMachine.stopAndFinish already
+    // dispatches view/setTab), so this only runs the pipeline.
+    void handleFinishedRecording().then((clipsPatch) => endCaptureRef.current(clipsPatch));
   }
 
   // ── Audio upload ─────────────────────────────────────────────────────────
@@ -514,86 +533,102 @@ export function useCapturePhase({
     patchClips((clips) => clips.filter((c) => c.id !== clipId).map((c, i) => ({ ...c, index: i })));
   }
 
-  // ── Recording complete — merge clips + compile live transcripts ──────────
-  async function buildMergedAudioForReview(opts?: { skipNav?: boolean }) {
-    const readyClips = sortedClips.filter(
-      (c) => c.status === 'ready' || c.status === 'transcribed',
-    );
-    if (readyClips.length > 0) {
-      setIsMerging(true);
-      try {
-        const loaded = await Promise.all(readyClips.map((c) => audioRepository.load(c.id)));
-        const blobs = loaded.filter((b): b is Blob => b !== null);
-        const dropped = readyClips.length - blobs.length;
-        if (dropped > 0) {
-          addNotification(
-            'warning',
-            `${dropped} clip${dropped === 1 ? '' : 's'} could not be loaded for playback.`,
-          );
-        }
-        if (blobs.length > 0) {
-          setMergedAudioBlob(await mergeAudioBlobs(blobs));
+  // ── Capture end — run the pipeline, apply its result ─────────────────────
+  // `clipsPatch` brings the render-time clip list current with mutations that
+  // handleFinishedRecording just made but React has not committed yet.
+  async function endCapture(clipsPatch?: ClipsPatch) {
+    const clips = clipsPatch ? clipsPatch(sortedClips) : sortedClips;
 
-          const sd = settings.audio.silenceDetection;
-          const silencedBlobs = await Promise.all(
-            blobs.map((blob) =>
-              sd.enabled
-                ? trimSilence(blob, { sensitivity: sd.sensitivity, padMs: sd.padMs })
-                    .then((r) => r.trimmed)
-                    .catch(() => blob)
-                : Promise.resolve(blob),
-            ),
-          );
-          setSilencedMergedBlob(await mergeAudioBlobs(silencedBlobs));
-        }
-      } catch (e) {
-        addNotification('error', `Could not combine clips for playback: ${(e as Error).message}`);
-      } finally {
-        setIsMerging(false);
-      }
+    let result;
+    try {
+      result = await runCaptureEnd({
+        clips,
+        loadAudio: (clipId) => audioRepository.load(clipId),
+        silenceDetection: settings.audio.silenceDetection,
+      });
+    } catch (e) {
+      addNotification('error', `Could not combine clips for playback: ${(e as Error).message}`);
+      return;
     }
 
-    const t1Texts = sortedClips
-      .map((c) => c.t1Transcript?.trim())
-      .filter((t): t is string => Boolean(t));
+    if (result.droppedClips > 0) {
+      addNotification(
+        'warning',
+        `${result.droppedClips} clip${result.droppedClips === 1 ? '' : 's'} could not be loaded for playback.`,
+      );
+    }
+    if (result.trimFailures > 0 && import.meta.env.DEV) {
+      // Untrimmed audio still transcribes, so this is not user-facing — but a VAD
+      // regression used to be invisible here, showing up only as a slow T2.
+      console.warn(`[useCapturePhase] silence trim failed for ${result.trimFailures} clip(s)`);
+    }
+    // Setting the blob is what starts T2 (useBackgroundTranscription keys off it).
+    if (result.silenced) setSilencedMergedBlob(result.silenced);
 
-    const compiledTexts = sortedClips
-      .map((c) => (c.transcript || c.t2Transcript || c.t1Transcript)?.trim())
-      .filter((t): t is string => Boolean(t));
-    if (compiledTexts.length > 0) {
-      const merged = compiledTexts.join('\n\n');
+    if (result.baseline) {
       // promoteTier guards the baseline (won't clobber a higher tier that already
       // ran). The frozen t1Transcript is a t1-only join, distinct from the merged
       // compiled baseline, so the producer still writes it itself.
-      const promo = promoteTier(session ?? {}, { tier: 't1', text: merged });
+      const promo = promoteTier(session ?? {}, { tier: 't1', text: result.baseline });
       if (promo) {
-        dispatch({ type: 'transcript/setBaseline', text: merged });
+        dispatch({ type: 'transcript/setBaseline', text: result.baseline });
         const patch: Partial<Session> = { ...promo };
-        if (t1Texts.length > 0) patch.t1Transcript = t1Texts.join('\n\n');
+        if (result.t1) patch.t1Transcript = result.t1;
         patchSession(patch);
       }
     }
-
-    if (!opts?.skipNav) dispatch({ type: 'view/setTab', tab: 'review' });
   }
 
   // Keep refs current so the auto-stop effect always invokes the latest closure.
   handleFinishedRecordingRef.current = handleFinishedRecording;
-  buildMergedAudioForReviewRef.current = buildMergedAudioForReview;
+  endCaptureRef.current = endCapture;
 
-  // When the hard cap or idle auto-stop fires, the MediaRecorder stops itself
-  // internally — handleFinishedRecording is never called by user action, so the
-  // clip stays 'pending' and audio is never persisted to IDB.
+  // The single subscriber to the RecorderEvent stream. Every event is either
+  // translated into a machine action (advisories the UI renders) or handled
+  // here as a side effect (chime, toast, the auto-stop finalize below) — so a
+  // new stop reason is a one-file change instead of a hook *and* a component.
   useEffect(() => {
     return recorder.subscribeEvents((e) => {
-      if (e.type === 'backgrounded') setBackgrounded(true);
-      if (e.type === 'stopped' && e.reason !== 'manual') {
-        void handleFinishedRecordingRef.current().then(() => {
-          setTimeout(() => void buildMergedAudioForReviewRef.current(), 0);
-        });
+      const advise = (advisory: AdvisoryAction) => dispatch({ type: 'capture/advisory', advisory });
+      switch (e.type) {
+        case 'backgrounded':
+          setBackgrounded(true);
+          break;
+        case 'silenceStart':
+          if (recorderStatusRef.current === 'recording') playAlertChime();
+          advise({ type: 'silenceStart' });
+          break;
+        case 'silenceEnd':
+          advise({ type: 'silenceEnd' });
+          break;
+        case 'softWarn':
+          advise({ type: 'softWarn' });
+          break;
+        case 'stopped':
+          if (e.reason === 'hardCap') {
+            toast.warning(
+              `Hit recording length cap (${settings.recordingLimits.maxMinutes} min) — auto-stopped.`,
+            );
+          } else if (e.reason === 'idleAuto') {
+            advise({ type: 'autoStopped' });
+          } else if (e.reason === 'micDisconnected') {
+            toast.warning('Microphone disconnected — recording stopped and audio saved.');
+          }
+          // When the hard cap or idle auto-stop fires, the MediaRecorder stops
+          // itself internally — handleFinishedRecording is never called by user
+          // action, so the clip would stay 'pending' and never reach IDB.
+          if (e.reason !== 'manual') {
+            void handleFinishedRecordingRef.current().then(async (clipsPatch) => {
+              await endCaptureRef.current(clipsPatch);
+              // Manual stop is navigated by useSessionMachine.stopAndFinish; an
+              // auto-stop has no user action behind it, so it navigates here.
+              dispatch({ type: 'view/setTab', tab: 'review' });
+            });
+          }
+          break;
       }
     });
-  }, [recorder.subscribeEvents]);
+  }, [recorder.subscribeEvents, dispatch, settings.recordingLimits.maxMinutes]);
 
   return {
     backgroundWarningDismissed,
@@ -607,10 +642,8 @@ export function useCapturePhase({
     handleStopAndFinish,
     handleUploadAudio,
     handleDeleteClip,
-    buildMergedAudioForReview,
-    mergedAudioBlob,
+    endCapture,
     silencedMergedBlob,
-    isMerging,
     reset,
   };
 }

@@ -64,6 +64,8 @@ export function SessionTopBar({
     <div
       className="flex items-center gap-3"
       style={{
+        position: 'relative',
+        zIndex: 10,
         height: 56,
         padding: '0 22px',
         background: 'var(--color-pt-surface)',

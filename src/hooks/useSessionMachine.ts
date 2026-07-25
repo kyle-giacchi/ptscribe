@@ -14,6 +14,7 @@ import { useWhisperLoading } from './useWhisperLoading';
 import { useUploadPhase } from './useUploadPhase';
 import { useTemplateChangePhase } from './useTemplateChangePhase';
 import { sessionMachineReducer } from './sessionMachine/reducer';
+import type { AdvisoryAction } from './sessionMachine/recordingAdvisories';
 import {
   createInitialSessionMachineState,
   type GateResolution,
@@ -25,6 +26,7 @@ import type { UseWebSpeechTranscript } from './useLiveTranscript';
 import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 import type {
   Note,
+  NoteActivities,
   NoteTemplate,
   Patient,
   Session,
@@ -119,7 +121,9 @@ export interface SessionMachineActions {
   dismissUploadProcessing: () => void;
   skipRecording: () => void;
   dismissBackgroundWarning: () => void;
-  dismissRecordWarning: () => void;
+  /** Dismiss/clear a recorder advisory. Only the machine raises them —
+   *  useCapturePhase is the sole RecorderEvent subscriber. */
+  dispatchAdvisory: (advisory: AdvisoryAction) => void;
   setTab: (tab: 'record' | 'review') => void;
   // Transcript (Curate)
   /** Overlay only — in-memory until commitTranscriptEdits/applyScrub. */
@@ -140,6 +144,8 @@ export interface SessionMachineActions {
   finalize: () => void;
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;
+  /** Persists the per-visit exercise log onto the note (creating it if needed). */
+  activitiesChange: (next: NoteActivities) => void;
   /** May open the template-change gate when the note has content. */
   changeTemplate: (templateId: string) => void;
   setModifiers: (next: SessionModifiers) => void;
@@ -550,10 +556,6 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     [],
   );
   const skipRecording = useCallback(() => dispatch({ type: 'view/skipRecording' }), []);
-  const dismissRecordWarning = useCallback(
-    () => dispatch({ type: 'view/dismissRecordWarning' }),
-    [],
-  );
   const dismissError = useCallback(() => dispatch({ type: 'error/set', message: null }), []);
   const setModifiers = useCallback(
     (next: SessionModifiers) => patchSession({ modifiers: next }),
@@ -571,7 +573,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       dismissUploadProcessing,
       skipRecording,
       dismissBackgroundWarning: () => capturePhase.setBackgroundWarningDismissed(true),
-      dismissRecordWarning,
+      dispatchAdvisory: (advisory) => dispatch({ type: 'capture/advisory', advisory }),
       setTab,
       editTranscript,
       commitTranscriptEdits,
@@ -586,6 +588,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       finalize,
       unfinalize: generatePhase.unfinalize,
       sectionChange: generatePhase.sectionChange,
+      activitiesChange: generatePhase.activitiesChange,
       changeTemplate,
       setModifiers,
       clearGenerateAiError: generatePhase.clearAiError,
@@ -594,13 +597,13 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       resolveGate,
     }),
     [
+      dispatch,
       startRecording,
       capturePhase,
       stopAndFinish,
       uploadAudio,
       dismissUploadProcessing,
       skipRecording,
-      dismissRecordWarning,
       setTab,
       editTranscript,
       commitTranscriptEdits,
@@ -662,7 +665,6 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       effectiveTranscript,
       state.transcript.edited,
       state.view.tab,
-      state.view.recordWarnDismissed,
       state.view.recordingSkipped,
       busy,
       inputsUnchanged,

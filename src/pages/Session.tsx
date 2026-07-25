@@ -6,6 +6,10 @@ import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
 import { SessionResetContext } from '@/contexts/SessionResetContext';
 import { useTemplates } from '@/contexts/TemplatesProvider';
+import { useExercises } from '@/contexts/ExercisesProvider';
+import { usePlans } from '@/contexts/PlansProvider';
+import { PatientActivitiesCard } from '@/components/sessions/activities/PatientActivitiesCard';
+import { homeDiffersFromPlan, seedHomeFromPlan } from '@/services/note/activities';
 import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
@@ -71,6 +75,19 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     allTemplates.find((t) => t.id === session?.templateId) ??
     templates[0];
 
+  // ── Patient activities (per-visit exercise log) ──────────────────────────
+  const { exercises } = useExercises();
+  const { activePlanForPatient } = usePlans();
+  const activePlan = patient ? activePlanForPatient(patient.id) : undefined;
+
+  // Seed is COMPUTED, never auto-written — persisting on mount would create a
+  // phantom Note for every session whose Review tab was merely opened.
+  // ponytail: a plain call, not useMemo — it is a map over a handful of
+  // prescriptions, and memoizing it made the React Compiler bail on this file.
+  const seededHome = seedHomeFromPlan(activePlan, exercises);
+  const displayActivities = note?.activities ?? { performed: [], home: seededHome };
+  const seededFromPlan = !note?.activities && seededHome.length > 0;
+
   const recorder = useRecorder({
     limits: settings.recordingLimits,
     inputDeviceId: settings.audio.inputDeviceId,
@@ -112,7 +129,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         }
       }
     },
-    [updatePatient],
+    [updatePatient, setDemoCompleteOpen],
   );
 
   // ── The session workflow module (CONTEXT.md: Capture → Curate → Generate → Finalize) ──
@@ -308,6 +325,8 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   onSkip={actions.skipRecording}
                   wasBackgrounded={selectors.showBackgroundWarning}
                   onDismissBackgroundWarning={actions.dismissBackgroundWarning}
+                  advisories={state.capture.advisories}
+                  dispatchAdvisory={actions.dispatchAdvisory}
                 />
               )}
             </div>
@@ -403,6 +422,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       template={template}
                       isStale={selectors.noteIsStale}
                       onSectionChange={actions.sectionChange}
+                    />
+
+                    <PatientActivitiesCard
+                      activities={displayActivities}
+                      exercises={exercises}
+                      readOnly={!!note?.finalized}
+                      seededFromPlan={seededFromPlan}
+                      canSyncPlan={homeDiffersFromPlan(displayActivities.home, activePlan)}
+                      onChange={actions.activitiesChange}
+                      // Task 6 replaces this with actions.syncPlanOfCare.
+                      onSyncPlan={() => {}}
                     />
                     {state.generate.retryStatus ? (
                       <div style={{ marginTop: 8 }}>

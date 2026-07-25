@@ -3,6 +3,7 @@ import type { Dispatch, MutableRefObject } from 'react';
 import type { SessionMachineAction, UploadFlowState } from './sessionMachine/types';
 import type { CapturePhaseResult } from './useCapturePhase';
 import type { T2Phase } from './useBackgroundTranscription';
+import { isSettled } from '@/utils/clips';
 import type { Session } from '@/types';
 
 export interface UseUploadPhaseParams {
@@ -23,7 +24,7 @@ export interface UploadPhaseResult {
 
 /**
  * Upload-processing choreography (CONTEXT.md — UploadProcessingView):
- * upload → clip saved → merge + T2 (skipNav) → ≥2s minimum display →
+ * upload → clip saved → Capture-end (merge + T2) → ≥2s minimum display →
  * navigate to review.
  */
 export function useUploadPhase({
@@ -53,14 +54,13 @@ export function useUploadPhase({
     const clip = session?.clips.find((c) => c.id === clipId);
     if (!clip) return;
 
-    const audioSaved =
-      clip.status === 'ready' || clip.status === 'transcribed' || clip.status === 'failed';
+    const audioSaved = isSettled(clip);
 
-    // Once audio is saved: kick off merge+T2 once (skipNav keeps the
-    // processing screen up until T2 lands).
+    // Once audio is saved: kick off Capture-end once. endCapture never
+    // navigates, so the processing screen stays up until T2 lands below.
     if (audioSaved && !mergeStarted) {
       dispatch({ type: 'uploadFlow/mergeStarted' });
-      void captureRef.current.buildMergedAudioForReview({ skipNav: true });
+      void captureRef.current.endCapture();
       return;
     }
 

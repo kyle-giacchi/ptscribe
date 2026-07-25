@@ -11,7 +11,6 @@ export function ActiveRecordingCard({
   subscribeDuration,
   getDurationSec,
   paused,
-  chainActive,
   analyser,
   webSpeech,
   whisperBubbles,
@@ -22,7 +21,6 @@ export function ActiveRecordingCard({
   subscribeDuration: (cb: () => void) => () => void;
   getDurationSec: () => number;
   paused: boolean;
-  chainActive: boolean;
   analyser: AnalyserNode | null;
   webSpeech: UseWebSpeechTranscript;
   whisperBubbles: string[];
@@ -173,7 +171,6 @@ export function ActiveRecordingCard({
           type="button"
           className="btn btn-secondary w-full"
           onClick={onPauseResume}
-          disabled={chainActive}
           style={{ minHeight: 44, touchAction: 'manipulation' }}
         >
           {paused ? (
@@ -192,7 +189,6 @@ export function ActiveRecordingCard({
           type="button"
           className="btn btn-primary w-full"
           onClick={onStopAndFinish}
-          disabled={chainActive}
           style={{ minHeight: 44, touchAction: 'manipulation' }}
         >
           <Square size={14} strokeWidth={2} /> Finish Recording
