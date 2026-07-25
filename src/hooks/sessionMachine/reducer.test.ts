@@ -326,6 +326,29 @@ describe('sessionMachineReducer — capture slice', () => {
       expect(next.capture.uploadStatus).toEqual({ phase: 'idle', message: '' });
     });
   });
+
+  // The advisory sub-reducer has its own tests (recordingAdvisories.test.ts);
+  // these only cover that the machine owns the state and delegates to it.
+  describe('capture/advisory', () => {
+    it('delegates to the advisory sub-reducer without touching uploadStatus', () => {
+      const seeded = seedCapture({ uploadStatus: { phase: 'saving', message: 'Saving…' } });
+      const next = sessionMachineReducer(seeded, {
+        type: 'capture/advisory',
+        advisory: { type: 'autoStopped' },
+      });
+      expect(next.capture.advisories.wasAutoStopped).toBe(true);
+      expect(next.capture.uploadStatus).toEqual({ phase: 'saving', message: 'Saving…' });
+    });
+
+    it('machine/reset clears advisories', () => {
+      const stopped = sessionMachineReducer(initialSessionMachineState, {
+        type: 'capture/advisory',
+        advisory: { type: 'autoStopped' },
+      });
+      const reset = sessionMachineReducer(stopped, { type: 'machine/reset' });
+      expect(reset.capture.advisories.wasAutoStopped).toBe(false);
+    });
+  });
 });
 
 describe('sessionMachineReducer — slice isolation', () => {

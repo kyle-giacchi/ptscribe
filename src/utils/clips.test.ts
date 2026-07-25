@@ -5,6 +5,9 @@ import {
   mergeClipTranscriptsWithMarkers,
   stripClipMarkers,
   clipStatusTone,
+  isMergeable,
+  isSettled,
+  hasTranscriptText,
 } from './clips';
 import type { SessionClip } from '@/types';
 
@@ -19,6 +22,30 @@ function clip(overrides: Partial<SessionClip> = {}): SessionClip {
     ...overrides,
   };
 }
+
+describe('usability predicates — the four questions differ', () => {
+  it('isMergeable accepts only clips whose audio is persisted', () => {
+    expect(isMergeable({ status: 'ready' })).toBe(true);
+    expect(isMergeable({ status: 'transcribed' })).toBe(true);
+    expect(isMergeable({ status: 'failed' })).toBe(false);
+    expect(isMergeable({ status: 'pending' })).toBe(false);
+    expect(isMergeable({ status: 'transcribing' })).toBe(false);
+  });
+
+  it('isSettled additionally accepts failed — a failed save still ends the wait', () => {
+    expect(isSettled({ status: 'failed' })).toBe(true);
+    expect(isSettled({ status: 'ready' })).toBe(true);
+    expect(isSettled({ status: 'pending' })).toBe(false);
+    expect(isSettled({ status: 'transcribing' })).toBe(false);
+  });
+
+  it('hasTranscriptText requires transcribed status and non-blank text', () => {
+    expect(hasTranscriptText(clip({ status: 'transcribed', transcript: 'hi' }))).toBe(true);
+    expect(hasTranscriptText(clip({ status: 'transcribed', transcript: '   ' }))).toBe(false);
+    expect(hasTranscriptText(clip({ status: 'transcribed' }))).toBe(false);
+    expect(hasTranscriptText(clip({ status: 'ready', transcript: 'hi' }))).toBe(false);
+  });
+});
 
 describe('getTranscribableClips', () => {
   it('includes ready clips', () => {

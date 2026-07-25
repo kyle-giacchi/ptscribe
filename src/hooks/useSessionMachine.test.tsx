@@ -102,6 +102,7 @@ function makeSettings(opts?: {
       speedUp: { enabled: false, speed: 1.25 },
       silenceDetection: { enabled: false, sensitivity: 0.5, padMs: 100 },
     },
+    recordingLimits: { maxMinutes: 90, softWarnAtMinutes: 60, idleAutoStopMinutes: 10 },
   } as unknown as Settings;
 }
 

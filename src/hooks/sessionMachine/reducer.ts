@@ -1,3 +1,4 @@
+import { advisoriesReducer } from './recordingAdvisories';
 import {
   createInitialSessionMachineState,
   type SessionMachineAction,
@@ -137,6 +138,15 @@ export function sessionMachineReducer(
         capture: { ...state.capture, uploadStatus: action.status },
       };
 
+    case 'capture/advisory':
+      return {
+        ...state,
+        capture: {
+          ...state.capture,
+          advisories: advisoriesReducer(state.capture.advisories, action.advisory),
+        },
+      };
+
     case 'view/setTab':
       return { ...state, view: { ...state.view, tab: action.tab } };
 
@@ -145,9 +155,6 @@ export function sessionMachineReducer(
         ...state,
         view: { ...state.view, tab: 'review', recordingSkipped: true },
       };
-
-    case 'view/dismissRecordWarning':
-      return { ...state, view: { ...state.view, recordWarnDismissed: true } };
 
     case 'transcript/setBaseline':
       return { ...state, transcript: { ...state.transcript, baseline: action.text } };
@@ -197,14 +204,13 @@ export function sessionMachineReducer(
 
     // Machine-state half of Reset Session. Entity wipes (audio blobs, note,
     // session patch) happen in the runner before this dispatch. The provider
-    // override and the record-warning dismissal deliberately survive reset.
+    // override deliberately survives reset.
     case 'machine/reset':
       return {
         ...createInitialSessionMachineState(),
         view: {
           tab: 'record',
           recordingSkipped: false,
-          recordWarnDismissed: state.view.recordWarnDismissed,
         },
         providerOverride: state.providerOverride,
       };

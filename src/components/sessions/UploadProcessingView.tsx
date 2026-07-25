@@ -23,8 +23,15 @@ export function UploadProcessingView({
   onRetry,
   onGoToNotes,
 }: Props) {
-  // ~150ms per second of audio; realtime transcription is typically 5–10× faster than playback
-  const estimatedMs = Math.max(3000, (durationSec ?? 30) * 150);
+  // ~150ms per second of audio; realtime transcription is typically 5–10× faster than playback.
+  // `durationSec` arrives in stages (unknown → 0 while the clip record is created → real value
+  // once decoded) — treat falsy as "still unknown" and keep the estimate in a ref so later
+  // updates re-pace the single animation instead of restarting it from 0.
+  const estimatedMs = Math.max(3000, (durationSec || 30) * 150);
+  const estimatedMsRef = useRef(estimatedMs);
+  useEffect(() => {
+    estimatedMsRef.current = estimatedMs;
+  });
   const [progress, setProgress] = useState(0);
   const rafRef = useRef<number>(0);
 
@@ -33,7 +40,7 @@ export function UploadProcessingView({
     const cap = 0.95;
 
     function tick() {
-      const t = Math.min(1, (Date.now() - start) / estimatedMs);
+      const t = Math.min(1, (Date.now() - start) / estimatedMsRef.current);
       const eased = Math.min(cap, 1 - Math.pow(1 - t, 3)); // ease-out cubic
       setProgress(eased);
       if (eased < cap) rafRef.current = requestAnimationFrame(tick);
@@ -41,7 +48,7 @@ export function UploadProcessingView({
 
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [estimatedMs]);
+  }, []);
 
   const autoStepLabel =
     [...PROCESSING_STEPS].reverse().find((s) => progress >= s.threshold)?.label ??
