@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SessionTopBar } from '../SessionTopBar';
 import type { Patient, Session, Note } from '@/types';
@@ -33,9 +33,6 @@ describe('SessionTopBar', () => {
           session={session}
           note={undefined}
           totalDurationSec={0}
-          clipsCount={0}
-          clipsOpen={false}
-          onToggleClips={() => {}}
           onRecord={() => {}}
           onUpload={() => {}}
           missingRequiredLabels={[]}
@@ -47,31 +44,6 @@ describe('SessionTopBar', () => {
     );
     expect(screen.getByText(/Jane Doe/)).toBeInTheDocument();
     expect(screen.getByText(/L knee OA/)).toBeInTheDocument();
-  });
-
-  it('Audio clips toggle calls onToggleClips', () => {
-    const onToggleClips = vi.fn();
-    render(
-      <MemoryRouter>
-        <SessionTopBar
-          patient={patient}
-          session={session}
-          note={undefined}
-          totalDurationSec={0}
-          clipsCount={3}
-          clipsOpen={false}
-          onToggleClips={onToggleClips}
-          onRecord={() => {}}
-          onUpload={() => {}}
-          missingRequiredLabels={[]}
-          onFinalize={() => {}}
-          onUnfinalize={() => {}}
-          showNoteActions
-        />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByText('Audio clips').closest('button')!);
-    expect(onToggleClips).toHaveBeenCalledTimes(1);
   });
 
   it('Sign & export is disabled when missingRequiredLabels is non-empty', () => {
@@ -92,9 +64,6 @@ describe('SessionTopBar', () => {
           session={session}
           note={note}
           totalDurationSec={0}
-          clipsCount={0}
-          clipsOpen={false}
-          onToggleClips={() => {}}
           onRecord={() => {}}
           onUpload={() => {}}
           missingRequiredLabels={['Assessment']}

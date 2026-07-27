@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { audioRepository } from '@/services/AudioRepository';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
-import { detectBrowser, detectOS, formatBytes, lsBytes } from '@/lib/debug/env';
+import { formatBytes, lsBytes } from '@/lib/debug/env';
+import { detectBrowser, detectOS } from '@/lib/userAgent';
 import { CollapsibleSection, FeaturePill, KVRow, SectionLabel } from './atoms';
 
 /**

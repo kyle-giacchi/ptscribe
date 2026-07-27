@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
+import { deriveDeviceName, isPasskeySupported, passkeyError } from '@/lib/auth/passkey';
 
 function safePath(raw: string | null): string {
   if (!raw) return '/';
@@ -14,29 +15,6 @@ function safePath(raw: string | null): string {
   }
 }
 
-function deriveDeviceName(): string {
-  const ua = navigator.userAgent;
-  const os = /Windows/.test(ua)
-    ? 'Windows'
-    : /Macintosh|Mac OS/.test(ua)
-      ? 'Mac'
-      : /iPhone|iPad/.test(ua)
-        ? 'iOS'
-        : /Android/.test(ua)
-          ? 'Android'
-          : 'this device';
-  const browser = /Edg\//.test(ua)
-    ? 'Edge'
-    : /Chrome\//.test(ua)
-      ? 'Chrome'
-      : /Firefox\//.test(ua)
-        ? 'Firefox'
-        : /Safari\//.test(ua)
-          ? 'Safari'
-          : 'Browser';
-  return `${browser} on ${os}`;
-}
-
 type View = 'verifying' | 'offer-passkey';
 
 export function AuthCallback() {
@@ -44,6 +22,7 @@ export function AuthCallback() {
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<View>('verifying');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dest = useRef('/');
 
   useEffect(() => {
@@ -63,7 +42,7 @@ export function AuthCallback() {
           return;
         }
         // Logged in. Offer a passkey if WebAuthn is available; otherwise go straight in.
-        if (typeof window.PublicKeyCredential !== 'undefined') {
+        if (isPasskeySupported()) {
           setView('offer-passkey');
         } else {
           navigate(dest.current, { replace: true });
@@ -78,12 +57,20 @@ export function AuthCallback() {
 
   async function handleAddPasskey() {
     setBusy(true);
+    setError(null);
     try {
-      await authClient.passkey.addPasskey({ name: deriveDeviceName() });
-    } catch {
-      // Cancelled or unsupported — fall through and continue; they can add one later.
-    } finally {
+      const result = await authClient.passkey.addPasskey({ name: deriveDeviceName() });
+      if (result?.error) {
+        // Stay on the card so they can retry or skip — silently continuing here
+        // would leave them believing they have a passkey when they don't.
+        setError(passkeyError(result.error, 'register'));
+        return;
+      }
       navigate(dest.current, { replace: true });
+    } catch (err) {
+      setError(passkeyError(err, 'register'));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -151,6 +138,22 @@ export function AuthCallback() {
             Skip the email next time. Use your fingerprint, face, or device PIN to sign in to
             PTScribe on this device.
           </p>
+          {error && (
+            <div
+              style={{
+                margin: '0 0 16px',
+                padding: '12px 14px',
+                background: 'var(--color-pt-amber-soft)',
+                border: '1px solid var(--color-pt-amber-border)',
+                borderRadius: 10,
+                fontSize: 13,
+                color: 'var(--color-pt-amber-fg)',
+                textAlign: 'left',
+              }}
+            >
+              {error}
+            </div>
+          )}
           <button
             onClick={handleAddPasskey}
             disabled={busy}

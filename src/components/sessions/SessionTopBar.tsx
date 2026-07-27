@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, AudioLines, CheckCircle2, Home, LockOpen } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Home, LockOpen } from 'lucide-react';
 import type { Patient, Session, Note } from '@/types';
 import { isDemoMode } from '@/lib/demoMode';
 import { AddClipButton } from './AddClipButton';
@@ -9,15 +9,12 @@ export interface SessionTopBarProps {
   session: Session;
   note: Note | undefined;
   totalDurationSec: number;
-  clipsCount: number;
-  clipsOpen: boolean;
-  onToggleClips: () => void;
   onRecord: () => void;
   onUpload: (file: File) => void;
   missingRequiredLabels: string[];
   onFinalize: () => void;
   onUnfinalize: () => void;
-  /** Note actions (New recording, Audio clips, Sign & export) are contextual to
+  /** Note actions (New recording, Sign & export) are contextual to
    *  the Review screen — they animate out on the fresh-start Record screen. */
   showNoteActions: boolean;
 }
@@ -34,9 +31,6 @@ export function SessionTopBar({
   session,
   note,
   totalDurationSec,
-  clipsCount,
-  clipsOpen,
-  onToggleClips,
   onRecord,
   onUpload,
   missingRequiredLabels,
@@ -137,42 +131,6 @@ export function SessionTopBar({
         inert={!showNoteActions}
       >
         <AddClipButton onRecord={onRecord} onUpload={onUpload} />
-
-        <button
-          type="button"
-          onClick={onToggleClips}
-          aria-pressed={clipsOpen}
-          className="inline-flex items-center"
-          style={{
-            gap: 6,
-            height: 32,
-            padding: '0 10px',
-            borderRadius: 7,
-            border: `1px solid ${clipsOpen ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
-            background: clipsOpen ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
-            color: clipsOpen ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
-            cursor: 'pointer',
-            fontSize: 12,
-          }}
-        >
-          <AudioLines size={13} strokeWidth={2} />
-          <span>Audio clips</span>
-          <span
-            style={{
-              minWidth: 18,
-              padding: '0 5px',
-              borderRadius: 999,
-              background: clipsOpen ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
-              color: clipsOpen ? '#fff' : 'var(--color-pt-text-2)',
-              fontSize: 10.5,
-              fontWeight: 700,
-              lineHeight: '15px',
-              textAlign: 'center',
-            }}
-          >
-            {clipsCount}
-          </span>
-        </button>
 
         <div style={{ width: 1, height: 22, background: 'var(--color-pt-border)' }} aria-hidden />
 

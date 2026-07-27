@@ -84,13 +84,6 @@ function getWorker(): Worker {
   return _worker;
 }
 
-export function preloadPrivacyFilter(model = PRIVACY_FILTER_MODEL): void {
-  const worker = getWorker();
-  const id = ++_idCounter;
-  _pending.set(id, { resolve: () => {}, reject: () => {} });
-  worker.postMessage({ id, type: 'preload', model, dtype: dtypeFor(model) });
-}
-
 export async function scrubPII(
   text: string,
   onProgress?: (msg: string) => void,

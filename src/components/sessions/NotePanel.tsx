@@ -79,20 +79,12 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
           Pick a template to see its sections.
         </p>
       ) : (
-        <div>
+        <div className="space-y-4">
           {sections.map((s) => {
             const isAssessment = s.key.toLowerCase() === 'assessment';
             const isPlanSection = s.key === 'plan';
             return (
-              <div
-                key={s.key}
-                style={{
-                  borderBottom: '1px dashed var(--color-pt-border)',
-                  paddingBottom: 16,
-                  marginBottom: 16,
-                  paddingLeft: 0,
-                }}
-              >
+              <div key={s.key} className="card">
                 <div className="mb-2 flex items-center gap-2">
                   <span
                     className="text-[11px] font-semibold tracking-widest uppercase"

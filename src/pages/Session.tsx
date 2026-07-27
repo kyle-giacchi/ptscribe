@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AudioLines, Headphones } from 'lucide-react';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -23,7 +23,9 @@ import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useResizablePanes } from '@/hooks/useResizablePanes';
 import { useSessionMachine, type SessionMachineEvent } from '@/hooks/useSessionMachine';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
-import { ClipsDrawer } from '@/components/sessions/ClipsDrawer';
+import { ClipsDrawer, ClipsListView } from '@/components/sessions/ClipsDrawer';
+import { type AudioFileInputHandle } from '@/components/common/AudioFileInput';
+import { SegmentedControl } from '@/components/design/SegmentedControl';
 import { TranscriptPanel } from '@/components/sessions/TranscriptPanel';
 import { PIIScrubModal } from '@/components/sessions/PIIScrubModal';
 import { NotePanel } from '@/components/sessions/NotePanel';
@@ -106,6 +108,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const [piiScrub, setPiiScrub] = useState<PiiScrubDebug | null>(null);
   const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
   const [clipsOpen, setClipsOpen] = useState(false);
+  // Desktop-only (≥1024px): persistent Transcription/Clips tabs replace the
+  // ClipsDrawer on-demand sheet, which stays as the <1024px fallback (no room
+  // for a second column there). See CONTEXT.md#clips.
+  const [rightPanelTab, setRightPanelTab] = useState<'transcript' | 'clips'>('transcript');
+  const [noteTab, setNoteTab] = useState<'notes' | 'activities'>('notes');
+  const clipsFileRef = useRef<AudioFileInputHandle>(null);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
   const [recordWarnOpen, setRecordWarnOpen] = useState(false);
@@ -225,9 +233,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           session={session}
           note={note}
           totalDurationSec={selectors.totalDurationSec}
-          clipsCount={sortedClips.length}
-          clipsOpen={clipsOpen}
-          onToggleClips={() => setClipsOpen((o) => !o)}
           onRecord={() => actions.setTab('record')}
           onUpload={(file) => {
             void actions.uploadAudio(file);
@@ -247,7 +252,10 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               position: 'sticky',
               top: 0,
               height: 0,
-              zIndex: 20,
+              // Below SessionTopBar's zIndex:10 — otherwise this pill's hit area
+              // (right-aligned, same padding as the header) sits on top of the
+              // AddClipButton dropdown and swallows clicks meant for it.
+              zIndex: 5,
               display: 'flex',
               justifyContent: 'flex-end',
               padding: '0 22px',
@@ -358,7 +366,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       ? 'minmax(0, 1fr)'
                       : `minmax(0, ${notePct}fr) 10px minmax(0, ${100 - notePct}fr)`,
                     gap: transcriptCollapsed ? 24 : 16,
-                    alignItems: 'start',
+                    alignItems: 'stretch',
                   }}
                 >
                   {/* ── Left: Clinical Note ── */}
@@ -381,17 +389,15 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                     )}
                     {/* Title row */}
                     <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-                      <h1
-                        style={{
-                          fontSize: 20,
-                          fontWeight: 600,
-                          color: 'var(--color-pt-text)',
-                          margin: 0,
-                        }}
-                      >
-                        Clinical note
-                      </h1>
-                      {note && (
+                      <SegmentedControl
+                        value={noteTab}
+                        onChange={setNoteTab}
+                        items={[
+                          { value: 'notes', label: 'Notes' },
+                          { value: 'activities', label: 'Activities' },
+                        ]}
+                      />
+                      {noteTab === 'notes' && note && (
                         <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
                           {selectors.busy === 'generating'
                             ? 'Generating…'
@@ -400,40 +406,44 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       )}
                     </div>
 
-                    <NoteToolbar
-                      template={template}
-                      templates={allTemplates}
-                      hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
-                      canGenerate={selectors.canGenerate}
-                      requiresFeedback={selectors.inputsUnchanged}
-                      isGenerating={selectors.busy === 'generating'}
-                      note={note}
-                      patient={patient}
-                      modifiers={selectors.currentModifiers}
-                      onTemplateChange={actions.changeTemplate}
-                      onManageTemplates={() => setManageTemplatesOpen(true)}
-                      onGenerate={actions.generate}
-                      onModifiersChange={actions.setModifiers}
-                    />
+                    {noteTab === 'notes' ? (
+                      <>
+                        <NoteToolbar
+                          template={template}
+                          templates={allTemplates}
+                          hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
+                          canGenerate={selectors.canGenerate}
+                          requiresFeedback={selectors.inputsUnchanged}
+                          isGenerating={selectors.busy === 'generating'}
+                          note={note}
+                          patient={patient}
+                          modifiers={selectors.currentModifiers}
+                          onTemplateChange={actions.changeTemplate}
+                          onManageTemplates={() => setManageTemplatesOpen(true)}
+                          onGenerate={actions.generate}
+                          onModifiersChange={actions.setModifiers}
+                        />
 
-                    <NotePanel
-                      patient={patient}
-                      note={note}
-                      template={template}
-                      isStale={selectors.noteIsStale}
-                      onSectionChange={actions.sectionChange}
-                    />
-
-                    <PatientActivitiesCard
-                      activities={displayActivities}
-                      exercises={exercises}
-                      readOnly={!!note?.finalized}
-                      seededFromPlan={seededFromPlan}
-                      canSyncPlan={homeDiffersFromPlan(displayActivities.home, activePlan)}
-                      onChange={actions.activitiesChange}
-                      // Task 6 replaces this with actions.syncPlanOfCare.
-                      onSyncPlan={() => {}}
-                    />
+                        <NotePanel
+                          patient={patient}
+                          note={note}
+                          template={template}
+                          isStale={selectors.noteIsStale}
+                          onSectionChange={actions.sectionChange}
+                        />
+                      </>
+                    ) : (
+                      <PatientActivitiesCard
+                        activities={displayActivities}
+                        exercises={exercises}
+                        readOnly={!!note?.finalized}
+                        seededFromPlan={seededFromPlan}
+                        canSyncPlan={homeDiffersFromPlan(displayActivities.home, activePlan)}
+                        onChange={actions.activitiesChange}
+                        // Task 6 replaces this with actions.syncPlanOfCare.
+                        onSyncPlan={() => {}}
+                      />
+                    )}
                     {state.generate.retryStatus ? (
                       <div style={{ marginTop: 8 }}>
                         <AiCallRetryStatus {...state.generate.retryStatus} />
@@ -464,91 +474,176 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         alignSelf: 'stretch',
                         cursor: 'col-resize',
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: 'stretch',
                         justifyContent: 'center',
                         minHeight: 80,
                       }}
                     >
                       <div
                         style={{
-                          width: 4,
-                          height: 48,
-                          borderRadius: 999,
+                          width: 1,
+                          alignSelf: 'stretch',
                           background: 'var(--color-pt-border)',
                         }}
                       />
                     </div>
                   )}
 
-                  {/* ── Right: Transcript ── */}
+                  {/* ── Right: Transcription / Clips ── */}
                   {!transcriptCollapsed && (
-                    <div style={{ position: 'relative' }}>
-                      <TranscriptPanel
-                        transcript={selectors.effectiveTranscript}
-                        clips={sortedClips}
-                        transcribing={selectors.busy === 'transcribing'}
-                        hasUserEdits={selectors.hasUserEdits}
-                        hasT2Transcript={selectors.hasT2Transcript}
-                        hasT3Transcript={selectors.hasT3Transcript}
-                        totalDurationSec={selectors.totalDurationSec}
-                        collapsed={transcriptCollapsed}
-                        onCollapse={() => setTranscriptCollapsed(true)}
-                        onChange={actions.editTranscript}
-                        onCommit={actions.commitTranscriptEdits}
-                        onCreateTranscript={() => {
-                          void actions.improveWithAI();
+                    <div
+                      style={{
+                        position: 'relative',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      <div role="tablist" className="flex items-stretch" style={{ gap: 8 }}>
+                        <RightPanelTab
+                          active={rightPanelTab === 'transcript'}
+                          onClick={() => setRightPanelTab('transcript')}
+                          icon={<Headphones size={13} strokeWidth={2} />}
+                          label="Transcription"
+                        />
+                        <RightPanelTab
+                          active={rightPanelTab === 'clips'}
+                          onClick={() => setRightPanelTab('clips')}
+                          icon={<AudioLines size={13} strokeWidth={2} />}
+                          label="Clips"
+                          count={sortedClips.length}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 10,
+                          flex: 1,
+                          minHeight: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
                         }}
-                        canImproveWithAI={selectors.canImproveWithAI}
-                        cloudDisabledReason={selectors.cloudDisabledReason}
-                        onRevertToLocal={actions.revertToLocal}
-                        onCopyTranscript={actions.copyTranscript}
-                        onOpenPIIScrub={() => setPiiScrubOpen(true)}
-                        hasEditedTranscript={selectors.hasUserEdits}
-                        onRevertEdits={actions.revertEdits}
-                        seekSignal={seekSignal}
-                      />
-                      {state.transcribe.retryStatus ? (
-                        <div style={{ marginTop: 8 }}>
-                          <AiCallRetryStatus {...state.transcribe.retryStatus} />
-                        </div>
-                      ) : null}
-                      {state.transcribe.aiError ? (
-                        <div style={{ marginTop: 8 }}>
-                          <AiCallError
-                            error={state.transcribe.aiError}
-                            onRetry={() => {
-                              actions.clearTranscribeAiError();
-                              void actions.improveWithAI();
+                      >
+                        {rightPanelTab === 'transcript' ? (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              flex: 1,
+                              minHeight: 0,
                             }}
-                            onDismiss={actions.clearTranscribeAiError}
-                          />
-                        </div>
-                      ) : null}
+                          >
+                            <TranscriptPanel
+                              transcript={selectors.effectiveTranscript}
+                              clips={sortedClips}
+                              transcribing={selectors.busy === 'transcribing'}
+                              hasUserEdits={selectors.hasUserEdits}
+                              hasT2Transcript={selectors.hasT2Transcript}
+                              hasT3Transcript={selectors.hasT3Transcript}
+                              totalDurationSec={selectors.totalDurationSec}
+                              collapsed={transcriptCollapsed}
+                              onCollapse={() => setTranscriptCollapsed(true)}
+                              onChange={actions.editTranscript}
+                              onCommit={actions.commitTranscriptEdits}
+                              onCreateTranscript={() => {
+                                void actions.improveWithAI();
+                              }}
+                              canImproveWithAI={selectors.canImproveWithAI}
+                              cloudDisabledReason={selectors.cloudDisabledReason}
+                              onRevertToLocal={actions.revertToLocal}
+                              onCopyTranscript={actions.copyTranscript}
+                              onOpenPIIScrub={() => setPiiScrubOpen(true)}
+                              hasEditedTranscript={selectors.hasUserEdits}
+                              onRevertEdits={actions.revertEdits}
+                              seekSignal={seekSignal}
+                            />
+                            {state.transcribe.retryStatus ? (
+                              <div style={{ marginTop: 8 }}>
+                                <AiCallRetryStatus {...state.transcribe.retryStatus} />
+                              </div>
+                            ) : null}
+                            {state.transcribe.aiError ? (
+                              <div style={{ marginTop: 8 }}>
+                                <AiCallError
+                                  error={state.transcribe.aiError}
+                                  onRetry={() => {
+                                    actions.clearTranscribeAiError();
+                                    void actions.improveWithAI();
+                                  }}
+                                  onDismiss={actions.clearTranscribeAiError}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div
+                            className="card"
+                            style={{
+                              padding: 0,
+                              overflow: 'hidden',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              flex: 1,
+                            }}
+                          >
+                            <ClipsListView
+                              clips={sortedClips}
+                              total={sortedClips.reduce((sum, c) => sum + (c.durationSec ?? 0), 0)}
+                              newest={
+                                sortedClips.length > 0
+                                  ? sortedClips.reduce((a, b) =>
+                                      a.createdAt > b.createdAt ? a : b,
+                                    )
+                                  : null
+                              }
+                              fileRef={clipsFileRef}
+                              isMobile={false}
+                              onClose={() => setRightPanelTab('transcript')}
+                              onJump={(t) => {
+                                setRightPanelTab('transcript');
+                                setSeekSignal({ seconds: t, id: Date.now() });
+                              }}
+                              onDelete={(clipId) => {
+                                void actions.deleteClip(clipId);
+                              }}
+                              onRecord={() => {
+                                actions.setTab('record');
+                              }}
+                              onUpload={(file) => {
+                                void actions.uploadAudio(file);
+                              }}
+                              t2Phase={backgroundT2.phase}
+                              t2Label={backgroundT2.progressLabel}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
-                  <ClipsDrawer
-                    open={clipsOpen}
-                    clips={sortedClips}
-                    onClose={() => setClipsOpen(false)}
-                    onJump={(t) => {
-                      setClipsOpen(false);
-                      if (transcriptCollapsed) setTranscriptCollapsed(false);
-                      setSeekSignal({ seconds: t, id: Date.now() });
-                    }}
-                    onDelete={(clipId) => {
-                      void actions.deleteClip(clipId);
-                    }}
-                    onRecord={() => {
-                      setClipsOpen(false);
-                      actions.setTab('record');
-                    }}
-                    onUpload={(file) => {
-                      setClipsOpen(false);
-                      void actions.uploadAudio(file);
-                    }}
-                    t2Phase={backgroundT2.phase}
-                    t2Label={backgroundT2.progressLabel}
-                  />
+                  {transcriptCollapsed && (
+                    <ClipsDrawer
+                      open={clipsOpen}
+                      clips={sortedClips}
+                      onClose={() => setClipsOpen(false)}
+                      onJump={(t) => {
+                        setClipsOpen(false);
+                        setTranscriptCollapsed(false);
+                        setSeekSignal({ seconds: t, id: Date.now() });
+                      }}
+                      onDelete={(clipId) => {
+                        void actions.deleteClip(clipId);
+                      }}
+                      onRecord={() => {
+                        setClipsOpen(false);
+                        actions.setTab('record');
+                      }}
+                      onUpload={(file) => {
+                        setClipsOpen(false);
+                        void actions.uploadAudio(file);
+                      }}
+                      t2Phase={backgroundT2.phase}
+                      t2Label={backgroundT2.progressLabel}
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -670,6 +765,59 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
+
+function RightPanelTab({
+  active,
+  onClick,
+  icon,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  count?: number;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className="inline-flex flex-1 items-center justify-center transition-colors"
+      style={{
+        gap: 6,
+        padding: '9px 12px',
+        borderRadius: 8,
+        fontSize: 12.5,
+        fontWeight: 600,
+        border: 'none',
+        borderBottom: active ? '2px solid var(--color-pt-accent)' : '2px solid transparent',
+        cursor: 'pointer',
+        background: 'transparent',
+        color: active ? 'var(--color-pt-text-1)' : 'var(--color-pt-text-2)',
+      }}
+    >
+      {icon}
+      {label}
+      {typeof count === 'number' && count > 0 && (
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            borderRadius: 999,
+            padding: '0 6px',
+            background: active ? 'var(--color-pt-accent)' : 'var(--color-pt-border)',
+            color: active ? '#ffffff' : 'var(--color-pt-text-2)',
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 function NotFound() {
   return (

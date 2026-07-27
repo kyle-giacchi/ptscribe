@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
 import { MailCheck } from 'lucide-react';
 import { authClient } from '@/lib/auth/client';
+import { isPasskeyAutofillAvailable, isPasskeySupported, passkeyError } from '@/lib/auth/passkey';
 import { activateTestUserSession } from '@/lib/profile/profileId';
 import { isDemoMode } from '@/lib/demoMode';
 import { unlockGateForDemo } from '@/lib/gate';
@@ -16,9 +17,6 @@ const errorMessages: Record<string, string> = {
     'We couldn’t reach the server to verify your link. Check your connection and try the link again — it hasn’t been used up.',
 };
 
-const PASSKEY_NO_CREDENTIAL =
-  'No passkey was found on this device, or the prompt was dismissed. If you’re new here or on a new device, use the email link below — passkeys don’t transfer between devices automatically.';
-
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,6 +27,8 @@ export function Login() {
     errorMessages[searchParams.get('error') ?? ''] ?? null,
   );
   const [loading, setLoading] = useState(false);
+  const passkeySupported = isPasskeySupported();
+  const autofillStarted = useRef(false);
 
   const from = (location.state as { from?: Location })?.from?.pathname ?? '/';
 
@@ -37,28 +37,35 @@ export function Login() {
     void whisperLoader.ensureReady().catch(() => {});
   }, []);
 
+  // Passkey autofill (conditional mediation): once the email field is on screen,
+  // arm a background WebAuthn request so the browser can offer a saved passkey
+  // straight from the field's dropdown. The promise stays pending until the user
+  // picks one — so failures here are silent, and an explicit `signIn.passkey()`
+  // supersedes it (SimpleWebAuthn aborts the outstanding ceremony for us).
+  useEffect(() => {
+    if (view !== 'magic-form' || autofillStarted.current) return;
+    autofillStarted.current = true;
+    void (async () => {
+      if (!(await isPasskeyAutofillAvailable())) return;
+      const result = await authClient.signIn.passkey({ autoFill: true }).catch(() => null);
+      if (result && !result.error) navigate(from, { replace: true });
+    })();
+  }, [view, from, navigate]);
+
   async function handlePasskey() {
     setError(null);
     setLoading(true);
     try {
+      // The passkey client returns errors rather than throwing; the catch is a
+      // backstop for transport failures.
       const result = await authClient.signIn.passkey();
       if (result?.error) {
-        // No registered credential is a normal "new device" case, not a failure.
-        setError(result.error.message ?? PASSKEY_NO_CREDENTIAL);
+        setError(passkeyError(result.error, 'sign-in'));
       } else {
         navigate(from, { replace: true });
       }
     } catch (err) {
-      // WebAuthn throws NotAllowedError when the user dismisses the prompt or no
-      // matching passkey exists on this device — guide them to the email path.
-      if (
-        err instanceof DOMException &&
-        (err.name === 'NotAllowedError' || err.name === 'AbortError')
-      ) {
-        setError(PASSKEY_NO_CREDENTIAL);
-      } else {
-        setError('Passkey sign-in failed. Try again or use a magic link.');
-      }
+      setError(passkeyError(err, 'sign-in'));
     } finally {
       setLoading(false);
     }
@@ -184,29 +191,32 @@ export function Login() {
                 lineHeight: 1.6,
               }}
             >
-              Use your device passkey for the fastest sign-in. New here, or on a new device? Email
-              yourself a link to get in, then add a passkey once you&apos;re signed in.
+              {passkeySupported
+                ? 'Use your device passkey for the fastest sign-in. New here, or on a new device? Email yourself a link to get in, then add a passkey once you’re signed in.'
+                : 'This browser doesn’t support passkeys. Email yourself a sign-in link to continue.'}
             </p>
 
-            <button
-              onClick={handlePasskey}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: loading ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: 12,
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                marginBottom: 12,
-                transition: 'background 0.15s',
-              }}
-            >
-              {loading ? 'Signing in…' : 'Sign in with Passkey'}
-            </button>
+            {passkeySupported && (
+              <button
+                onClick={handlePasskey}
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: loading ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 12,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  marginBottom: 12,
+                  transition: 'background 0.15s',
+                }}
+              >
+                {loading ? 'Signing in…' : 'Sign in with Passkey'}
+              </button>
+            )}
 
             <button
               onClick={() => {
@@ -217,16 +227,16 @@ export function Login() {
               style={{
                 width: '100%',
                 padding: '14px',
-                background: 'transparent',
-                color: 'var(--color-pt-accent-fg)',
-                border: '1.5px solid var(--color-pt-accent-border)',
+                background: passkeySupported ? 'transparent' : 'var(--color-pt-accent)',
+                color: passkeySupported ? 'var(--color-pt-accent-fg)' : '#ffffff',
+                border: passkeySupported ? '1.5px solid var(--color-pt-accent-border)' : 'none',
                 borderRadius: 12,
                 fontSize: 15,
-                fontWeight: 600,
+                fontWeight: passkeySupported ? 600 : 700,
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              Email me a link instead
+              {passkeySupported ? 'Email me a link instead' : 'Email me a sign-in link'}
             </button>
 
             {isDemoMode() && (
@@ -279,6 +289,8 @@ export function Login() {
               }}
             >
               Enter your email and we&apos;ll send you a sign-in link.
+              {passkeySupported &&
+                ' If you already have a passkey, your browser will offer it here.'}
             </p>
 
             <form onSubmit={handleMagicLink}>
@@ -288,6 +300,9 @@ export function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
+                // `webauthn` is what makes the conditional-mediation request above
+                // surface saved passkeys in this field's autofill dropdown.
+                autoComplete="username webauthn"
                 style={{
                   width: '100%',
                   padding: '13px 14px',

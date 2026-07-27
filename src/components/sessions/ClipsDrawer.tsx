@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AudioLines, Mic, Play, Trash2, Upload, X, CornerDownLeft } from 'lucide-react';
+import { AudioLines, Mic, Trash2, Upload, X, CornerDownLeft } from 'lucide-react';
 import { audioRepository } from '@/services/AudioRepository';
 import { duration, ease } from '@/lib/motion';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
@@ -23,7 +23,7 @@ interface ClipsDrawerProps {
   t2Label: string;
 }
 
-interface InnerProps {
+export interface ClipsListViewProps {
   clips: SessionClip[];
   total: number;
   newest: SessionClip | null;
@@ -38,7 +38,8 @@ interface InnerProps {
   t2Label: string;
 }
 
-function Inner({
+/** Also used as the inline Clips tab panel in the desktop Review layout (Session.tsx). */
+export function ClipsListView({
   clips,
   total,
   newest,
@@ -51,7 +52,7 @@ function Inner({
   isMobile,
   t2Phase,
   t2Label,
-}: InnerProps) {
+}: ClipsListViewProps) {
   return (
     <>
       {/* Header */}
@@ -195,7 +196,7 @@ export function ClipsDrawer({
   const newest =
     clips.length > 0 ? clips.reduce((a, b) => (a.createdAt > b.createdAt ? a : b)) : null;
 
-  const innerProps: InnerProps = {
+  const innerProps: ClipsListViewProps = {
     clips,
     total,
     newest,
@@ -237,7 +238,7 @@ export function ClipsDrawer({
               paddingBottom: 'env(safe-area-inset-bottom)',
             }}
           >
-            <Inner {...innerProps} />
+            <ClipsListView {...innerProps} />
           </motion.div>
         ) : (
           <motion.div
@@ -262,7 +263,7 @@ export function ClipsDrawer({
               flexDirection: 'column',
             }}
           >
-            <Inner {...innerProps} />
+            <ClipsListView {...innerProps} />
           </motion.div>
         ))}
     </AnimatePresence>
@@ -286,11 +287,9 @@ function ClipCard({
   t2Phase: T2Phase;
   t2Label: string;
 }) {
-  const [playing, setPlaying] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!playing) return;
     let cancelled = false;
     let createdUrl: string | null = null;
     void (async () => {
@@ -304,16 +303,7 @@ function ClipCard({
       if (createdUrl) URL.revokeObjectURL(createdUrl);
       setUrl(null);
     };
-  }, [playing, clip.id]);
-
-  const bars = useMemo(
-    () =>
-      Array.from(
-        { length: 48 },
-        (_, j) => Math.abs(Math.sin(j * 0.7 + index) * Math.cos(j * 0.18)) * 22,
-      ),
-    [index],
-  );
+  }, [clip.id]);
 
   const time = new Date(clip.createdAt).toLocaleTimeString(undefined, {
     hour: 'numeric',
@@ -357,22 +347,6 @@ function ClipCard({
         </span>
       </div>
 
-      {/* Waveform */}
-      <div className="flex items-end gap-[2px]" style={{ height: 24 }} aria-hidden>
-        {bars.map((h, j) => (
-          <span
-            key={j}
-            style={{
-              width: 2,
-              height: Math.max(2, h),
-              borderRadius: 1,
-              background: 'var(--color-pt-text-3)',
-              opacity: 0.55,
-            }}
-          />
-        ))}
-      </div>
-
       {/* Meta row */}
       <div className="flex items-center gap-2">
         <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{time}</span>
@@ -406,10 +380,9 @@ function ClipCard({
 
       {/* Action row */}
       <div className="flex items-center gap-2">
-        {playing && url ? (
+        {url ? (
           <audio
             controls
-            autoPlay
             src={url}
             style={{ flex: 1, height: 28 }}
             onLoadedMetadata={(e) => {
@@ -426,14 +399,7 @@ function ClipCard({
             }}
           />
         ) : (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            style={{ height: 28, fontSize: 12 }}
-            onClick={() => setPlaying(true)}
-          >
-            <Play size={12} strokeWidth={2} /> Play
-          </button>
+          <span style={{ flex: 1, fontSize: 12, color: 'var(--color-pt-text-3)' }}>Loading…</span>
         )}
         <button
           type="button"

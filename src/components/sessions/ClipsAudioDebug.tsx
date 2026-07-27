@@ -1,7 +1,8 @@
 import { memo, useState } from 'react';
 import { CheckCircle2, Clock, Loader2, Trash2, XCircle } from 'lucide-react';
 import { PlaybackWaveform } from '@/components/audio/PlaybackWaveform';
-import { formatDuration, wordCount } from '@/utils/format';
+import { wordCount } from '@/lib/clinical/transcript';
+import { formatDuration } from '@/utils/format';
 import type { ClipStatus, SessionClip } from '@/types';
 
 export function ClipsAudioDebug({

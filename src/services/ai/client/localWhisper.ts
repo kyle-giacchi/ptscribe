@@ -298,9 +298,8 @@ export async function blobToFloat32(blob: Blob): Promise<Float32Array> {
 // ── Transcription functions ───────────────────────────────────────────────────
 
 /** Send a pre-decoded 16 kHz mono Float32Array directly to the Whisper worker,
- *  bypassing the blob-decode step. Use this when the caller has already decoded
- *  and preprocessed the audio (e.g. VAD extraction + chunking). */
-export async function transcribeFloat32(
+ *  bypassing the blob-decode step. Used by the parallel chunk pool below. */
+async function transcribeFloat32(
   audio: Float32Array,
   model = LOCAL_WHISPER_DEFAULT_MODEL,
   onProgress?: (msg: string) => void,

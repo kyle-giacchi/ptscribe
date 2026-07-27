@@ -51,7 +51,7 @@ A session is always owned by a Patient — patient selection is a hard prerequis
 
 ## Curate panel
 
-The clinician's primary working surface during Curate. Layout stays close to the existing Review-page design — full-width editable transcript with the three named actions (**Improve with AI**, **Revert to original**, **Scrub PII**) and the ClipsDrawer toggle preserved in SessionTopBar. The new state machine adds only the minimum visible changes: a banner slot for "T1 fallback in use" or "No speech detected — type your transcript", and the read-only locked-transcript state once Generate fires. A larger layout rethink is explicitly deferred.
+The clinician's primary working surface during Curate. Full-width editable transcript with the three named actions (**Improve with AI**, **Revert to original**, **Scrub PII**), plus a banner slot for "T1 fallback in use" or "No speech detected — type your transcript", and the read-only locked-transcript state once Generate fires. (The Review-page visual layout itself — Note sections as cards, Notes/Activities tabs, Transcription/Clips tabs — is a presentation concern; see [Note editor](#note-editor) and [Clips](#clips) for current layout, not fixed permanently to any one design.)
 
 ## Generation input
 
@@ -107,9 +107,9 @@ The clinician's commitment that the Note represents their clinical reasoning. Fi
 Per-recording-take audio segments within a session. Created during Capture: pause/resume keeps the clinician in one clip; "Stop & Start New" creates an additional clip (e.g. patient stepped out). Clips are visible:
 
 - **During Capture** — recording panel shows clip count + scrub, clinician chooses whether to pause or stop-and-start-new.
-- **During Curate / Review** — the ClipsDrawer (side drawer ≥ 768 px / bottom sheet < 768 px) surfaces clips as a _diagnostic tool_. The clinician opens it when something in the curated transcript looks wrong and they want to listen to the specific clip that produced it.
+- **During Curate / Review** — clips surface as a _diagnostic tool_ the clinician reaches for when something in the curated transcript looks wrong and they want to listen to the specific clip that produced it. On wide layouts (≥ 1024 px, the two-column Review grid) this is a persistent **Clips tab** next to Transcription in the right panel; below that width, where there's no room for a second column, it's the on-demand ClipsDrawer bottom sheet instead. Same data and actions either way — the tab is not a mode switch, just a wider-viewport presentation of the same diagnostic view.
 
-The curated transcript is one continuous artifact; the AI receives one transcript; the Note is generated from one transcript. Clips never partition the transcript. The ClipsDrawer's role is to help the clinician investigate mismatches, not to structure the workflow.
+The curated transcript is one continuous artifact; the AI receives one transcript; the Note is generated from one transcript. Clips never partition the transcript. Clips (tab or drawer) exist to help the clinician investigate mismatches, not to structure the workflow.
 
 ## Recording controls
 
@@ -161,6 +161,10 @@ The Note draft is presented as **section blocks** — one editable text block pe
 The transcript is visible adjacent to the Note (panel or collapsible reference) so the clinician can scan it without context-switching while editing. It stays editable — see [Note staleness](#note-staleness); editing it after Generate flags the Note stale rather than being blocked.
 
 Top-level actions while editing: **Regenerate** (with Modifier chips), **Finalize**. No per-section regenerate — Regenerate is always Note-level (entire draft replaced). When the Note is stale, the editor shows the stale banner and Finalize routes through the stale-confirm.
+
+## Activities
+
+The per-visit exercise log, shown alongside the Note in Review. Two always-visible lists: **Performed this visit** and **Home program**. The home list is seeded from the patient's Plan of Care and can diverge from it; the clinician can push local changes back with **Update plan of care**. Activities are stored on the Note (`NoteActivities`) but are a separate concern from the Note's section blocks — they are never sent to the note-generation AI (see [Generation input](#generation-input)) and are not part of what Regenerate replaces.
 
 ## Regeneration
 

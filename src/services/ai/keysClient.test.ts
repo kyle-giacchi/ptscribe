@@ -1,13 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  getUserKeys,
-  getOrgKeys,
-  putUserKey,
-  deleteUserKey,
-  verifyUserKey,
-  putOrgKey,
-  deleteOrgKey,
-} from './keysClient';
+import { getUserKeys, getOrgKeys, keyOps } from './keysClient';
 import { apiFetch } from '@/lib/apiClient';
 
 vi.mock('@/lib/apiClient', () => ({
@@ -48,7 +40,10 @@ describe('getUserKeys', () => {
   });
 });
 
-describe('putUserKey', () => {
+const user = keyOps('user');
+const org = keyOps('org');
+
+describe('put', () => {
   it('returns ok + masked status on success', async () => {
     mockApiFetch.mockResolvedValueOnce(
       jsonResponse(200, {
@@ -60,7 +55,7 @@ describe('putUserKey', () => {
         verifiedAt: 9,
       }),
     );
-    const result = await putUserKey('openai', 'sk-test');
+    const result = await user.put('openai', 'sk-test');
     expect(result).toEqual({
       ok: true,
       status: { provider: 'openai', set: true, last4: '1234', status: 'verified', verifiedAt: 9 },
@@ -71,17 +66,17 @@ describe('putUserKey', () => {
     mockApiFetch.mockResolvedValueOnce(
       jsonResponse(400, { code: 'KEY_REJECTED', error: 'rejected' }),
     );
-    const result = await putUserKey('anthropic', 'bad');
+    const result = await user.put('anthropic', 'bad');
     expect(result).toMatchObject({ ok: false, code: 'KEY_REJECTED' });
   });
 });
 
-describe('deleteUserKey / verifyUserKey', () => {
+describe('delete / verify', () => {
   it('delete returns an unset status', async () => {
     mockApiFetch.mockResolvedValueOnce(
       jsonResponse(200, { ok: true, provider: 'google', set: false }),
     );
-    const result = await deleteUserKey('google');
+    const result = await user.remove('google');
     expect(result).toEqual({
       ok: true,
       status: { provider: 'google', set: false, last4: null, status: 'unset', verifiedAt: null },
@@ -90,7 +85,7 @@ describe('deleteUserKey / verifyUserKey', () => {
 
   it('verify surfaces NO_KEY when nothing is stored', async () => {
     mockApiFetch.mockResolvedValueOnce(jsonResponse(404, { code: 'NO_KEY', error: 'none' }));
-    const result = await verifyUserKey('anthropic');
+    const result = await user.verify('anthropic');
     expect(result).toMatchObject({ ok: false, code: 'NO_KEY' });
   });
 });
@@ -102,20 +97,20 @@ describe('org scope hits the org endpoints', () => {
     expect(mockApiFetch.mock.calls[0][0]).toBe('/api/keys/org');
   });
 
-  it('putOrgKey PUTs to /api/keys/org', async () => {
+  it('org.put PUTs to /api/keys/org', async () => {
     mockApiFetch.mockResolvedValueOnce(
       jsonResponse(200, { ok: true, provider: 'anthropic', set: true, last4: 'abcd' }),
     );
-    await putOrgKey('anthropic', 'sk-ant-x');
+    await org.put('anthropic', 'sk-ant-x');
     expect(mockApiFetch.mock.calls[0][0]).toBe('/api/keys/org');
     expect(mockApiFetch.mock.calls[0][1]?.method).toBe('PUT');
   });
 
-  it('deleteOrgKey DELETEs against /api/keys/org with the provider query', async () => {
+  it('org.remove DELETEs against /api/keys/org with the provider query', async () => {
     mockApiFetch.mockResolvedValueOnce(
       jsonResponse(200, { ok: true, provider: 'google', set: false }),
     );
-    await deleteOrgKey('google');
+    await org.remove('google');
     expect(mockApiFetch.mock.calls[0][0]).toBe('/api/keys/org?provider=google');
     expect(mockApiFetch.mock.calls[0][1]?.method).toBe('DELETE');
   });

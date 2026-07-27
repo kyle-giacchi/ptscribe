@@ -11,14 +11,3 @@ export const duration = {
   slow: 0.5,
   hero: 0.8,
 } as const;
-
-export const fadeIn = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -4 },
-  transition: { duration: duration.base, ease: ease.enter },
-} as const;
-
-export const stagger = (children = 0.04) => ({
-  animate: { transition: { staggerChildren: children } },
-});

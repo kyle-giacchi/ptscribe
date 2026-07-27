@@ -46,9 +46,5 @@ const backends: Record<TranscriptionProvider, Backend> = {
 };
 
 export async function transcribe(args: TranscribeArgs): Promise<TranscribeResult> {
-  const backend = backends[args.provider];
-  if (!backend) {
-    throw new Error(`Unknown transcription provider: ${args.provider}`);
-  }
-  return backend(args);
+  return backends[args.provider](args);
 }

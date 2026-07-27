@@ -14,7 +14,7 @@ const BASE_KEYS = {
 } as const;
 
 /** Suffix a base key with the active profile id (`ptnotes.appData:local`, …). */
-export function scopedKey(base: string): string {
+function scopedKey(base: string): string {
   return `${base}:${getActiveProfileId()}`;
 }
 
