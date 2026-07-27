@@ -1,27 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wordCount, formatDuration } from './format';
-
-describe('wordCount', () => {
-  it('returns 0 for an empty string', () => {
-    expect(wordCount('')).toBe(0);
-  });
-
-  it('returns 0 for whitespace-only string', () => {
-    expect(wordCount('   ')).toBe(0);
-  });
-
-  it('returns 1 for a single word', () => {
-    expect(wordCount('hello')).toBe(1);
-  });
-
-  it('counts words correctly with normal spacing', () => {
-    expect(wordCount('the quick brown fox')).toBe(4);
-  });
-
-  it('counts correctly with extra internal whitespace', () => {
-    expect(wordCount('  two   words  ')).toBe(2);
-  });
-});
+import { formatDuration } from './format';
 
 describe('formatDuration', () => {
   it('returns "00:00" for zero seconds', () => {

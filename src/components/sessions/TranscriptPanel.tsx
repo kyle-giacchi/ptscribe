@@ -10,6 +10,7 @@ import {
   EyeOff,
   PanelRightClose,
   Loader2,
+  Info,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
@@ -143,7 +144,10 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
   const effectiveEditMode = editMode || (isEmpty && !transcribing);
 
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+    >
       {pendingOverwrite && (
         <ConfirmBanner
           message="This will replace your edited transcript."
@@ -158,18 +162,40 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
 
       <div
         className="overflow-hidden rounded-lg border"
-        style={{ borderColor: 'var(--color-pt-border)' }}
+        style={{
+          borderColor: 'var(--color-pt-border)',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+        }}
       >
         {/* Header — Row 1 (tier + actions) */}
         <div
           className="flex flex-wrap items-center gap-2"
-          style={{ padding: '12px 20px 8px', background: 'var(--color-pt-surface-alt)' }}
+          style={{ padding: '12px 16px', background: 'var(--color-pt-surface)' }}
         >
           <span
-            className="text-xs font-semibold tracking-wide uppercase"
-            style={{ color: 'var(--color-fg-muted)' }}
+            title={
+              tier === 'modified'
+                ? 'This transcript has been manually edited.'
+                : tier === 'cloud'
+                  ? 'Transcribed with cloud AI (speaker diarization).'
+                  : 'Transcribed on-device.'
+            }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 22,
+              height: 22,
+              borderRadius: 999,
+              border: '1px solid var(--color-pt-border)',
+              color: 'var(--color-fg-subtle)',
+              flexShrink: 0,
+            }}
           >
-            Transcript
+            <Info size={12} strokeWidth={2} />
           </span>
           {tier && <TierChip tier={tier} />}
           {transcript.trim() && (
@@ -181,32 +207,38 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
           <div style={{ flex: 1 }} />
 
           {hasEditedTranscript && onRevertEdits && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: 12 }}
+            <PillButton
               onClick={onRevertEdits}
               title="Clear your edits and show the original transcript."
             >
               <RotateCcw size={13} strokeWidth={2} /> Revert edits
-            </button>
+            </PillButton>
           )}
           {hasT2Transcript && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: 12 }}
+            <PillButton
               onClick={onRevertToLocal}
               title="Restore the on-device draft transcript captured while you were recording."
             >
               <RotateCcw size={13} strokeWidth={2} /> Revert to draft transcript
-            </button>
+            </PillButton>
+          )}
+          {onOpenPIIScrub && transcript.trim() && (
+            <PillButton onClick={onOpenPIIScrub}>
+              <EyeOff size={13} strokeWidth={2} /> Scrub
+            </PillButton>
+          )}
+          {transcript.trim() && (
+            <PillButton
+              onClick={() => setEditMode((m) => !m)}
+              active={editMode}
+              title={editMode ? 'Switch to formatted view' : 'Edit transcript'}
+            >
+              <Edit3 size={13} strokeWidth={2} /> Edit
+            </PillButton>
           )}
           {canImproveWithAI && transcript.trim() && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: 12 }}
+            <PillButton
+              accent
               disabled={transcribing || Boolean(cloudDisabledReason)}
               onClick={handleCreateClick}
               title={
@@ -220,20 +252,10 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                 </>
               ) : (
                 <>
-                  <Wand2 size={13} strokeWidth={2} /> Improve with AI
+                  <Wand2 size={13} strokeWidth={2} /> Improve
                 </>
               )}
-            </button>
-          )}
-          {onOpenPIIScrub && transcript.trim() && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: 12 }}
-              onClick={onOpenPIIScrub}
-            >
-              <EyeOff size={13} strokeWidth={2} /> Scrub PII
-            </button>
+            </PillButton>
           )}
 
           {onCopyTranscript && transcript.trim() && (
@@ -245,18 +267,6 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
               aria-label="Copy transcript"
             >
               <Copy size={13} strokeWidth={2} />
-            </button>
-          )}
-          <div style={{ width: 1, height: 18, background: 'var(--color-pt-border)' }} aria-hidden />
-          {transcript.trim() && (
-            <button
-              type="button"
-              className="btn btn-ghost p-1.5"
-              title={editMode ? 'Switch to formatted view' : 'Edit transcript'}
-              onClick={() => setEditMode((m) => !m)}
-              style={{ color: editMode ? 'var(--color-pt-accent)' : 'var(--color-fg-subtle)' }}
-            >
-              <Edit3 size={13} strokeWidth={2} />
             </button>
           )}
           <button
@@ -275,18 +285,18 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
         {!effectiveEditMode && (
           <div
             style={{
-              padding: '0 20px 12px',
-              background: 'var(--color-pt-surface-alt)',
+              padding: '0 16px 12px',
+              background: 'var(--color-pt-surface)',
               borderBottom: '1px solid var(--color-pt-border)',
             }}
           >
-            <div className="relative flex items-center" style={{ maxWidth: 280 }}>
+            <div className="relative flex items-center" style={{ maxWidth: '100%' }}>
               <Search
-                size={12}
+                size={13}
                 strokeWidth={2}
                 style={{
                   position: 'absolute',
-                  left: 7,
+                  left: 10,
                   color: 'var(--color-fg-subtle)',
                   pointerEvents: 'none',
                 }}
@@ -300,8 +310,8 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                   setSearchQuery(e.target.value);
                   setMatchIndex(0);
                 }}
-                className="input h-7 py-0 text-xs"
-                style={{ paddingLeft: 24, paddingRight: searchQuery ? 56 : 8, width: '100%' }}
+                className="input h-9 py-0 text-sm"
+                style={{ paddingLeft: 30, paddingRight: searchQuery ? 56 : 8, width: '100%' }}
               />
               {searchQuery && (
                 <>
@@ -352,7 +362,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
         )}
 
         {/* Body */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           {effectiveEditMode ? (
             <>
               {!isEmpty && (
@@ -409,7 +419,9 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                   borderRight: 'none',
                   borderBottom: 'none',
                   borderTop: '1px solid var(--color-pt-border)',
-                  height: 'max(320px, calc(100vh - 300px))',
+                  flex: 1,
+                  minHeight: 320,
+                  resize: 'none',
                 }}
                 placeholder="Speak while recording, paste in a transcript, or type freely."
                 value={displayTranscript}
@@ -429,6 +441,47 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function PillButton({
+  children,
+  onClick,
+  title,
+  disabled,
+  active,
+  accent,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title?: string;
+  disabled?: boolean;
+  active?: boolean;
+  accent?: boolean;
+}) {
+  const on = active || accent;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="inline-flex items-center"
+      style={{
+        gap: 5,
+        padding: '5px 10px',
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        border: `1px solid ${on ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
+        background: on ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
+        color: on ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
+        opacity: disabled ? 0.55 : 1,
+        cursor: disabled ? 'default' : 'pointer',
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -524,7 +577,7 @@ function FormattedTranscriptView({
     <div
       ref={rootRef}
       className="space-y-3 overflow-y-auto px-4 py-3"
-      style={{ maxHeight: 460, fontSize: 13, lineHeight: '1.7' }}
+      style={{ flex: 1, minHeight: 320, fontSize: 13, lineHeight: '1.7' }}
     >
       {segments.map((seg, si) => (
         <div key={si} data-ts={seg.estimatedSec ?? si * 60}>

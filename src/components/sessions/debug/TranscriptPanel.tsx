@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, Cpu, Mic, Pencil, Sparkles } from 'lucide-react';
 import type { Session } from '@/types';
-import { wordCount } from '@/lib/debug/env';
+import { wordCount } from '@/lib/clinical/transcript';
 import { CollapsibleSection, useCopy } from './atoms';
 
 /**

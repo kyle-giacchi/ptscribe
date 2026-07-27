@@ -44,7 +44,7 @@ describe('wordCount', () => {
 
   it('returns 0 for falsy input', () => {
     expect(wordCount(null as unknown as string)).toBe(0);
-    expect(wordCount(undefined as unknown as string)).toBe(0);
+    expect(wordCount(undefined)).toBe(0);
   });
 
   it('returns 1 for a single word', () => {
@@ -53,5 +53,13 @@ describe('wordCount', () => {
 
   it('counts words correctly', () => {
     expect(wordCount('Patient reports left knee pain')).toBe(5);
+  });
+
+  it('returns 0 for a whitespace-only string', () => {
+    expect(wordCount('   ')).toBe(0);
+  });
+
+  it('ignores extra internal whitespace', () => {
+    expect(wordCount('  two   words  ')).toBe(2);
   });
 });

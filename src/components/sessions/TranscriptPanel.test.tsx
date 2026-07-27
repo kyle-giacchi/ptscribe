@@ -27,7 +27,7 @@ describe('TranscriptPanel Improve-with-AI in demo mode', () => {
         cloudDisabledReason="Cloud transcription is disabled in demo mode."
       />,
     );
-    const btn = screen.getByRole('button', { name: /improve with ai/i });
+    const btn = screen.getByRole('button', { name: /improve/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute('title', 'Cloud transcription is disabled in demo mode.');
   });

@@ -1,3 +1,4 @@
+import { wordCount } from '@/lib/clinical/transcript';
 import type { SessionClip } from '@/types';
 
 export interface TranscriptSegment {
@@ -98,10 +99,6 @@ export function parseChunkedTranscript(clips: SessionClip[]): TranscriptSegment[
   }
 
   return segments.length > 0 ? segments : null;
-}
-
-function wordCount(s: string): number {
-  return s.trim() === '' ? 0 : s.trim().split(/\s+/).length;
 }
 
 function normalise(raw: string): string {

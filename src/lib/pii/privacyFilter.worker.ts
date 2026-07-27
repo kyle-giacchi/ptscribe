@@ -121,9 +121,7 @@ async function cachePut(key: string, entry: CacheEntry): Promise<void> {
 
 type PipelineDtype = 'q8' | 'q4' | 'q4f16' | 'fp16' | 'fp32' | 'int8' | 'uint8';
 
-type InMsg =
-  | { id: number; type: 'preload'; model: string; dtype?: PipelineDtype }
-  | { id: number; type: 'scrub'; text: string; model: string; dtype?: PipelineDtype };
+type InMsg = { id: number; type: 'scrub'; text: string; model: string; dtype?: PipelineDtype };
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
@@ -190,11 +188,6 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
         'Privacy model load timed out — check network and try again',
       );
       currentModel = model;
-    }
-
-    if (msg.type === 'preload') {
-      post({ id, type: 'result', scrubbed: '', entityCount: 0, spans: [] });
-      return;
     }
 
     const raw = await (

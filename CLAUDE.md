@@ -24,7 +24,7 @@
 | Default local transcription model?       | `Xenova/whisper-tiny.en` — see `src/services/ai/client/localWhisper.ts`. Model files served from R2 at `/api/model/*`; falls back to HuggingFace if R2 is empty. Pre-populate with `npx tsx scripts/seed-r2-models.ts`.                                                                                             |
 | Default note generation model?           | `claude-sonnet-4-6` (Anthropic) via `/api/generate`; the browser never sees provider credentials.                                                                                                                                                                                                                   |
 | All models, caching strategy, R2 seeding | [architecture.md — AI model catalog](docs/architecture.md#ai-model-catalog) — catalog, download/IDB/R2 layers, `dtype: 'q8'` requirement for privacy filter, seeding runbook                                                                                                                                        |
-| ID generation?                           | Always `newId()` from `src/utils/ids.ts` (UUID); never timestamps                                                                                                                                                                                                                                                   |
+| ID generation?                           | `crypto.randomUUID()` inline; never timestamps                                                                                                                                                                                                                                                                      |
 | Where is data encrypted?                 | Inside `DataRepository` (AppData) and `AudioRepository` (audio Blobs + chunks). AES-GCM via `src/lib/vault/`. ([invariants.md — Vault](docs/invariants.md#vault-and-at-rest-encryption))                                                                                                                            |
 | Who owns the wake lock during recording? | `useRecorder` — released on stop/reset/error/unmount. ([invariants.md — Recorder lifecycle](docs/invariants.md#recorder-lifecycle-wake-lock--visibility))                                                                                                                                                           |
 | Demo mode build flag?                    | `VITE_DEMO_MODE=false` to disable. Default is **ON** — auto-unlocks vault with a hardcoded passphrase, skips first-run wizard, seeds a demo patient. **Cloud transcription (Nova) is hard-disabled in demo mode**; T2 local Whisper and Anthropic note generation remain on. Must be `false` for production builds. |
@@ -36,20 +36,11 @@
 
 ## Commands
 
+Standard scripts are in `package.json`. The non-obvious ones:
+
 ```
-npm run dev              Dev server on port 8080
-npm run build            Production build
-npm run build:dev        Dev-mode build (no minification)
-npm run lint             ESLint. Target: 0 errors. Note: pre-commit hook runs typecheck + vitest but NOT lint — run this manually before PRs.
-npm run format           Prettier write
-npm run format:check     Prettier check (CI gate)
-npm run preview          Preview production build locally
-npm run typecheck        tsc --noEmit -p tsconfig.app.json  <- NOT root tsconfig.json
-npm run test             Vitest (jsdom)
-npm run test:coverage    Vitest with v8 coverage
-npm run test:e2e         Playwright E2E
-npm run test:e2e:ui      Playwright interactive UI mode
-npm run test:e2e:update  Update Playwright snapshots
+npm run lint       ESLint. Target: 0 errors. Note: pre-commit hook runs typecheck + vitest but NOT lint — run this manually before PRs.
+npm run typecheck  tsc --noEmit -p tsconfig.app.json  <- NOT root tsconfig.json
 
 npx tsx scripts/seed-r2-models.ts   Pre-populate R2 with Whisper model files (run once before first deploy)
 ```

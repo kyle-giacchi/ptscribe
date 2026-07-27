@@ -43,30 +43,26 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
-/** Fetch the masked status for every provider (or signinRequired on a 401). */
-export async function getUserKeys(): Promise<KeyListResult> {
-  const res = await apiFetch('/api/keys/user', { method: 'GET' }, { interceptGate: false });
-  if (res.status === 401) return { signinRequired: true };
-  const body = await readJson(res);
-  const keys = Array.isArray(body.keys) ? (body.keys as KeyStatus[]) : [];
-  return { signinRequired: false, keys };
-}
+/** Key owner: a clinician's personal keys vs. the org's shared keys. */
+export type KeyScope = 'user' | 'org';
+const scopeBase = (scope: KeyScope) => (scope === 'org' ? '/api/keys/org' : '/api/keys/user');
 
 /**
- * Fetch the org's masked key status (any member may read it — used only as an
- * onboarding hint: "your organization provides a key"). Never returns a key.
+ * Fetch the masked status for every provider (or signinRequired when the caller
+ * can't read them). Any org member may read the org's statuses — it is only an
+ * onboarding hint ("your organization provides a key"), never a key.
  */
-export async function getOrgKeys(): Promise<KeyListResult> {
-  const res = await apiFetch('/api/keys/org', { method: 'GET' }, { interceptGate: false });
+async function getKeys(scope: KeyScope): Promise<KeyListResult> {
+  const res = await apiFetch(scopeBase(scope), { method: 'GET' }, { interceptGate: false });
+  // 403 = signed in but not in the org; same "you can't see these" outcome as a 401.
   if (res.status === 401 || res.status === 403) return { signinRequired: true };
   const body = await readJson(res);
   const keys = Array.isArray(body.keys) ? (body.keys as KeyStatus[]) : [];
   return { signinRequired: false, keys };
 }
 
-/** Key owner: a clinician's personal keys vs. the org's shared keys. */
-export type KeyScope = 'user' | 'org';
-const scopeBase = (scope: KeyScope) => (scope === 'org' ? '/api/keys/org' : '/api/keys/user');
+export const getUserKeys = () => getKeys('user');
+export const getOrgKeys = () => getKeys('org');
 
 /** Live-validate + store a key. The server rejects an invalid key (it is NOT stored). */
 async function putKey(
@@ -118,14 +114,6 @@ async function verifyKey(scope: KeyScope, provider: KeyProvider): Promise<KeyMut
   if (!res.ok) return NOT_OK(res, body);
   return { ok: true, status: maskFrom(provider, body) };
 }
-
-export const putUserKey = (provider: KeyProvider, key: string) => putKey('user', provider, key);
-export const deleteUserKey = (provider: KeyProvider) => deleteKey('user', provider);
-export const verifyUserKey = (provider: KeyProvider) => verifyKey('user', provider);
-
-export const putOrgKey = (provider: KeyProvider, key: string) => putKey('org', provider, key);
-export const deleteOrgKey = (provider: KeyProvider) => deleteKey('org', provider);
-export const verifyOrgKey = (provider: KeyProvider) => verifyKey('org', provider);
 
 /** Mutation trio for a scope — lets a shared component (ProviderKeyCard) drive either owner. */
 export interface KeyOps {

@@ -14,7 +14,7 @@ export function normalizeTranscript(raw: string): string {
 /**
  * Word count — used for UI hints ("transcript looks short").
  */
-export function wordCount(s: string): number {
+export function wordCount(s?: string): number {
   if (!s) return 0;
   return s.trim().split(/\s+/).filter(Boolean).length;
 }

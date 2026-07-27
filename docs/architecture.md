@@ -15,7 +15,7 @@ src/
   components/     common/ — AppShell, GlobalTopNav, PatientQuickSearch, TopNavControls (AlertsButton/
                             VaultPill/ProfileButton — exported for GlobalTopNav reuse),
                             Sidebar (scoped to /today only), AudioFileInput, ErrorBanner,
-                            ConfirmBanner, Modal, Field, PageHeader
+                            ConfirmBanner, Modal, Field
                   sessions/ — Session page panels:
                     SessionTopBar (chrome row: back-to-chart, breadcrumb, AddClipButton,
                       Audio clips toggle, Sign & export),
@@ -23,7 +23,7 @@ src/
                     RecordingPanel, TranscriptPanel (seekSignal prop drives clip timestamp scroll),
                     PIIScrubModal (owned usePrivacyFilter; lazy scan + inline diff),
                     NoteToolbar (Template, Modifier, Copy, Generate/Regenerate), NotePanel,
-                    plus small extracts: RecordWarningBanner, ReviewEmptyState,
+                    plus small extracts: ReviewEmptyState,
                     TranscriptCollapsedTab, ResetSessionModal, UploadProcessingView
   types/          Domain types (index.ts)
   schemas/        Zod schemas mirroring types + defaultAppData factory

@@ -192,8 +192,6 @@ export default defineConfig({
           if (id.includes('@react-pdf')) return 'vendor-pdf';
           // Rich-text editor
           if (id.includes('@tiptap') || id.includes('tiptap-markdown')) return 'vendor-editor';
-          // Data visualisation
-          if (id.includes('@visx')) return 'vendor-charts';
         },
       },
     },

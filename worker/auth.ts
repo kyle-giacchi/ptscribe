@@ -52,6 +52,16 @@ export function createAuth(env: Env, ctx: ExecutionContext) {
         rpID,
         rpName: 'PTScribe',
         origin: baseURL,
+        // Discoverable (resident) credentials are non-negotiable here: Login.tsx
+        // signs in with no email typed, so the authenticator must be able to
+        // enumerate the credential itself. The plugin default is 'preferred',
+        // which silently yields non-discoverable keys on some authenticators —
+        // those register fine and are then invisible at sign-in.
+        authenticatorSelection: {
+          residentKey: 'required',
+          requireResidentKey: true,
+          userVerification: 'preferred',
+        },
       }),
       magicLink({
         expiresIn: 600,
