@@ -6,7 +6,7 @@ import {
   LOCAL_WHISPER_DEFAULT_MODEL,
   WhisperExhaustedError,
 } from '@/services/ai/client/localWhisper';
-import { promoteTier } from '@/services/transcript/promoteTier';
+import { applyTierWrite } from '@/services/transcript/promoteTier';
 import { findSpeechRangesML } from '@/lib/audio/vadML';
 import { extractRanges } from '@/lib/audio/silenceTrim';
 import { DEFAULT_VAD_OPTIONS } from '@/lib/audio/vad';
@@ -185,15 +185,20 @@ export function useBackgroundTranscription({
         // so no stale setTranscript/patchSession/setPhase write occurs.
         if (controller.signal.aborted) return;
         if (result.ok) {
-          // promoteTier owns the ordering rule: a fresh T2 may not clobber a
+          // applyTierWrite owns the ordering rule: a fresh T2 may not clobber a
           // higher tier (T3) that produced output while Whisper was processing.
-          const promo = promoteTier(sessionRef.current ?? {}, { tier: 't2', text: result.text });
-          if (!promo) {
+          // It also clears editedTranscript so a stale scrub/edit can't shadow
+          // this fresh result.
+          const patch = applyTierWrite(sessionRef.current ?? {}, {
+            tier: 't2',
+            text: result.text,
+          });
+          if (!patch) {
             setPhase('done');
             return;
           }
           setTranscript(result.text);
-          patchSession({ ...promo, t2Transcript: result.text });
+          patchSession(patch);
           setPhase('done');
         } else if (result.error !== 'Aborted.') {
           // Content error (no speech, too short) — notify and treat as done

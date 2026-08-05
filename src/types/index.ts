@@ -212,7 +212,9 @@ export type AiErrorEntryKind =
   | 'no_key'
   | 'key_rejected'
   | 'provider_limited'
-  | 'signin_required';
+  | 'signin_required'
+  | 'service_unavailable'
+  | 'demo_disabled';
 
 /**
  * One persisted AI-call failure. Transport failures store lean metadata only;

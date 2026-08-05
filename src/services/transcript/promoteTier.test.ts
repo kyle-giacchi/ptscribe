@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { promoteTier } from './promoteTier';
+import { promoteTier, applyTierWrite, demoteTier } from './promoteTier';
 
 // promoteTier owns the single ordering rule for machine transcript tiers:
 // t1 < t2 < t3, and a freshly produced tier may never clobber a higher tier
@@ -58,5 +58,64 @@ describe('promoteTier', () => {
       transcript: 'local',
       activeTranscriptTier: 't2',
     });
+  });
+});
+
+describe('applyTierWrite', () => {
+  it('returns the complete patch: baseline, freeze field, and edit clear', () => {
+    expect(applyTierWrite(empty, { tier: 't2', text: 'hello' })).toEqual({
+      transcript: 'hello',
+      activeTranscriptTier: 't2',
+      editedTranscript: undefined,
+      t2Transcript: 'hello',
+    });
+  });
+
+  it('blocks like promoteTier when a higher tier already ran (the T2-never-clears bug)', () => {
+    // Regression: T2 previously wrote its patch without editedTranscript, so a
+    // stale scrubbed/edited transcript could shadow a fresh T2 result. A blocked
+    // write must return null outright — no partial patch to apply.
+    expect(
+      applyTierWrite({ ...empty, t3Transcript: 'cloud' }, { tier: 't2', text: 'local' }),
+    ).toBeNull();
+  });
+
+  it('uses a separate freeze value when the tier field differs from the baseline text', () => {
+    expect(
+      applyTierWrite(empty, { tier: 't1', text: 'compiled baseline', freeze: 'live-only join' }),
+    ).toEqual({
+      transcript: 'compiled baseline',
+      activeTranscriptTier: 't1',
+      editedTranscript: undefined,
+      t1Transcript: 'live-only join',
+    });
+  });
+
+  it('omits the tier field from the patch when freeze is falsy', () => {
+    expect(applyTierWrite(empty, { tier: 't1', text: 'compiled baseline', freeze: '' })).toEqual({
+      transcript: 'compiled baseline',
+      activeTranscriptTier: 't1',
+      editedTranscript: undefined,
+    });
+  });
+});
+
+describe('demoteTier', () => {
+  it('prefers t2 over t1 when both are frozen', () => {
+    expect(demoteTier({ t1Transcript: 'live', t2Transcript: 'whisper' })).toEqual({
+      tier: 't2',
+      text: 'whisper',
+    });
+  });
+
+  it('falls back to t1 when t2 is absent', () => {
+    expect(demoteTier({ t1Transcript: 'live', t2Transcript: undefined })).toEqual({
+      tier: 't1',
+      text: 'live',
+    });
+  });
+
+  it('returns null when no local tier has frozen output', () => {
+    expect(demoteTier({ t1Transcript: undefined, t2Transcript: '   ' })).toBeNull();
   });
 });

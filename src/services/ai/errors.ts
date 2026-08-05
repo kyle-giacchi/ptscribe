@@ -9,7 +9,9 @@ export type AiErrorKind =
   | 'no_key' // 402 NO_KEY — no provider key stored for the active provider
   | 'key_rejected' // 401 KEY_REJECTED — the user's provider rejected their key
   | 'provider_limited' // 429 PROVIDER_LIMITED — the user's provider rate-limited / out of credit
-  | 'signin_required'; // 401 SIGNIN_REQUIRED — not authenticated (BYOK requires a session)
+  | 'signin_required' // 401 SIGNIN_REQUIRED — not authenticated (BYOK requires a session)
+  | 'service_unavailable' // 503 KEY_ENC_UNAVAILABLE — deterministic server misconfig, not a network blip
+  | 'demo_disabled'; // 403 DEMO_DISABLED — cloud transcription is off in demo mode
 
 export type AiProvider = 'anthropic' | 'nova' | 'openai' | 'google';
 
@@ -53,6 +55,8 @@ const CODE_TO_KIND: Record<string, AiErrorKind> = {
   KEY_REJECTED: 'key_rejected',
   PROVIDER_LIMITED: 'provider_limited',
   SIGNIN_REQUIRED: 'signin_required',
+  KEY_ENC_UNAVAILABLE: 'service_unavailable',
+  DEMO_DISABLED: 'demo_disabled',
 };
 
 export function classifyError(code: string | undefined, res: Response): AiErrorKind {
@@ -145,6 +149,20 @@ export function friendlyAiError(err: AiCallError): FriendlyAiError {
           'Note generation with your own provider key requires an account. Sign in and try again.',
         action: 'signin',
         actionLabel: 'Sign in',
+      };
+    case 'service_unavailable':
+      return {
+        title: 'Service temporarily unavailable',
+        description: "We're having a server-side issue. Please wait a moment and try again.",
+        action: 'wait',
+        actionLabel: 'Try again',
+      };
+    case 'demo_disabled':
+      return {
+        title: 'Disabled in demo mode',
+        description: 'Cloud transcription is turned off in this demo. Try the on-device option.',
+        action: 'retry',
+        actionLabel: 'OK',
       };
   }
 }

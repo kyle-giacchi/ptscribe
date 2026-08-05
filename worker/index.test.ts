@@ -108,7 +108,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-async function body(res: Response): Promise<{ code?: string; error?: string; text?: string }> {
+async function body(
+  res: Response,
+): Promise<{ code?: string; error?: string; text?: string; retryable?: boolean }> {
   return JSON.parse(await res.text());
 }
 
@@ -282,7 +284,9 @@ describe('Demo Nova hard-disable', () => {
       ctx,
     );
     expect(res.status).toBe(403);
-    expect((await body(res)).code).toBe('DEMO_DISABLED');
+    const parsed = await body(res);
+    expect(parsed.code).toBe('DEMO_DISABLED');
+    expect(parsed.retryable).toBe(false);
     expect(env.AI.run).not.toHaveBeenCalled();
   });
 

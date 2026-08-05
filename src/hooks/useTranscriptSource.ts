@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import type { Dispatch } from 'react';
 import { toast } from 'sonner';
-import { transcribe } from '@/services/ai/transcribe';
-import { promoteTier } from '@/services/transcript/promoteTier';
+import { transcribeWithCloudflare } from '@/services/ai/client/cloudflare';
+import { applyTierWrite, demoteTier } from '@/services/transcript/promoteTier';
 import { AiCallError, friendlyAiError } from '@/services/ai/errors';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { runAiCall } from './ai/runAiCall';
@@ -126,9 +126,8 @@ export function useTranscriptSource({
             }
           }
 
-          const result = await transcribe({
-            blob: blobToSend,
-            provider: 'cloudflare',
+          const result = await transcribeWithCloudflare({
+            audio: blobToSend,
             model: '@cf/deepgram/nova-3',
             signal,
             onRetry: (info) =>
@@ -145,17 +144,17 @@ export function useTranscriptSource({
           if (text) {
             setBaseline(text);
             clearEdited();
-            // T3 is the top tier — promoteTier never blocks it; the fallback is
-            // defensive only. t3Transcript frozen here; t2 preserved untouched.
-            const promo = promoteTier(session, { tier: 't3', text }) ?? {
+            // T3 is the top tier — applyTierWrite never blocks it; the fallback
+            // is defensive only. t3Transcript frozen here; t2 preserved untouched.
+            const patch = applyTierWrite(session, { tier: 't3', text }) ?? {
               transcript: text,
               activeTranscriptTier: 't3' as const,
+              editedTranscript: undefined,
+              t3Transcript: text,
             };
             patchSession({
-              ...promo,
-              t3Transcript: text,
+              ...patch,
               status: 'draft',
-              editedTranscript: undefined,
               cloudTranscribeCount: spent + 1,
             });
             recordAction('transcribe');
@@ -238,15 +237,13 @@ export function useTranscriptSource({
   );
 
   const revertToLocal = useCallback(() => {
-    const t2 = session?.t2Transcript;
-    const t1 = session?.t1Transcript;
-    const text = t2 || t1;
-    if (text?.trim()) {
-      setBaseline(text);
+    const demoted = demoteTier(session ?? {});
+    if (demoted) {
+      setBaseline(demoted.text);
       clearEdited();
       patchSession({
-        transcript: text,
-        activeTranscriptTier: t2 ? 't2' : 't1',
+        transcript: demoted.text,
+        activeTranscriptTier: demoted.tier,
         editedTranscript: undefined,
       });
       toast.success('Reverted to local transcription.');

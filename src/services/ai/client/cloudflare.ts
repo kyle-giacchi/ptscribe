@@ -18,7 +18,7 @@
  */
 
 import { apiFetch } from '@/lib/apiClient';
-import { AiCallError, classifyResponse } from '../errors';
+import { AiCallError, classifyError } from '../errors';
 import { retryFetch, safeReadText } from './retryFetch';
 
 export interface CloudflareWhisperArgs {
@@ -67,9 +67,11 @@ export async function transcribeWithCloudflare(
   );
 
   if (!response.ok) {
-    const detail = (await safeReadText(response)) || response.statusText;
+    const raw = await safeReadText(response);
+    const detail = raw || response.statusText;
+    // Worker codes (DEMO_DISABLED, KEY_ENC_UNAVAILABLE, …) carry meaning status alone can't.
     throw new AiCallError({
-      kind: classifyResponse(response, 'nova'),
+      kind: classifyError(parseErrorCode(raw), response),
       provider: 'nova',
       status: response.status,
       attemptsMade: attempts,
@@ -90,4 +92,14 @@ export async function transcribeWithCloudflare(
     });
   }
   return { text: data.text };
+}
+
+/** Pull the Worker's `{ code }` discriminator out of an error body, if present. */
+function parseErrorCode(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown };
+    return typeof parsed.code === 'string' ? parsed.code : undefined;
+  } catch {
+    return undefined;
+  }
 }

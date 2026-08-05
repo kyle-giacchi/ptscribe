@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Copy, Pencil, Trash2, Lock, Plus, Star, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '@/components/ui/Modal';
@@ -6,8 +6,8 @@ import { Field, TextInput, Select } from '@/components/ui/Field';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { DIARIZATION_NOTE, NO_DIARIZATION_NOTE, NO_PII_RULE } from '@/lib/clinical/promptAppendix';
 import { useTemplates } from '@/contexts/TemplatesProvider';
-import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { useTemplateCatalog } from '@/hooks/useTemplateCatalog';
 import type { NoteFormat, NoteTemplate, NoteTemplateSection } from '@/types';
 
 const FORMAT_LABEL: Record<NoteFormat, string> = {
@@ -22,37 +22,11 @@ const FORMAT_ORDER: NoteFormat[] = ['evaluation', 'soap', 'progress', 'discharge
 const SELECTABLE_FORMATS: NoteFormat[] = ['evaluation', 'soap', 'progress', 'discharge'];
 
 export function Templates() {
-  const { templates, addTemplate, updateTemplate, cloneTemplate, removeTemplate } = useTemplates();
-  const { sharedTemplates } = useOrgConfig();
-  const { settings, updateOrgPolicy } = useSettings();
-  const orgDefaultId = settings.orgPolicy.activeTemplateId;
+  const { addTemplate, updateTemplate, cloneTemplate, removeTemplate } = useTemplates();
+  const { updateOrgPolicy } = useSettings();
+  const { all, orgTemplateIds, defaultTemplateId: orgDefaultId } = useTemplateCatalog();
   const [editing, setEditing] = useState<NoteTemplate | null>(null);
   const [creating, setCreating] = useState(false);
-
-  // Org shared templates are read-only and live only in OrgConfig context (never
-  // in AppData) — like built-ins, but sourced from the org. We merge them into
-  // the list for display; cloning copies them into the user's own library.
-  const orgTemplateIds = useMemo(
-    () => new Set(sharedTemplates.map((t) => t.id)),
-    [sharedTemplates],
-  );
-
-  const cloneFromOrg = useCallback(
-    (src: NoteTemplate): NoteTemplate => {
-      const now = Date.now();
-      const clone: NoteTemplate = {
-        ...src,
-        id: crypto.randomUUID(),
-        name: `${src.name} (copy)`,
-        builtin: false,
-        createdAt: now,
-        updatedAt: now,
-      };
-      addTemplate(clone);
-      return clone;
-    },
-    [addTemplate],
-  );
 
   const grouped = useMemo(() => {
     const buckets: Record<NoteFormat, NoteTemplate[]> = {
@@ -62,20 +36,11 @@ export function Templates() {
       discharge: [],
       custom: [],
     };
-    const localIds = new Set(templates.map((t) => t.id));
-    const merged = [...templates, ...sharedTemplates.filter((t) => !localIds.has(t.id))];
-    for (const t of merged) {
+    for (const t of all) {
       buckets[t.format]?.push(t);
     }
-    for (const fmt of FORMAT_ORDER) {
-      // Built-ins first, then org shared, then user templates — each alpha within.
-      buckets[fmt].sort((a, b) => {
-        const rank = (t: NoteTemplate) => (t.builtin ? 0 : orgTemplateIds.has(t.id) ? 1 : 2);
-        return rank(a) - rank(b) || a.name.localeCompare(b.name);
-      });
-    }
     return buckets;
-  }, [templates, sharedTemplates, orgTemplateIds]);
+  }, [all]);
 
   function handleCreate(format: NoteFormat, name: string) {
     const trimmed = name.trim();
@@ -279,11 +244,9 @@ export function Templates() {
                           iconLeft={<Copy size={12} strokeWidth={2} />}
                           style={{ padding: '6px 10px', fontSize: 12 }}
                           onClick={() => {
-                            const clone = isOrg ? cloneFromOrg(t) : cloneTemplate(t.id);
-                            if (clone) {
-                              toast.success('Template cloned');
-                              setEditing(clone);
-                            }
+                            const clone = cloneTemplate(t);
+                            toast.success('Template cloned');
+                            setEditing(clone);
                           }}
                         >
                           Clone

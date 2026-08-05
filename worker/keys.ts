@@ -21,6 +21,7 @@ import { getProvider, isProviderId, PROVIDER_IDS, type ProviderId } from './prov
 import type { ValidateReason } from './providers';
 import { encryptKey, decryptKey, KeyCryptoError, type EncryptedKey } from './keyCrypto';
 import type { Env } from './index';
+import { isRetryableCode } from './apiErrors';
 
 interface KeyRow {
   provider: string;
@@ -343,5 +344,5 @@ type KeysErrorCode =
   | 'NO_KEY';
 
 function keysError(code: KeysErrorCode, error: string, status: number): Response {
-  return keysJson({ code, error }, status);
+  return keysJson({ code, error, retryable: isRetryableCode(code) }, status);
 }

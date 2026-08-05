@@ -1,7 +1,11 @@
-import type { TranscribeResult } from '../transcribe';
 import { clearModelCache } from '@/lib/audio/modelCache';
 
 export const LOCAL_WHISPER_DEFAULT_MODEL = 'Xenova/whisper-tiny.en';
+
+export interface TranscribeResult {
+  text: string;
+  source: 'whisper' | 'webspeech' | 'manual';
+}
 
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }

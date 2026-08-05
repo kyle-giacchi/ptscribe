@@ -10,14 +10,13 @@ import { useExercises } from '@/contexts/ExercisesProvider';
 import { usePlans } from '@/contexts/PlansProvider';
 import { PatientActivitiesCard } from '@/components/sessions/activities/PatientActivitiesCard';
 import { homeDiffersFromPlan, seedHomeFromPlan } from '@/services/note/activities';
-import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { useTemplateCatalog } from '@/hooks/useTemplateCatalog';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import { useSessionPatcher } from '@/hooks/useSessionPatcher';
-import { useMemo } from 'react';
 import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useResizablePanes } from '@/hooks/useResizablePanes';
@@ -57,17 +56,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getSession, sessions } = useSessions();
   const { getPatient, updatePatient } = usePatients();
   const { forSession } = useNotes();
-  const { templates, getTemplate } = useTemplates();
-  const { sharedTemplates } = useOrgConfig();
+  const { getTemplate } = useTemplates();
   const { settings, updateSession } = useSettings();
   const { patchSession, patchClips, patchClip } = useSessionPatcher(sessionId);
 
-  // Org shared templates resolve here just like local ones (read-only, sourced
+  // Org-shared templates resolve here just like local ones (read-only, sourced
   // from the org) so a session pointing at an org template generates correctly.
-  const allTemplates = useMemo(() => {
-    const localIds = new Set(templates.map((t) => t.id));
-    return [...templates, ...sharedTemplates.filter((t) => !localIds.has(t.id))];
-  }, [templates, sharedTemplates]);
+  const { all: allTemplates } = useTemplateCatalog();
 
   const session = getSession(sessionId);
   const patient = session ? getPatient(session.patientId) : undefined;
@@ -75,7 +70,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const template =
     getTemplate(session?.templateId ?? '') ??
     allTemplates.find((t) => t.id === session?.templateId) ??
-    templates[0];
+    allTemplates[0];
 
   // ── Patient activities (per-visit exercise log) ──────────────────────────
   const { exercises } = useExercises();
