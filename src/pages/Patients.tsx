@@ -1,12 +1,11 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Upload } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
 import {
   Avatar,
-  ComingSoonChip,
   Eyebrow,
   PtButton,
   SegmentedControl,
@@ -253,15 +252,6 @@ function Toolbar({
       </div>
       <SegmentedControl items={STATUS_FILTERS} value={filter} onChange={onFilter} size="sm" />
       <div style={{ flex: 1 }} />
-      <PtButton
-        variant="ghost"
-        iconLeft={<Upload size={14} strokeWidth={2} />}
-        iconRight={<ComingSoonChip />}
-        disabled
-        title="Coming soon"
-      >
-        Import patient
-      </PtButton>
       <PtButton variant="primary" iconLeft={<Plus size={14} strokeWidth={2.4} />} onClick={onAdd}>
         New patient
       </PtButton>

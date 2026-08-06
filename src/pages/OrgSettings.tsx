@@ -133,8 +133,8 @@ export function OrgSettings() {
           >
             Organizations let a practice manage clinicians and shared settings. If you have an
             invite link, open it to join. Account-only settings live in{' '}
-            <Link to="/account" style={{ color: 'var(--color-pt-accent-fg)' }}>
-              Account Settings
+            <Link to="/settings" style={{ color: 'var(--color-pt-accent-fg)' }}>
+              Settings
             </Link>
             .
           </p>

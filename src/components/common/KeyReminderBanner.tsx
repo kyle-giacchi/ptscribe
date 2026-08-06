@@ -46,7 +46,7 @@ export function KeyReminderBanner() {
     >
       <KeyRound size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
       <span style={{ flex: 1 }}>
-        Add your {label} API key to generate notes. Recording and manual notes work without it.
+        Add an API key ({label}) to generate notes. Recording and manual notes work without it.
       </span>
       <button
         type="button"

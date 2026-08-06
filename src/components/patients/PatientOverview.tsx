@@ -5,16 +5,18 @@ import { Eyebrow, Heatmap, PtButton, StatusBadge, SurfaceCard } from '@/componen
 import { DAY_MS, fmtIsoDateOptional, relativeFromNow, startOfDay } from '@/utils/dates';
 import { labelForType } from '@/utils/labels';
 import { daysInCare, dischargePct, adherencePct } from '@/utils/patientMetrics';
-import { PlanEditor } from '@/components/patients/PlanEditor';
-import type { Exercise, Note, Patient, PlanOfCare, Session } from '@/types';
+import { measureDef } from '@/lib/clinical/measures';
+import { buildTrends, formatChange, formatValue } from '@/utils/measureTrend';
+import { MeasureSparkline } from '@/components/patients/MeasureSparkline';
+import type { Exercise, Measurement, Note, Patient, PlanOfCare, Session } from '@/types';
 
 export function PatientOverview({
   patient,
   sessions,
   notes,
   plan,
+  measurements,
   onStartPlan,
-  onUpdatePlan,
   exercises,
   onDelete,
 }: {
@@ -22,8 +24,9 @@ export function PatientOverview({
   sessions: Session[];
   notes: Note[];
   plan: PlanOfCare | undefined;
+  measurements: Measurement[];
   onStartPlan: () => void;
-  onUpdatePlan: (patch: Partial<PlanOfCare>) => void;
+  /** Read-only here — prescriptions are edited on the Plan of care tab. */
   exercises: Exercise[];
   onDelete: () => void;
 }) {
@@ -38,6 +41,10 @@ export function PatientOverview({
     () => [...sessions].sort((a, b) => b.date - a.date).slice(0, 5),
     [sessions],
   );
+
+  // buildTrends already sorts most-recently-measured first, so the top four are
+  // the measures this clinician actually touched last.
+  const topTrends = useMemo(() => buildTrends(measurements).slice(0, 4), [measurements]);
 
   const adherence = useMemo(() => {
     const days = 14;
@@ -173,8 +180,97 @@ export function PatientOverview({
           )}
         </SurfaceCard>
 
+        {/* Latest objective measures. Editing lives on the Measures tab; this is
+            the at-a-glance "is this patient getting better" answer. */}
         <SurfaceCard padding="16px 18px">
-          <Eyebrow>Plan of care</Eyebrow>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Eyebrow>Latest measures</Eyebrow>
+            <Link
+              to={`/patients/${patient.id}/measures`}
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: 'var(--color-pt-accent-fg)',
+                textDecoration: 'none',
+              }}
+            >
+              View all
+            </Link>
+          </div>
+          {topTrends.length === 0 ? (
+            <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+              No measures recorded yet.
+            </p>
+          ) : (
+            <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+              {topTrends.map((t) => {
+                const def = measureDef(t.measureId);
+                return (
+                  <div
+                    key={`${t.measureId}:${t.side ?? ''}`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr auto auto auto',
+                      gap: 12,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+                      {t.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--color-pt-text)',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {formatValue(t.latest.value)}
+                      {def.unit}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        minWidth: 40,
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                        color:
+                          t.direction === true
+                            ? 'var(--color-pt-accent-fg)'
+                            : t.direction === false
+                              ? 'var(--color-pt-red)'
+                              : 'var(--color-pt-text-3)',
+                      }}
+                    >
+                      {formatChange(t.change) || '—'}
+                    </span>
+                    <MeasureSparkline trend={t} width={72} height={22} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SurfaceCard>
+
+        <SurfaceCard padding="16px 18px">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Eyebrow>Plan of care</Eyebrow>
+            {plan && (
+              <Link
+                to={`/patients/${patient.id}/plan`}
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: 'var(--color-pt-accent-fg)',
+                  textDecoration: 'none',
+                }}
+              >
+                Open plan
+              </Link>
+            )}
+          </div>
           {!plan ? (
             <div
               style={{
@@ -193,7 +289,39 @@ export function PatientOverview({
               </PtButton>
             </div>
           ) : (
-            <PlanEditor plan={plan} exercises={exercises} onChange={onUpdatePlan} />
+            <ul style={{ marginTop: 12, display: 'grid', gap: 6 }}>
+              {plan.goals.length === 0 && (
+                <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+                  No goals set yet.
+                </li>
+              )}
+              {plan.goals.slice(0, 4).map((g) => (
+                <li
+                  key={g.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    fontSize: 12.5,
+                    color: g.met ? 'var(--color-pt-text-3)' : 'var(--color-pt-text)',
+                    textDecoration: g.met ? 'line-through' : 'none',
+                  }}
+                >
+                  <span>{g.text}</span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      color: 'var(--color-pt-text-3)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {fmtIsoDateOptional(g.targetDate)}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </SurfaceCard>
 
@@ -226,16 +354,10 @@ export function PatientOverview({
           <Eyebrow>Active home program</Eyebrow>
           {plan && plan.prescriptions.length > 0 ? (
             <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-              {plan.prescriptions.map((rx, i) => {
+              {plan.prescriptions.map((rx) => {
                 const ex = exercises.find((e) => e.id === rx.exerciseId);
-                const isNew = i === 0;
                 return (
-                  <ExRow
-                    key={rx.id}
-                    name={ex?.name ?? 'Unknown exercise'}
-                    dosage={rx.dosage}
-                    isNew={isNew}
-                  />
+                  <ExRow key={rx.id} name={ex?.name ?? 'Unknown exercise'} dosage={rx.dosage} />
                 );
               })}
             </div>
@@ -495,7 +617,7 @@ function Metric({
   );
 }
 
-function ExRow({ name, dosage, isNew }: { name: string; dosage: string; isNew?: boolean }) {
+function ExRow({ name, dosage }: { name: string; dosage: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div
@@ -530,22 +652,6 @@ function ExRow({ name, dosage, isNew }: { name: string; dosage: string; isNew?: 
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>{dosage}</div>
       </div>
-      {isNew && (
-        <span
-          style={{
-            fontSize: 9.5,
-            fontWeight: 700,
-            padding: '2px 6px',
-            borderRadius: 4,
-            background: 'var(--color-pt-accent-soft)',
-            color: 'var(--color-pt-accent-fg)',
-            border: '1px solid var(--color-pt-accent-border)',
-            letterSpacing: '0.6px',
-          }}
-        >
-          NEW
-        </span>
-      )}
     </div>
   );
 }

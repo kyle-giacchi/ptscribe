@@ -21,7 +21,8 @@ const FORMAT_LABEL: Record<NoteFormat, string> = {
 const FORMAT_ORDER: NoteFormat[] = ['evaluation', 'soap', 'progress', 'discharge', 'custom'];
 const SELECTABLE_FORMATS: NoteFormat[] = ['evaluation', 'soap', 'progress', 'discharge'];
 
-export function Templates() {
+/** `embedded` = rendered inside the Settings tab shell, which owns the page padding + title. */
+export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
   const { addTemplate, updateTemplate, cloneTemplate, removeTemplate } = useTemplates();
   const { updateOrgPolicy } = useSettings();
   const { all, orgTemplateIds, defaultTemplateId: orgDefaultId } = useTemplateCatalog();
@@ -65,7 +66,7 @@ export function Templates() {
   return (
     <div
       style={{
-        padding: 22,
+        padding: embedded ? 0 : 22,
         display: 'grid',
         gap: 14,
         alignContent: 'start',
@@ -78,7 +79,7 @@ export function Templates() {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
       >
         <div style={{ display: 'grid', gap: 4 }}>
-          <Eyebrow>Templates</Eyebrow>
+          {!embedded && <Eyebrow>Templates</Eyebrow>}
           <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
             One template per visit type. Built-in formats are read-only — clone one to customize.
           </p>

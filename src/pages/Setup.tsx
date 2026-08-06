@@ -14,7 +14,7 @@ import { useProviderCatalog, defaultModelFor } from '@/services/ai/providerCatal
 import { isDemoMode } from '@/lib/demoMode';
 import type { KeyProvider, KeyStatus } from '@/services/ai/keysClient';
 import { duration, ease } from '@/lib/motion';
-import { DISCLOSURE_VERSION, type FirstRunRole } from '@/types';
+import { DISCLOSURE_VERSION, isCloudProvider, type FirstRunRole } from '@/types';
 
 type Step = 'welcome' | 'role' | 'profile' | 'connect-key' | 'owner-tips' | 'done';
 const FLOW: Step[] = ['role', 'profile', 'connect-key', 'owner-tips', 'done'];
@@ -413,9 +413,10 @@ const KEY_PROVIDERS: KeyProvider[] = ['anthropic', 'openai', 'google'];
 function ConnectKeyStep({ onNext }: { onNext: () => void }) {
   const { settings, updateAi } = useSettings();
   const { state, orgSet } = useUsableKey();
-  // The active generation provider; coerce 'none' to anthropic for the picker.
-  const provider: KeyProvider =
-    settings.ai.generation.provider === 'none' ? 'anthropic' : settings.ai.generation.provider;
+  // The active generation provider; this step is BYOK-only, so anything that
+  // isn't a cloud provider ('none', or a self-hosted endpoint) shows Anthropic.
+  const active = settings.ai.generation.provider;
+  const provider: KeyProvider = isCloudProvider(active) ? active : 'anthropic';
   const [keyStatus, setKeyStatus] = useState<KeyStatus | undefined>(undefined);
 
   function pickProvider(next: KeyProvider) {
@@ -561,7 +562,7 @@ function OwnerTipsStep({ onContinue }: { onContinue: () => void }) {
         </div>
       </SurfaceCard>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <PtButton variant="primary" onClick={() => navigate('/templates')}>
+        <PtButton variant="primary" onClick={() => navigate('/settings/templates')}>
           Open Templates
         </PtButton>
         <PtButton variant="ghost" onClick={() => navigate('/settings')}>

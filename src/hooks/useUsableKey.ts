@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSettings } from '@/contexts/SettingsProvider';
 import { isDemoMode } from '@/lib/demoMode';
 import { getUserKeys, getOrgKeys, type KeyProvider } from '@/services/ai/keysClient';
+import { isCloudProvider } from '@/types';
 
 /**
  * Whether the active generation provider has a usable key, mirroring the Worker's
@@ -11,7 +12,7 @@ import { getUserKeys, getOrgKeys, type KeyProvider } from '@/services/ai/keysCli
  * ONLY. The Generate action itself never pre-blocks on this — it treats the
  * Worker's `NO_KEY` response as authoritative, so client and server can't disagree.
  *
- * - `disabled`: demo build or provider = none (BYOK not in play).
+ * - `disabled`: demo build, provider = none, or a self-hosted provider (BYOK not in play).
  * - `signin`:   not authenticated (shouldn't happen behind RequireAuth, but safe).
  * - `ready`:    a personal OR org key is set for the active provider.
  * - `missing`:  authenticated, BYOK on, but no usable key anywhere.
@@ -37,7 +38,9 @@ interface Resolved {
 export function useUsableKey(): UsableKey {
   const { settings } = useSettings();
   const provider = settings.ai.generation.provider;
-  const active: KeyProvider | null = provider === 'none' ? null : provider;
+  // Self-hosted providers (local/network) hold no key on our side, so they fall
+  // into the same "BYOK not in play" bucket as `none`.
+  const active: KeyProvider | null = isCloudProvider(provider) ? provider : null;
   const disabled = isDemoMode() || active === null;
 
   const [resolved, setResolved] = useState<Resolved | null>(null);

@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
-import { Sun, Mic, ChevronRight, Inbox, Headphones, ClipboardCheck, Menu } from 'lucide-react';
-import { Sidebar } from '@/components/common/Sidebar';
-import { duration, ease } from '@/lib/motion';
+import { Sun, Mic, ChevronRight, Inbox, Headphones, ClipboardCheck } from 'lucide-react';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
 import { useNotes } from '@/contexts/NotesProvider';
@@ -39,7 +36,6 @@ export function Dashboard() {
   const { clinician } = useClinician();
   const navigate = useNavigate();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   // Resume-modal candidate is derived from sessions; `resumeDismissed` is set
   // by the user's "Not now"/"Resume" click, so we don't need an effect to
   // trigger the modal.
@@ -52,15 +48,6 @@ export function Dashboard() {
         .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null
     );
   }, [sessions, resumeDismissed]);
-
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSidebarOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [sidebarOpen]);
 
   // Quick Record: create a draft session attached to the built-in Unassigned
   // patient and jump straight into recording. The user can reassign on the
@@ -127,39 +114,8 @@ export function Dashboard() {
   });
 
   return (
-    <div
-      className="dashboard-shell"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'var(--dashboard-sidebar-cols, 220px 1fr)',
-        minHeight: '100%',
-      }}
-    >
-      {/* Desktop sidebar */}
-      <Sidebar className="hidden md:grid" />
-
-      {/* Page body */}
+    <div style={{ minHeight: '100%' }}>
       <div className="min-w-0">
-        {/* Mobile hamburger */}
-        <div className="md:hidden" style={{ padding: '10px 16px 0' }}>
-          <button
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setSidebarOpen(true)}
-            className="flex items-center justify-center"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 8,
-              border: '1px solid var(--color-pt-border)',
-              background: 'var(--color-pt-surface)',
-              color: 'var(--color-pt-text-2)',
-            }}
-          >
-            <Menu size={16} strokeWidth={1.75} />
-          </button>
-        </div>
-
         <div style={{ padding: 22 }}>
           <div className="mx-auto max-w-[1400px] space-y-[18px]">
             {/* Hero strip */}
@@ -323,37 +279,6 @@ export function Dashboard() {
             })()}
         </div>
       </div>
-
-      {/* Mobile drawer */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <motion.div
-              className="absolute inset-0"
-              style={{ background: 'var(--color-pt-overlay)' }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: duration.quick, ease: ease.standard }}
-              onClick={() => setSidebarOpen(false)}
-              aria-hidden
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Navigation menu"
-              className="absolute inset-y-0 left-0"
-              style={{ width: 220, paddingLeft: 'env(safe-area-inset-left)' }}
-              initial={{ x: -220 }}
-              animate={{ x: 0 }}
-              exit={{ x: -220 }}
-              transition={{ duration: duration.base, ease: ease.enter }}
-            >
-              <Sidebar onClose={() => setSidebarOpen(false)} />
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

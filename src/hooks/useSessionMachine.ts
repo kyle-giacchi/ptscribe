@@ -25,6 +25,7 @@ import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
 import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 import type {
+  CloudGenerationProvider,
   Note,
   NoteActivities,
   NoteTemplate,
@@ -139,7 +140,11 @@ export interface SessionMachineActions {
   copyTranscript: () => void;
   // Note (Generate / Finalize)
   /** May open the PHI gate instead of generating. */
-  generate: (mode?: 'replace' | 'append', feedback?: string) => void;
+  generate: (
+    mode?: 'replace' | 'append',
+    feedback?: string,
+    cloudOverride?: CloudGenerationProvider,
+  ) => void;
   /** May open the stale-finalize gate instead of finalizing. */
   finalize: () => void;
   unfinalize: () => void;
@@ -330,11 +335,18 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
 
   // ── Generate / Finalize (PHI + stale gates) ──────────────────────────────
   const generate = useCallback(
-    (mode: 'replace' | 'append' = 'replace', feedback?: string) => {
+    (
+      mode: 'replace' | 'append' = 'replace',
+      feedback?: string,
+      cloudOverride?: CloudGenerationProvider,
+    ) => {
       if (settings.session.phiConfirmDismissed) {
-        void generatePhase.run(mode, feedback);
+        void generatePhase.run(mode, feedback, cloudOverride);
       } else {
-        dispatch({ type: 'gate/open', gate: { kind: 'phi-confirm', intent: { mode, feedback } } });
+        dispatch({
+          type: 'gate/open',
+          gate: { kind: 'phi-confirm', intent: { mode, feedback, cloudOverride } },
+        });
       }
     },
     [settings.session.phiConfirmDismissed, generatePhase],
@@ -456,7 +468,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       if (gate.kind === 'phi-confirm' && resolution.kind === 'phi-confirm') {
         if (resolution.outcome === 'confirm') {
           if (resolution.dontShowAgain) persistPhiConfirmDismissed();
-          void generatePhase.run(gate.intent.mode, gate.intent.feedback);
+          void generatePhase.run(gate.intent.mode, gate.intent.feedback, gate.intent.cloudOverride);
         }
       } else if (resolution.kind === 'stale-finalize') {
         if (resolution.outcome === 'regenerate') generate('replace');

@@ -2,15 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildKeyReport, extractJson, generateNote } from './generate';
 import type { GenerateNoteArgs } from './generate';
 import { callAnthropic } from './client/anthropic';
+import { callOpenAiCompat } from './client/openaiCompat';
 import type { NoteTemplate, Patient } from '@/types';
 
 vi.mock('./client/anthropic');
+vi.mock('./client/openaiCompat');
 vi.mock('@/lib/clinical/prompts', () => ({
   buildUserPrompt: vi.fn().mockReturnValue('mock user prompt'),
   buildModifierBlock: vi.fn().mockReturnValue('# Length\ntight clinical prose'),
 }));
 
 const mockCallAnthropic = vi.mocked(callAnthropic);
+const mockCallOpenAiCompat = vi.mocked(callOpenAiCompat);
 
 const mockTemplate = {
   systemPrompt: 'You are a PT assistant.',
@@ -226,5 +229,55 @@ describe('generateNote', () => {
     await expect(
       generateNote({ ...baseArgs, provider: 'bogus' as GenerateNoteArgs['provider'] }),
     ).rejects.toThrow('Unknown generation provider: bogus');
+  });
+
+  describe('self-hosted providers (ADR-0011)', () => {
+    const endpoint = { baseUrl: 'http://localhost:11434', model: 'llama3.1:8b' };
+    const selfHostedArgs: GenerateNoteArgs = {
+      ...baseArgs,
+      provider: 'local',
+      model: 'llama3.1:8b',
+      endpoint,
+      modifiers: {
+        length: 'concise',
+        clinicalDetail: [],
+        codingBilling: [],
+        beyondNote: [],
+        customInstructions: [],
+      },
+    };
+
+    it('routes to the endpoint and never touches the Worker client', async () => {
+      mockCallOpenAiCompat.mockResolvedValueOnce({
+        text: '{"subjective":"knee pain","plan":"HEP"}',
+      });
+
+      const result = await generateNote(selfHostedArgs);
+
+      expect(mockCallAnthropic).not.toHaveBeenCalled();
+      expect(mockCallOpenAiCompat).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'local', endpoint }),
+      );
+      expect(result.sections[0].body).toBe('knee pain');
+    });
+
+    it('composes the modifier block into the system prompt client-side', async () => {
+      // The Worker normally appends it server-side; with no Worker in the path
+      // the string the model sees must still contain it.
+      mockCallOpenAiCompat.mockResolvedValueOnce({ text: '{"subjective":"x","plan":"y"}' });
+
+      await generateNote(selfHostedArgs);
+
+      const call = mockCallOpenAiCompat.mock.calls[0][0];
+      expect(call.system).toContain(mockTemplate.systemPrompt);
+      expect(call.system).toContain('tight clinical prose');
+    });
+
+    it('throws when no endpoint is configured', async () => {
+      await expect(generateNote({ ...selfHostedArgs, endpoint: undefined })).rejects.toThrow(
+        /Settings/,
+      );
+      expect(mockCallOpenAiCompat).not.toHaveBeenCalled();
+    });
   });
 });

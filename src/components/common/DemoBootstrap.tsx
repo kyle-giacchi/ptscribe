@@ -9,6 +9,8 @@ import { useTemplates } from '@/contexts/TemplatesProvider';
 import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
 import { isDemoMode, DEMO_PATIENT_ID, DEMO_SESSION_ID } from '@/lib/demoMode';
 import { isTestUserSession } from '@/lib/profile/profileId';
+import { buildDevSeed, DEV_SEED_MARKER_ID } from '@/lib/devSeed';
+import { useAppData } from '@/contexts/AppDataProvider';
 import type { Patient, Session } from '@/types';
 
 const DEMO_SESSION_PATH = `/sessions/${DEMO_SESSION_ID}`;
@@ -20,6 +22,7 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
   const demoMode = isDemoMode();
   const { clinician, setClinician } = useClinician();
   const { patients, addPatient } = usePatients();
+  const { bulkUpdate } = useAppData();
   const { sessions, addSession, removeSession } = useSessions();
   const { forSession, removeNote } = useNotes();
   const { templates } = useTemplates();
@@ -39,17 +42,30 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!demoMode) return;
+    // Test User can be a non-demo dev build (Admin Quick Login) — still seed
+    // the clinician so it doesn't hit FirstRunGuard's onboarding wizard.
+    if (!demoMode && !isTestUserSession()) return;
 
     // Seed clinician + patient regardless of prompt state.
     if (!clinician.name.trim()) {
-      setClinician({ name: 'Demo Clinician', credentials: 'DPT' });
+      setClinician(
+        isTestUserSession()
+          ? { name: 'Dev Admin', credentials: 'DPT' }
+          : { name: 'Demo Clinician', credentials: 'DPT' },
+      );
     }
 
-    // Test User = full real-app experience: seed only the clinician, then step
-    // aside — no demo patient/session, no nav-lock, no continuity prompt, no
-    // forced setup-check. (Distinct from the guided "Try Demo" walkthrough.)
-    if (isTestUserSession()) return;
+    // Test User = full real-app experience: seed a dev caseload once, then step
+    // aside — no nav-lock, no continuity prompt, no forced setup-check.
+    // (Distinct from the guided "Try Demo" walkthrough.)
+    if (isTestUserSession()) {
+      // One bulkUpdate rather than five slice mutators: chaining synchronous
+      // writes across slices makes each one clobber the last.
+      if (import.meta.env.DEV && !patients.some((p) => p.id === DEV_SEED_MARKER_ID)) {
+        bulkUpdate(buildDevSeed());
+      }
+      return;
+    }
 
     if (!patients.find((p) => p.id === DEMO_PATIENT_ID)) {
       const now = Date.now();
@@ -103,11 +119,15 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     if (promptState === 'show') return;
 
     // promptState === 'done' — keep the demo user locked to the session page.
-    // Exceptions: /account so the profile dropdown link works, and /setup-check
+    // Exceptions: /settings so the profile dropdown link works, and /setup-check
     // until the first-run gate has been completed. (The Debug Menu is a drawer
     // now — it opens over any route, no navigation needed.)
     const onPendingSetupCheck = pathname === SETUP_CHECK_PATH && !setupCheckDone;
-    if (pathname !== DEMO_SESSION_PATH && pathname !== '/account' && !onPendingSetupCheck) {
+    if (
+      pathname !== DEMO_SESSION_PATH &&
+      !pathname.startsWith('/settings') &&
+      !onPendingSetupCheck
+    ) {
       navigate(DEMO_SESSION_PATH, { replace: true });
     }
   }, [
@@ -121,6 +141,7 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
     setClinician,
     addPatient,
     addSession,
+    bulkUpdate,
     navigate,
     pathname,
   ]);

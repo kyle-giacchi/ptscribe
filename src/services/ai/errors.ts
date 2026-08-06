@@ -11,9 +11,12 @@ export type AiErrorKind =
   | 'provider_limited' // 429 PROVIDER_LIMITED — the user's provider rate-limited / out of credit
   | 'signin_required' // 401 SIGNIN_REQUIRED — not authenticated (BYOK requires a session)
   | 'service_unavailable' // 503 KEY_ENC_UNAVAILABLE — deterministic server misconfig, not a network blip
-  | 'demo_disabled'; // 403 DEMO_DISABLED — cloud transcription is off in demo mode
+  | 'demo_disabled' // 403 DEMO_DISABLED — cloud transcription is off in demo mode
+  // Self-hosted generation (ADR-0011) — direct browser → endpoint fetch, no Worker.
+  | 'unreachable' // fetch TypeError: server down, CORS, mixed content, or private-network block
+  | 'model_missing'; // 404 — the server is up but doesn't have the configured model
 
-export type AiProvider = 'anthropic' | 'nova' | 'openai' | 'google';
+export type AiProvider = 'anthropic' | 'nova' | 'openai' | 'google' | 'local' | 'network';
 
 export interface AiCallErrorInit {
   kind: AiErrorKind;
@@ -76,6 +79,8 @@ const PROVIDER_NAMES: Record<AiProvider, string> = {
   nova: 'Cloudflare Nova',
   openai: 'OpenAI',
   google: 'Google',
+  local: 'your local model',
+  network: 'your in-network model',
 };
 
 export function friendlyAiError(err: AiCallError): FriendlyAiError {
@@ -163,6 +168,22 @@ export function friendlyAiError(err: AiCallError): FriendlyAiError {
         description: 'Cloud transcription is turned off in this demo. Try the on-device option.',
         action: 'retry',
         actionLabel: 'OK',
+      };
+    case 'unreachable':
+      return {
+        title: `Couldn't reach ${name}`,
+        description:
+          'The server did not respond. Check that it is running, that it allows requests from this site (CORS), and — for a server on your network — that it is reachable over HTTPS.',
+        action: 'open_settings',
+        actionLabel: 'Open Settings',
+      };
+    case 'model_missing':
+      return {
+        title: 'Model not found on that server',
+        description:
+          'The server answered but does not have the model you selected. Re-run "Test connection" in Settings and pick a model it actually serves.',
+        action: 'open_settings',
+        actionLabel: 'Open Settings',
       };
   }
 }

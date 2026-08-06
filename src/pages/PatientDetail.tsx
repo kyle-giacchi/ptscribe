@@ -12,27 +12,42 @@ import { ageFromDob } from '@/utils/patients';
 import { EditPatientModal } from '@/components/patients/EditPatientModal';
 import { PatientSameDayModal } from '@/components/patients/PatientSameDayModal';
 import { derivePatientBadge } from '@/utils/patientMetrics';
-import { PatientHeader, type Tab } from '@/components/patients/PatientHeader';
+import { PatientHeader, parseTab, type Tab } from '@/components/patients/PatientHeader';
 import { PatientOverview } from '@/components/patients/PatientOverview';
+import { PatientVisits } from '@/components/patients/PatientVisits';
+import { PatientMeasures } from '@/components/patients/PatientMeasures';
+import { PatientCarePlan } from '@/components/patients/PatientCarePlan';
+import { useMeasurements } from '@/contexts/MeasurementsProvider';
 import type { PlanOfCare, Session } from '@/types';
 
 export function PatientDetail() {
-  const { id = '' } = useParams<{ id: string }>();
+  const { id = '', tab: tabParam } = useParams<{ id: string; tab?: string }>();
   const navigate = useNavigate();
   const { getPatient, updatePatient, removePatient } = usePatients();
   const { forPatient: sessionsFor } = useSessions();
   const { forPatient: notesFor } = useNotes();
   const { activePlanForPatient, addPlan, updatePlan } = usePlans();
   const { exercises } = useExercises();
+  const { forPatient: measurementsFor, addMeasurement, removeMeasurement } = useMeasurements();
 
   const patient = getPatient(id);
   const [editing, setEditing] = useState(false);
-  const [tab, setTab] = useState<Tab>('overview');
+  const tab = parseTab(tabParam);
   const [sameDaySessions, setSameDaySessions] = useState<Session[] | null>(null);
 
   const sessions = useMemo(() => (patient ? sessionsFor(patient.id) : []), [patient, sessionsFor]);
   const notes = useMemo(() => (patient ? notesFor(patient.id) : []), [patient, notesFor]);
+  const measurements = useMemo(
+    () => (patient ? measurementsFor(patient.id) : []),
+    [patient, measurementsFor],
+  );
   const plan = patient ? activePlanForPatient(patient.id) : undefined;
+
+  function goToTab(next: Tab) {
+    // `replace` so tab-hopping doesn't bury the page the clinician arrived from
+    // under a dozen history entries.
+    navigate(`/patients/${id}/${next}`, { replace: true });
+  }
 
   if (!patient) {
     return (
@@ -115,9 +130,14 @@ export function PatientDetail() {
         subtitle={subtitle || 'No diagnosis on file'}
         status={status}
         tab={tab}
-        onTab={setTab}
+        onTab={goToTab}
         onEdit={() => setEditing(true)}
         onStartSession={handleStartSession}
+        counts={{
+          visits: sessions.length,
+          measures: measurements.length,
+          plan: plan?.goals.length ?? 0,
+        }}
       />
 
       <div
@@ -133,29 +153,28 @@ export function PatientDetail() {
             sessions={sessions}
             notes={notes}
             plan={plan}
+            measurements={measurements}
             onStartPlan={handleStartPlan}
-            onUpdatePlan={(patch) => plan && updatePlan(plan.id, patch)}
             exercises={exercises}
             onDelete={handleDelete}
           />
         )}
-        {tab !== 'overview' && (
-          <SurfaceCard padding={40} style={{ textAlign: 'center' }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: 'var(--color-pt-text-2)',
-                marginBottom: 4,
-                textTransform: 'capitalize',
-              }}
-            >
-              {tab}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
-              Tab placeholder — coming soon.
-            </div>
-          </SurfaceCard>
+        {tab === 'visits' && <PatientVisits sessions={sessions} notes={notes} />}
+        {tab === 'measures' && (
+          <PatientMeasures
+            patientId={patient.id}
+            measurements={measurements}
+            onAdd={addMeasurement}
+            onRemove={removeMeasurement}
+          />
+        )}
+        {tab === 'plan' && (
+          <PatientCarePlan
+            plan={plan}
+            exercises={exercises}
+            onStartPlan={handleStartPlan}
+            onUpdatePlan={(patch) => plan && updatePlan(plan.id, patch)}
+          />
         )}
       </div>
 

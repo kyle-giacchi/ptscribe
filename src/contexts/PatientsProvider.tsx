@@ -44,6 +44,7 @@ export function PatientsProvider({ children }: { children: ReactNode }) {
       bulkUpdate({
         notes: appData.notes.filter((n) => !sessionIds.has(n.sessionId)),
         plans: appData.plans.filter((p) => p.patientId !== id),
+        measurements: appData.measurements.filter((m) => m.patientId !== id),
         sessions: appData.sessions.filter((s) => s.patientId !== id),
         patients: appData.patients.filter((p) => p.id !== id),
       });

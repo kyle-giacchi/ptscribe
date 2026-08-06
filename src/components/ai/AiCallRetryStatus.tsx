@@ -1,16 +1,19 @@
 import { Loader2 } from 'lucide-react';
+import type { AiProvider } from '@/services/ai/errors';
 
 interface Props {
-  provider: 'anthropic' | 'nova' | 'openai' | 'google';
+  provider: AiProvider;
   attempt: number;
   max: number;
 }
 
-const NAMES: Record<Props['provider'], string> = {
+const NAMES: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
   nova: 'Cloudflare Nova',
   openai: 'OpenAI',
   google: 'Google',
+  local: 'Local model',
+  network: 'In-network model',
 };
 
 export function AiCallRetryStatus({ provider, attempt, max }: Props) {

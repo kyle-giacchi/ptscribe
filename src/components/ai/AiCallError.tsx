@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Cloud, RefreshCw, X } from 'lucide-react';
 import { AiCallError as AiCallErrorClass, friendlyAiError } from '@/services/ai/errors';
 
 interface Props {
@@ -7,6 +7,12 @@ interface Props {
   onDismiss?: () => void;
   /** When true, an expandable details section shows the raw provider message. DEV-only by default. */
   showRawDetail?: boolean;
+  /**
+   * Optional escape hatch offered alongside Retry — used when a self-hosted model
+   * fails and a cloud provider could run this one call instead (ADR-0011). Never
+   * taken automatically: the button confirms first, because it sends PHI off-device.
+   */
+  fallback?: { label: string; confirm: string; onUse: () => void };
 }
 
 export function AiCallError({
@@ -14,6 +20,7 @@ export function AiCallError({
   onRetry,
   onDismiss,
   showRawDetail = import.meta.env.DEV,
+  fallback,
 }: Props) {
   const friendly = friendlyAiError(error);
 
@@ -89,6 +96,19 @@ export function AiCallError({
             <RefreshCw size={12} strokeWidth={2} style={{ marginRight: 4 }} />
             {friendly.actionLabel}
           </button>
+          {fallback ? (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+              onClick={() => {
+                if (window.confirm(fallback.confirm)) fallback.onUse();
+              }}
+            >
+              <Cloud size={12} strokeWidth={2} style={{ marginRight: 4 }} />
+              {fallback.label}
+            </button>
+          ) : null}
           {onDismiss ? (
             <button
               type="button"

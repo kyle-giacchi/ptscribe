@@ -17,6 +17,7 @@ import type {
   NoteTemplate,
   Exercise,
   PlanOfCare,
+  Measurement,
   Settings,
 } from '@/types';
 import { toast } from 'sonner';
@@ -39,6 +40,7 @@ export interface AppDataContextValue {
   updateTemplatesSlice: (next: SliceUpdater<NoteTemplate[]>) => void;
   updateExercisesSlice: (next: SliceUpdater<Exercise[]>) => void;
   updatePlansSlice: (next: SliceUpdater<PlanOfCare[]>) => void;
+  updateMeasurementsSlice: (next: SliceUpdater<Measurement[]>) => void;
   updateSettingsSlice: (next: SliceUpdater<Settings>) => void;
   bulkUpdate: (patch: Partial<Omit<AppData, 'version' | 'lastModified'>>) => void;
   resetAll: () => void;
@@ -247,6 +249,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateTemplatesSlice: (next) => merge('templates', next),
       updateExercisesSlice: (next) => merge('exercises', next),
       updatePlansSlice: (next) => merge('plans', next),
+      updateMeasurementsSlice: (next) => merge('measurements', next),
       updateSettingsSlice: (next) => merge('settings', next),
       bulkUpdate,
       resetAll: () => {
