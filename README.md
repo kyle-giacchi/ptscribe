@@ -86,7 +86,7 @@ PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1
 ```bash
 npm install
 cp .dev.vars.example .dev.vars   # worker secrets — fill in ANTHROPIC_API_KEY etc.
-cp .env.example .env.local       # client build flags (VITE_DEMO_MODE…)
+cp .env.example .env.development.local   # client build flags (VITE_DEMO_MODE…)
 npm run db:migrate               # apply D1 migrations to the LOCAL database
 npm run dev:secrets              # seed the local Secrets Store with KEY_ENC_MASTER
 ```
@@ -144,11 +144,14 @@ npm run test             # Vitest unit tests
 npm run test:e2e         # Playwright E2E tests (UI only — no worker is started)
 npm run lint             # ESLint
 npm run format           # Prettier write
+npm run deploy           # Build + wrangler deploy (see caveat below)
 npm run cf:tail          # Tail production Worker logs
 ```
 
-Deploys are not a local command — push to `cloudflare-deployment` and GitHub
-Actions runs typecheck, tests, build, and `wrangler deploy`.
+**Deploys are manual today.** GitHub Actions is disabled at the repo level, so
+neither `ci.yml` nor `deploy.yml` runs on push — `npm run deploy` from
+`cloudflare-deployment` is the live path. Both branches now carry the same
+`wrangler.jsonc`, so this deploys the correct bindings from either one.
 
 ---
 
