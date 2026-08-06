@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { retryFetch, type RetryPolicy } from './retryFetch';
 
 function res(status: number, body = ''): Response {
-  return {
+  const r = {
     ok: status >= 200 && status < 300,
     status,
     statusText: '',
     text: () => Promise.resolve(body),
-  } as unknown as Response;
+    json: () => Promise.resolve(body ? JSON.parse(body) : {}),
+  };
+  return { ...r, clone: () => res(status, body) } as unknown as Response;
 }
 
 const basePolicy: RetryPolicy = {
@@ -28,6 +30,16 @@ describe('retryFetch — pass-through (no retry)', () => {
     const doFetch = vi.fn(() => Promise.resolve(res(429, 'slow down')));
     const r = await retryFetch(basePolicy, doFetch);
     expect(r.response.status).toBe(429);
+    expect(doFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops immediately on a retryable status whose body declares retryable:false', async () => {
+    // e.g. 503 KEY_ENC_UNAVAILABLE — a deterministic misconfig, not a transient blip.
+    const doFetch = vi.fn(() =>
+      Promise.resolve(res(503, JSON.stringify({ code: 'KEY_ENC_UNAVAILABLE', retryable: false }))),
+    );
+    const r = await retryFetch(basePolicy, doFetch);
+    expect(r.response.status).toBe(503);
     expect(doFetch).toHaveBeenCalledTimes(1);
   });
 });

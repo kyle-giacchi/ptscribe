@@ -16,7 +16,8 @@ import {
   type ExerciseCategory,
 } from '@/types';
 
-export function Exercises() {
+/** `embedded` = rendered inside the Settings tab shell, which owns the page padding + title. */
+export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
   const { exercises, addExercise, updateExercise, removeExercise } = useExercises();
   const { sharedExercises } = useOrgConfig();
   const [query, setQuery] = useState('');
@@ -61,12 +62,12 @@ export function Exercises() {
   }, [exercises, sharedExercises, query, region]);
 
   return (
-    <div style={{ padding: 22, display: 'grid', gap: 14, alignContent: 'start' }}>
+    <div style={{ padding: embedded ? 0 : 22, display: 'grid', gap: 14, alignContent: 'start' }}>
       <div
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
       >
         <div style={{ display: 'grid', gap: 4 }}>
-          <Eyebrow>Exercise library</Eyebrow>
+          {!embedded && <Eyebrow>Exercise library</Eyebrow>}
           <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
             Reference catalog you can prescribe from a patient's plan of care.
           </p>

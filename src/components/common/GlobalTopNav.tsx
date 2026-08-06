@@ -15,10 +15,11 @@ interface NavItemDef {
 
 const BASE_NAV_ITEMS: NavItemDef[] = [
   { to: '/today', label: 'My Chart' },
+  { to: '/sessions/new', label: 'Record' },
   { to: '/notes', label: 'Review queue' },
   { to: '/patients', label: 'Patients' },
-  { to: '/templates', label: 'Templates' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/settings/templates', label: 'Templates' },
+  { to: '/settings', label: 'Settings', end: true },
 ];
 
 // The Organization link appears only for members of a real org (hidden in

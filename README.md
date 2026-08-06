@@ -81,18 +81,39 @@ PTs spend 2–3 hours a day on documentation. The leading SaaS scribes charge $1
 
 ## Getting started
 
-Local dev requires two processes running at the same time.
+### One-time setup
+
+```bash
+npm install
+cp .dev.vars.example .dev.vars   # worker secrets — fill in ANTHROPIC_API_KEY etc.
+cp .env.example .env.local       # client build flags (VITE_DEMO_MODE…)
+npm run db:migrate               # apply D1 migrations to the LOCAL database
+npm run dev:secrets              # seed the local Secrets Store with KEY_ENC_MASTER
+```
+
+`dev:secrets` writes a throwaway master key into the local Secrets Store
+(`.wrangler/state/`) so BYOK provider-key encryption runs for real locally —
+without it `worker/keyCrypto.ts` fails closed and every key save/use returns 5xx.
+Run it once per clone; re-running errors because the secret already exists.
+
+> **Never pass `--remote` to a local wrangler command.** Local dev emulates D1,
+> KV, R2, and the Secrets Store in `.wrangler/state/`. `--remote` reaches the
+> real production resources — including a D1 migration path that can wipe
+> registered users (see [docs/invariants.md](docs/invariants.md)).
+
+### Running
+
+Two processes, at the same time.
 
 **Terminal 1 — Cloudflare Worker (port 8787)**
 
 ```bash
-npx wrangler dev
+npm run dev:worker
 ```
 
 **Terminal 2 — Vite frontend (port 8080)**
 
 ```bash
-npm install
 npm run dev
 ```
 
@@ -113,15 +134,21 @@ npx tsx scripts/seed-r2-models.ts
 ## Scripts
 
 ```bash
-npm run dev              # Dev server on port 8080
+npm run dev              # Vite dev server on port 8080
+npm run dev:worker       # Cloudflare Worker on port 8787
+npm run db:migrate       # Apply D1 migrations locally (never add --remote)
+npm run dev:secrets      # Seed the local Secrets Store (run once per clone)
 npm run build            # Production build
-npm run build:dev        # Dev-mode build (no minification)
-npm run typecheck        # tsc --noEmit
+npm run typecheck        # tsc --noEmit — app + worker
 npm run test             # Vitest unit tests
-npm run test:e2e         # Playwright E2E tests
+npm run test:e2e         # Playwright E2E tests (UI only — no worker is started)
 npm run lint             # ESLint
 npm run format           # Prettier write
+npm run cf:tail          # Tail production Worker logs
 ```
+
+Deploys are not a local command — push to `cloudflare-deployment` and GitHub
+Actions runs typecheck, tests, build, and `wrangler deploy`.
 
 ---
 

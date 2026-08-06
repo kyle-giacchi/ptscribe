@@ -3,7 +3,7 @@ import type { Dispatch } from 'react';
 import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { audioRepository } from '@/services/AudioRepository';
-import { promoteTier } from '@/services/transcript/promoteTier';
+import { applyTierWrite } from '@/services/transcript/promoteTier';
 import { runCaptureEnd } from '@/services/capture/runCaptureEnd';
 import {
   transcribeLocally,
@@ -566,14 +566,16 @@ export function useCapturePhase({
     if (result.silenced) setSilencedMergedBlob(result.silenced);
 
     if (result.baseline) {
-      // promoteTier guards the baseline (won't clobber a higher tier that already
-      // ran). The frozen t1Transcript is a t1-only join, distinct from the merged
-      // compiled baseline, so the producer still writes it itself.
-      const promo = promoteTier(session ?? {}, { tier: 't1', text: result.baseline });
-      if (promo) {
+      // applyTierWrite guards the baseline (won't clobber a higher tier that
+      // already ran), freezes t1Transcript (the t1-only join, distinct from the
+      // merged compiled baseline) and clears editedTranscript.
+      const patch = applyTierWrite(session ?? {}, {
+        tier: 't1',
+        text: result.baseline,
+        freeze: result.t1,
+      });
+      if (patch) {
         dispatch({ type: 'transcript/setBaseline', text: result.baseline });
-        const patch: Partial<Session> = { ...promo };
-        if (result.t1) patch.t1Transcript = result.t1;
         patchSession(patch);
       }
     }

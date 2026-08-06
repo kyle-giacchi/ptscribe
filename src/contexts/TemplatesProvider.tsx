@@ -5,7 +5,7 @@ export interface TemplatesContextValue {
   templates: NoteTemplate[];
   addTemplate: (template: NoteTemplate) => void;
   updateTemplate: (id: string, patch: Partial<NoteTemplate>) => void;
-  cloneTemplate: (id: string) => NoteTemplate | undefined;
+  cloneTemplate: (src: NoteTemplate) => NoteTemplate;
   removeTemplate: (id: string) => void;
   getTemplate: (id: string) => NoteTemplate | undefined;
 }
@@ -21,9 +21,7 @@ const { Provider, useSlice } = createListSliceContext<NoteTemplate, TemplatesCon
     updateTemplate: m.update,
     removeTemplate: m.remove,
     getTemplate: m.get,
-    cloneTemplate: (id) => {
-      const src = m.get(id);
-      if (!src) return undefined;
+    cloneTemplate: (src) => {
       const now = Date.now();
       const clone: NoteTemplate = {
         ...src,

@@ -347,6 +347,16 @@ Vocabulary for who supplies the AI credential that bills note generation. Note g
 - **Verified key** — a key confirmed by a live validation call to its provider before being stored. The UI shows verified vs. unverified status; a key is never silently invalidated on a later runtime error.
   - _Avoid_: "API key" unqualified when the distinction matters — say **personal key**, **org key**, or **shared key**.
 
+## Self-hosted generation
+
+A clinician who runs their own model can point note generation at it instead of a cloud provider. Signed-in accounts only; unavailable in [demo mode](#demo-mode). Transcription is unaffected.
+
+- **Self-hosted provider** — a generation provider the clinician runs themselves. Two of them: **This machine** (`local`) — a loopback server on the clinician's own computer, e.g. Ollama or LM Studio — and **In-network** (`network`) — a server the clinic controls on the LAN or VPN. Both speak the OpenAI-compatible chat API.
+- **Endpoint** — the server URL + model for a self-hosted provider, plus an optional access token. The browser calls it **directly**; the transcript never reaches PTScribe's servers ([ADR-0011](docs/adr/0011-direct-browser-calls-to-self-hosted-llm-endpoints.md)). Changing an in-network URL asks for confirmation, because it changes who receives PHI.
+- **Test connection** — the Settings probe that lists the models a server actually serves and fills the model picker. A self-hosted model is never typed in free-form.
+- **Cloud fallback** — a cloud provider the clinician nominates in advance, offered **only** in the failure banner after a self-hosted call fails, and **only** on explicit confirm. It runs one call and does not change the active provider. Generation never silently leaves the clinician's own hardware.
+  - _Avoid_: "local model" for note generation when you mean local **transcription** (T2 Whisper) — say **self-hosted generation** or name the provider.
+
 ## Primary success criterion
 
 **Quality of the final Note**, where "quality" is **defined by the clinician, not the system**. The workflow is optimized so the clinician arrives at a Note they personally judge to be defensible — even at the cost of additional time, network calls, or clinician effort. The system does not enforce a quality standard.

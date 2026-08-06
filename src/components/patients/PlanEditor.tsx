@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { TextInput, Select } from '@/components/ui/Field';
 import { PtButton } from '@/components/design';
+import { fmtIsoDateOptional, parseIsoDate } from '@/utils/dates';
 import type { Exercise, PlanGoal, PlanOfCare, Prescription } from '@/types';
+
+/** An unmet goal whose target date has passed — the only state worth colouring. */
+function overdue(g: PlanGoal): boolean {
+  return !g.met && g.targetDate !== undefined && g.targetDate < Date.now();
+}
 
 export function PlanEditor({
   plan,
@@ -14,14 +20,26 @@ export function PlanEditor({
   onChange: (patch: Partial<PlanOfCare>) => void;
 }) {
   const [goalText, setGoalText] = useState('');
+  const [goalTarget, setGoalTarget] = useState('');
   const [exerciseId, setExerciseId] = useState('');
   const [dosage, setDosage] = useState('');
 
   function addGoal() {
     if (!goalText.trim()) return;
-    const g: PlanGoal = { id: crypto.randomUUID(), text: goalText.trim(), met: false };
+    const g: PlanGoal = {
+      id: crypto.randomUUID(),
+      text: goalText.trim(),
+      targetDate: parseIsoDate(goalTarget),
+      met: false,
+    };
     onChange({ goals: [...plan.goals, g] });
     setGoalText('');
+    setGoalTarget('');
+  }
+  function setGoalDate(gid: string, iso: string) {
+    onChange({
+      goals: plan.goals.map((g) => (g.id === gid ? { ...g, targetDate: parseIsoDate(iso) } : g)),
+    });
   }
   function toggleGoal(gid: string) {
     onChange({
@@ -83,6 +101,23 @@ export function PlanEditor({
               >
                 {g.text}
               </span>
+              {/* Native date input: a goal without a target date is a wish, and
+                  the type already carried `targetDate` with nothing surfacing it. */}
+              <input
+                type="date"
+                aria-label={`Target date for: ${g.text}`}
+                value={fmtIsoDateOptional(g.targetDate)}
+                onChange={(e) => setGoalDate(g.id, e.target.value)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--color-pt-border)',
+                  borderRadius: 6,
+                  padding: '2px 6px',
+                  fontSize: 11.5,
+                  fontFamily: 'var(--font-mono)',
+                  color: overdue(g) ? 'var(--color-pt-red)' : 'var(--color-pt-text-3)',
+                }}
+              />
               <button
                 type="button"
                 onClick={() => removeGoal(g.id)}
@@ -110,6 +145,13 @@ export function PlanEditor({
                 addGoal();
               }
             }}
+          />
+          <TextInput
+            type="date"
+            aria-label="Target date"
+            value={goalTarget}
+            onChange={(e) => setGoalTarget(e.target.value)}
+            style={{ maxWidth: 150 }}
           />
           <PtButton
             variant="accent-soft"

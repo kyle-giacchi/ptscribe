@@ -47,3 +47,50 @@ export function promoteTier(
   if (higherAlreadyRan) return null;
   return { transcript: produced.text, activeTranscriptTier: produced.tier };
 }
+
+export type TierWritePatch = TierPromotion & {
+  editedTranscript: undefined;
+} & { [K in `${MachineTier}Transcript`]?: string };
+
+/**
+ * The complete tier-write protocol as one patch: promote (if allowed), freeze
+ * the producing tier's own field, and clear `editedTranscript` so a stale
+ * clinician edit never shadows a fresh machine result. Returns `null` under
+ * the same condition as `promoteTier` (a higher tier already produced output).
+ *
+ * @param produced.freeze The tier field's own frozen value, when it differs
+ *                        from the baseline `text` (T1's live-only join vs. the
+ *                        compiled per-clip baseline). Defaults to `text`. Falsy
+ *                        values are omitted so an empty freeze never clobbers
+ *                        a previously-frozen field.
+ */
+export function applyTierWrite(
+  frozen: Pick<Session, 't1Transcript' | 't2Transcript' | 't3Transcript'>,
+  produced: { tier: MachineTier; text: string; freeze?: string },
+): TierWritePatch | null {
+  const promo = promoteTier(frozen, produced);
+  if (!promo) return null;
+  const freeze = produced.freeze ?? produced.text;
+  return {
+    ...promo,
+    editedTranscript: undefined,
+    ...(freeze ? { [`${produced.tier}Transcript`]: freeze } : {}),
+  };
+}
+
+const LOCAL_TIERS: MachineTier[] = ['t2', 't1']; // descending rank, cloud (t3) excluded
+
+/**
+ * The "revert to local" rule: the highest-ranked local (non-cloud) tier that
+ * has frozen output. Never returns t3 — reverting to local must not resurrect
+ * a cloud result.
+ */
+export function demoteTier(
+  frozen: Pick<Session, 't1Transcript' | 't2Transcript'>,
+): { tier: MachineTier; text: string } | null {
+  for (const tier of LOCAL_TIERS) {
+    const text = frozen[`${tier}Transcript` as 't1Transcript' | 't2Transcript'];
+    if (text?.trim()) return { tier, text };
+  }
+  return null;
+}

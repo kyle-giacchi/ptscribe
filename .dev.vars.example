@@ -1,5 +1,8 @@
 # Copy to `.dev.vars` (gitignored) and fill in. Used by `wrangler dev` only —
 # production secrets are set via `npx wrangler secret put NAME`.
+#
+# NOT here: KEY_ENC_MASTER (BYOK master key). That is a Secrets Store binding,
+# not a var — seed it locally once with `npm run dev:secrets`.
 
 # Anthropic API key for /api/generate (server-side, never exposed to browser)
 ANTHROPIC_API_KEY=sk-ant-...
@@ -7,3 +10,21 @@ ANTHROPIC_API_KEY=sk-ant-...
 # 6-digit gate code. Must match the SHA-256 hash hardcoded in src/lib/gate.ts.
 # Default test code is 112233.
 PTSCRIBE_GATE=112233
+
+# BetterAuth signing secret. Any random string, 32+ chars.
+AUTH_SECRET=change-me-at-least-32-characters-long
+
+# Full BROWSER-FACING origin — the Vite dev server (8080), not wrangler (8787).
+# Passkey assertions embed this origin in clientDataJSON and it must match exactly.
+AUTH_BASE_URL=http://localhost:8080
+
+# Demo/preview toggle. Mirrors `vars.DEMO_MODE` in wrangler.jsonc; .dev.vars wins
+# locally. 'true' routes sessionless /api/generate through the shared key and
+# hard-disables Nova transcription. Unset it to exercise the real BYOK path
+# (sessionless generate then returns 401 SIGNIN_REQUIRED).
+DEMO_MODE=true
+
+# Transactional email (magic links). Without RESEND_API_KEY, worker/email.ts
+# falls back to console.warn — fine for local dev, required in production.
+# RESEND_API_KEY=re_...
+# EMAIL_FROM=noreply@your-verified-domain.com

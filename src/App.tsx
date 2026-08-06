@@ -8,6 +8,7 @@ import { NotesProvider } from '@/contexts/NotesProvider';
 import { TemplatesProvider } from '@/contexts/TemplatesProvider';
 import { ExercisesProvider } from '@/contexts/ExercisesProvider';
 import { PlansProvider } from '@/contexts/PlansProvider';
+import { MeasurementsProvider } from '@/contexts/MeasurementsProvider';
 import { SettingsProvider } from '@/contexts/SettingsProvider';
 import { ConfigSyncProvider } from '@/contexts/ConfigSyncProvider';
 import { OrgConfigProvider } from '@/contexts/OrgConfigProvider';
@@ -41,12 +42,7 @@ const NewSession = lazy(() =>
 );
 const SessionPage = lazy(() => import('@/pages/Session').then((m) => ({ default: m.SessionPage })));
 const Notes = lazy(() => import('@/pages/Notes').then((m) => ({ default: m.Notes })));
-const Templates = lazy(() => import('@/pages/Templates').then((m) => ({ default: m.Templates })));
-const Exercises = lazy(() => import('@/pages/Exercises').then((m) => ({ default: m.Exercises })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
-const UserSettings = lazy(() =>
-  import('@/pages/UserSettings').then((m) => ({ default: m.UserSettings })),
-);
 const OrgSettings = lazy(() =>
   import('@/pages/OrgSettings').then((m) => ({ default: m.OrgSettings })),
 );
@@ -74,71 +70,102 @@ function AppProviders() {
                         <TemplatesProvider>
                           <ExercisesProvider>
                             <PlansProvider>
-                              <SettingsProvider>
-                                <DebugDrawerProvider>
-                                  <DemoBootstrap>
-                                    <FirstRunGuard>
-                                      <Suspense fallback={<PageLoader />}>
-                                        <Routes>
-                                          <Route path="/setup" element={<Setup />} />
-                                          <Route
-                                            path="/setup-check"
-                                            element={<CheckingRequirements />}
-                                          />
-                                          <Route element={<AppShell />}>
-                                            <Route path="/today" element={<Dashboard />} />
-                                            <Route path="/patients" element={<Patients />} />
+                              <MeasurementsProvider>
+                                <SettingsProvider>
+                                  <DebugDrawerProvider>
+                                    <DemoBootstrap>
+                                      <FirstRunGuard>
+                                        <Suspense fallback={<PageLoader />}>
+                                          <Routes>
+                                            <Route path="/setup" element={<Setup />} />
                                             <Route
-                                              path="/patients/:id"
-                                              element={<PatientDetail />}
+                                              path="/setup-check"
+                                              element={<CheckingRequirements />}
                                             />
-                                            <Route path="/sessions/new" element={<NewSession />} />
-                                            <Route path="/sessions/:id" element={<SessionPage />} />
-                                            <Route path="/notes" element={<Notes />} />
-                                            <Route path="/templates" element={<Templates />} />
-                                            <Route path="/exercises" element={<Exercises />} />
-                                            <Route path="/settings" element={<Settings />} />
-                                            <Route path="/account" element={<UserSettings />} />
-                                            <Route path="/org" element={<OrgSettings />} />
-                                          </Route>
-                                          <Route
-                                            path="*"
-                                            element={
-                                              <div
-                                                style={{
-                                                  display: 'flex',
-                                                  flexDirection: 'column',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'center',
-                                                  height: '100%',
-                                                  gap: 12,
-                                                  color: 'var(--color-fg)',
-                                                  fontSize: 15,
-                                                }}
-                                              >
-                                                <span style={{ fontSize: 32, lineHeight: 1 }}>
-                                                  404
-                                                </span>
-                                                <span>Page not found</span>
-                                                <Link
-                                                  to="/today"
+                                            <Route element={<AppShell />}>
+                                              <Route path="/today" element={<Dashboard />} />
+                                              <Route path="/patients" element={<Patients />} />
+                                              <Route
+                                                path="/patients/:id"
+                                                element={<PatientDetail />}
+                                              />
+                                              {/* Record tab lives in the URL so a tab is
+                                                linkable and the back button works. */}
+                                              <Route
+                                                path="/patients/:id/:tab"
+                                                element={<PatientDetail />}
+                                              />
+                                              <Route
+                                                path="/sessions/new"
+                                                element={<NewSession />}
+                                              />
+                                              <Route
+                                                path="/sessions/:id"
+                                                element={<SessionPage />}
+                                              />
+                                              <Route path="/notes" element={<Notes />} />
+                                              {/* Templates + Exercises are now Settings tabs;
+                                                keep the old paths as redirects for bookmarks. */}
+                                              <Route
+                                                path="/templates"
+                                                element={
+                                                  <Navigate to="/settings/templates" replace />
+                                                }
+                                              />
+                                              <Route
+                                                path="/exercises"
+                                                element={
+                                                  <Navigate to="/settings/exercises" replace />
+                                                }
+                                              />
+                                              <Route path="/settings" element={<Settings />} />
+                                              <Route path="/settings/:tab" element={<Settings />} />
+                                              {/* Account settings folded into /settings. */}
+                                              <Route
+                                                path="/account"
+                                                element={<Navigate to="/settings" replace />}
+                                              />
+                                              <Route path="/org" element={<OrgSettings />} />
+                                            </Route>
+                                            <Route
+                                              path="*"
+                                              element={
+                                                <div
                                                   style={{
-                                                    color: 'var(--color-accent)',
-                                                    fontSize: 14,
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    height: '100%',
+                                                    gap: 12,
+                                                    color: 'var(--color-fg)',
+                                                    fontSize: 15,
                                                   }}
                                                 >
-                                                  Go to dashboard
-                                                </Link>
-                                              </div>
-                                            }
-                                          />
-                                        </Routes>
-                                      </Suspense>
-                                    </FirstRunGuard>
-                                  </DemoBootstrap>
-                                  <GlobalDebugDrawer />
-                                </DebugDrawerProvider>
-                              </SettingsProvider>
+                                                  <span style={{ fontSize: 32, lineHeight: 1 }}>
+                                                    404
+                                                  </span>
+                                                  <span>Page not found</span>
+                                                  <Link
+                                                    to="/today"
+                                                    style={{
+                                                      color: 'var(--color-accent)',
+                                                      fontSize: 14,
+                                                    }}
+                                                  >
+                                                    Go to dashboard
+                                                  </Link>
+                                                </div>
+                                              }
+                                            />
+                                          </Routes>
+                                        </Suspense>
+                                      </FirstRunGuard>
+                                    </DemoBootstrap>
+                                    <GlobalDebugDrawer />
+                                  </DebugDrawerProvider>
+                                </SettingsProvider>
+                              </MeasurementsProvider>
                             </PlansProvider>
                           </ExercisesProvider>
                         </TemplatesProvider>

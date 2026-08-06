@@ -112,7 +112,7 @@ describe('TemplatesProvider', () => {
     const builtin = ref.current.templates.find((t) => t.builtin)!;
     let clone: NoteTemplate | undefined;
     await act(async () => {
-      clone = ref.current.cloneTemplate(builtin.id);
+      clone = ref.current.cloneTemplate(builtin);
     });
     await waitFor(() =>
       expect(ref.current.templates.find((t) => t.id === clone?.id)).toBeDefined(),
@@ -122,12 +122,19 @@ describe('TemplatesProvider', () => {
     expect(clone?.id).not.toBe(builtin.id);
   });
 
-  it('cloneTemplate: returns undefined for an unknown id', async () => {
+  it('cloneTemplate: works for a template not in the local library (e.g. an org-shared one)', async () => {
     const ref = await renderAndWait();
-    let result: NoteTemplate | undefined;
+    const foreign: NoteTemplate = {
+      ...ref.current.templates[0],
+      id: 'org-template-id',
+    };
+    let clone: NoteTemplate | undefined;
     await act(async () => {
-      result = ref.current.cloneTemplate('does-not-exist');
+      clone = ref.current.cloneTemplate(foreign);
     });
-    expect(result).toBeUndefined();
+    await waitFor(() =>
+      expect(ref.current.templates.find((t) => t.id === clone?.id)).toBeDefined(),
+    );
+    expect(clone?.id).not.toBe(foreign.id);
   });
 });

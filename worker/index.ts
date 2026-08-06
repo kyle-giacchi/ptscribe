@@ -32,6 +32,7 @@ import {
   type ProviderAdapter,
 } from './providers';
 import { decryptKey, KeyCryptoError } from './keyCrypto';
+import { isRetryableCode } from './apiErrors';
 
 /**
  * Workers Rate Limiting binding (GA). `limit()` is in-network, per-Cloudflare-
@@ -946,7 +947,7 @@ type ErrorCode =
   | 'KEY_ENC_UNAVAILABLE';
 
 function apiError(code: ErrorCode, error: string, status: number): Response {
-  return json({ code, error }, status);
+  return json({ code, error, retryable: isRetryableCode(code) }, status);
 }
 
 async function safeText(res: Response): Promise<string> {

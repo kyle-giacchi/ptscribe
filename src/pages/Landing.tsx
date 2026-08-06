@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, ArrowUpRight, Scale, Network } from 'lucide-react';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
-import { isDemoMode, DEMO_SESSION_ID } from '@/lib/demoMode';
+import { isDemoMode, DEMO_SESSION_ID, forceDemoMode, clearForcedDemoMode } from '@/lib/demoMode';
+import { activateTestUserSession, deactivateTestUserSession } from '@/lib/profile/profileId';
+import { unlockGateForDemo, clearGateCode } from '@/lib/gate';
 import { CompareModal } from '@/components/landing/CompareModal';
 import { HowItWorksModal } from '@/components/landing/HowItWorksModal';
 import { HowItWorksModalV2 } from '@/components/landing/HowItWorksModalV2';
@@ -180,6 +182,32 @@ function GithubMark({ size = 22, color = '#ffffff' }: { size?: number; color?: s
   );
 }
 
+/**
+ * "Try Demo" and "Admin Quick Login (dev)" are mutually exclusive entry modes.
+ * Each owns three pieces of persisted state — the demo-mode override, the
+ * test-user marker (which Profile the storage layer resolves to), and the
+ * AppGate code — and whichever ran last used to win, because neither cleared
+ * the other's. These two helpers keep the switch atomic in both directions.
+ */
+function enterDemoEntryMode(): void {
+  deactivateTestUserSession(); // else the profile resolves to `test-user`, not `demo`
+  if (import.meta.env.DEV) {
+    // Undo what "Admin Quick Login (dev)" leaves behind. It assumes a
+    // VITE_DEMO_MODE=false build and pre-unlocks the gate — both of which route
+    // Try Demo into the logged-in app and skip the demo-code prompt. Dev-only:
+    // in a real demo build there is no Quick Login to leave stale state, and
+    // clearing the gate there would re-prompt returning visitors for the code.
+    forceDemoMode();
+    clearGateCode();
+  }
+}
+
+function enterTestUserEntryMode(): void {
+  clearForcedDemoMode();
+  activateTestUserSession();
+  unlockGateForDemo();
+}
+
 export function Landing({ onSignIn }: LandingProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -321,6 +349,7 @@ export function Landing({ onSignIn }: LandingProps) {
   function handleDemo() {
     void whisperLoader.ensureReady().catch(() => {});
     if (!onSignIn) {
+      enterDemoEntryMode();
       // Deep-link target after the gate unlocks. In demo mode this must be the
       // demo session — not /today — so DemoBootstrap drops the user straight into
       // the session (and its "Welcome back" prompt) rather than flashing the
@@ -569,9 +598,31 @@ export function Landing({ onSignIn }: LandingProps) {
                   boxSizing: 'border-box',
                 }}
               >
-                Set up your account
+                Sign up Today
               </button>
             </div>
+            {import.meta.env.DEV && (
+              <button
+                onClick={() => {
+                  enterTestUserEntryMode();
+                  // Hard navigate: AuthProvider reads the test-user marker once at
+                  // mount, so an SPA route change would still see "signed out".
+                  window.location.href = '/today';
+                }}
+                style={{
+                  padding: '8px 14px',
+                  background: 'var(--color-pt-surface)',
+                  color: 'var(--color-pt-text-2)',
+                  border: '1px dashed var(--color-pt-border)',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Admin Quick Login (dev)
+              </button>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8893a5' }}>
               <Lock size={11} color="#8893a5" strokeWidth={2} />
               <span style={{ fontSize: 12 }}>
@@ -1509,6 +1560,36 @@ export function Landing({ onSignIn }: LandingProps) {
           </span>
         </div>
       </footer>
+
+      {/* Dev-only shortcut into a signed-in session. `import.meta.env.DEV` is
+          false in any built bundle, so this never ships. Same path as the
+          Login page's "Login as Test User": mark the session + satisfy the gate. */}
+      {import.meta.env.DEV && (
+        <button
+          onClick={() => {
+            enterTestUserEntryMode();
+            // Hard navigate: AuthProvider reads the test-user marker once at
+            // mount, so an SPA route change would still see "signed out".
+            window.location.href = '/today';
+          }}
+          style={{
+            position: 'fixed',
+            right: 16,
+            bottom: 16,
+            zIndex: 100,
+            padding: '8px 14px',
+            background: 'var(--color-pt-surface)',
+            color: 'var(--color-pt-text-2)',
+            border: '1px dashed var(--color-pt-border)',
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Admin Quick Login (dev)
+        </button>
+      )}
 
       <CompareModal
         open={compareOpen}

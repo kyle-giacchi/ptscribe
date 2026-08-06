@@ -1,23 +1,27 @@
-import { Mic, Pencil, Calendar, MessageSquare } from 'lucide-react';
-import {
-  Avatar,
-  ComingSoonChip,
-  PtButton,
-  StatusBadge,
-  type StatusTone,
-} from '@/components/design';
+import { Mic, Pencil } from 'lucide-react';
+import { Avatar, PtButton, StatusBadge, type StatusTone } from '@/components/design';
 import { labelForSex } from '@/utils/patientMetrics';
 import type { Patient } from '@/types';
 
-export type Tab = 'overview' | 'history' | 'measures' | 'hep' | 'documents' | 'billing';
+/**
+ * Record tabs. Every one of these is backed by real data — the former
+ * `documents` and `billing` tabs were removed rather than left as placeholders,
+ * because neither has a type, a schema, or a store behind it.
+ */
+export type Tab = 'overview' | 'visits' | 'measures' | 'plan';
 export const TABS: { value: Tab; label: string }[] = [
   { value: 'overview', label: 'Overview' },
-  { value: 'history', label: 'History' },
+  { value: 'visits', label: 'Visits' },
   { value: 'measures', label: 'Measures' },
-  { value: 'hep', label: 'HEP' },
-  { value: 'documents', label: 'Documents' },
-  { value: 'billing', label: 'Billing' },
+  { value: 'plan', label: 'Plan of care' },
 ];
+
+export const DEFAULT_TAB: Tab = 'overview';
+
+/** Narrow an untrusted `:tab` URL segment; anything unknown falls back to Overview. */
+export function parseTab(segment: string | undefined): Tab {
+  return TABS.find((t) => t.value === segment)?.value ?? DEFAULT_TAB;
+}
 
 export function PatientHeader({
   patient,
@@ -29,6 +33,7 @@ export function PatientHeader({
   onTab,
   onEdit,
   onStartSession,
+  counts,
 }: {
   patient: Patient;
   age: number | null;
@@ -39,6 +44,8 @@ export function PatientHeader({
   onTab: (t: Tab) => void;
   onEdit: () => void;
   onStartSession: () => void;
+  /** Per-tab item counts. Omitted or zero renders no badge. */
+  counts?: Partial<Record<Tab, number>>;
 }) {
   const idLine = [
     `PT-${patient.id.slice(0, 5).toUpperCase()}`,
@@ -101,24 +108,6 @@ export function PatientHeader({
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <PtButton
             variant="ghost"
-            iconLeft={<MessageSquare size={14} strokeWidth={2} />}
-            iconRight={<ComingSoonChip />}
-            disabled
-            title="Coming soon"
-          >
-            Message
-          </PtButton>
-          <PtButton
-            variant="ghost"
-            iconLeft={<Calendar size={14} strokeWidth={2} />}
-            iconRight={<ComingSoonChip />}
-            disabled
-            title="Coming soon"
-          >
-            Schedule
-          </PtButton>
-          <PtButton
-            variant="ghost"
             iconLeft={<Pencil size={14} strokeWidth={2} />}
             onClick={onEdit}
           >
@@ -135,17 +124,24 @@ export function PatientHeader({
       </div>
 
       <div
+        role="tablist"
         className="[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         style={{ display: 'flex', gap: 22, marginTop: 18, overflowX: 'auto' }}
       >
         {TABS.map((t) => {
           const active = tab === t.value;
+          const count = counts?.[t.value] ?? 0;
           return (
             <button
               key={t.value}
               type="button"
+              role="tab"
+              aria-selected={active}
               onClick={() => onTab(t.value)}
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
                 padding: '10px 0',
                 border: 'none',
                 background: 'transparent',
@@ -159,6 +155,22 @@ export function PatientHeader({
               }}
             >
               {t.label}
+              {count > 0 && (
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: 999,
+                    background: 'var(--color-pt-surface-mut)',
+                    border: '1px solid var(--color-pt-border)',
+                    color: 'var(--color-pt-text-3)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {count}
+                </span>
+              )}
             </button>
           );
         })}

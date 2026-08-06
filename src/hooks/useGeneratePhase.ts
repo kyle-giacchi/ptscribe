@@ -8,8 +8,10 @@ import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { runAiCall } from './ai/runAiCall';
 import type { useActionGuard } from './useActionGuard';
 import type { SessionMachineAction } from './sessionMachine/types';
-import { MAX_GENERATES_PER_SESSION } from '@/types';
+import { MAX_GENERATES_PER_SESSION, isSelfHostedProvider } from '@/types';
+import { defaultModelFor } from '@/services/ai/providerCatalog';
 import type {
+  CloudGenerationProvider,
   Note,
   NoteActivities,
   NoteFormat,
@@ -36,7 +38,16 @@ export interface UseGeneratePhaseParams {
 export type GenerateMode = 'replace' | 'append';
 
 export interface GeneratePhaseResult {
-  run: (mode?: GenerateMode, feedback?: string) => Promise<void>;
+  /**
+   * `cloudOverride` runs this one call against a cloud provider instead of the
+   * configured self-hosted endpoint. It is never chosen automatically — the user
+   * accepts it in the failure banner — and it deliberately does NOT write settings.
+   */
+  run: (
+    mode?: GenerateMode,
+    feedback?: string,
+    cloudOverride?: CloudGenerationProvider,
+  ) => Promise<void>;
   finalize: () => void;
   unfinalize: () => void;
   sectionChange: (key: string, body: string) => void;
@@ -113,7 +124,11 @@ export function useGeneratePhase({
   );
 
   const run = useCallback(
-    async (mode: GenerateMode = 'replace', feedback?: string) => {
+    async (
+      mode: GenerateMode = 'replace',
+      feedback?: string,
+      cloudOverride?: CloudGenerationProvider,
+    ) => {
       if (isGeneratingRef.current) return;
       isGeneratingRef.current = true;
       try {
@@ -122,11 +137,23 @@ export function useGeneratePhase({
           toast.error('Add a transcript first.');
           return;
         }
-        if (settings.ai.generation.provider === 'none') {
+        const genProvider = cloudOverride ?? settings.ai.generation.provider;
+        if (genProvider === 'none') {
           toast.error('Pick a generation provider in Settings to draft a note.');
           return;
         }
-        const genProvider = settings.ai.generation.provider;
+        // Self-hosted calls go browser → endpoint directly (ADR-0011), so an
+        // unconfigured endpoint is a dead call, not a Worker error to classify.
+        const endpoint = isSelfHostedProvider(genProvider)
+          ? settings.ai.generation.endpoints?.[genProvider]
+          : undefined;
+        if (isSelfHostedProvider(genProvider) && !endpoint?.baseUrl) {
+          toast.error('Add a server URL and model in Settings to draft a note.');
+          return;
+        }
+        const genModel = cloudOverride
+          ? defaultModelFor(cloudOverride)
+          : (endpoint?.model ?? settings.ai.generation.model);
 
         // Lifetime cap is session-backed (persisted) so it survives reload, Revert,
         // and Unlock — mirrors the cloud-transcribe cap in useTranscriptSource.
@@ -155,7 +182,8 @@ export function useGeneratePhase({
           execute: (signal) =>
             generateNote({
               provider: genProvider,
-              model: settings.ai.generation.model,
+              model: genModel,
+              endpoint,
               template,
               transcript,
               patient: patient!,
@@ -218,7 +246,7 @@ export function useGeneratePhase({
               errorPatch = {
                 aiErrors: appendAiError(session!.aiErrors, {
                   call: 'generate',
-                  provider: 'anthropic',
+                  provider: genProvider,
                   kind: 'key_mismatch',
                   detail: `Returned [${returned.join(', ')}] vs expected [${result.keyReport.expected.join(', ')}]`,
                   rawSnippet: result.rawText ?? undefined,
@@ -232,7 +260,7 @@ export function useGeneratePhase({
               errorPatch = {
                 aiErrors: appendAiError(session!.aiErrors, {
                   call: 'generate',
-                  provider: 'anthropic',
+                  provider: genProvider,
                   kind: 'blank',
                   detail: 'All sections empty after generation.',
                   rawSnippet: result.rawText ?? undefined,

@@ -125,6 +125,10 @@ const AiErrorEntrySchema = z.object({
     'key_rejected',
     'provider_limited',
     'signin_required',
+    'service_unavailable',
+    'demo_disabled',
+    'unreachable',
+    'model_missing',
   ]),
   status: z.number().int().optional(),
   latencyMs: z.number().min(0).optional(),
@@ -285,6 +289,21 @@ const PlanOfCareSchema = z.object({
   updatedAt: z.number().int(),
 });
 
+// ─── Objective measures ─────────────────────────────────────────────────────
+
+const MeasurementSchema = z.object({
+  id: z.string().min(1),
+  patientId: z.string().min(1),
+  sessionId: z.string().min(1).optional(),
+  measureId: z.string().min(1),
+  side: z.enum(['left', 'right']).optional(),
+  value: z.number(),
+  takenAt: z.number().int(),
+  notes: z.string().optional(),
+  createdAt: z.number().int(),
+  updatedAt: z.number().int(),
+});
+
 // ─── Settings ───────────────────────────────────────────────────────────────
 
 const SettingsSchema = z.object({
@@ -294,8 +313,16 @@ const SettingsSchema = z.object({
       model: z.string(),
     }),
     generation: z.object({
-      provider: z.enum(['anthropic', 'openai', 'google', 'none']),
+      provider: z.enum(['anthropic', 'openai', 'google', 'local', 'network', 'none']),
       model: z.string(),
+      // Self-hosted endpoints (ADR-0011) — absent until the user configures one.
+      endpoints: z
+        .record(
+          z.enum(['local', 'network']),
+          z.object({ baseUrl: z.string(), model: z.string(), apiKey: z.string().optional() }),
+        )
+        .optional(),
+      cloudFallback: z.enum(['anthropic', 'openai', 'google']).optional(),
     }),
   }),
   audio: z.object({
@@ -358,6 +385,11 @@ export const AppDataSchema = z.object({
   templates: z.array(NoteTemplateSchema),
   exercises: z.array(ExerciseSchema),
   plans: z.array(PlanOfCareSchema),
+  // `.default([])` rather than a migration step: AppData saved before objective
+  // measures existed parses clean and gains an empty slice. `migrate()` has no
+  // ladder (it asserts version === 1 and quarantines anything else), so an
+  // additive optional field is the only backward-compatible way to grow AppData.
+  measurements: z.array(MeasurementSchema).default([]),
   settings: SettingsSchema,
 });
 
@@ -396,6 +428,7 @@ export function defaultAppData(): AppData {
     templates,
     exercises,
     plans: [],
+    measurements: [],
     settings: {
       ai: {
         transcription: { provider: 'cloudflare', model: '@cf/deepgram/nova-3' },

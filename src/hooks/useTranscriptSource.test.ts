@@ -6,7 +6,7 @@ import { useTranscriptSource, type UseTranscriptSourceParams } from './useTransc
 import { MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock('@/services/ai/transcribe', () => ({ transcribe: vi.fn() }));
+vi.mock('@/services/ai/client/cloudflare', () => ({ transcribeWithCloudflare: vi.fn() }));
 // useBackgroundTranscription pulls in NotificationsProvider via useNotifications;
 // stub it so the hook renders without the full provider tree.
 vi.mock('./useBackgroundTranscription', () => ({
@@ -31,7 +31,8 @@ describe('runT3 demo-mode guard', () => {
 
   it('refuses to call Nova when demo mode is on', async () => {
     vi.spyOn(demo, 'isDemoMode').mockReturnValue(true);
-    const { transcribe } = await import('@/services/ai/transcribe');
+    const { transcribeWithCloudflare: transcribe } =
+      await import('@/services/ai/client/cloudflare');
     const params = makeParams();
     const { result } = renderHook(() => useTranscriptSource(params));
     await result.current.runT3();
@@ -46,7 +47,8 @@ describe('runT3 session-backed cap', () => {
 
   it('blocks Nova when session.cloudTranscribeCount already equals the cap', async () => {
     vi.spyOn(demo, 'isDemoMode').mockReturnValue(false);
-    const { transcribe } = await import('@/services/ai/transcribe');
+    const { transcribeWithCloudflare: transcribe } =
+      await import('@/services/ai/client/cloudflare');
     const params = makeParams({
       session: {
         id: 's1',
@@ -66,7 +68,8 @@ describe('runT3 session-backed cap', () => {
 
   it('increments cloudTranscribeCount on a successful Nova pass', async () => {
     vi.spyOn(demo, 'isDemoMode').mockReturnValue(false);
-    const { transcribe } = await import('@/services/ai/transcribe');
+    const { transcribeWithCloudflare: transcribe } =
+      await import('@/services/ai/client/cloudflare');
     (transcribe as Mock).mockResolvedValue({ text: 'final transcript' });
     const params = makeParams({
       session: {

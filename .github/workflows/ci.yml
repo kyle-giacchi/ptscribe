@@ -37,3 +37,8 @@ jobs:
 
       - name: Test (with coverage floor)
         run: npm run test:coverage
+
+      # Deploy runs `npm run build`; without this a build break lands on main
+      # green and only surfaces on the cloudflare-deployment branch.
+      - name: Build
+        run: npm run build

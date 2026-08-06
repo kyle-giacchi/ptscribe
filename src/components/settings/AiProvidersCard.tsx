@@ -7,13 +7,23 @@ import { useProviderCatalog, defaultModelFor } from '@/services/ai/providerCatal
 import { getUserKeys, type KeyProvider, type KeyStatus } from '@/services/ai/keysClient';
 import { useUsableKey } from '@/hooks/useUsableKey';
 import { ProviderKeyCard } from './ProviderKeyCard';
-import type { GenerationProvider } from '@/types';
+import { SelfHostedEndpointCard } from './SelfHostedEndpointCard';
+import { useSelfHostedAllowed } from '@/hooks/useSelfHostedAllowed';
+import {
+  isCloudProvider,
+  isSelfHostedProvider,
+  type CloudGenerationProvider,
+  type GenerationProvider,
+} from '@/types';
 
-const GEN_PROVIDERS: GenerationProvider[] = ['anthropic', 'openai', 'google', 'none'];
+const CLOUD_SEGMENTS: CloudGenerationProvider[] = ['anthropic', 'openai', 'google'];
+const SELF_HOSTED_SEGMENTS: GenerationProvider[] = ['local', 'network'];
 const GEN_LABELS: Record<GenerationProvider, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   google: 'Google',
+  local: 'This machine',
+  network: 'In-network',
   none: 'Off',
 };
 
@@ -47,13 +57,29 @@ export function AiProvidersCard() {
   }, []);
 
   function changeGenProvider(next: GenerationProvider) {
+    const current = settings.ai.generation;
     if (next === 'none') {
-      updateAi({ generation: { ...settings.ai.generation, provider: 'none' } });
+      updateAi({ generation: { ...current, provider: 'none' } });
+      return;
+    }
+    if (isSelfHostedProvider(next)) {
+      // Remember the cloud provider being routed around — it's the only one the
+      // failure dialog may offer, and only with the user's explicit consent.
+      updateAi({
+        generation: {
+          ...current,
+          provider: next,
+          model: current.endpoints?.[next]?.model ?? '',
+          cloudFallback: isCloudProvider(current.provider)
+            ? current.provider
+            : current.cloudFallback,
+        },
+      });
       return;
     }
     // Switching provider keeps each provider's stored key (server-side, untouched);
     // only re-point the active model to the new provider's default.
-    updateAi({ generation: { provider: next, model: defaultModelFor(next) } });
+    updateAi({ generation: { ...current, provider: next, model: defaultModelFor(next) } });
   }
 
   function handleKeyStatus(provider: KeyProvider, status: KeyStatus) {
@@ -61,7 +87,13 @@ export function AiProvidersCard() {
   }
 
   const catalog = useProviderCatalog();
-  const activeDescriptor = genProvider !== 'none' ? catalog[genProvider] : null;
+  const activeDescriptor = isCloudProvider(genProvider) ? catalog[genProvider] : null;
+  const selfHostedAllowed = useSelfHostedAllowed();
+  const segments: GenerationProvider[] = [
+    ...CLOUD_SEGMENTS,
+    ...(selfHostedAllowed ? SELF_HOSTED_SEGMENTS : []),
+    'none',
+  ];
 
   return (
     <SurfaceCard padding={18}>
@@ -134,15 +166,55 @@ export function AiProvidersCard() {
               <SegmentedControl<GenerationProvider>
                 value={genProvider}
                 onChange={changeGenProvider}
-                items={GEN_PROVIDERS.map((p) => ({ value: p, label: GEN_LABELS[p] }))}
+                items={segments.map((p) => ({ value: p, label: GEN_LABELS[p] }))}
               />
             </div>
           </Field>
+
+          {!selfHostedAllowed && (
+            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
+              Sign in to route note generation to a model on this machine or on your clinic network.
+            </div>
+          )}
 
           {genProvider === 'none' ? (
             <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
               AI note generation is off — you can still write and edit notes manually.
             </div>
+          ) : isSelfHostedProvider(genProvider) ? (
+            <>
+              <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+                Transcripts go straight from this browser to the server below — they never reach
+                PTScribe&apos;s servers.
+              </div>
+              <SelfHostedEndpointCard provider={genProvider} />
+              <Field
+                label="Fallback if it fails"
+                hint="Offered in a dialog when the self-hosted call fails. Never used automatically — choosing it sends the transcript to the cloud."
+                className="max-w-sm"
+              >
+                <Select
+                  value={settings.ai.generation.cloudFallback ?? ''}
+                  onChange={(e) =>
+                    updateAi({
+                      generation: {
+                        ...settings.ai.generation,
+                        cloudFallback: e.target.value
+                          ? (e.target.value as CloudGenerationProvider)
+                          : undefined,
+                      },
+                    })
+                  }
+                >
+                  <option value="">No fallback</option>
+                  {CLOUD_SEGMENTS.map((p) => (
+                    <option key={p} value={p}>
+                      {GEN_LABELS[p]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </>
           ) : (
             <>
               <Field label="Model" className="max-w-sm">

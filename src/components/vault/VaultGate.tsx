@@ -5,6 +5,7 @@ import { vault } from '@/lib/vault/vault';
 import { PASSPHRASE_MIN_CHARS } from '@/lib/vault/crypto';
 import { migrateLegacyPlaintext } from '@/lib/vault/migration';
 import { isDemoMode, DEMO_VAULT_PASSPHRASE } from '@/lib/demoMode';
+import { isTestUserSession } from '@/lib/profile/profileId';
 import { STORAGE_KEYS } from '@/lib/storageKeys';
 import { audioRepository } from '@/services/AudioRepository';
 import { dataRepository } from '@/services/DataRepository';
@@ -14,9 +15,14 @@ type Mode = 'setup' | 'unlock';
 
 export function VaultGate({ children }: { children: ReactNode }) {
   const demoMode = isDemoMode();
+  // Dev-only: the Landing "Admin Quick Login" marks a test-user session on a
+  // non-demo local build. Auto-unlock with the demo passphrase so the shortcut
+  // lands in the app instead of the passphrase prompt. Never in a built bundle.
+  const devBypass = import.meta.env.DEV && !demoMode && isTestUserSession();
+  const autoUnlock = demoMode || devBypass;
   const [mode] = useState<Mode>(() => (vault.isInitialized() ? 'unlock' : 'setup'));
   const [unlocked, setUnlocked] = useState<boolean>(vault.isUnlocked());
-  const [autoUnlockTried, setAutoUnlockTried] = useState<boolean>(!demoMode);
+  const [autoUnlockTried, setAutoUnlockTried] = useState<boolean>(!autoUnlock);
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,7 +35,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
   const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
-    if (!demoMode || unlocked || autoUnlockTried) return;
+    if (!autoUnlock || unlocked || autoUnlockTried) return;
     let cancelled = false;
     void (async () => {
       const demoPass = DEMO_VAULT_PASSPHRASE;
@@ -38,7 +44,10 @@ export function VaultGate({ children }: { children: ReactNode }) {
           const result = await vault.unlock(demoPass);
           if (!cancelled && result.ok) {
             setUnlocked(true);
-          } else if (!cancelled) {
+          } else if (!cancelled && demoMode) {
+            // Wipe-and-reinit is demo-only. Under devBypass the active profile is
+            // `local` (a real, possibly user-owned vault) — never wipe it; fall
+            // through to the normal passphrase prompt instead.
             // An initialized vault in this profile's namespace won't open with
             // the demo passphrase. Post-ADR-0007 this wipe is profile-scoped:
             // resetLocalDataForDemo() only touches the demo/test-user namespace
@@ -65,15 +74,15 @@ export function VaultGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [demoMode, unlocked, autoUnlockTried]);
+  }, [autoUnlock, demoMode, unlocked, autoUnlockTried]);
 
   useEffect(() => {
-    if (demoMode && !autoUnlockTried) return;
+    if (autoUnlock && !autoUnlockTried) return;
     if (!unlocked) inputRef.current?.focus();
-  }, [unlocked, mode, demoMode, autoUnlockTried]);
+  }, [unlocked, mode, autoUnlock, autoUnlockTried]);
 
   if (unlocked) return <>{children}</>;
-  if (demoMode && !autoUnlockTried) return null;
+  if (autoUnlock && !autoUnlockTried) return null;
 
   if (pendingRecoveryCode) {
     return (

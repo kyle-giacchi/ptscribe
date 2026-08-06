@@ -6,11 +6,14 @@ import type {
   NoteTemplate,
   Note,
   Patient,
+  SelfHostedEndpoint,
+  SelfHostedProvider,
   SessionModifiers,
   SessionType,
   TranscriptTier,
 } from '@/types';
 import { callAnthropic } from './client/anthropic';
+import { callOpenAiCompat } from './client/openaiCompat';
 import { buildUserPrompt, buildModifierBlock } from '@/lib/clinical/prompts';
 import { DIARIZATION_NOTE, NO_DIARIZATION_NOTE, NO_PII_RULE } from '@/lib/clinical/promptAppendix';
 
@@ -26,6 +29,9 @@ export interface GenerateNoteArgs {
   activeTranscriptTier?: TranscriptTier;
   regenerationDraft?: Note;
   regenerationFeedback?: string;
+  /** Required when `provider` is 'local' or 'network'. Resolved by the caller
+   *  from settings so this module stays settings-agnostic. */
+  endpoint?: SelfHostedEndpoint;
   signal?: AbortSignal;
   onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
@@ -44,6 +50,70 @@ type GenerateBackend = (args: GenerateNoteArgs) => Promise<GenerateNoteResult>;
 // The Worker resolves the user's key for that provider and forwards the call.
 const workerBackend: GenerateBackend = async (args) => {
   const provider = args.provider as 'anthropic' | 'openai' | 'google';
+  const { system, modifierBlock, userPrompt } = buildPrompts(args);
+  const model = args.model || (provider === 'anthropic' ? 'claude-sonnet-4-6' : args.model);
+
+  const result = await callAnthropic({
+    provider,
+    model,
+    system,
+    modifierBlock,
+    user: userPrompt,
+    signal: args.signal,
+    onRetry: args.onRetry,
+  });
+
+  return parseIntoSections(args, result.text, { model, system, modifierBlock, user: userPrompt });
+};
+
+/**
+ * Self-hosted generation (ADR-0011): the browser talks to the user's own
+ * OpenAI-compatible server directly — no Worker, so the transcript never
+ * touches our infrastructure.
+ */
+const selfHostedBackend: GenerateBackend = async (args) => {
+  const provider = args.provider as SelfHostedProvider;
+  if (!args.endpoint?.baseUrl || !args.endpoint.model) {
+    throw new Error(
+      `No ${provider === 'local' ? 'local' : 'in-network'} endpoint configured. Add one in Settings.`,
+    );
+  }
+  const { system, modifierBlock, userPrompt } = buildPrompts(args);
+  // The Worker normally appends the modifier block server-side to keep the
+  // prompt-cache key stable. There is no Worker and no cache here, so compose it
+  // client-side — the string sent to the model must still be identical in shape.
+  const fullSystem = system + modifierBlock;
+
+  const result = await callOpenAiCompat({
+    provider,
+    endpoint: args.endpoint,
+    system: fullSystem,
+    user: userPrompt,
+    signal: args.signal,
+    onRetry: args.onRetry,
+  });
+
+  return parseIntoSections(args, result.text, {
+    model: args.endpoint.model,
+    system: fullSystem,
+    modifierBlock,
+    user: userPrompt,
+  });
+};
+
+const generateBackends: Record<GenerationProvider, GenerateBackend> = {
+  anthropic: workerBackend,
+  openai: workerBackend,
+  google: workerBackend,
+  local: selfHostedBackend,
+  network: selfHostedBackend,
+  none: () => {
+    throw new Error('AI generation is disabled. Pick a provider in Settings.');
+  },
+};
+
+/** Prompt build shared by every backend — the model sees the same thing either way. */
+function buildPrompts(args: GenerateNoteArgs) {
   const userPrompt = buildUserPrompt({
     template: args.template,
     transcript: args.transcript,
@@ -57,45 +127,27 @@ const workerBackend: GenerateBackend = async (args) => {
   // Only the cloud path (Nova-3 / T3) produces a diarized transcript with
   // speaker labels. T1 (browser speech recognition) and T2 (local Whisper)
   // are a single merged stream, so we tell the model speakers aren't split.
-  const isDiarized = args.activeTranscriptTier === 't3';
-  const speakerNote = isDiarized ? DIARIZATION_NOTE : NO_DIARIZATION_NOTE;
-  const system = args.template.systemPrompt.trimEnd() + speakerNote + NO_PII_RULE;
+  const speakerNote = args.activeTranscriptTier === 't3' ? DIARIZATION_NOTE : NO_DIARIZATION_NOTE;
+  return {
+    system: args.template.systemPrompt.trimEnd() + speakerNote + NO_PII_RULE,
+    modifierBlock: args.modifiers ? buildModifierBlock(args.modifiers) : '',
+    userPrompt,
+  };
+}
 
-  const modifierBlock = args.modifiers ? buildModifierBlock(args.modifiers) : '';
-  const model = args.model || (provider === 'anthropic' ? 'claude-sonnet-4-6' : args.model);
-
-  const result = await callAnthropic({
-    provider,
-    model,
-    system,
-    modifierBlock,
-    user: userPrompt,
-    signal: args.signal,
-    onRetry: args.onRetry,
-  });
-
-  const parsed = extractJson(result.text);
+function parseIntoSections(
+  args: GenerateNoteArgs,
+  rawText: string,
+  debugPrompts: AiDebugPrompts,
+): GenerateNoteResult {
+  const parsed = extractJson(rawText);
   const sections: NoteSection[] = args.template.sections.map((s) => ({
     key: s.key,
     label: s.label,
     body: typeof parsed[s.key] === 'string' ? (parsed[s.key] as string) : '',
   }));
-  return {
-    sections,
-    rawText: result.text,
-    debugPrompts: { model, system, modifierBlock, user: userPrompt },
-    keyReport: buildKeyReport(args.template, parsed),
-  };
-};
-
-const generateBackends: Record<GenerationProvider, GenerateBackend> = {
-  anthropic: workerBackend,
-  openai: workerBackend,
-  google: workerBackend,
-  none: () => {
-    throw new Error('AI generation is disabled. Pick a provider in Settings.');
-  },
-};
+  return { sections, rawText, debugPrompts, keyReport: buildKeyReport(args.template, parsed) };
+}
 
 /**
  * Send the transcript + context to the configured provider and parse the

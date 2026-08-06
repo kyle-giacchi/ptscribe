@@ -212,7 +212,11 @@ export type AiErrorEntryKind =
   | 'no_key'
   | 'key_rejected'
   | 'provider_limited'
-  | 'signin_required';
+  | 'signin_required'
+  | 'service_unavailable'
+  | 'demo_disabled'
+  | 'unreachable' // self-hosted endpoint didn't answer (down / CORS / mixed content / private-network block)
+  | 'model_missing'; // self-hosted endpoint is up but doesn't serve the configured model
 
 /**
  * One persisted AI-call failure. Transport failures store lean metadata only;
@@ -441,10 +445,78 @@ export interface PlanOfCare {
   updatedAt: number;
 }
 
+// ─── Objective measures ─────────────────────────────────────────────────────
+
+export type Side = 'left' | 'right';
+export type MeasureKind = 'pain' | 'rom' | 'strength' | 'outcome' | 'functional';
+
+/**
+ * A measure *definition* from the built-in catalog (`src/lib/clinical/measures.ts`).
+ * Definitions carry the unit, the plausible range, and — critically — which
+ * direction counts as improvement, so a raw delta can be rendered as better/worse.
+ */
+export interface MeasureDef {
+  /** Stable catalog key, e.g. `nprs`, `rom_knee_flexion`. Persisted on Measurement. */
+  id: string;
+  label: string;
+  kind: MeasureKind;
+  /** Display suffix: `/10`, `°`, `/5`, `kg`, `s`, `m`, `pts`, `%`. */
+  unit: string;
+  min: number;
+  max: number;
+  /** True when a HIGHER value is clinically better (ROM, MMT, LEFS, 6MWT). */
+  higherIsBetter: boolean;
+  /** Measure is taken per-limb — the entry form asks for a side. */
+  bilateral?: boolean;
+  /** Minimal clinically important difference, where one is published. */
+  mcid?: number;
+  /** Shown under the value in the entry form. */
+  hint?: string;
+}
+
+/**
+ * One recorded data point. Patient-owned rather than visit-owned: measures are
+ * routinely taken outside a documented visit, and every useful view of them
+ * (trend, baseline vs latest) is per-patient. `sessionId` is a back-link when
+ * the value was captured during a visit.
+ */
+export interface Measurement {
+  id: ID;
+  patientId: ID;
+  sessionId?: ID;
+  /** References `MeasureDef.id`. Free string so a retired catalog entry still renders. */
+  measureId: string;
+  side?: Side;
+  value: number;
+  takenAt: number;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ─── Settings ───────────────────────────────────────────────────────────────
 
 export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'local' | 'none';
-export type GenerationProvider = 'anthropic' | 'openai' | 'google' | 'none';
+/**
+ * `local` (loopback server on the clinician's machine) and `network` (clinic-hosted
+ * server on the LAN/VPN) are *self-hosted*: the browser calls them directly, with no
+ * Worker in the path and no BYOK key on our side. See ADR-0011.
+ */
+export type GenerationProvider = 'anthropic' | 'openai' | 'google' | 'local' | 'network' | 'none';
+
+/** Providers whose key we store server-side and whose calls the Worker proxies. */
+export type CloudGenerationProvider = Exclude<GenerationProvider, 'none' | 'local' | 'network'>;
+export type SelfHostedProvider = Extract<GenerationProvider, 'local' | 'network'>;
+
+export const CLOUD_GENERATION_PROVIDERS = ['anthropic', 'openai', 'google'] as const;
+export const SELF_HOSTED_PROVIDERS = ['local', 'network'] as const;
+
+export function isCloudProvider(p: GenerationProvider): p is CloudGenerationProvider {
+  return (CLOUD_GENERATION_PROVIDERS as readonly string[]).includes(p);
+}
+export function isSelfHostedProvider(p: GenerationProvider): p is SelfHostedProvider {
+  return p === 'local' || p === 'network';
+}
 export type DensityMode = 'cozy' | 'compact';
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -456,7 +528,21 @@ export interface AISettings {
   generation: {
     provider: GenerationProvider;
     model: string; // e.g. 'claude-sonnet-4-6'
+    /** Endpoint config for the self-hosted providers. Absent until configured. */
+    endpoints?: Partial<Record<SelfHostedProvider, SelfHostedEndpoint>>;
+    /** Cloud provider offered as a fallback when a self-hosted call fails.
+     *  Never used automatically — the user has to accept it in the dialog. */
+    cloudFallback?: CloudGenerationProvider;
   };
+}
+
+/** An OpenAI-compatible server the browser talks to directly (Ollama, LM Studio, vLLM…). */
+export interface SelfHostedEndpoint {
+  /** Origin + optional path prefix, no trailing `/v1`. `http://` only for loopback. */
+  baseUrl: string;
+  model: string;
+  /** Optional bearer token for the user's own server. Vault-encrypted with the rest of AppData. */
+  apiKey?: string;
 }
 
 export type SilenceSensitivity = 'low' | 'medium' | 'high';
@@ -651,5 +737,6 @@ export interface AppData {
   templates: NoteTemplate[];
   exercises: Exercise[];
   plans: PlanOfCare[];
+  measurements: Measurement[];
   settings: Settings;
 }

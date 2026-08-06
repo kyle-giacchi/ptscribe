@@ -7,10 +7,12 @@
  */
 
 import { apiFetch } from '@/lib/apiClient';
-import type { GenerationProvider } from '@/types';
+import type { CloudGenerationProvider } from '@/types';
 
-/** The three BYOK providers — `none` is the manual-only path, never a key owner. */
-export type KeyProvider = Exclude<GenerationProvider, 'none'>;
+/** The three BYOK providers — `none` is the manual-only path, never a key owner.
+ *  Self-hosted providers are excluded: their calls never reach the Worker, so
+ *  there is no key for us to store or verify. */
+export type KeyProvider = CloudGenerationProvider;
 
 /** Masked, read-only key status for one provider (never the key itself). */
 export interface KeyStatus {

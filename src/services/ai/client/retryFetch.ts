@@ -65,7 +65,11 @@ export async function retryFetch(
 
     try {
       const response = await doFetch();
-      if (response.ok || !policy.retryableStatuses.has(response.status)) {
+      if (
+        response.ok ||
+        !policy.retryableStatuses.has(response.status) ||
+        (await isDeclaredNonRetryable(response))
+      ) {
         return { response, attempts: attempt };
       }
 
@@ -113,6 +117,21 @@ export async function retryFetch(
     rawDetail: lastRaw,
     message: `${policy.label} call failed`,
   });
+}
+
+/**
+ * The Worker marks deterministic failures (bad config, rejected key, disabled
+ * feature) with `retryable: false` even when the HTTP status is one we'd
+ * otherwise retry (e.g. 503 KEY_ENC_UNAVAILABLE). Peek at a clone so the
+ * adapter can still read the original body for classification/messaging.
+ */
+async function isDeclaredNonRetryable(res: Response): Promise<boolean> {
+  try {
+    const body = (await res.clone().json()) as { retryable?: unknown };
+    return body.retryable === false;
+  } catch {
+    return false;
+  }
 }
 
 /** Read a Response body as text without throwing on a decode/stream error. */

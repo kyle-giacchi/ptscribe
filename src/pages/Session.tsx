@@ -9,15 +9,17 @@ import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useExercises } from '@/contexts/ExercisesProvider';
 import { usePlans } from '@/contexts/PlansProvider';
 import { PatientActivitiesCard } from '@/components/sessions/activities/PatientActivitiesCard';
+import { SessionMeasures } from '@/components/sessions/SessionMeasures';
+import { useMeasurements } from '@/contexts/MeasurementsProvider';
 import { homeDiffersFromPlan, seedHomeFromPlan } from '@/services/note/activities';
-import { useOrgConfig } from '@/contexts/OrgConfigProvider';
 import { useSettings } from '@/contexts/SettingsProvider';
+import { isSelfHostedProvider } from '@/types';
+import { useTemplateCatalog } from '@/hooks/useTemplateCatalog';
 import { isDemoMode, DEMO_PATIENT_ID } from '@/lib/demoMode';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebSpeechTranscript } from '@/hooks/useLiveTranscript';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import { useSessionPatcher } from '@/hooks/useSessionPatcher';
-import { useMemo } from 'react';
 import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
 import { useResizablePanes } from '@/hooks/useResizablePanes';
@@ -57,17 +59,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const { getSession, sessions } = useSessions();
   const { getPatient, updatePatient } = usePatients();
   const { forSession } = useNotes();
-  const { templates, getTemplate } = useTemplates();
-  const { sharedTemplates } = useOrgConfig();
+  const { getTemplate } = useTemplates();
   const { settings, updateSession } = useSettings();
   const { patchSession, patchClips, patchClip } = useSessionPatcher(sessionId);
 
-  // Org shared templates resolve here just like local ones (read-only, sourced
+  // Org-shared templates resolve here just like local ones (read-only, sourced
   // from the org) so a session pointing at an org template generates correctly.
-  const allTemplates = useMemo(() => {
-    const localIds = new Set(templates.map((t) => t.id));
-    return [...templates, ...sharedTemplates.filter((t) => !localIds.has(t.id))];
-  }, [templates, sharedTemplates]);
+  const { all: allTemplates } = useTemplateCatalog();
 
   const session = getSession(sessionId);
   const patient = session ? getPatient(session.patientId) : undefined;
@@ -75,7 +73,12 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const template =
     getTemplate(session?.templateId ?? '') ??
     allTemplates.find((t) => t.id === session?.templateId) ??
-    templates[0];
+    allTemplates[0];
+
+  // Full history, not just this visit — the Measures tab shows each measure's
+  // last reading so today's is one number rather than a lookup.
+  const { forPatient: measurementsFor, addMeasurement, removeMeasurement } = useMeasurements();
+  const patientMeasurements = patient ? measurementsFor(patient.id) : [];
 
   // ── Patient activities (per-visit exercise log) ──────────────────────────
   const { exercises } = useExercises();
@@ -112,7 +115,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ClipsDrawer on-demand sheet, which stays as the <1024px fallback (no room
   // for a second column there). See CONTEXT.md#clips.
   const [rightPanelTab, setRightPanelTab] = useState<'transcript' | 'clips'>('transcript');
-  const [noteTab, setNoteTab] = useState<'notes' | 'activities'>('notes');
+  const [noteTab, setNoteTab] = useState<'notes' | 'activities' | 'measures'>('notes');
   const clipsFileRef = useRef<AudioFileInputHandle>(null);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
@@ -195,6 +198,21 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     piiScrub,
     setSessionDebug,
   ]);
+
+  // A self-hosted generation failure can offer one cloud run — only if the user
+  // picked a fallback provider in Settings, and only on explicit confirm (ADR-0011).
+  const cloudFallback = settings.ai.generation.cloudFallback;
+  const generateCloudFallback =
+    cloudFallback && isSelfHostedProvider(settings.ai.generation.provider)
+      ? {
+          label: 'Use cloud once',
+          confirm: `This sends the transcript to ${cloudFallback} for this note only. Your settings stay on your own server.`,
+          onUse: () => {
+            actions.clearGenerateAiError();
+            actions.generate('replace', undefined, cloudFallback);
+          },
+        }
+      : undefined;
 
   if (!session || !patient) return <NotFound />;
 
@@ -395,6 +413,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         items={[
                           { value: 'notes', label: 'Notes' },
                           { value: 'activities', label: 'Activities' },
+                          { value: 'measures', label: 'Measures' },
                         ]}
                       />
                       {noteTab === 'notes' && note && (
@@ -432,7 +451,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                           onSectionChange={actions.sectionChange}
                         />
                       </>
-                    ) : (
+                    ) : noteTab === 'activities' ? (
                       <PatientActivitiesCard
                         activities={displayActivities}
                         exercises={exercises}
@@ -442,6 +461,16 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         onChange={actions.activitiesChange}
                         // Task 6 replaces this with actions.syncPlanOfCare.
                         onSyncPlan={() => {}}
+                      />
+                    ) : (
+                      <SessionMeasures
+                        patientId={session.patientId}
+                        sessionId={session.id}
+                        sessionDate={session.date}
+                        measurements={patientMeasurements}
+                        onAdd={addMeasurement}
+                        onRemove={removeMeasurement}
+                        readOnly={!!note?.finalized}
                       />
                     )}
                     {state.generate.retryStatus ? (
@@ -458,6 +487,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                             actions.generate();
                           }}
                           onDismiss={actions.clearGenerateAiError}
+                          fallback={generateCloudFallback}
                         />
                       </div>
                     ) : null}

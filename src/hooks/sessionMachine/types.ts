@@ -1,5 +1,5 @@
-import type { AiCallError } from '@/services/ai/errors';
-import type { AiDebugPrompts, GenerateKeyReport } from '@/types';
+import type { AiCallError, AiProvider } from '@/services/ai/errors';
+import type { AiDebugPrompts, CloudGenerationProvider, GenerateKeyReport } from '@/types';
 import {
   initialAdvisories,
   type AdvisoryAction,
@@ -9,7 +9,7 @@ import {
 // ── Shared ────────────────────────────────────────────────────────────────
 
 export interface RetryStatus {
-  provider: 'anthropic' | 'nova' | 'openai' | 'google';
+  provider: AiProvider;
   attempt: number;
   max: number;
 }
@@ -69,7 +69,15 @@ export interface CaptureState {
 
 export type SessionGate =
   /** PHI confirmation before Generate. Holds the parked generate intent. */
-  | { kind: 'phi-confirm'; intent: { mode: 'replace' | 'append'; feedback?: string } }
+  | {
+      kind: 'phi-confirm';
+      intent: {
+        mode: 'replace' | 'append';
+        feedback?: string;
+        /** One-shot cloud provider chosen after a self-hosted call failed (ADR-0011). */
+        cloudOverride?: CloudGenerationProvider;
+      };
+    }
   /** Stale-note confirmation before Finalize (CONTEXT.md §Note staleness). */
   | { kind: 'stale-finalize' }
   /** Local Whisper unavailable before Recording (CONTEXT.md §T2 failure handling). */

@@ -5,13 +5,13 @@ import { audioRepository } from '@/services/AudioRepository';
 import { noteMatchesInputs } from '@/services/note/staleness';
 import { appendAiError } from '@/lib/debug/aiErrorLog';
 import { isDemoMode } from '@/lib/demoMode';
+import { isSettled } from '@/utils/clips';
 import { useActionGuard } from './useActionGuard';
 import { useCapturePhase } from './useCapturePhase';
 import { useTranscriptSource } from './useTranscriptSource';
 import { useGeneratePhase } from './useGeneratePhase';
 import { useAutoRotateClip } from './useAutoRotateClip';
 import { useWhisperLoading } from './useWhisperLoading';
-import { useUploadPhase } from './useUploadPhase';
 import { useTemplateChangePhase } from './useTemplateChangePhase';
 import { sessionMachineReducer } from './sessionMachine/reducer';
 import type { AdvisoryAction } from './sessionMachine/recordingAdvisories';
@@ -25,6 +25,7 @@ import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
 import { MAX_GENERATES_PER_SESSION, MAX_TRANSCRIBES_PER_SESSION } from '@/types';
 import type {
+  CloudGenerationProvider,
   Note,
   NoteActivities,
   NoteTemplate,
@@ -139,7 +140,11 @@ export interface SessionMachineActions {
   copyTranscript: () => void;
   // Note (Generate / Finalize)
   /** May open the PHI gate instead of generating. */
-  generate: (mode?: 'replace' | 'append', feedback?: string) => void;
+  generate: (
+    mode?: 'replace' | 'append',
+    feedback?: string,
+    cloudOverride?: CloudGenerationProvider,
+  ) => void;
   /** May open the stale-finalize gate instead of finalizing. */
   finalize: () => void;
   unfinalize: () => void;
@@ -330,11 +335,18 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
 
   // ── Generate / Finalize (PHI + stale gates) ──────────────────────────────
   const generate = useCallback(
-    (mode: 'replace' | 'append' = 'replace', feedback?: string) => {
+    (
+      mode: 'replace' | 'append' = 'replace',
+      feedback?: string,
+      cloudOverride?: CloudGenerationProvider,
+    ) => {
       if (settings.session.phiConfirmDismissed) {
-        void generatePhase.run(mode, feedback);
+        void generatePhase.run(mode, feedback, cloudOverride);
       } else {
-        dispatch({ type: 'gate/open', gate: { kind: 'phi-confirm', intent: { mode, feedback } } });
+        dispatch({
+          type: 'gate/open',
+          gate: { kind: 'phi-confirm', intent: { mode, feedback, cloudOverride } },
+        });
       }
     },
     [settings.session.phiConfirmDismissed, generatePhase],
@@ -456,7 +468,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       if (gate.kind === 'phi-confirm' && resolution.kind === 'phi-confirm') {
         if (resolution.outcome === 'confirm') {
           if (resolution.dontShowAgain) persistPhiConfirmDismissed();
-          void generatePhase.run(gate.intent.mode, gate.intent.feedback);
+          void generatePhase.run(gate.intent.mode, gate.intent.feedback, gate.intent.cloudOverride);
         }
       } else if (resolution.kind === 'stale-finalize') {
         if (resolution.outcome === 'regenerate') generate('replace');
@@ -486,14 +498,55 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   );
 
   // ── Upload-processing choreography ───────────────────────────────────────
+  // (CONTEXT.md — UploadProcessingView): upload → clip saved → Capture-end
+  // (merge + T2) → ≥2s minimum display → navigate to review.
   const t2Phase = transcriptSource.backgroundT2.phase;
-  const { uploadAudio, dismissUploadProcessing } = useUploadPhase({
-    session,
-    uploadFlow: state.uploadFlow,
-    t2Phase,
-    dispatch,
-    captureRef,
-  });
+
+  const uploadAudio = useCallback(async (file: File) => {
+    dispatch({ type: 'uploadFlow/begin' });
+    dispatch({ type: 'view/setTab', tab: 'record' });
+    const clipId = await captureRef.current.handleUploadAudio(file);
+    if (clipId) {
+      dispatch({ type: 'uploadFlow/clipSaved', clipId, startedAt: Date.now() });
+    } else {
+      dispatch({ type: 'uploadFlow/clear' });
+    }
+  }, []);
+
+  useEffect(() => {
+    const { active, clipId, mergeStarted, startedAt } = state.uploadFlow;
+    if (!active || !clipId) return;
+    const clip = session?.clips.find((c) => c.id === clipId);
+    if (!clip) return;
+
+    const audioSaved = isSettled(clip);
+
+    // Once audio is saved: kick off Capture-end once. endCapture never
+    // navigates, so the processing screen stays up until T2 lands below.
+    if (audioSaved && !mergeStarted) {
+      dispatch({ type: 'uploadFlow/mergeStarted' });
+      void captureRef.current.endCapture();
+      return;
+    }
+
+    // T2 finished — navigate to review after a brief minimum display time.
+    if (mergeStarted && t2Phase === 'done') {
+      const elapsed = Date.now() - (startedAt ?? Date.now());
+      const delay = Math.max(0, 2000 - elapsed);
+      const t = setTimeout(() => {
+        dispatch({ type: 'uploadFlow/clear' });
+        dispatch({ type: 'view/setTab', tab: 'review' });
+      }, delay);
+      return () => clearTimeout(t);
+    }
+    // t2Phase === 'error': stay on the processing screen; retry / go-to-notes
+    // (dismissUploadProcessing) handle it.
+  }, [session?.clips, state.uploadFlow, t2Phase]);
+
+  const dismissUploadProcessing = useCallback(() => {
+    dispatch({ type: 'uploadFlow/clear' });
+    dispatch({ type: 'view/setTab', tab: 'review' });
+  }, []);
 
   // ── Transcript document actions ──────────────────────────────────────────
   const editTranscript = useCallback(
