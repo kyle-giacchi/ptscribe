@@ -42,10 +42,14 @@ function RouteTile({
     >
       <span style={{ flexShrink: 0, color: 'var(--color-pt-text-2)' }}>{icon}</span>
       <span className="flex min-w-0 flex-col" style={{ flex: 1 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-1)' }}>
+        <span
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text-1)' }}
+        >
           {title}
         </span>
-        <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{subtitle}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+          {subtitle}
+        </span>
       </span>
       <ChevronRight
         size={16}
@@ -194,7 +198,7 @@ export function IdleRecordingCard({
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: duration.quick, ease: ease.enter }}
             style={{
-              fontSize: 28,
+              fontSize: 'var(--text-2xl)',
               fontWeight: 600,
               letterSpacing: '-0.01em',
               color: 'var(--color-pt-text-1)',
@@ -210,7 +214,7 @@ export function IdleRecordingCard({
           </motion.h1>
         </AnimatePresence>
         {isAddingClip && !countingDown && (
-          <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
             Add another clip to this session
           </p>
         )}
@@ -343,7 +347,7 @@ export function IdleRecordingCard({
           </button>
         </div>
         {micHelper && !countingDown && (
-          <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
             {micHelper}
           </p>
         )}
@@ -367,7 +371,7 @@ export function IdleRecordingCard({
         <div className="flex items-center gap-3" style={{ width: 360, maxWidth: '100%' }}>
           <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
           <span
-            className="text-[10px] font-semibold uppercase"
+            className="text-2xs font-semibold uppercase"
             style={{ letterSpacing: '0.08em', color: 'var(--color-pt-text-3)' }}
           >
             or
@@ -419,7 +423,7 @@ export function IdleRecordingCard({
           {hasStatusMessage && (
             <p
               key={uploadStatus.message}
-              className="text-center text-xs"
+              className="text-center text-sm"
               style={{
                 color:
                   uploadStatus.phase === 'error'

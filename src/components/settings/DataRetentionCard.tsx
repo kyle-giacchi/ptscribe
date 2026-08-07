@@ -9,7 +9,14 @@ export function DataRetentionCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 12 }}>
         <Eyebrow>Data retention</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0, lineHeight: 1.5 }}>
+        <p
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-pt-text-3)',
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
           Audio recordings are the largest PHI artifact. Automatically delete clip audio after a set
           period — transcripts and notes are kept. Applied at next app start.
         </p>

@@ -114,7 +114,7 @@ export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="btn btn-secondary text-xs"
+          className="btn btn-secondary text-sm"
           onClick={handlePlay}
           disabled={loading || !ready}
           aria-label={playing ? 'Pause' : 'Play'}
@@ -134,7 +134,7 @@ export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
         />
         {ready && (
           <span
-            className="font-mono text-xs tabular-nums"
+            className="font-mono text-sm tabular-nums"
             style={{ color: 'var(--color-fg-subtle)' }}
           >
             {formatDuration(current)} / {formatDuration(duration)}
@@ -142,7 +142,7 @@ export function PlaybackWaveform({ audioKey }: PlaybackWaveformProps) {
         )}
       </div>
       {error && (
-        <p className="text-xs" style={{ color: 'var(--color-negative)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-negative)' }}>
           {error}
         </p>
       )}

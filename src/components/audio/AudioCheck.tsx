@@ -148,13 +148,18 @@ export function AudioCheck({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <Modal open={open} onClose={onClose} title="Microphone check" size="md">
-      <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
         Speak normally and watch the level move. Pick the input you'll use for the visit —
         recordings will use this microphone.
       </p>
 
       <label
-        style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text-2)' }}
+        style={{
+          display: 'block',
+          fontSize: 'var(--text-sm)',
+          fontWeight: 600,
+          color: 'var(--color-pt-text-2)',
+        }}
       >
         Input device
         <select
@@ -169,7 +174,7 @@ export function AudioCheck({ open, onClose }: { open: boolean; onClose: () => vo
             border: '1px solid var(--color-pt-border)',
             background: 'var(--color-pt-surface)',
             color: 'var(--color-pt-text)',
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             fontWeight: 500,
           }}
         >
@@ -211,7 +216,7 @@ export function AudioCheck({ open, onClose }: { open: boolean; onClose: () => vo
             }}
           />
         </div>
-        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+        <div style={{ marginTop: 8, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
           {phase === 'connecting' && 'Connecting to microphone…'}
           {phase === 'denied' &&
             'Microphone access was blocked — allow the mic in your browser, then reopen this check.'}

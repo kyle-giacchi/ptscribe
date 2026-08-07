@@ -48,14 +48,19 @@ export function RecoveryCodeCard() {
         ) : (
           <>
             <p
-              style={{ margin: 0, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}
+              style={{
+                margin: 0,
+                fontSize: 'var(--text-base)',
+                color: 'var(--color-pt-text-2)',
+                lineHeight: 1.5,
+              }}
             >
               {hasCode
                 ? 'A recovery code is set. Regenerate it if you’ve lost it — this invalidates the old one.'
                 : 'No recovery code yet. Generate one so a forgotten passphrase isn’t the end of your data.'}
             </p>
             {!unlocked && (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
                 Unlock the vault to manage your recovery code.
               </p>
             )}

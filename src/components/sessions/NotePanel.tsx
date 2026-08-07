@@ -30,7 +30,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
       {/* Finalized banner */}
       {note?.finalized && (
         <div
-          className="rounded-lg border px-3 py-2 text-xs"
+          className="rounded-lg border px-3 py-2 text-sm"
           style={{
             borderColor: 'var(--color-positive)',
             background: 'var(--color-surface-2)',
@@ -45,7 +45,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
       {/* Audit trail banner */}
       {note?.finalized && note.editedAfterFinalizedAt && (
         <div
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs"
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm"
           style={{
             borderColor: 'var(--color-caution)',
             background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
@@ -60,7 +60,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
       {/* Stale banner — note no longer matches the current transcript/template/modifiers */}
       {isStale && !note?.finalized && (
         <div
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs"
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm"
           style={{
             borderColor: 'var(--color-caution)',
             background: 'color-mix(in oklab, var(--color-caution) 8%, transparent)',
@@ -75,7 +75,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
 
       {/* Section list */}
       {sections.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--color-fg-subtle)' }}>
+        <p className="text-base" style={{ color: 'var(--color-fg-subtle)' }}>
           Pick a template to see its sections.
         </p>
       ) : (
@@ -87,7 +87,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
               <div key={s.key} className="card">
                 <div className="mb-2 flex items-center gap-2">
                   <span
-                    className="text-[11px] font-semibold tracking-widest uppercase"
+                    className="text-xs font-semibold tracking-widest uppercase"
                     style={{
                       color: isAssessment ? 'var(--color-pt-accent-fg)' : 'var(--color-fg-muted)',
                       letterSpacing: '0.1em',
@@ -112,7 +112,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
                       className="btn btn-ghost"
                       style={{
                         color: 'var(--color-fg-subtle)',
-                        fontSize: 11,
+                        fontSize: 'var(--text-xs)',
                         padding: '2px 6px',
                         gap: 3,
                       }}

@@ -89,7 +89,7 @@ function BrowserChrome({ url }: { url: string }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 10,
+          fontSize: 'var(--text-2xs)',
           color: '#8893a5',
         }}
       >
@@ -112,7 +112,7 @@ function NoteRows({ darkBg }: { darkBg?: boolean }) {
         >
           <div
             style={{
-              fontSize: 10,
+              fontSize: 'var(--text-2xs)',
               fontWeight: 700,
               letterSpacing: '0.12em',
               color: '#8893a5',
@@ -142,7 +142,7 @@ function TranscriptRows() {
     <div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 'var(--text-2xs)',
           fontWeight: 700,
           color: '#8893a5',
           letterSpacing: '0.1em',
@@ -159,14 +159,16 @@ function TranscriptRows() {
               style={{
                 flexShrink: 0,
                 width: 58,
-                fontSize: 11,
+                fontSize: 'var(--text-xs)',
                 fontWeight: 700,
                 color: speaker === 'Clinician' ? '#0a6d70' : '#6f5acc',
               }}
             >
               {speaker}
             </div>
-            <div style={{ fontSize: 12.5, color: '#5a6577', lineHeight: 1.55 }}>{text}</div>
+            <div style={{ fontSize: 'var(--text-sm)', color: '#5a6577', lineHeight: 1.55 }}>
+              {text}
+            </div>
           </div>
         ))}
       </div>
@@ -440,7 +442,7 @@ export function Landing({ onSignIn }: LandingProps) {
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
             }}
@@ -448,7 +450,12 @@ export function Landing({ onSignIn }: LandingProps) {
             P
           </div>
           <span
-            style={{ fontSize: 15.5, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}
+            style={{
+              fontSize: 'var(--text-md)',
+              fontWeight: 700,
+              color: '#ffffff',
+              letterSpacing: '-0.02em',
+            }}
           >
             PTScribe
           </span>
@@ -456,7 +463,7 @@ export function Landing({ onSignIn }: LandingProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span
             style={{
-              fontSize: 10.5,
+              fontSize: 'var(--text-2xs)',
               fontWeight: 700,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
@@ -476,7 +483,7 @@ export function Landing({ onSignIn }: LandingProps) {
               background: '#0ea5a8',
               borderRadius: 999,
               color: 'white',
-              fontSize: 14,
+              fontSize: 'var(--text-md)',
               fontWeight: 700,
               border: 'none',
               cursor: 'pointer',
@@ -506,7 +513,7 @@ export function Landing({ onSignIn }: LandingProps) {
         <div
           className="ldg-u ldg-u1"
           style={{
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             fontWeight: 700,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
@@ -538,7 +545,7 @@ export function Landing({ onSignIn }: LandingProps) {
           className="ldg-u ldg-u3"
           style={{
             margin: '0 0 44px',
-            fontSize: 18,
+            fontSize: 'var(--text-lg)',
             lineHeight: 1.6,
             color: '#5a6577',
             maxWidth: 480,
@@ -571,7 +578,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   background: '#0ea5a8',
                   borderRadius: 12,
                   color: 'white',
-                  fontSize: 15.5,
+                  fontSize: 'var(--text-md)',
                   fontWeight: 700,
                   letterSpacing: '-0.01em',
                   border: 'none',
@@ -591,7 +598,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   borderRadius: 12,
                   background: 'transparent',
                   color: '#1a2030',
-                  fontSize: 15.5,
+                  fontSize: 'var(--text-md)',
                   fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'border-color 150ms ease-out',
@@ -615,7 +622,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   color: 'var(--color-pt-text-2)',
                   border: '1px dashed var(--color-pt-border)',
                   borderRadius: 10,
-                  fontSize: 12,
+                  fontSize: 'var(--text-sm)',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -625,7 +632,7 @@ export function Landing({ onSignIn }: LandingProps) {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#8893a5' }}>
               <Lock size={11} color="#8893a5" strokeWidth={2} />
-              <span style={{ fontSize: 12 }}>
+              <span style={{ fontSize: 'var(--text-sm)' }}>
                 Stored encrypted on your device · sent securely when AI is used
               </span>
             </div>
@@ -641,7 +648,7 @@ export function Landing({ onSignIn }: LandingProps) {
               gap: 8,
             }}
           >
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#5a6577' }}>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: '#5a6577' }}>
               Enter the 6-digit demo code
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -662,7 +669,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   border: `1.5px solid ${codeError ? '#dc2942' : '#e4e8ee'}`,
                   borderRadius: 10,
                   outline: 'none',
-                  fontSize: 20,
+                  fontSize: 'var(--text-xl)',
                   letterSpacing: '0.3em',
                   textAlign: 'center',
                   color: '#1a2030',
@@ -680,7 +687,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   background: code.length === 6 && !busy ? '#0ea5a8' : '#f1f3f7',
                   color: code.length === 6 && !busy ? 'white' : '#8893a5',
                   fontWeight: 700,
-                  fontSize: 14,
+                  fontSize: 'var(--text-md)',
                   cursor: code.length === 6 && !busy ? 'pointer' : 'default',
                   transition: 'background 150ms',
                 }}
@@ -688,7 +695,9 @@ export function Landing({ onSignIn }: LandingProps) {
                 {busy ? '…' : 'Unlock'}
               </button>
             </div>
-            {codeError && <div style={{ fontSize: 12, color: '#dc2942' }}>{codeError}</div>}
+            {codeError && (
+              <div style={{ fontSize: 'var(--text-sm)', color: '#dc2942' }}>{codeError}</div>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -698,7 +707,7 @@ export function Landing({ onSignIn }: LandingProps) {
               }}
               style={{
                 all: 'unset',
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: '#8893a5',
                 cursor: 'pointer',
                 alignSelf: 'flex-start',
@@ -777,7 +786,7 @@ export function Landing({ onSignIn }: LandingProps) {
                     gap: 24,
                   }}
                 >
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1a2030' }}>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: '#1a2030' }}>
                     Sarah M. — Follow-up Visit
                   </div>
                   <div style={{ position: 'relative', width: 80, height: 80 }}>
@@ -815,7 +824,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   </div>
                   <div
                     style={{
-                      fontSize: 24,
+                      fontSize: 'var(--text-2xl)',
                       fontWeight: 400,
                       color: '#8893a5',
                       fontVariantNumeric: 'tabular-nums',
@@ -824,7 +833,9 @@ export function Landing({ onSignIn }: LandingProps) {
                   >
                     00:00
                   </div>
-                  <div style={{ fontSize: 13, color: '#8893a5' }}>Tap to begin recording</div>
+                  <div style={{ fontSize: 'var(--text-base)', color: '#8893a5' }}>
+                    Tap to begin recording
+                  </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     {[0, 1, 2, 3, 4].map((i) => (
                       <div
@@ -855,7 +866,7 @@ export function Landing({ onSignIn }: LandingProps) {
                     </div>
                     <div
                       style={{
-                        fontSize: 16,
+                        fontSize: 'var(--text-lg)',
                         fontVariantNumeric: 'tabular-nums',
                         color: '#1a2030',
                         fontWeight: 500,
@@ -894,7 +905,7 @@ export function Landing({ onSignIn }: LandingProps) {
                   <div style={{ marginTop: 20 }}>
                     <div
                       style={{
-                        fontSize: 10,
+                        fontSize: 'var(--text-2xs)',
                         fontWeight: 700,
                         color: '#8893a5',
                         letterSpacing: '0.1em',
@@ -916,7 +927,7 @@ export function Landing({ onSignIn }: LandingProps) {
                           background: '#f4f6f9',
                           borderRadius: 8,
                           marginBottom: 6,
-                          fontSize: 13,
+                          fontSize: 'var(--text-base)',
                           color: '#1a2030',
                           lineHeight: 1.5,
                           display: 'flex',
@@ -954,7 +965,9 @@ export function Landing({ onSignIn }: LandingProps) {
                     >
                       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
-                    <span style={{ fontSize: 13, color: '#6f5acc', fontWeight: 600 }}>
+                    <span
+                      style={{ fontSize: 'var(--text-base)', color: '#6f5acc', fontWeight: 600 }}
+                    >
                       Generating note from transcript...
                     </span>
                   </div>
@@ -972,13 +985,15 @@ export function Landing({ onSignIn }: LandingProps) {
                         color: '#0a6d70',
                         padding: '4px 12px',
                         borderRadius: 999,
-                        fontSize: 12,
+                        fontSize: 'var(--text-sm)',
                         fontWeight: 600,
                       }}
                     >
                       Ready
                     </div>
-                    <div style={{ marginLeft: 'auto', fontSize: 13, color: '#5a6577' }}>
+                    <div
+                      style={{ marginLeft: 'auto', fontSize: 'var(--text-base)', color: '#5a6577' }}
+                    >
                       Sarah M. — Follow-up
                     </div>
                   </div>
@@ -991,7 +1006,7 @@ export function Landing({ onSignIn }: LandingProps) {
                       background: '#0ea5a8',
                       borderRadius: 8,
                       color: 'white',
-                      fontSize: 14,
+                      fontSize: 'var(--text-md)',
                       fontWeight: 700,
                       width: '100%',
                       textAlign: 'center',
@@ -1011,7 +1026,7 @@ export function Landing({ onSignIn }: LandingProps) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <h3
                 style={{
-                  fontSize: 28,
+                  fontSize: 'var(--text-2xl)',
                   fontWeight: 700,
                   color: '#1a2030',
                   letterSpacing: '-0.02em',
@@ -1022,7 +1037,7 @@ export function Landing({ onSignIn }: LandingProps) {
               </h3>
               <p
                 style={{
-                  fontSize: 16,
+                  fontSize: 'var(--text-lg)',
                   color: '#5a6577',
                   maxWidth: 440,
                   textAlign: 'center',
@@ -1071,7 +1086,7 @@ export function Landing({ onSignIn }: LandingProps) {
         <div style={{ maxWidth: 680 }}>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 'var(--text-xs)',
               fontWeight: 700,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
@@ -1103,7 +1118,7 @@ export function Landing({ onSignIn }: LandingProps) {
           </h2>
           <p
             style={{
-              fontSize: 18,
+              fontSize: 'var(--text-lg)',
               color: '#5a6577',
               lineHeight: 1.65,
               margin: 0,
@@ -1171,7 +1186,7 @@ export function Landing({ onSignIn }: LandingProps) {
             <div>
               <div
                 style={{
-                  fontSize: 17,
+                  fontSize: 'var(--text-lg)',
                   fontWeight: 700,
                   color: '#ffffff',
                   letterSpacing: '-0.01em',
@@ -1180,7 +1195,13 @@ export function Landing({ onSignIn }: LandingProps) {
               >
                 See the Code
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.5 }}>
+              <div
+                style={{
+                  fontSize: 'var(--text-base)',
+                  color: 'rgba(255,255,255,0.62)',
+                  lineHeight: 1.5,
+                }}
+              >
                 Open source. Audit the encryption, proxy, and AI calls yourself.
               </div>
             </div>
@@ -1188,7 +1209,7 @@ export function Landing({ onSignIn }: LandingProps) {
               style={{
                 marginTop: 'auto',
                 paddingTop: 4,
-                fontSize: 11.5,
+                fontSize: 'var(--text-xs)',
                 color: '#0ea5a8',
                 fontWeight: 600,
                 fontFamily: "'JetBrains Mono', ui-monospace, monospace",
@@ -1230,14 +1251,21 @@ export function Landing({ onSignIn }: LandingProps) {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Scale size={22} color="#0ea5a8" strokeWidth={1.75} />
-              <span style={{ fontSize: 16, color: '#8893a5', fontWeight: 600, lineHeight: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-lg)',
+                  color: '#8893a5',
+                  fontWeight: 600,
+                  lineHeight: 1,
+                }}
+              >
                 →
               </span>
             </div>
             <div>
               <div
                 style={{
-                  fontSize: 17,
+                  fontSize: 'var(--text-lg)',
                   fontWeight: 700,
                   color: '#1a2030',
                   letterSpacing: '-0.01em',
@@ -1246,7 +1274,7 @@ export function Landing({ onSignIn }: LandingProps) {
               >
                 Compare Features to Overpriced Alternative
               </div>
-              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--text-base)', color: '#5a6577', lineHeight: 1.5 }}>
                 Feature-by-feature vs the $1,800/yr SaaS scribes.
               </div>
             </div>
@@ -1260,11 +1288,13 @@ export function Landing({ onSignIn }: LandingProps) {
                 fontFamily: "'JetBrains Mono', ui-monospace, monospace",
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#0a6d70' }}>~$15/yr</span>
-              <span style={{ fontSize: 12, color: '#8893a5' }}>vs</span>
+              <span style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: '#0a6d70' }}>
+                ~$15/yr
+              </span>
+              <span style={{ fontSize: 'var(--text-sm)', color: '#8893a5' }}>vs</span>
               <span
                 style={{
-                  fontSize: 13,
+                  fontSize: 'var(--text-base)',
                   color: '#8893a5',
                   textDecoration: 'line-through',
                   textDecorationColor: 'rgba(136,147,165,0.55)',
@@ -1306,14 +1336,21 @@ export function Landing({ onSignIn }: LandingProps) {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Network size={22} color="#0ea5a8" strokeWidth={1.75} />
-              <span style={{ fontSize: 16, color: '#8893a5', fontWeight: 600, lineHeight: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-lg)',
+                  color: '#8893a5',
+                  fontWeight: 600,
+                  lineHeight: 1,
+                }}
+              >
                 →
               </span>
             </div>
             <div>
               <div
                 style={{
-                  fontSize: 17,
+                  fontSize: 'var(--text-lg)',
                   fontWeight: 700,
                   color: '#1a2030',
                   letterSpacing: '-0.01em',
@@ -1322,7 +1359,7 @@ export function Landing({ onSignIn }: LandingProps) {
               >
                 Why I built this
               </div>
-              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--text-base)', color: '#5a6577', lineHeight: 1.5 }}>
                 Architecture, decisions, trade-offs, and what's next.
               </div>
             </div>
@@ -1330,7 +1367,7 @@ export function Landing({ onSignIn }: LandingProps) {
               style={{
                 marginTop: 'auto',
                 paddingTop: 4,
-                fontSize: 11.5,
+                fontSize: 'var(--text-xs)',
                 color: '#0a6d70',
                 fontWeight: 600,
                 fontFamily: "'JetBrains Mono', ui-monospace, monospace",
@@ -1372,14 +1409,21 @@ export function Landing({ onSignIn }: LandingProps) {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Network size={22} color="#0ea5a8" strokeWidth={1.75} />
-              <span style={{ fontSize: 16, color: '#8893a5', fontWeight: 600, lineHeight: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-lg)',
+                  color: '#8893a5',
+                  fontWeight: 600,
+                  lineHeight: 1,
+                }}
+              >
                 →
               </span>
             </div>
             <div>
               <div
                 style={{
-                  fontSize: 17,
+                  fontSize: 'var(--text-lg)',
                   fontWeight: 700,
                   color: '#1a2030',
                   letterSpacing: '-0.01em',
@@ -1388,7 +1432,7 @@ export function Landing({ onSignIn }: LandingProps) {
               >
                 Why I built this — v2
               </div>
-              <div style={{ fontSize: 13, color: '#5a6577', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--text-base)', color: '#5a6577', lineHeight: 1.5 }}>
                 Architecture, decisions, trade-offs, and what's next.
               </div>
             </div>
@@ -1396,7 +1440,7 @@ export function Landing({ onSignIn }: LandingProps) {
               style={{
                 marginTop: 'auto',
                 paddingTop: 4,
-                fontSize: 11.5,
+                fontSize: 'var(--text-xs)',
                 color: '#0a6d70',
                 fontWeight: 600,
                 fontFamily: "'JetBrains Mono', ui-monospace, monospace",
@@ -1473,7 +1517,7 @@ export function Landing({ onSignIn }: LandingProps) {
             background: '#0ea5a8',
             borderRadius: 12,
             color: 'white',
-            fontSize: 16,
+            fontSize: 'var(--text-lg)',
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
@@ -1507,7 +1551,7 @@ export function Landing({ onSignIn }: LandingProps) {
             gap: 8,
           }}
         >
-          <p style={{ margin: 0, fontSize: 12, color: '#8893a5', lineHeight: 1.65 }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#8893a5', lineHeight: 1.65 }}>
             <strong style={{ color: '#5a6577', fontWeight: 600 }}>
               PTScribe is not HIPAA-certified.
             </strong>{' '}
@@ -1515,7 +1559,7 @@ export function Landing({ onSignIn }: LandingProps) {
             Anthropic — you'll need to obtain your own BAA with each provider before using real
             patient data. Full disclosure is shown during setup.
           </p>
-          <p style={{ margin: 0, fontSize: 12, color: '#8893a5', lineHeight: 1.65 }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: '#8893a5', lineHeight: 1.65 }}>
             <strong style={{ color: '#5a6577', fontWeight: 600 }}>Patient consent required</strong>{' '}
             — obtain explicit verbal or written consent before recording any session.
           </p>
@@ -1535,7 +1579,7 @@ export function Landing({ onSignIn }: LandingProps) {
       >
         <div
           style={{
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             color: '#8893a5',
             display: 'flex',
             alignItems: 'center',
@@ -1552,7 +1596,7 @@ export function Landing({ onSignIn }: LandingProps) {
                 color: '#0ea5a8',
                 fontWeight: 600,
                 cursor: 'pointer',
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
               }}
             >
               Sign in
@@ -1582,7 +1626,7 @@ export function Landing({ onSignIn }: LandingProps) {
             color: 'var(--color-pt-text-2)',
             border: '1px dashed var(--color-pt-border)',
             borderRadius: 10,
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             fontWeight: 600,
             cursor: 'pointer',
           }}

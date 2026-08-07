@@ -106,7 +106,7 @@ function NoteToolbarImpl({
           border: `1px solid ${popoverOpen ? 'var(--color-pt-text-2)' : 'var(--color-pt-border)'}`,
           background: popoverOpen ? 'var(--color-pt-border)' : 'var(--color-pt-surface)',
           color: 'var(--color-pt-text)',
-          fontSize: 12.5,
+          fontSize: 'var(--text-sm)',
           fontWeight: 500,
           cursor: 'pointer',
         }}
@@ -125,7 +125,7 @@ function NoteToolbarImpl({
               border: '1px solid var(--color-pt-border)',
               background: 'var(--color-pt-bg, var(--color-pt-surface))',
               color: 'var(--color-pt-text-2)',
-              fontSize: 10,
+              fontSize: 'var(--text-2xs)',
               fontWeight: 600,
             }}
           >
@@ -156,7 +156,7 @@ function NoteToolbarImpl({
       <button
         type="button"
         className="btn btn-primary"
-        style={{ height: 34, padding: '0 14px', fontSize: 12.5 }}
+        style={{ height: 34, padding: '0 14px', fontSize: 'var(--text-sm)' }}
         disabled={generateDisabled}
         aria-busy={isGenerating}
         onClick={handleRegenerate}
@@ -182,7 +182,7 @@ function NoteToolbarImpl({
         title="This note already has content"
         size="sm"
       >
-        <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 'var(--text-md)', color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
           You've already written into this note. Choose <strong>Append</strong> to add the newly
           generated text below what's there, or <strong>Replace</strong> to overwrite it. Replacing
           cannot be undone.
@@ -227,7 +227,7 @@ function NoteToolbarImpl({
       >
         <p
           style={{
-            fontSize: 14,
+            fontSize: 'var(--text-md)',
             color: 'var(--color-pt-text-2)',
             lineHeight: 1.5,
             marginBottom: 10,
@@ -248,7 +248,7 @@ function NoteToolbarImpl({
             border: '1px solid var(--color-pt-border)',
             background: 'var(--color-pt-surface)',
             color: 'var(--color-pt-text)',
-            fontSize: 13.5,
+            fontSize: 'var(--text-base)',
             lineHeight: 1.5,
             resize: 'vertical',
             boxSizing: 'border-box',

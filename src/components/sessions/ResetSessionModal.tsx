@@ -10,7 +10,7 @@ interface ResetSessionModalProps {
 export function ResetSessionModal({ open, onClose, onConfirm }: ResetSessionModalProps) {
   return (
     <Modal open={open} onClose={onClose} title="Reset Session" size="sm">
-      <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 'var(--text-md)', color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
         This will permanently delete all recordings and transcriptions for this session, including
         any generated note. The session will return to a fresh state.
       </p>

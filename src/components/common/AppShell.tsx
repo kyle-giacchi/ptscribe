@@ -42,7 +42,7 @@ export function AppShell() {
                 borderBottom:
                   '1px solid color-mix(in oklab, var(--color-caution) 25%, transparent)',
                 padding: '5px 22px',
-                fontSize: 11.5,
+                fontSize: 'var(--text-xs)',
                 color: 'var(--color-caution)',
                 textAlign: 'center',
                 lineHeight: 1.4,

@@ -8,7 +8,7 @@ const bannerBase = {
   zIndex: 9999,
   padding: '7px 16px',
   textAlign: 'center',
-  fontSize: 13,
+  fontSize: 'var(--text-base)',
   fontWeight: 500,
   lineHeight: 1.4,
 } as const;

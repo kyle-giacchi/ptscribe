@@ -88,14 +88,16 @@ function SettingsGroup({ title, description, children }: SettingsGroupProps) {
         <div style={{ display: 'grid', gap: 2 }}>
           <span
             style={{
-              fontSize: 12.5,
+              fontSize: 'var(--text-sm)',
               fontWeight: 600,
               color: 'var(--color-pt-text)',
             }}
           >
             {title}
           </span>
-          <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{description}</span>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+            {description}
+          </span>
         </div>
         <svg
           className="settings-group-chevron"
@@ -203,7 +205,7 @@ export function Settings() {
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ display: 'grid', gap: 4 }}>
             <Eyebrow>Settings</Eyebrow>
-            <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
               {activeTab.description}
             </p>
           </div>

@@ -269,7 +269,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           display: 'grid',
           placeItems: 'center',
           color: 'var(--color-pt-text-2, #666)',
-          fontSize: 13,
+          fontSize: 'var(--text-base)',
         }}
       >
         Loading…
@@ -291,7 +291,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             background: '#78350f',
             color: '#fffbeb',
             padding: '10px 16px',
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -315,7 +315,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             background: '#7f1d1d',
             color: '#fef2f2',
             padding: '10px 16px',
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -337,7 +337,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
               borderRadius: 4,
               padding: '4px 10px',
               cursor: 'pointer',
-              fontSize: 12,
+              fontSize: 'var(--text-sm)',
             }}
           >
             Dismiss

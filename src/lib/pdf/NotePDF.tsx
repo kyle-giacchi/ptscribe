@@ -12,7 +12,7 @@ const styles = StyleSheet.create({
   page: {
     paddingHorizontal: 48,
     paddingVertical: 56,
-    fontSize: 11,
+    fontSize: 'var(--text-xs)',
     fontFamily: 'Helvetica',
     color: '#0f172a',
     lineHeight: 1.5,
@@ -27,17 +27,17 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   practice: {
-    fontSize: 14,
+    fontSize: 'var(--text-md)',
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
   },
   practiceMeta: {
-    fontSize: 9,
+    fontSize: 'var(--text-2xs)',
     color: '#475569',
     marginTop: 2,
   },
   docMeta: {
-    fontSize: 9,
+    fontSize: 'var(--text-2xs)',
     color: '#475569',
     textAlign: 'right',
   },
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   patientName: {
-    fontSize: 13,
+    fontSize: 'var(--text-base)',
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
   },
@@ -62,12 +62,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   patientMeta: {
-    fontSize: 9,
+    fontSize: 'var(--text-2xs)',
     color: '#475569',
     marginRight: 14,
   },
   sectionTitle: {
-    fontSize: 10,
+    fontSize: 'var(--text-2xs)',
     fontFamily: 'Helvetica-Bold',
     color: '#1e293b',
     textTransform: 'uppercase',
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   sectionBody: {
-    fontSize: 11,
+    fontSize: 'var(--text-xs)',
     color: '#0f172a',
   },
   signature: {
@@ -86,11 +86,11 @@ const styles = StyleSheet.create({
     borderTopColor: '#cbd5e1',
   },
   signatureLabel: {
-    fontSize: 9,
+    fontSize: 'var(--text-2xs)',
     color: '#475569',
   },
   signatureName: {
-    fontSize: 11,
+    fontSize: 'var(--text-xs)',
     fontFamily: 'Helvetica-Bold',
     color: '#0f172a',
     marginTop: 4,
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 48,
     right: 48,
-    fontSize: 8,
+    fontSize: 'var(--text-2xs)',
     color: '#94a3b8',
     textAlign: 'center',
   },
@@ -117,7 +117,10 @@ function fmtDob(ms?: number): string {
 
 export function NotePDF({ note, template, patient, clinician }: NotePDFProps) {
   return (
-    <Document title={`${patient.lastName}_${patient.firstName}_${template?.name ?? note.format}`}>
+    // PDF metadata title — shows up in the browser's print-preview header, the
+    // viewer tab title, and file properties. Pseudonymous on purpose; the page
+    // body below still prints the full identity block.
+    <Document title={`PT-${patient.id.slice(0, 8).toUpperCase()}_${template?.name ?? note.format}`}>
       <Page size="LETTER" style={styles.page}>
         <HeaderRow clinician={clinician} note={note} template={template} />
         <PatientBlock patient={patient} />

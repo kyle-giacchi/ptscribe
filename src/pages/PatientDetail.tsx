@@ -156,7 +156,6 @@ export function PatientDetail() {
             measurements={measurements}
             onStartPlan={handleStartPlan}
             exercises={exercises}
-            onDelete={handleDelete}
           />
         )}
         {tab === 'visits' && <PatientVisits sessions={sessions} notes={notes} />}
@@ -182,6 +181,7 @@ export function PatientDetail() {
         open={editing}
         patient={patient}
         onClose={() => setEditing(false)}
+        onDelete={handleDelete}
         onSave={(patch) => {
           updatePatient(patient.id, patch);
           setEditing(false);

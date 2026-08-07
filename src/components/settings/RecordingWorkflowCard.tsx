@@ -9,7 +9,7 @@ export function RecordingWorkflowCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 12 }}>
         <Eyebrow>Recording workflow</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           When auto-finish is on, the recording panel shows a one-tap{' '}
           <strong>Stop &amp; finish</strong> button that chains stop → transcribe → generate. Turn
           off if you prefer to advance each step yourself.

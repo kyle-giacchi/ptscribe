@@ -35,7 +35,7 @@ export const TagChip = memo(function TagChip({ kind, text }: TagChipProps) {
         borderRadius: 7,
         border: `1px solid ${t.border}`,
         background: t.bg,
-        fontSize: 12.5,
+        fontSize: 'var(--text-sm)',
         color: 'var(--color-pt-text)',
         maxWidth: '100%',
       }}
@@ -51,7 +51,7 @@ export const TagChip = memo(function TagChip({ kind, text }: TagChipProps) {
       />
       <span
         style={{
-          fontSize: 10.5,
+          fontSize: 'var(--text-2xs)',
           fontWeight: 600,
           letterSpacing: '0.6px',
           textTransform: 'uppercase',
@@ -88,7 +88,7 @@ export const QuickTagButton = memo(function QuickTagButton({
         borderRadius: 9,
         background: 'var(--color-pt-surface)',
         border: '1px solid var(--color-pt-border)',
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
         fontWeight: 500,
         color: 'var(--color-pt-text)',
         width: '100%',

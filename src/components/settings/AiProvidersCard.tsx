@@ -172,18 +172,36 @@ export function AiProvidersCard() {
           </Field>
 
           {!selfHostedAllowed && (
-            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
+            <div
+              style={{
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-pt-text-3)',
+                lineHeight: 1.5,
+              }}
+            >
               Sign in to route note generation to a model on this machine or on your clinic network.
             </div>
           )}
 
           {genProvider === 'none' ? (
-            <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+            <div
+              style={{
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-pt-text-2)',
+                lineHeight: 1.5,
+              }}
+            >
               AI note generation is off — you can still write and edit notes manually.
             </div>
           ) : isSelfHostedProvider(genProvider) ? (
             <>
-              <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+              <div
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-pt-text-2)',
+                  lineHeight: 1.5,
+                }}
+              >
                 Transcripts go straight from this browser to the server below — they never reach
                 PTScribe&apos;s servers.
               </div>
@@ -235,12 +253,18 @@ export function AiProvidersCard() {
               </Field>
 
               {signinRequired ? (
-                <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+                <div
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-pt-text-2)',
+                    lineHeight: 1.5,
+                  }}
+                >
                   Sign in to add your own {activeDescriptor?.label} API key. With your key, note
                   generation runs against your provider account.
                 </div>
               ) : keys === null ? (
-                <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
                   Loading key status…
                 </div>
               ) : activeDescriptor ? (
@@ -251,7 +275,13 @@ export function AiProvidersCard() {
                     onStatusChange={(s) => handleKeyStatus(activeDescriptor.id, s)}
                   />
                   {orgSet ? (
-                    <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+                    <div
+                      style={{
+                        fontSize: 'var(--text-sm)',
+                        color: 'var(--color-pt-text-2)',
+                        lineHeight: 1.5,
+                      }}
+                    >
                       Your organization provides a {activeDescriptor.label} key. It’s used when you
                       haven’t set your own — your personal key takes priority.
                     </div>

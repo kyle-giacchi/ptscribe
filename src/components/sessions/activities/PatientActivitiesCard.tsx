@@ -87,7 +87,7 @@ export function PatientActivitiesCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 'var(--text-xs)',
               fontWeight: 600,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
@@ -97,7 +97,9 @@ export function PatientActivitiesCard({
             {LIST_LABEL[list]}
           </span>
           {list === 'home' && seededFromPlan && (
-            <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>from plan of care</span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+              from plan of care
+            </span>
           )}
           <span style={{ flex: 1 }} />
           {list === 'home' && !readOnly && activities.performed.length > 0 && (
@@ -105,7 +107,12 @@ export function PatientActivitiesCard({
               type="button"
               className="btn btn-ghost"
               onClick={copyPerformedToHome}
-              style={{ fontSize: 11, padding: '2px 6px', gap: 3, color: 'var(--color-pt-text-3)' }}
+              style={{
+                fontSize: 'var(--text-xs)',
+                padding: '2px 6px',
+                gap: 3,
+                color: 'var(--color-pt-text-3)',
+              }}
             >
               <ArrowUp size={10} strokeWidth={2} /> Copy from performed
             </button>
@@ -114,15 +121,19 @@ export function PatientActivitiesCard({
 
         <ul style={{ display: 'grid', gap: 5, margin: 0, padding: 0, listStyle: 'none' }}>
           {entries.length === 0 && (
-            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>Nothing logged yet.</li>
+            <li style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+              Nothing logged yet.
+            </li>
           )}
           {entries.map((e) => (
             <li key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ flex: 1, fontSize: 13, color: 'var(--color-pt-text)' }}>
+              <span
+                style={{ flex: 1, fontSize: 'var(--text-base)', color: 'var(--color-pt-text)' }}
+              >
                 {e.exerciseName}
               </span>
               {readOnly ? (
-                <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
                   {e.notes ? `${e.dosage} — ${e.notes}` : e.dosage}
                 </span>
               ) : (
@@ -177,7 +188,7 @@ export function PatientActivitiesCard({
               onClick={() => setOpenPicker(list)}
               style={{
                 marginTop: 6,
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 padding: '3px 7px',
                 gap: 4,
                 color: 'var(--color-pt-accent-fg)',
@@ -193,7 +204,14 @@ export function PatientActivitiesCard({
   return (
     <SurfaceCard padding={16} style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-pt-text)', margin: 0 }}>
+        <h2
+          style={{
+            fontSize: 'var(--text-md)',
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            margin: 0,
+          }}
+        >
           Patient activities
         </h2>
         <span style={{ flex: 1 }} />

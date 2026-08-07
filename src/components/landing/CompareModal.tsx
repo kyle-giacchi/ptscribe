@@ -29,12 +29,19 @@ function GrpHeader({
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, padding: '10px 36px 4px' }}>
-      <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO, letterSpacing: '0.08em' }}>
+      <span
+        style={{
+          fontSize: 'var(--text-xs)',
+          color: '#8893a5',
+          fontFamily: MONO,
+          letterSpacing: '0.08em',
+        }}
+      >
         {num}
       </span>
       <h3
         style={{
-          fontSize: 16,
+          fontSize: 'var(--text-lg)',
           fontWeight: 700,
           margin: 0,
           letterSpacing: '-0.005em',
@@ -46,7 +53,7 @@ function GrpHeader({
       <span
         style={{
           marginLeft: 'auto',
-          fontSize: 11,
+          fontSize: 'var(--text-xs)',
           fontFamily: MONO,
           color: lead ? '#0a6d70' : '#8893a5',
           background: lead ? '#e6f7f6' : '#f4f6f9',
@@ -65,12 +72,24 @@ function Feat({ name, desc }: { name: string; desc?: string }) {
   return (
     <div>
       <div
-        style={{ fontWeight: 500, fontSize: 13.5, color: '#1a2030', marginBottom: desc ? 3 : 0 }}
+        style={{
+          fontWeight: 500,
+          fontSize: 'var(--text-base)',
+          color: '#1a2030',
+          marginBottom: desc ? 3 : 0,
+        }}
       >
         {name}
       </div>
       {desc && (
-        <div style={{ color: '#8893a5', fontSize: 12, lineHeight: 1.45, maxWidth: '44ch' }}>
+        <div
+          style={{
+            color: '#8893a5',
+            fontSize: 'var(--text-sm)',
+            lineHeight: 1.45,
+            maxWidth: '44ch',
+          }}
+        >
           {desc}
         </div>
       )}
@@ -301,7 +320,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               <div style={{ maxWidth: 700 }}>
                 <div
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 600,
                     letterSpacing: '0.12em',
                     textTransform: 'uppercase',
@@ -328,7 +347,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                 <p
                   style={{
                     margin: 0,
-                    fontSize: 13.5,
+                    fontSize: 'var(--text-base)',
                     color: '#5a6577',
                     lineHeight: 1.55,
                     maxWidth: 620,
@@ -375,7 +394,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               >
                 <span
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 700,
                     letterSpacing: '0.10em',
                     textTransform: 'uppercase',
@@ -400,18 +419,23 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                       justifyContent: 'center',
                       fontFamily: MONO,
                       fontWeight: 700,
-                      fontSize: 11,
+                      fontSize: 'var(--text-xs)',
                       letterSpacing: '-0.02em',
                     }}
                   >
                     PT
                   </span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--text-md)', color: '#1a2030' }}>
                       PTScribe
                     </div>
                     <div
-                      style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}
+                      style={{
+                        fontSize: 'var(--text-2xs)',
+                        color: '#8893a5',
+                        marginTop: 1,
+                        fontFamily: MONO,
+                      }}
                     >
                       PT-focused · pay per AI call
                     </div>
@@ -434,17 +458,22 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                       justifyContent: 'center',
                       fontFamily: MONO,
                       fontWeight: 600,
-                      fontSize: 13,
+                      fontSize: 'var(--text-base)',
                     }}
                   >
                     S
                   </span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 14.5, color: '#1a2030' }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--text-md)', color: '#1a2030' }}>
                       Leading SaaS scribe
                     </div>
                     <div
-                      style={{ fontSize: 10.5, color: '#8893a5', marginTop: 1, fontFamily: MONO }}
+                      style={{
+                        fontSize: 'var(--text-2xs)',
+                        color: '#8893a5',
+                        marginTop: 1,
+                        fontFamily: MONO,
+                      }}
                     >
                       paid SaaS · $150/user/mo
                     </div>
@@ -469,7 +498,9 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   <Feat name="Speaker diarization (clinician vs. patient)" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="ok" label="Shipped" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                    <span
+                      style={{ fontSize: 'var(--text-xs)', color: '#8893a5', fontFamily: MONO }}
+                    >
                       cloud path
                     </span>
                   </div>
@@ -516,13 +547,17 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   <Feat name="PT templates (eval, follow-up, progress, discharge)" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="ok" label="Shipped" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                    <span
+                      style={{ fontSize: 'var(--text-xs)', color: '#8893a5', fontFamily: MONO }}
+                    >
                       PT-specific
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="yes" label="Included" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                    <span
+                      style={{ fontSize: 'var(--text-xs)', color: '#8893a5', fontFamily: MONO }}
+                    >
                       200+ templates
                     </span>
                   </div>
@@ -595,7 +630,9 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   <Feat name="Patient charts with full session history" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <CmpBadge v="ok" label="Shipped" />
-                    <span style={{ fontSize: 11, color: '#8893a5', fontFamily: MONO }}>
+                    <span
+                      style={{ fontSize: 'var(--text-xs)', color: '#8893a5', fontFamily: MONO }}
+                    >
                       + plan of care
                     </span>
                   </div>
@@ -717,14 +754,19 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                         ~$15
                       </span>
                       <span
-                        style={{ fontSize: 14, fontWeight: 500, color: '#0a6d70', opacity: 0.75 }}
+                        style={{
+                          fontSize: 'var(--text-md)',
+                          fontWeight: 500,
+                          color: '#0a6d70',
+                          opacity: 0.75,
+                        }}
                       >
                         /yr
                       </span>
                     </div>
                     <div
                       style={{
-                        fontSize: 13,
+                        fontSize: 'var(--text-base)',
                         fontWeight: 600,
                         color: '#0a6d70',
                         letterSpacing: '-0.005em',
@@ -734,7 +776,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 'var(--text-xs)',
                         color: '#8893a5',
                         fontFamily: MONO,
                         letterSpacing: '0.02em',
@@ -762,14 +804,19 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                         $1,800
                       </span>
                       <span
-                        style={{ fontSize: 14, fontWeight: 500, color: '#dc2942', opacity: 0.7 }}
+                        style={{
+                          fontSize: 'var(--text-md)',
+                          fontWeight: 500,
+                          color: '#dc2942',
+                          opacity: 0.7,
+                        }}
                       >
                         /yr
                       </span>
                     </div>
                     <div
                       style={{
-                        fontSize: 13,
+                        fontSize: 'var(--text-base)',
                         fontWeight: 600,
                         color: '#5a6577',
                         letterSpacing: '-0.005em',
@@ -779,7 +826,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 'var(--text-xs)',
                         color: '#8893a5',
                         fontFamily: MONO,
                         letterSpacing: '0.02em',
@@ -804,17 +851,21 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               >
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <CmpBadge v="ok" label="Shipped" />
-                  <span style={{ fontSize: 12, color: '#8893a5' }}>Available today.</span>
+                  <span style={{ fontSize: 'var(--text-sm)', color: '#8893a5' }}>
+                    Available today.
+                  </span>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <CmpBadge v="wip" label="In development" />
-                  <span style={{ fontSize: 12, color: '#8893a5' }}>
+                  <span style={{ fontSize: 'var(--text-sm)', color: '#8893a5' }}>
                     Active build — coming soon.
                   </span>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <CmpBadge v="planned" label="Planned" />
-                  <span style={{ fontSize: 12, color: '#8893a5' }}>On the roadmap.</span>
+                  <span style={{ fontSize: 'var(--text-sm)', color: '#8893a5' }}>
+                    On the roadmap.
+                  </span>
                 </div>
               </div>
             </div>
@@ -835,7 +886,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
               <div>
                 <div
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 'var(--text-2xs)',
                     color: '#8893a5',
                     letterSpacing: '0.12em',
                     textTransform: 'uppercase',
@@ -845,12 +896,17 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   What's next
                 </div>
                 <div
-                  style={{ fontSize: 15.5, fontWeight: 600, margin: '4px 0 3px', color: '#1a2030' }}
+                  style={{
+                    fontSize: 'var(--text-md)',
+                    fontWeight: 600,
+                    margin: '4px 0 3px',
+                    color: '#1a2030',
+                  }}
                 >
                   PTScribe ships new features monthly.{' '}
                   <span style={{ color: '#0ea5a8' }}>Try it free today.</span>
                 </div>
-                <div style={{ fontSize: 12.5, color: '#5a6577', maxWidth: 520 }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: '#5a6577', maxWidth: 520 }}>
                   ICD-10 coding, mobile, and EHR integration are in active development. Most PTs pay
                   under $25/year at normal visit volume.
                 </div>
@@ -866,7 +922,7 @@ export function CompareModal({ open, onClose, onTryDemo }: Props) {
                   color: 'white',
                   border: 'none',
                   borderRadius: 10,
-                  fontSize: 14.5,
+                  fontSize: 'var(--text-md)',
                   fontWeight: 700,
                   cursor: 'pointer',
                   flexShrink: 0,

@@ -9,7 +9,7 @@ export function AudioProcessingCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 12 }}>
         <Eyebrow>Audio processing (experimental)</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           Trim sustained silent regions and/or speed up playback before sending audio to Cloudflare
           Whisper. Recordings stay intact in this browser; only the copy uploaded for transcription
           is affected. Both options are off by default.

@@ -42,14 +42,14 @@ export function ActiveRecordingCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <p
-              className="text-[11px] font-semibold tracking-[0.18em] uppercase"
+              className="text-xs font-semibold tracking-[0.18em] uppercase"
               style={{ color: 'var(--color-pt-text-3)' }}
             >
               Transcript
             </p>
             {wasmSupported !== false ? (
               <span
-                className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                className="text-2xs rounded px-1.5 py-0.5 font-medium"
                 style={{
                   background: 'var(--color-pt-accent-soft)',
                   color: 'var(--color-pt-accent-fg)',
@@ -58,7 +58,7 @@ export function ActiveRecordingCard({
                 Live Transcription
               </span>
             ) : (
-              <span className="text-[10px] italic" style={{ color: 'var(--color-pt-text-3)' }}>
+              <span className="text-2xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
                 Live unavailable · processed after recording
               </span>
             )}
@@ -72,7 +72,7 @@ export function ActiveRecordingCard({
               className="flex items-center gap-1.5"
               style={{ touchAction: 'manipulation', minHeight: 44 }}
             >
-              <span className="text-[11px]" style={{ color: 'var(--color-pt-text-3)' }}>
+              <span className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
                 visible
               </span>
               <span
@@ -108,7 +108,7 @@ export function ActiveRecordingCard({
               background: 'var(--color-pt-surface)',
             }}
           >
-            <p className="text-xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
+            <p className="text-sm italic" style={{ color: 'var(--color-pt-text-3)' }}>
               Transcript hidden
             </p>
           </div>
@@ -124,7 +124,7 @@ export function ActiveRecordingCard({
       {/* Right: Controls panel */}
       <div className="flex shrink-0 flex-col gap-3 pl-5" style={{ width: 224 }}>
         <p
-          className="text-[11px] font-semibold tracking-[0.18em] uppercase"
+          className="text-xs font-semibold tracking-[0.18em] uppercase"
           style={{ color: 'var(--color-pt-text-3)' }}
         >
           Controls
@@ -156,7 +156,7 @@ export function ActiveRecordingCard({
             }}
           />
           <span
-            className="self-end pb-0.5 text-[11px] font-bold tracking-widest uppercase"
+            className="self-end pb-0.5 text-xs font-bold tracking-widest uppercase"
             style={{ color: accentFg }}
           >
             {paused ? 'Paused' : 'Rec'}

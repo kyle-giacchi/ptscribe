@@ -143,7 +143,7 @@ export function Login() {
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ffffff',
-            fontSize: 14,
+            fontSize: 'var(--text-md)',
             fontWeight: 800,
             letterSpacing: '-0.02em',
             margin: '0 auto 20px',
@@ -156,7 +156,7 @@ export function Login() {
           style={{
             margin: '0 0 8px',
             color: 'var(--color-pt-text)',
-            fontSize: 26,
+            fontSize: 'var(--text-2xl)',
             fontWeight: 800,
             letterSpacing: '-0.03em',
           }}
@@ -172,7 +172,7 @@ export function Login() {
               background: 'var(--color-pt-amber-soft)',
               border: '1px solid var(--color-pt-amber-border)',
               borderRadius: 10,
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               color: 'var(--color-pt-amber-fg)',
               textAlign: 'left',
             }}
@@ -187,7 +187,7 @@ export function Login() {
               style={{
                 margin: '0 0 28px',
                 color: 'var(--color-pt-text-2)',
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 lineHeight: 1.6,
               }}
             >
@@ -207,7 +207,7 @@ export function Login() {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 12,
-                  fontSize: 15,
+                  fontSize: 'var(--text-md)',
                   fontWeight: 700,
                   cursor: loading ? 'not-allowed' : 'pointer',
                   marginBottom: 12,
@@ -231,7 +231,7 @@ export function Login() {
                 color: passkeySupported ? 'var(--color-pt-accent-fg)' : '#ffffff',
                 border: passkeySupported ? '1.5px solid var(--color-pt-accent-border)' : 'none',
                 borderRadius: 12,
-                fontSize: 15,
+                fontSize: 'var(--text-md)',
                 fontWeight: passkeySupported ? 600 : 700,
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
@@ -265,7 +265,7 @@ export function Login() {
                     color: 'var(--color-pt-text-3)',
                     border: '1px dashed var(--color-pt-border)',
                     borderRadius: 10,
-                    fontSize: 13,
+                    fontSize: 'var(--text-base)',
                     fontWeight: 500,
                     cursor: loading ? 'not-allowed' : 'pointer',
                     letterSpacing: '0.01em',
@@ -284,7 +284,7 @@ export function Login() {
               style={{
                 margin: '0 0 24px',
                 color: 'var(--color-pt-text-2)',
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 lineHeight: 1.6,
               }}
             >
@@ -308,7 +308,7 @@ export function Login() {
                   padding: '13px 14px',
                   border: '1.5px solid var(--color-pt-border)',
                   borderRadius: 10,
-                  fontSize: 14,
+                  fontSize: 'var(--text-md)',
                   color: 'var(--color-pt-text)',
                   background: 'var(--color-pt-surface)',
                   marginBottom: 12,
@@ -328,7 +328,7 @@ export function Login() {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 12,
-                  fontSize: 15,
+                  fontSize: 'var(--text-md)',
                   fontWeight: 700,
                   cursor: loading || !email ? 'not-allowed' : 'pointer',
                   marginBottom: 12,
@@ -348,7 +348,7 @@ export function Login() {
                 background: 'none',
                 border: 'none',
                 color: 'var(--color-pt-text-3)',
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 cursor: 'pointer',
                 padding: '4px 0',
               }}
@@ -380,7 +380,7 @@ export function Login() {
               style={{
                 margin: '0 0 8px',
                 color: 'var(--color-pt-text)',
-                fontSize: 15,
+                fontSize: 'var(--text-md)',
                 fontWeight: 600,
               }}
             >
@@ -390,7 +390,7 @@ export function Login() {
               style={{
                 margin: '0 0 24px',
                 color: 'var(--color-pt-text-2)',
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 lineHeight: 1.6,
               }}
             >
@@ -405,7 +405,7 @@ export function Login() {
                 background: 'none',
                 border: 'none',
                 color: 'var(--color-pt-accent-fg)',
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 fontWeight: 600,
                 cursor: 'pointer',
               }}

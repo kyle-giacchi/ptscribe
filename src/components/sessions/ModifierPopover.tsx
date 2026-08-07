@@ -331,7 +331,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
   const showCustomBlock = draft.customInstructions.length > 0 || composerOpen;
 
   const labelStyle: React.CSSProperties = {
-    fontSize: 10,
+    fontSize: 'var(--text-2xs)',
     fontWeight: 600,
     textTransform: 'uppercase',
     letterSpacing: '0.08em',
@@ -347,7 +347,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
     border: 'none',
     borderRadius: 4,
     color: 'var(--color-pt-text-2)',
-    fontSize: 11,
+    fontSize: 'var(--text-xs)',
     cursor: 'pointer',
   };
 
@@ -394,7 +394,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={labelStyle}>modifier · prompt add-ons</div>
-          <div style={{ fontSize: 11, color: 'var(--color-pt-text-2)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
             {presetActiveCount} preset{presetActiveCount !== 1 ? 's' : ''}
             {customActiveCount > 0
               ? ` · ${customActiveCount} custom rule${customActiveCount !== 1 ? 's' : ''}`
@@ -425,7 +425,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                 <Sparkles size={11} style={{ color: SAGE }} />
                 <span style={labelStyle}>your custom instructions</span>
               </div>
-              <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-2)' }}>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-pt-text-2)' }}>
                 applied before presets
               </span>
             </div>
@@ -463,7 +463,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     <div
                       style={{
                         flex: 1,
-                        fontSize: 12.5,
+                        fontSize: 'var(--text-sm)',
                         lineHeight: 1.45,
                         fontStyle: 'italic',
                         color: 'var(--color-pt-text)',
@@ -523,7 +523,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                   <span style={{ ...labelStyle, color: SAGE }}>
                     {editingId ? 'edit instruction' : 'new instruction'}
                   </span>
-                  <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-2)' }}>
+                  <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-pt-text-2)' }}>
                     plain English · max 240 chars
                   </span>
                 </div>
@@ -540,7 +540,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     border: '1px solid var(--color-pt-border)',
                     background: '#ffffff',
                     color: 'var(--color-pt-text)',
-                    fontSize: 12.5,
+                    fontSize: 'var(--text-sm)',
                     lineHeight: 1.5,
                     padding: '8px 10px',
                     boxSizing: 'border-box',
@@ -560,7 +560,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     type="button"
                     onClick={cancelComposer}
                     className="btn btn-ghost"
-                    style={{ height: 26, padding: '0 10px', fontSize: 11 }}
+                    style={{ height: 26, padding: '0 10px', fontSize: 'var(--text-xs)' }}
                   >
                     Cancel
                   </button>
@@ -569,7 +569,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     onClick={saveInstruction}
                     disabled={!composerText.trim()}
                     className="btn btn-primary"
-                    style={{ height: 26, padding: '0 10px', fontSize: 11 }}
+                    style={{ height: 26, padding: '0 10px', fontSize: 'var(--text-xs)' }}
                   >
                     Save
                   </button>
@@ -620,14 +620,14 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
                     <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <span
                         style={{
-                          fontSize: 12.5,
+                          fontSize: 'var(--text-sm)',
                           fontWeight: active ? 600 : 500,
                           color: 'var(--color-pt-text)',
                         }}
                       >
                         {opt.name}
                       </span>
-                      <span style={{ fontSize: 11, color: 'var(--color-pt-text-2)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
                         {opt.desc}
                       </span>
                     </span>
@@ -655,7 +655,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
           onClick={openComposer}
           disabled={composerOpen}
           className="btn btn-ghost"
-          style={{ height: 30, padding: '0 10px', fontSize: 12, gap: 5 }}
+          style={{ height: 30, padding: '0 10px', fontSize: 'var(--text-sm)', gap: 5 }}
         >
           <Plus size={12} /> Add custom instruction
         </button>
@@ -663,7 +663,7 @@ export function ModifierPopover({ modifiers, anchorRef, onClose, onApply }: Modi
           type="button"
           onClick={() => onApply(draft)}
           className="btn btn-primary"
-          style={{ height: 30, padding: '0 12px', fontSize: 12 }}
+          style={{ height: 30, padding: '0 12px', fontSize: 'var(--text-sm)' }}
         >
           Apply
         </button>

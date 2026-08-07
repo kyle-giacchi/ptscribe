@@ -16,7 +16,7 @@ const CARD_STYLE: React.CSSProperties = {
 };
 
 const DESC_STYLE: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 'var(--text-sm)',
   color: 'var(--color-pt-text-3)',
   margin: '0 0 14px',
   lineHeight: 1.5,
@@ -30,7 +30,7 @@ const ROW_BUTTON_STYLE: React.CSSProperties = {
   borderRadius: 7,
   border: '1px solid var(--color-pt-border)',
   background: 'var(--color-pt-surface)',
-  fontSize: 12,
+  fontSize: 'var(--text-sm)',
   fontWeight: 600,
   flexShrink: 0,
 };
@@ -116,7 +116,7 @@ export function PasskeySecurityPanel() {
             background: 'var(--color-pt-amber-soft)',
             border: '1px solid var(--color-pt-amber-border)',
             borderRadius: 8,
-            fontSize: 12.5,
+            fontSize: 'var(--text-sm)',
             color: 'var(--color-pt-amber-fg)',
           }}
         >
@@ -125,11 +125,11 @@ export function PasskeySecurityPanel() {
       )}
 
       {isPending ? (
-        <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)', margin: '4px 0' }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: '4px 0' }}>
           Loading passkeys…
         </p>
       ) : list.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)', margin: '4px 0' }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: '4px 0' }}>
           No passkeys registered yet. Add one to sign in faster next time.
         </p>
       ) : (
@@ -171,7 +171,7 @@ export function PasskeySecurityPanel() {
                       border: '1px solid var(--color-pt-border)',
                       background: 'var(--color-pt-surface)',
                       color: 'var(--color-pt-text)',
-                      fontSize: 13,
+                      fontSize: 'var(--text-base)',
                       outline: 'none',
                     }}
                   />
@@ -209,7 +209,7 @@ export function PasskeySecurityPanel() {
                     <span
                       style={{
                         display: 'block',
-                        fontSize: 13,
+                        fontSize: 'var(--text-base)',
                         fontWeight: 600,
                         color: 'var(--color-pt-text)',
                       }}
@@ -217,7 +217,7 @@ export function PasskeySecurityPanel() {
                       {pk.name || 'Passkey'}
                     </span>
                     {pk.createdAt && (
-                      <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
                         Added {formatPasskeyDate(pk.createdAt)}
                       </span>
                     )}
@@ -263,7 +263,7 @@ export function PasskeySecurityPanel() {
       )}
 
       {!supported && (
-        <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)', margin: '4px 0' }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: '4px 0' }}>
           This browser doesn&apos;t support passkeys, so one can&apos;t be added here.
         </p>
       )}
@@ -285,7 +285,7 @@ export function PasskeySecurityPanel() {
           border: '1.5px solid var(--color-pt-accent-border)',
           background: 'var(--color-pt-accent-soft)',
           color: 'var(--color-pt-accent-fg)',
-          fontSize: 13,
+          fontSize: 'var(--text-base)',
           fontWeight: 600,
           cursor: busy ? 'not-allowed' : 'pointer',
           opacity: busy ? 0.5 : 1,

@@ -20,7 +20,7 @@ export function SoapLine({ text, anchor, edited, billing }: SoapLineProps) {
         background: edited ? 'var(--color-pt-amber-soft)' : 'transparent',
         border: edited ? '1px solid var(--color-pt-amber-border)' : '1px solid transparent',
         transition: 'background-color 120ms ease-out, border-color 120ms ease-out',
-        fontSize: 13.5,
+        fontSize: 'var(--text-base)',
         lineHeight: 1.55,
         color: 'var(--color-pt-text)',
       }}
@@ -32,7 +32,7 @@ export function SoapLine({ text, anchor, edited, billing }: SoapLineProps) {
           style={{
             background: 'var(--color-pt-violet-soft)',
             color: 'var(--color-pt-violet-fg)',
-            fontSize: 9.5,
+            fontSize: 'var(--text-2xs)',
             fontWeight: 700,
             letterSpacing: '0.6px',
             textTransform: 'uppercase',
@@ -49,7 +49,7 @@ export function SoapLine({ text, anchor, edited, billing }: SoapLineProps) {
           style={{
             background: 'var(--color-pt-amber)',
             color: '#ffffff',
-            fontSize: 9.5,
+            fontSize: 'var(--text-2xs)',
             fontWeight: 700,
             letterSpacing: '0.6px',
             textTransform: 'uppercase',

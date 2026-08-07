@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Field, TextInput, Select } from '@/components/ui/Field';
-import { PtButton } from '@/components/design';
+import { AVATAR_COLORS, PtButton } from '@/components/design';
 import { fmtIsoDateOptional, parseIsoDate } from '@/utils/dates';
 import type { Patient, PatientStatus, Sex } from '@/types';
 
@@ -10,11 +11,13 @@ export function EditPatientModal({
   patient,
   onClose,
   onSave,
+  onDelete,
 }: {
   open: boolean;
   patient: Patient;
   onClose: () => void;
   onSave: (patch: Partial<Patient>) => void;
+  onDelete: () => void;
 }) {
   const [firstName, setFirstName] = useState(patient.firstName);
   const [lastName, setLastName] = useState(patient.lastName);
@@ -26,6 +29,7 @@ export function EditPatientModal({
   const [referring, setReferring] = useState(patient.referringProvider ?? '');
   const [status, setStatus] = useState<PatientStatus>(patient.status);
   const [notes, setNotes] = useState(patient.notes ?? '');
+  const [color, setColor] = useState(patient.color ?? AVATAR_COLORS[0].hex);
 
   function handleSave() {
     onSave({
@@ -38,6 +42,7 @@ export function EditPatientModal({
       icd10: icd10.trim() || undefined,
       referringProvider: referring.trim() || undefined,
       notes: notes.trim() || undefined,
+      color,
       status,
     });
   }
@@ -81,6 +86,46 @@ export function EditPatientModal({
         <Field label="Referring provider" className="sm:col-span-2">
           <TextInput value={referring} onChange={(e) => setReferring(e.target.value)} />
         </Field>
+        <Field
+          label="Chart color"
+          className="sm:col-span-2"
+          hint="Quick visual identifier on lists and headers."
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {AVATAR_COLORS.map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                aria-label={c.label}
+                aria-pressed={color.toLowerCase() === c.hex}
+                onClick={() => setColor(c.hex)}
+                className="h-8 w-8 cursor-pointer rounded-full transition-transform hover:scale-110"
+                style={{
+                  background: c.hex,
+                  border:
+                    color.toLowerCase() === c.hex
+                      ? '2px solid var(--color-pt-text)'
+                      : '1px solid rgba(0,0,0,0.08)',
+                }}
+              />
+            ))}
+            <label
+              className="ml-1 inline-flex h-8 cursor-pointer items-center gap-2 rounded-full border border-[var(--color-pt-border)] pr-3 pl-1"
+              title="Custom color"
+            >
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-6 w-6 cursor-pointer rounded-full border-none bg-transparent p-0"
+                aria-label="Custom color"
+              />
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
+                Custom
+              </span>
+            </label>
+          </div>
+        </Field>
         <Field label="Internal notes" className="sm:col-span-2" hint="Visible only to you.">
           <textarea
             className="input min-h-24"
@@ -89,7 +134,14 @@ export function EditPatientModal({
           />
         </Field>
       </div>
-      <div className="flex justify-end gap-2 pt-3">
+      <div className="flex items-center justify-end gap-2 pt-3">
+        <button
+          type="button"
+          onClick={onDelete}
+          className="mr-auto inline-flex cursor-pointer items-center gap-1.5 rounded-lg border-none bg-transparent px-2.5 py-1.5 text-sm font-semibold text-[var(--color-pt-red)] transition-colors hover:bg-[var(--color-pt-surface-mut)]"
+        >
+          <Trash2 size={12} strokeWidth={2} /> Remove patient
+        </button>
         <PtButton variant="ghost" onClick={onClose}>
           Cancel
         </PtButton>

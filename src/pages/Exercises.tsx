@@ -68,7 +68,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
       >
         <div style={{ display: 'grid', gap: 4 }}>
           {!embedded && <Eyebrow>Exercise library</Eyebrow>}
-          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
             Reference catalog you can prescribe from a patient's plan of care.
           </p>
         </div>
@@ -103,7 +103,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                 padding: '9px 12px 9px 32px',
                 borderRadius: 9,
                 border: '1px solid var(--color-pt-border)',
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 color: 'var(--color-pt-text)',
                 background: 'var(--color-pt-surface)',
                 outline: 'none',
@@ -124,7 +124,13 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
               ))}
             </Select>
           </div>
-          <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginLeft: 'auto' }}>
+          <span
+            style={{
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-pt-text-3)',
+              marginLeft: 'auto',
+            }}
+          >
             {filtered.length} {filtered.length === 1 ? 'exercise' : 'exercises'}
           </span>
         </div>
@@ -153,7 +159,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                   <div style={{ minWidth: 0 }}>
                     <h3
                       style={{
-                        fontSize: 14,
+                        fontSize: 'var(--text-md)',
                         fontWeight: 600,
                         color: 'var(--color-pt-text)',
                         margin: 0,
@@ -164,7 +170,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                     <div
                       style={{
                         marginTop: 2,
-                        fontSize: 11.5,
+                        fontSize: 'var(--text-xs)',
                         color: 'var(--color-pt-text-3)',
                         fontFamily: 'var(--font-mono)',
                       }}
@@ -180,7 +186,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                         gap: 4,
                         padding: '2px 7px',
                         borderRadius: 999,
-                        fontSize: 10,
+                        fontSize: 'var(--text-2xs)',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         background: 'var(--color-pt-surface-mut)',
@@ -200,7 +206,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                           gap: 4,
                           padding: '2px 7px',
                           borderRadius: 999,
-                          fontSize: 10,
+                          fontSize: 'var(--text-2xs)',
                           textTransform: 'uppercase',
                           letterSpacing: '0.05em',
                           background: 'var(--color-pt-surface-mut)',
@@ -213,7 +219,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                       <PtButton
                         variant="ghost"
                         iconLeft={<Copy size={12} strokeWidth={2} />}
-                        style={{ padding: '4px 8px', fontSize: 11 }}
+                        style={{ padding: '4px 8px', fontSize: 'var(--text-xs)' }}
                         onClick={() => cloneFromOrg(e)}
                       >
                         Clone
@@ -223,14 +229,18 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                     <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                       <PtButton
                         variant="ghost"
-                        style={{ padding: '4px 8px', fontSize: 11 }}
+                        style={{ padding: '4px 8px', fontSize: 'var(--text-xs)' }}
                         onClick={() => setEditing(e)}
                       >
                         <Pencil size={12} />
                       </PtButton>
                       <PtButton
                         variant="ghost"
-                        style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-pt-red)' }}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-pt-red)',
+                        }}
                         onClick={() => {
                           if (confirm(`Delete "${e.name}"?`)) removeExercise(e.id);
                         }}
@@ -242,7 +252,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                 </div>
                 <p
                   style={{
-                    fontSize: 12,
+                    fontSize: 'var(--text-sm)',
                     color: 'var(--color-pt-text-2)',
                     margin: 0,
                     lineHeight: 1.5,
@@ -253,7 +263,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                 {e.cues && (
                   <p
                     style={{
-                      fontSize: 11.5,
+                      fontSize: 'var(--text-xs)',
                       fontStyle: 'italic',
                       color: 'var(--color-pt-text-3)',
                       margin: 0,
@@ -263,7 +273,13 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
                   </p>
                 )}
                 {e.defaultDosage && (
-                  <p style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', margin: 0 }}>
+                  <p
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-pt-text-3)',
+                      margin: 0,
+                    }}
+                  >
                     Default dosage:{' '}
                     <span style={{ color: 'var(--color-pt-text)', fontWeight: 600 }}>
                       {e.defaultDosage}
@@ -278,7 +294,7 @@ export function Exercises({ embedded = false }: { embedded?: boolean } = {}) {
           <SurfaceCard padding={20}>
             <p
               style={{
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 color: 'var(--color-pt-text-3)',
                 margin: 0,
                 textAlign: 'center',
@@ -420,7 +436,7 @@ function ExerciseEditorModal({
         <Field label="Instructions">
           <textarea
             className="input"
-            style={{ minHeight: 96, fontSize: 13 }}
+            style={{ minHeight: 96, fontSize: 'var(--text-base)' }}
             value={draft.instructions}
             onChange={(e) => set('instructions', e.target.value)}
           />

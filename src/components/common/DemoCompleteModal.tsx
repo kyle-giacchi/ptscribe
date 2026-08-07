@@ -54,7 +54,7 @@ export function DemoCompleteModal({ open, onClose }: DemoCompleteModalProps) {
         <div>
           <h3
             style={{
-              fontSize: 16,
+              fontSize: 'var(--text-lg)',
               fontWeight: 700,
               color: 'var(--color-pt-text)',
               marginBottom: 6,
@@ -62,7 +62,13 @@ export function DemoCompleteModal({ open, onClose }: DemoCompleteModalProps) {
           >
             Session complete!
           </h3>
-          <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.6 }}>
+          <p
+            style={{
+              fontSize: 'var(--text-base)',
+              color: 'var(--color-pt-text-2)',
+              lineHeight: 1.6,
+            }}
+          >
             The demo patient has been discharged. Start fresh to reset the demo and try again from
             the beginning.
           </p>
@@ -73,7 +79,7 @@ export function DemoCompleteModal({ open, onClose }: DemoCompleteModalProps) {
         <button
           type="button"
           className="btn btn-primary w-full"
-          style={{ height: 40, fontSize: 13.5, fontWeight: 700 }}
+          style={{ height: 40, fontSize: 'var(--text-base)', fontWeight: 700 }}
           disabled={resetting}
           onClick={handleStartFresh}
         >
@@ -83,7 +89,7 @@ export function DemoCompleteModal({ open, onClose }: DemoCompleteModalProps) {
         <button
           type="button"
           className="btn btn-ghost w-full"
-          style={{ height: 36, fontSize: 13 }}
+          style={{ height: 36, fontSize: 'var(--text-base)' }}
           disabled={resetting}
           onClick={onClose}
         >

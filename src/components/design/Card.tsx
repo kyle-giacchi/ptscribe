@@ -44,7 +44,7 @@ export const Eyebrow = memo(function Eyebrow({ children, className }: EyebrowPro
     <div
       className={className}
       style={{
-        fontSize: 10.5,
+        fontSize: 'var(--text-2xs)',
         fontWeight: 600,
         letterSpacing: '1.2px',
         textTransform: 'uppercase',

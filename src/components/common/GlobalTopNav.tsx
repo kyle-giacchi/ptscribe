@@ -4,7 +4,7 @@ import { Menu } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDismissable } from '@/hooks/useDismissable';
-import { AlertsButton, ProfileButton, VaultPill } from './TopNavControls';
+import { AlertsButton, ProfileButton } from './TopNavControls';
 import { PatientQuickSearch } from './PatientQuickSearch';
 
 interface NavItemDef {
@@ -14,7 +14,7 @@ interface NavItemDef {
 }
 
 const BASE_NAV_ITEMS: NavItemDef[] = [
-  { to: '/today', label: 'My Chart' },
+  { to: '/today', label: 'Today' },
   { to: '/sessions/new', label: 'Record' },
   { to: '/notes', label: 'Review queue' },
   { to: '/patients', label: 'Patients' },
@@ -32,7 +32,7 @@ function PendingBadge({ count }: { count: number }) {
     <span
       aria-label={`${count} pending`}
       style={{
-        fontSize: 10,
+        fontSize: 'var(--text-2xs)',
         fontWeight: 700,
         minWidth: 18,
         padding: '0 5px',
@@ -68,7 +68,7 @@ function NavItem({ item, variant, pendingCount, onNavigate }: NavItemProps) {
         isDropdown
           ? {
               padding: '8px 16px',
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               fontWeight: isActive ? 600 : 500,
               color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
               background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
@@ -80,7 +80,7 @@ function NavItem({ item, variant, pendingCount, onNavigate }: NavItemProps) {
           : {
               padding: '6px 10px',
               borderRadius: 8,
-              fontSize: 12.5,
+              fontSize: 'var(--text-sm)',
               fontWeight: isActive ? 600 : 500,
               color: isActive ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-3)',
               background: isActive ? 'var(--color-pt-accent-soft)' : 'transparent',
@@ -198,13 +198,15 @@ export function GlobalTopNav() {
             background: 'var(--color-pt-accent)',
             color: '#fff',
             fontFamily: 'var(--font-mono)',
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             fontWeight: 700,
           }}
         >
           P
         </div>
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-pt-text)' }}>
+        <span
+          style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--color-pt-text)' }}
+        >
           PTScribe
         </span>
       </button>
@@ -225,7 +227,6 @@ export function GlobalTopNav() {
         <div className="global-search-input">
           <PatientQuickSearch />
         </div>
-        <VaultPill />
         <AlertsButton />
         <ProfileButton />
       </div>

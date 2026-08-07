@@ -74,7 +74,13 @@ export function SessionMeasures({
       {trends.length === 0 ? (
         !adding && (
           <SurfaceCard padding={28} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
+            <div
+              style={{
+                fontSize: 'var(--text-sm)',
+                color: 'var(--color-pt-text-3)',
+                lineHeight: 1.5,
+              }}
+            >
               Nothing tracked for this patient yet. Record pain, range of motion, or an outcome
               measure here and it lands on their Measures tab.
             </div>
@@ -179,10 +185,10 @@ function QuickRow({
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-pt-text)' }}>
+        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-pt-text)' }}>
           {trend.label}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
           {outOfRange
             ? `Must be ${def.min}–${def.max}${def.unit}`
             : previous
@@ -194,7 +200,7 @@ function QuickRow({
       {showDelta && (
         <span
           style={{
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             fontWeight: 600,
             fontVariantNumeric: 'tabular-nums',
             color:
@@ -213,14 +219,20 @@ function QuickRow({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
           <span
             style={{
-              fontSize: 15,
+              fontSize: 'var(--text-md)',
               fontWeight: 600,
               color: 'var(--color-pt-text)',
               fontVariantNumeric: 'tabular-nums',
             }}
           >
             {formatValue(recorded.value)}
-            <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)', fontWeight: 500 }}>
+            <span
+              style={{
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-pt-text-3)',
+                fontWeight: 500,
+              }}
+            >
               {def.unit}
             </span>
           </span>

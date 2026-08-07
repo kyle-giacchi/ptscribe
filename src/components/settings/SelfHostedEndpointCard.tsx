@@ -113,7 +113,9 @@ export function SelfHostedEndpointCard({ provider }: Props) {
         />
       </Field>
       {urlError ? (
-        <div style={{ fontSize: 12.5, color: 'var(--color-pt-danger)', lineHeight: 1.5 }}>
+        <div
+          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-danger)', lineHeight: 1.5 }}
+        >
           {urlError}
         </div>
       ) : null}
@@ -132,7 +134,7 @@ export function SelfHostedEndpointCard({ provider }: Props) {
           {testing ? 'Testing…' : 'Test connection'}
         </PtButton>
         {saved ? (
-          <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
             Saved: {saved.model} @ {saved.baseUrl}
           </span>
         ) : null}
@@ -156,7 +158,9 @@ export function SelfHostedEndpointCard({ provider }: Props) {
         </Field>
       )}
 
-      <details style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', lineHeight: 1.6 }}>
+      <details
+        style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)', lineHeight: 1.6 }}
+      >
         <summary style={{ cursor: 'pointer' }}>Setting up your server</summary>
         <ul style={{ marginTop: 8, paddingLeft: 18, display: 'grid', gap: 6 }}>
           <li>

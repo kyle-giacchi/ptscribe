@@ -10,7 +10,7 @@ interface Props {
 export function TemplateChangeDialog({ open, targetTemplateName, onCancel, onConfirm }: Props) {
   return (
     <Modal open={open} onClose={onCancel} title="Change template?" size="sm">
-      <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 'var(--text-md)', color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
         Switching to <strong>{targetTemplateName}</strong> will clear the text you've written in
         this note.
       </p>

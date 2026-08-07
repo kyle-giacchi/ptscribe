@@ -6,8 +6,6 @@ groupfinanceapp.xlsx
 # Brainstorm artifacts
 .superpowers/
 
-# Impeccable design-tool session state (DESIGN.md itself is tracked)
-.impeccable/
 
 # Local-markdown issue tracker (see docs/agents/issue-tracker.md) — kept local-only
 .scratch/

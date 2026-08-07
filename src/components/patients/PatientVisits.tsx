@@ -34,10 +34,12 @@ export function PatientVisits({ sessions, notes }: { sessions: Session[]; notes:
   if (ordered.length === 0) {
     return (
       <SurfaceCard padding={40} style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+        <div
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text-2)' }}
+        >
           No visits yet
         </div>
-        <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)', marginTop: 4 }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', marginTop: 4 }}>
           Start a session from the header to create the first visit.
         </div>
       </SurfaceCard>
@@ -73,7 +75,7 @@ export function PatientVisits({ sessions, notes }: { sessions: Session[]; notes:
           <div
             style={{
               padding: 28,
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               color: 'var(--color-pt-text-3)',
               textAlign: 'center',
             }}
@@ -149,7 +151,7 @@ function VisitEntry({
         <div
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             color: 'var(--color-pt-text-2)',
           }}
         >
@@ -157,12 +159,14 @@ function VisitEntry({
         </div>
 
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, color: 'var(--color-pt-text)', fontWeight: 500 }}>
+          <div
+            style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)', fontWeight: 500 }}
+          >
             {labelForType(session.type)}
           </div>
           <div
             style={{
-              fontSize: 11.5,
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-pt-text-3)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -179,14 +183,14 @@ function VisitEntry({
         {note && !note.finalized ? (
           <button
             type="button"
-            onClick={() => navigate(`/notes/${note.id}`)}
+            onClick={() => navigate(`/sessions/${note.sessionId}?tab=review`)}
             style={{
               padding: '4px 10px',
               borderRadius: 999,
               border: '1px solid var(--color-pt-amber-border)',
               background: 'var(--color-pt-amber-soft)',
               color: 'var(--color-pt-amber-fg)',
-              fontSize: 11.5,
+              fontSize: 'var(--text-xs)',
               fontWeight: 600,
               cursor: 'pointer',
             }}
@@ -197,7 +201,7 @@ function VisitEntry({
           <Link
             to={`/sessions/${session.id}`}
             style={{
-              fontSize: 11.5,
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-pt-text-3)',
               fontWeight: 500,
               textDecoration: 'none',
@@ -209,7 +213,7 @@ function VisitEntry({
 
         <span
           style={{
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
             textAlign: 'right',
             minWidth: 72,
@@ -228,7 +232,7 @@ function VisitEntry({
           }}
         >
           {filled.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
               This note has no content yet.
             </div>
           ) : (
@@ -236,7 +240,7 @@ function VisitEntry({
               <div key={s.key}>
                 <div
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 700,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
@@ -248,7 +252,7 @@ function VisitEntry({
                 <p
                   style={{
                     margin: '4px 0 0',
-                    fontSize: 12.5,
+                    fontSize: 'var(--text-sm)',
                     lineHeight: 1.55,
                     color: 'var(--color-pt-text-2)',
                     whiteSpace: 'pre-wrap',
@@ -260,12 +264,12 @@ function VisitEntry({
             ))
           )}
           <Link
-            to={`/notes/${note.id}`}
+            to={`/sessions/${note.sessionId}?tab=review`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              fontSize: 11.5,
+              fontSize: 'var(--text-xs)',
               fontWeight: 600,
               color: 'var(--color-pt-accent-fg)',
               textDecoration: 'none',
@@ -299,7 +303,7 @@ function FilterChip({
         border: `1px solid ${active ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
         background: active ? 'var(--color-pt-accent-soft)' : 'transparent',
         color: active ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
-        fontSize: 11.5,
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         cursor: 'pointer',
       }}

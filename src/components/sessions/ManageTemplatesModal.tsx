@@ -45,7 +45,7 @@ export function ManageTemplatesModal({ open, onClose }: ManageTemplatesModalProp
           className="flex shrink-0 items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid var(--color-pt-border)' }}
         >
-          <span className="text-base font-semibold" style={{ color: 'var(--color-pt-text)' }}>
+          <span className="text-md font-semibold" style={{ color: 'var(--color-pt-text)' }}>
             Manage Templates
           </span>
           <button

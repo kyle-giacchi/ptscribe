@@ -52,14 +52,21 @@ export function RecoveryCodeReveal({
           <KeyRound size={16} strokeWidth={1.75} style={{ color: 'var(--color-pt-accent-fg)' }} />
           <Eyebrow>Recovery code</Eyebrow>
         </div>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 'var(--text-base)',
+            color: 'var(--color-pt-text-2)',
+            lineHeight: 1.5,
+          }}
+        >
           This is the <strong>only</strong> way back into your data if you forget your passphrase.
           We can’t recover it for you — save it somewhere safe now. It won’t be shown again.
         </p>
         <div
           style={{
             fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-            fontSize: 15,
+            fontSize: 'var(--text-md)',
             letterSpacing: '0.04em',
             wordBreak: 'break-all',
             padding: '12px 14px',
@@ -93,7 +100,7 @@ export function RecoveryCodeReveal({
             display: 'flex',
             alignItems: 'flex-start',
             gap: 8,
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             color: 'var(--color-pt-text-1)',
             cursor: 'pointer',
           }}

@@ -64,17 +64,30 @@ Single typeface throughout: **Inter**. It's neutral, legible at clinical distanc
 
 ### 3.1 Scale
 
-| Role            | Size    | Weight | Notes                                             |
-| --------------- | ------- | ------ | ------------------------------------------------- |
-| Page title      | 20–24px | 600    | `.font-display`; one per page                     |
-| Section heading | 15–16px | 600    | Sentence case; never ALL CAPS                     |
-| Body            | 14–15px | 400    | Default reading size                              |
-| Label / caption | 12–13px | 500    | `--color-pt-text-2`                               |
-| Timer / ID      | any     | 400    | `.tnum` — tabular numerals; `.font-mono` if fixed |
-| Button          | 14px    | 500    | Via `.btn` — don't override                       |
+Nine steps, defined as `--text-*` in `@theme` (`src/index.css`). These override
+Tailwind's default ramp, so the `text-*` utilities and raw `fontSize:` numbers
+agree. **11px is the hard floor — nothing in the product renders smaller.**
+
+| Token         | Class       | Size | Weight | Role                                              |
+| ------------- | ----------- | ---- | ------ | ------------------------------------------------- |
+| `--text-2xl`  | `text-2xl`  | 28px | 600    | Hero numerals, greeting                           |
+| `--text-xl`   | `text-xl`   | 22px | 600    | Page title; `.font-display`; one per page         |
+| `--text-lg`   | `text-lg`   | 18px | 600    | Card / section heading; sentence case, never CAPS |
+| `--text-md`   | `text-md`   | 16px | 400    | Emphasized body, note editor, inputs              |
+| `--text-base` | `text-base` | 14px | 400    | Default reading size; rows, nav items, buttons    |
+| `--text-sm`   | `text-sm`   | 13px | 500    | Labels / captions; `--color-pt-text-2`            |
+| `--text-xs`   | `text-xs`   | 12px | 400    | Dense metadata, timestamps                        |
+| `--text-2xs`  | `text-2xs`  | 11px | 600    | Badge counts, uppercase eyebrows — floor          |
+
+| Role       | Size | Weight | Notes                                             |
+| ---------- | ---- | ------ | ------------------------------------------------- |
+| Timer / ID | any  | 400    | `.tnum` — tabular numerals; `.font-mono` if fixed |
+| Button     | 14px | 500    | Via `.btn` — don't override                       |
 
 ### 3.2 Rules
 
+- **Never go below 11px.** Clinicians are on their feet, at arm's length, often in reading glasses. If a layout only fits at 10px, the layout is wrong — not the type.
+- **Stay on the scale.** No half-pixel sizes, no one-off values. Inline `fontSize:` numbers must be one of the eight steps above.
 - **Tabular numerals on any elapsed time or count.** Use `.tnum` class (maps to `font-variant-numeric: tabular-nums`).
 - No uppercase tracked-out labels — they read as institutional, not clinical.
 - Mono font is for timers, IDs, and code blocks only — not for emphasis or decoration.

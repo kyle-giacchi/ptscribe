@@ -27,7 +27,7 @@ function ProfileLoading() {
         display: 'grid',
         placeItems: 'center',
         color: 'var(--color-pt-text-2, #666)',
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
       }}
     >
       Loading…

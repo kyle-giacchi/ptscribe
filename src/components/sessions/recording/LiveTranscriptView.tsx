@@ -47,7 +47,7 @@ function ChatBubble({
         {children}
         {timestamp && (
           <span
-            className="mt-1 block text-right text-[10px] tabular-nums"
+            className="text-2xs mt-1 block text-right tabular-nums"
             style={{ color: 'var(--color-pt-text-3)' }}
           >
             {timestamp}
@@ -156,13 +156,13 @@ export function LiveTranscriptView({
                   />
                 ))}
               </div>
-              <p className="text-xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
+              <p className="text-sm italic" style={{ color: 'var(--color-pt-text-3)' }}>
                 Transcribing&hellip;
               </p>
             </div>
             {showNoSpeechHint && (
               <p
-                className="text-center text-xs leading-relaxed"
+                className="text-center text-sm leading-relaxed"
                 style={{ color: 'var(--color-pt-text-3)' }}
               >
                 Transcription starts after the first audio chunk (~5 s).
@@ -183,7 +183,7 @@ export function LiveTranscriptView({
                     >
                       <ChatBubble timestamp={fmtWallTime(seg.wallTime)}>
                         <p
-                          className="text-sm leading-relaxed"
+                          className="text-base leading-relaxed"
                           style={{ color: 'var(--color-pt-text)' }}
                         >
                           {seg.text.trim()}
@@ -195,7 +195,7 @@ export function LiveTranscriptView({
                     <div style={{ animation: 'transcript-slide-in 280ms ease-out both' }}>
                       <ChatBubble isInterim>
                         <p
-                          className="text-sm leading-relaxed italic"
+                          className="text-base leading-relaxed italic"
                           style={{ color: 'var(--color-pt-text-3)' }}
                         >
                           {interimText}
@@ -219,7 +219,7 @@ export function LiveTranscriptView({
                     <div key={i} style={{ animation: 'transcript-slide-in 280ms ease-out both' }}>
                       <ChatBubble>
                         <p
-                          className="text-sm leading-relaxed whitespace-pre-wrap"
+                          className="text-base leading-relaxed whitespace-pre-wrap"
                           style={{ color: 'var(--color-pt-text)' }}
                         >
                           {text}

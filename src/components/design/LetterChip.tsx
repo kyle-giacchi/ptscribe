@@ -7,7 +7,7 @@ export function LetterChip({ letter }: LetterChipProps) {
     <span
       className="inline-flex items-center justify-center font-mono"
       style={{
-        fontSize: 11,
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         color: 'var(--color-pt-accent-fg)',
         background: 'var(--color-pt-accent-soft)',

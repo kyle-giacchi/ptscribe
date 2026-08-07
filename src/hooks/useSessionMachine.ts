@@ -76,7 +76,7 @@ export interface UseSessionMachineParams {
 
   /** Mount-time intent from deep links. Read once; later changes are ignored.
    *  The host owns URL hygiene (stripping the params). */
-  initial?: { quickMode?: boolean; autoRecord?: boolean };
+  initial?: { quickMode?: boolean; autoRecord?: boolean; tab?: 'record' | 'review' };
 
   /** Observational outcome channel. See SessionMachineEvent. */
   onEvent?: (event: SessionMachineEvent) => void;
@@ -222,6 +222,7 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   const [state, dispatch] = useReducer(sessionMachineReducer, undefined, () =>
     createInitialSessionMachineState({
       quickMode: initial?.quickMode,
+      tab: initial?.tab,
       baseline: session?.transcript ?? '',
       edited: session?.editedTranscript ?? '',
     }),

@@ -179,7 +179,7 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
                 <Eyebrow>Demo Mode</Eyebrow>
                 <div
                   style={{
-                    fontSize: 18,
+                    fontSize: 'var(--text-lg)',
                     fontWeight: 700,
                     color: 'var(--color-pt-text)',
                     marginTop: 4,
@@ -191,7 +191,7 @@ export function DemoBootstrap({ children }: { children: ReactNode }) {
                 <p
                   style={{
                     margin: '8px 0 0',
-                    fontSize: 14,
+                    fontSize: 'var(--text-md)',
                     color: 'var(--color-pt-text-2)',
                     lineHeight: 1.5,
                   }}

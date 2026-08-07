@@ -45,7 +45,7 @@ export function TemplateDropdown({
         className="inline-flex items-center gap-1.5 rounded-lg transition-colors"
         style={{
           padding: '5px 10px',
-          fontSize: 12.5,
+          fontSize: 'var(--text-sm)',
           fontWeight: 600,
           height: 32,
           border: '1px solid var(--color-pt-border)',
@@ -55,7 +55,9 @@ export function TemplateDropdown({
           boxSizing: 'border-box' as const,
         }}
       >
-        <span style={{ color: 'var(--color-pt-text-2)', fontWeight: 400, fontSize: 11 }}>
+        <span
+          style={{ color: 'var(--color-pt-text-2)', fontWeight: 400, fontSize: 'var(--text-xs)' }}
+        >
           Template
         </span>
         <span
@@ -104,7 +106,7 @@ export function TemplateDropdown({
             }}
           >
             <span
-              className="text-[11px] font-semibold tracking-widest uppercase"
+              className="text-xs font-semibold tracking-widest uppercase"
               style={{ color: 'var(--color-pt-text-2)' }}
             >
               Choose Template
@@ -115,7 +117,7 @@ export function TemplateDropdown({
           <div style={{ maxHeight: 320, overflowY: 'auto' }}>
             {templates.length === 0 && (
               <p
-                className="px-4 py-6 text-center text-sm"
+                className="px-4 py-6 text-center text-base"
                 style={{ color: 'var(--color-pt-text-2)' }}
               >
                 No templates available.
@@ -128,14 +130,14 @@ export function TemplateDropdown({
                 <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                   <div className="flex items-center gap-2">
                     <span
-                      className="text-sm font-semibold"
+                      className="text-base font-semibold"
                       style={{ color: 'var(--color-pt-text)' }}
                     >
                       {t.name}
                     </span>
                     {isActive && (
                       <span
-                        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        className="text-2xs inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
                         style={{
                           background:
                             'color-mix(in oklab, var(--color-pt-accent) 15%, transparent)',
@@ -148,7 +150,7 @@ export function TemplateDropdown({
                     )}
                   </div>
                   <p
-                    className="mt-0.5 text-[11px] leading-snug"
+                    className="mt-0.5 text-xs leading-snug"
                     style={{ color: 'var(--color-pt-text-2)' }}
                   >
                     {sectionSummary}
@@ -198,12 +200,12 @@ export function TemplateDropdown({
               borderTop: '1px solid var(--color-pt-border)',
             }}
           >
-            <span className="text-[11px]" style={{ color: 'var(--color-pt-text-2)' }}>
+            <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
               Changing template clears the current note.
             </span>
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-[11px] font-medium"
+              className="inline-flex items-center gap-1 text-xs font-medium"
               style={{
                 color: 'var(--color-pt-accent)',
                 background: 'none',

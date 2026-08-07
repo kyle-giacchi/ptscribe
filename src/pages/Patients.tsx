@@ -2,8 +2,7 @@ import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Modal } from '@/components/ui/Modal';
-import { Field, TextInput, Select } from '@/components/ui/Field';
+import { AddPatientModal } from '@/components/patients/AddPatientModal';
 import {
   Avatar,
   Eyebrow,
@@ -15,10 +14,10 @@ import {
 } from '@/components/design';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
-import { parseIsoDate, fmtIsoDateOptional, relativeFromNow } from '@/utils/dates';
+import { relativeFromNow } from '@/utils/dates';
 import { ageFromDob } from '@/utils/patients';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { Patient, Sex } from '@/types';
+import type { Patient } from '@/types';
 
 type StatusFilter = 'all' | 'on_track' | 'plateau' | 'flagged' | 'new';
 
@@ -160,7 +159,7 @@ export function Patients() {
                 padding: '28px 18px',
                 textAlign: 'center',
                 color: 'var(--color-pt-text-3)',
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
               }}
             >
               No patients match this filter.
@@ -242,7 +241,7 @@ function Toolbar({
             padding: '9px 12px 9px 32px',
             borderRadius: 9,
             border: '1px solid var(--color-pt-border)',
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             color: 'var(--color-pt-text)',
             background: 'var(--color-pt-surface)',
             outline: 'none',
@@ -259,7 +258,11 @@ function Toolbar({
   );
 }
 
-const COLS = '36px 1.6fr 1fr 1fr 1fr 1fr 120px';
+// No diagnosis column: name + MRN + age is what it takes to pick the right row,
+// and a caseload list is the screen most likely to be read over a shoulder or
+// left open on a shared workstation. Diagnosis is still searchable (below) and
+// still on the chart itself.
+const COLS = '36px 1.8fr 1fr 1fr 1fr 120px';
 
 const TableHeader = memo(function TableHeader() {
   return (
@@ -275,7 +278,6 @@ const TableHeader = memo(function TableHeader() {
     >
       <span />
       <Eyebrow>Patient</Eyebrow>
-      <Eyebrow>Diagnosis</Eyebrow>
       <Eyebrow>Last visit</Eyebrow>
       <Eyebrow>Next visit</Eyebrow>
       <Eyebrow>Progress</Eyebrow>
@@ -321,11 +323,11 @@ const PatientRow = memo(function PatientRow({
         background: 'transparent',
       }}
     >
-      <Avatar name={fullName || '?'} size={32} />
+      <Avatar name={fullName || '?'} color={p.color} size={32} />
       <div style={{ minWidth: 0 }}>
         <div
           style={{
-            fontSize: 13.5,
+            fontSize: 'var(--text-base)',
             fontWeight: 600,
             color: 'var(--color-pt-text)',
             whiteSpace: 'nowrap',
@@ -337,7 +339,7 @@ const PatientRow = memo(function PatientRow({
         </div>
         <div
           style={{
-            fontSize: 11.5,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
             fontFamily: 'var(--font-mono)',
             marginTop: 1,
@@ -347,22 +349,10 @@ const PatientRow = memo(function PatientRow({
           {age !== null ? ` · ${age} yo` : ''}
         </div>
       </div>
-      <div
-        style={{
-          fontSize: 12.5,
-          color: 'var(--color-pt-text)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-        title={p.primaryDiagnosis}
-      >
-        {p.primaryDiagnosis || '—'}
-      </div>
-      <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
         {lastVisit ? relativeFromNow(lastVisit) : '—'}
       </div>
-      <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
         {nextVisit ? relativeFromNow(nextVisit) : '—'}
       </div>
       <ProgressCell count={sessionCount} />
@@ -376,7 +366,7 @@ const ProgressCell = memo(function ProgressCell({ count }: { count: number }) {
     return (
       <span
         style={{
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           fontWeight: 600,
           color: 'var(--color-pt-text-3)',
           fontFamily: 'var(--font-mono)',
@@ -392,7 +382,7 @@ const ProgressCell = memo(function ProgressCell({ count }: { count: number }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span
         style={{
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           fontWeight: 600,
           color: 'var(--color-pt-text)',
           fontFamily: 'var(--font-mono)',
@@ -450,7 +440,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         >
           <Plus size={20} strokeWidth={2} />
         </div>
-        <p style={{ fontSize: 13.5, color: 'var(--color-pt-text-2)' }}>
+        <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)' }}>
           No patients yet — add your first to start charting.
         </p>
         <PtButton variant="primary" onClick={onAdd} iconLeft={<Plus size={14} strokeWidth={2.4} />}>
@@ -458,166 +448,5 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         </PtButton>
       </div>
     </SurfaceCard>
-  );
-}
-
-function AddPatientModal({
-  open,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (p: Patient) => void;
-}) {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dob, setDob] = useState('');
-  const [sex, setSex] = useState<Sex | ''>('');
-  const [mrn, setMrn] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-  const [icd10, setIcd10] = useState('');
-  const [referring, setReferring] = useState('');
-
-  function reset() {
-    setFirstName('');
-    setLastName('');
-    setDob('');
-    setSex('');
-    setMrn('');
-    setDiagnosis('');
-    setIcd10('');
-    setReferring('');
-  }
-
-  function handleSave() {
-    const now = Date.now();
-    const patient: Patient = {
-      id: crypto.randomUUID(),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      dob: parseIsoDate(dob),
-      sex: sex || undefined,
-      mrn: mrn.trim() || undefined,
-      primaryDiagnosis: diagnosis.trim() || undefined,
-      icd10: icd10.trim() || undefined,
-      referringProvider: referring.trim() || undefined,
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    };
-    onSave(patient);
-    reset();
-  }
-
-  function handleClose() {
-    reset();
-    onClose();
-  }
-
-  const canSave = firstName.trim().length > 0 && lastName.trim().length > 0;
-
-  return (
-    <Modal open={open} onClose={handleClose} title="Add patient" size="lg">
-      <FormSection title="Identity" hint="Required to create a chart.">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="First name">
-            <TextInput
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              autoFocus
-              autoComplete="given-name"
-            />
-          </Field>
-          <Field label="Last name">
-            <TextInput
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              autoComplete="family-name"
-            />
-          </Field>
-        </div>
-      </FormSection>
-
-      <FormSection title="Demographics" hint="Optional — used in note headers and PDFs.">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Date of birth" hint={fmtIsoDateOptional(parseIsoDate(dob)) || undefined}>
-            <TextInput type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-          </Field>
-          <Field label="Sex">
-            <Select value={sex} onChange={(e) => setSex(e.target.value as Sex | '')}>
-              <option value="">—</option>
-              <option value="F">Female</option>
-              <option value="M">Male</option>
-              <option value="X">Other / unspecified</option>
-            </Select>
-          </Field>
-        </div>
-      </FormSection>
-
-      <FormSection title="Clinical" hint="Optional — fill what you know now.">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="MRN">
-            <TextInput value={mrn} onChange={(e) => setMrn(e.target.value)} />
-          </Field>
-          <Field label="Referring provider">
-            <TextInput value={referring} onChange={(e) => setReferring(e.target.value)} />
-          </Field>
-          <Field label="Primary diagnosis" className="sm:col-span-2">
-            <TextInput
-              placeholder="e.g., Right rotator cuff tendinopathy"
-              value={diagnosis}
-              onChange={(e) => setDiagnosis(e.target.value)}
-            />
-          </Field>
-          <Field label="ICD-10">
-            <TextInput
-              placeholder="M75.101"
-              value={icd10}
-              onChange={(e) => setIcd10(e.target.value)}
-            />
-          </Field>
-        </div>
-      </FormSection>
-
-      <div className="flex justify-end gap-2 pt-2">
-        <PtButton variant="ghost" onClick={handleClose}>
-          Cancel
-        </PtButton>
-        <PtButton variant="primary" disabled={!canSave} onClick={handleSave}>
-          Save patient
-        </PtButton>
-      </div>
-    </Modal>
-  );
-}
-
-function FormSection({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-2">
-      <div className="flex items-baseline justify-between">
-        <h3
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            color: 'var(--color-pt-text-2)',
-          }}
-        >
-          {title}
-        </h3>
-        {hint && <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{hint}</span>}
-      </div>
-      {children}
-    </section>
   );
 }

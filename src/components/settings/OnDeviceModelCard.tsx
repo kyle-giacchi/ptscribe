@@ -43,7 +43,14 @@ export function OnDeviceModelCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 10 }}>
         <Eyebrow>On-device model</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0, lineHeight: 1.5 }}>
+        <p
+          style={{
+            fontSize: 'var(--text-sm)',
+            color: 'var(--color-pt-text-3)',
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
           The local Whisper transcription model (~150 MB) is downloaded once and cached on this
           device — it persists across sessions, reloads, and resets, so you only download it again
           if you choose to. Clear and re-download it if transcription stops working or you suspect

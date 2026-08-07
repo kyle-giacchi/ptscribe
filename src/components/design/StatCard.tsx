@@ -28,7 +28,7 @@ export function StatCard({ eyebrow, value, trend, trendKind = 'neutral' }: StatC
     >
       <div
         style={{
-          fontSize: 10.5,
+          fontSize: 'var(--text-2xs)',
           fontWeight: 600,
           letterSpacing: '1.2px',
           textTransform: 'uppercase',
@@ -40,7 +40,7 @@ export function StatCard({ eyebrow, value, trend, trendKind = 'neutral' }: StatC
       <div
         className="font-mono"
         style={{
-          fontSize: 26,
+          fontSize: 'var(--text-2xl)',
           fontWeight: 600,
           letterSpacing: '-0.4px',
           color: 'var(--color-pt-text)',
@@ -53,7 +53,7 @@ export function StatCard({ eyebrow, value, trend, trendKind = 'neutral' }: StatC
       {trend && (
         <div
           style={{
-            fontSize: 11.5,
+            fontSize: 'var(--text-xs)',
             fontWeight: 600,
             color: TREND_COLORS[trendKind],
             marginTop: 4,

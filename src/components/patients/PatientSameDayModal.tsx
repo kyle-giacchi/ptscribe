@@ -21,7 +21,7 @@ export function PatientSameDayModal({
   const name = `${patient.firstName} ${patient.lastName}`;
   return (
     <Modal open onClose={onClose} title="Session already started today" size="sm">
-      <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: 0 }}>
+      <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)', margin: 0 }}>
         You have {sessions.length === 1 ? 'an open session' : `${sessions.length} open sessions`}{' '}
         for <strong>{name}</strong> today. Continue where you left off, or start fresh.
       </p>
@@ -52,10 +52,22 @@ export function PatientSameDayModal({
               }}
             >
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-accent-fg)' }}>
+                <div
+                  style={{
+                    fontSize: 'var(--text-base)',
+                    fontWeight: 600,
+                    color: 'var(--color-pt-accent-fg)',
+                  }}
+                >
                   {labelForType(s.type)}
                 </div>
-                <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}>
+                <div
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-pt-text-3)',
+                    marginTop: 1,
+                  }}
+                >
                   Started at {time}
                 </div>
               </div>

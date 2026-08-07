@@ -192,7 +192,7 @@ export function OrgNew() {
               borderRadius: 8,
               background: 'var(--color-pt-accent)',
               color: '#ffffff',
-              fontSize: 14,
+              fontSize: 'var(--text-md)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               flexShrink: 0,
@@ -203,7 +203,7 @@ export function OrgNew() {
           <div>
             <div
               style={{
-                fontSize: 15.5,
+                fontSize: 'var(--text-md)',
                 fontWeight: 700,
                 color: 'var(--color-pt-text)',
                 letterSpacing: '-0.02em',
@@ -211,7 +211,7 @@ export function OrgNew() {
             >
               PTScribe
             </div>
-            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
               Set up your organization
             </div>
           </div>
@@ -412,7 +412,7 @@ function StepInviteTeam({
                     }}
                   />
                   {isDupe && (
-                    <div style={{ fontSize: 11, color: 'var(--color-pt-amber-fg)' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-amber-fg)' }}>
                       Duplicate email — this person will only receive one invite.
                     </div>
                   )}
@@ -424,7 +424,7 @@ function StepInviteTeam({
                     padding: '10px 12px',
                     border: '1.5px solid var(--color-pt-border)',
                     borderRadius: 10,
-                    fontSize: 13,
+                    fontSize: 'var(--text-base)',
                     color: 'var(--color-pt-text)',
                     background: 'var(--color-pt-surface)',
                     cursor: 'pointer',
@@ -470,7 +470,7 @@ function StepInviteTeam({
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               fontWeight: 600,
               color: 'var(--color-pt-accent-fg)',
             }}
@@ -478,7 +478,7 @@ function StepInviteTeam({
             <Plus size={14} />
             Add another
           </button>
-          <span style={{ color: 'var(--color-pt-border)', fontSize: 13 }}>·</span>
+          <span style={{ color: 'var(--color-pt-border)', fontSize: 'var(--text-base)' }}>·</span>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -488,7 +488,7 @@ function StepInviteTeam({
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               fontWeight: 600,
               color: 'var(--color-pt-text-3)',
             }}
@@ -558,7 +558,7 @@ function StepReview({
           <div style={{ borderTop: '1px solid var(--color-pt-border)', paddingTop: 16 }}>
             <div
               style={{
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 fontWeight: 700,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
@@ -569,7 +569,13 @@ function StepReview({
               Team invites ({invites.length})
             </div>
             {invites.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)', fontStyle: 'italic' }}>
+              <div
+                style={{
+                  fontSize: 'var(--text-base)',
+                  color: 'var(--color-pt-text-3)',
+                  fontStyle: 'italic',
+                }}
+              >
                 No invites — you can add team members from Settings.
               </div>
             ) : (
@@ -581,13 +587,13 @@ function StepReview({
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      fontSize: 13,
+                      fontSize: 'var(--text-base)',
                     }}
                   >
                     <span style={{ color: 'var(--color-pt-text)' }}>{row.email}</span>
                     <span
                       style={{
-                        fontSize: 11,
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 600,
                         letterSpacing: '0.06em',
                         textTransform: 'uppercase',
@@ -614,7 +620,7 @@ function StepReview({
             background: 'var(--color-pt-amber-soft)',
             border: '1px solid var(--color-pt-amber-border)',
             borderRadius: 10,
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             color: 'var(--color-pt-amber-fg)',
           }}
         >
@@ -643,7 +649,7 @@ function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
       <h1
         style={{
           marginTop: 4,
-          fontSize: 22,
+          fontSize: 'var(--text-xl)',
           fontWeight: 700,
           color: 'var(--color-pt-text)',
           letterSpacing: '-0.01em',
@@ -651,7 +657,14 @@ function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
       >
         {title}
       </h1>
-      <p style={{ marginTop: 6, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
+      <p
+        style={{
+          marginTop: 6,
+          fontSize: 'var(--text-base)',
+          color: 'var(--color-pt-text-2)',
+          lineHeight: 1.55,
+        }}
+      >
         {subtitle}
       </p>
     </div>
@@ -683,7 +696,7 @@ function OrgStepper({ labels, current }: { labels: string[]; current: number }) 
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 fontWeight: 600,
                 background:
                   done || active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
@@ -696,7 +709,7 @@ function OrgStepper({ labels, current }: { labels: string[]; current: number }) 
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-3)',
                 fontWeight: active ? 600 : 400,
               }}
@@ -773,7 +786,7 @@ function ErrorGate({
             alignItems: 'center',
             justifyContent: 'center',
             color: '#ffffff',
-            fontSize: 14,
+            fontSize: 'var(--text-md)',
             fontWeight: 800,
             margin: '0 auto 20px',
           }}
@@ -783,7 +796,7 @@ function ErrorGate({
         <h1
           style={{
             margin: '0 0 12px',
-            fontSize: 20,
+            fontSize: 'var(--text-xl)',
             fontWeight: 700,
             color: 'var(--color-pt-text)',
             letterSpacing: '-0.02em',
@@ -794,7 +807,7 @@ function ErrorGate({
         <p
           style={{
             margin: '0 0 24px',
-            fontSize: 14,
+            fontSize: 'var(--text-md)',
             color: 'var(--color-pt-text-2)',
             lineHeight: 1.6,
           }}
@@ -814,7 +827,7 @@ function ReviewSection({ label, children }: { label: string; children: React.Rea
     <div>
       <div
         style={{
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           fontWeight: 700,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
@@ -836,7 +849,7 @@ function ReviewRow({ field, value }: { field: string; value: string }) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'baseline',
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
       }}
     >
       <span style={{ color: 'var(--color-pt-text-3)' }}>{field}</span>

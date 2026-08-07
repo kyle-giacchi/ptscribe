@@ -90,7 +90,7 @@ export const StatusBadge = memo(function StatusBadge({ tone, label }: StatusBadg
         background: t.bg,
         border: `1px solid ${t.border === 'transparent' ? 'transparent' : t.border}`,
         color: t.fg,
-        fontSize: 11.5,
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
       }}
     >

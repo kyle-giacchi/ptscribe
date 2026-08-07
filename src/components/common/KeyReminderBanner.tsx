@@ -39,7 +39,7 @@ export function KeyReminderBanner() {
         background: 'var(--color-pt-amber-soft, #fff7ed)',
         borderBottom: '1px solid var(--color-pt-amber-border, #fed7aa)',
         padding: '7px 22px',
-        fontSize: 12.5,
+        fontSize: 'var(--text-sm)',
         color: 'var(--color-pt-amber-fg, #9a3412)',
         lineHeight: 1.4,
       }}
@@ -51,7 +51,7 @@ export function KeyReminderBanner() {
       <button
         type="button"
         className="btn btn-secondary"
-        style={{ minHeight: 28, padding: '3px 10px', fontSize: 12 }}
+        style={{ minHeight: 28, padding: '3px 10px', fontSize: 'var(--text-sm)' }}
         onClick={() => navigate('/settings')}
       >
         Add key

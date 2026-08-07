@@ -9,7 +9,7 @@ const VARIANT_STYLES: Record<Variant, React.CSSProperties> = {
     border: 'none',
     padding: '9px 14px',
     borderRadius: 8,
-    fontSize: 13,
+    fontSize: 'var(--text-base)',
     fontWeight: 600,
   },
   ghost: {
@@ -18,7 +18,7 @@ const VARIANT_STYLES: Record<Variant, React.CSSProperties> = {
     border: '1px solid var(--color-pt-border)',
     padding: '8px 12px',
     borderRadius: 8,
-    fontSize: 12.5,
+    fontSize: 'var(--text-sm)',
     fontWeight: 500,
   },
   danger: {
@@ -27,7 +27,7 @@ const VARIANT_STYLES: Record<Variant, React.CSSProperties> = {
     border: 'none',
     padding: '8px 14px',
     borderRadius: 8,
-    fontSize: 13,
+    fontSize: 'var(--text-base)',
     fontWeight: 600,
   },
   'accent-soft': {
@@ -36,7 +36,7 @@ const VARIANT_STYLES: Record<Variant, React.CSSProperties> = {
     border: '1px solid var(--color-pt-accent-border)',
     padding: '8px 12px',
     borderRadius: 8,
-    fontSize: 12.5,
+    fontSize: 'var(--text-sm)',
     fontWeight: 600,
   },
 };

@@ -26,7 +26,7 @@ export function HipaaDisclosure({
           borderRadius: 10,
           border: '1px solid var(--color-pt-border)',
           background: 'var(--color-pt-surface-mut)',
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           color: 'var(--color-pt-text-2)',
           lineHeight: 1.5,
         }}
@@ -59,7 +59,7 @@ export function HipaaDisclosure({
         borderRadius: 12,
         border: '1px solid var(--color-pt-border)',
         background: 'var(--color-pt-surface-mut)',
-        fontSize: 12.5,
+        fontSize: 'var(--text-sm)',
         color: 'var(--color-pt-text-2)',
         lineHeight: 1.55,
       }}
@@ -70,7 +70,7 @@ export function HipaaDisclosure({
           strokeWidth={1.75}
           style={{ flexShrink: 0, color: 'var(--color-pt-amber)' }}
         />
-        <strong style={{ color: 'var(--color-pt-text)', fontSize: 13 }}>
+        <strong style={{ color: 'var(--color-pt-text)', fontSize: 'var(--text-base)' }}>
           Privacy &amp; HIPAA disclosure
         </strong>
       </div>

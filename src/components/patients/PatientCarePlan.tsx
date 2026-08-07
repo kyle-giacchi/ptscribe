@@ -24,12 +24,14 @@ export function PatientCarePlan({
   if (!plan) {
     return (
       <SurfaceCard padding={40} style={{ maxWidth: 980, textAlign: 'center' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+        <div
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text-2)' }}
+        >
           No active plan of care
         </div>
         <div
           style={{
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             color: 'var(--color-pt-text-3)',
             marginTop: 4,
             marginBottom: 16,
@@ -102,7 +104,7 @@ export function PatientCarePlan({
               </div>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 'var(--text-sm)',
                   fontWeight: 600,
                   color: 'var(--color-pt-text-2)',
                   fontVariantNumeric: 'tabular-nums',
@@ -131,7 +133,7 @@ export function PatientCarePlan({
             gap: 12,
           }}
         >
-          <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', margin: 0 }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)', margin: 0 }}>
             {plan.active
               ? 'This plan is active. Close it when the patient is discharged — the record stays, it just stops showing as the current plan.'
               : 'This plan is closed. Reopening makes it the active plan again.'}
@@ -152,7 +154,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
       style={{
-        fontSize: 11,
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         textTransform: 'uppercase',
         letterSpacing: '0.06em',
@@ -188,7 +190,7 @@ function DateField({
           border: '1px solid var(--color-pt-border)',
           borderRadius: 8,
           padding: '7px 10px',
-          fontSize: 12.5,
+          fontSize: 'var(--text-sm)',
           fontFamily: 'var(--font-mono)',
           color: 'var(--color-pt-text)',
         }}

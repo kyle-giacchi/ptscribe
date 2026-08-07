@@ -58,12 +58,14 @@ export function AiCallError({
         style={{ color: 'var(--color-caution)', flexShrink: 0, marginTop: 2 }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        <div
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text)' }}
+        >
           {friendly.title}
         </div>
         <div
           style={{
-            fontSize: 12.5,
+            fontSize: 'var(--text-sm)',
             color: 'var(--color-pt-text-2)',
             lineHeight: 1.5,
             marginTop: 2,
@@ -72,7 +74,9 @@ export function AiCallError({
           {friendly.description}
         </div>
         {showRawDetail && error.rawDetail ? (
-          <details style={{ marginTop: 6, fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+          <details
+            style={{ marginTop: 6, fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}
+          >
             <summary style={{ cursor: 'pointer' }}>Technical detail</summary>
             <pre
               style={{
@@ -90,7 +94,7 @@ export function AiCallError({
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+            style={{ minHeight: 32, padding: '4px 10px', fontSize: 'var(--text-sm)' }}
             onClick={handleAction}
           >
             <RefreshCw size={12} strokeWidth={2} style={{ marginRight: 4 }} />
@@ -100,7 +104,7 @@ export function AiCallError({
             <button
               type="button"
               className="btn btn-ghost"
-              style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+              style={{ minHeight: 32, padding: '4px 10px', fontSize: 'var(--text-sm)' }}
               onClick={() => {
                 if (window.confirm(fallback.confirm)) fallback.onUse();
               }}
@@ -113,7 +117,7 @@ export function AiCallError({
             <button
               type="button"
               className="btn btn-ghost"
-              style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+              style={{ minHeight: 32, padding: '4px 10px', fontSize: 'var(--text-sm)' }}
               onClick={onDismiss}
             >
               <X size={12} strokeWidth={2} style={{ marginRight: 4 }} />

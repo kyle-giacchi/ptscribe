@@ -34,7 +34,7 @@ function TranscriptTabs({ session }: { session: Session }) {
 
   if (available.length === 0) {
     return (
-      <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+      <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
         No session-level transcripts yet.
       </span>
     );
@@ -57,7 +57,7 @@ function TranscriptTabs({ session }: { session: Session }) {
               onClick={() => setActiveKey(tab.key)}
               className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-colors"
               style={{
-                fontSize: 11,
+                fontSize: 'var(--text-xs)',
                 fontWeight: 600,
                 cursor: hasText ? 'pointer' : 'default',
                 opacity: hasText ? 1 : 0.38,
@@ -76,7 +76,7 @@ function TranscriptTabs({ session }: { session: Session }) {
                 <span
                   className="rounded-full px-1.5"
                   style={{
-                    fontSize: 9,
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 600,
                     background: isActive
                       ? `color-mix(in oklab, ${tab.color} 18%, transparent)`
@@ -96,7 +96,7 @@ function TranscriptTabs({ session }: { session: Session }) {
         <details className="mb-3">
           <summary
             style={{
-              fontSize: 10.5,
+              fontSize: 'var(--text-2xs)',
               color: 'var(--color-pt-text-3)',
               cursor: 'pointer',
               userSelect: 'none',
@@ -109,7 +109,7 @@ function TranscriptTabs({ session }: { session: Session }) {
               <div
                 key={clip.id}
                 className="flex items-center gap-2 rounded-md px-3 py-2"
-                style={{ background: 'var(--color-pt-surface-mut)', fontSize: 11 }}
+                style={{ background: 'var(--color-pt-surface-mut)', fontSize: 'var(--text-xs)' }}
               >
                 <span style={{ fontWeight: 600, color: 'var(--color-pt-text)', flexShrink: 0 }}>
                   Clip {clip.index + 1}
@@ -151,7 +151,7 @@ function TranscriptTabs({ session }: { session: Session }) {
           <div className="mb-2 flex items-center justify-between">
             <div
               style={{
-                fontSize: 9.5,
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.06em',
@@ -165,7 +165,7 @@ function TranscriptTabs({ session }: { session: Session }) {
               onClick={() => copy(text, activeKey)}
               className="inline-flex items-center gap-1 transition-opacity hover:opacity-70"
               style={{
-                fontSize: 10,
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 600,
                 color: copied === activeKey ? '#10b981' : active.color,
                 background: 'none',
@@ -187,7 +187,7 @@ function TranscriptTabs({ session }: { session: Session }) {
           </div>
           <p
             style={{
-              fontSize: 12,
+              fontSize: 'var(--text-sm)',
               lineHeight: 1.65,
               color: 'var(--color-pt-text)',
               whiteSpace: 'pre-wrap',
@@ -214,7 +214,7 @@ export function TranscriptPanel({ session }: { session: Session }) {
     availableCount > 0 ? (
       <span
         style={{
-          fontSize: 9.5,
+          fontSize: 'var(--text-2xs)',
           fontWeight: 700,
           padding: '1px 6px',
           borderRadius: 999,
@@ -225,7 +225,7 @@ export function TranscriptPanel({ session }: { session: Session }) {
         {availableCount} tier{availableCount !== 1 ? 's' : ''}
       </span>
     ) : (
-      <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}>none</span>
+      <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-pt-text-3)' }}>none</span>
     );
 
   return (

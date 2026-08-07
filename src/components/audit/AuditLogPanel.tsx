@@ -74,11 +74,11 @@ export function AuditLogPanel() {
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
           {entries.length} entries
           {entries.length > 0 && ` · oldest ${fmt(entries[0].ts)}`}
         </span>
-        <span style={{ fontSize: 12, color: statusColor }}>{statusText}</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: statusColor }}>{statusText}</span>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <PtButton variant="ghost" onClick={() => setExpanded((v) => !v)}>
@@ -97,7 +97,7 @@ export function AuditLogPanel() {
         <div
           style={{
             fontFamily: 'monospace',
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             lineHeight: 1.6,
             maxHeight: 240,
             overflowY: 'auto',

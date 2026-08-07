@@ -36,7 +36,7 @@ export function ResetCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 10 }}>
         <Eyebrow>Reset</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           Erase all local data: patients, sessions, notes, templates, exercises, and audio. This
           cannot be undone.
         </p>

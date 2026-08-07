@@ -194,6 +194,8 @@ export type SessionMachineAction =
 export interface SessionMachineInit {
   /** ?mode=quick — start on the review tab with recording skipped. */
   quickMode?: boolean;
+  /** ?tab=review — open straight on the note, without skipping recording. */
+  tab?: 'record' | 'review';
   /** Transcript baseline seeded once per mount from session.transcript. */
   baseline?: string;
   /** Edit overlay seeded once per mount from session.editedTranscript. */
@@ -221,7 +223,7 @@ export function createInitialSessionMachineState(init?: SessionMachineInit): Ses
       advisories: initialAdvisories,
     },
     view: {
-      tab: init?.quickMode ? 'review' : 'record',
+      tab: init?.tab ?? (init?.quickMode ? 'review' : 'record'),
       recordingSkipped: init?.quickMode ?? false,
     },
     transcript: {

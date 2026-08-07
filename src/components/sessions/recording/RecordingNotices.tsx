@@ -77,7 +77,7 @@ export function RecordingNotices({
     <>
       {webspeechProvider && (
         <div
-          className="flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium"
+          className="flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-medium"
           style={{
             background: 'var(--color-pt-accent-soft)',
             color: 'var(--color-pt-accent-fg)',
@@ -105,7 +105,7 @@ export function RecordingNotices({
         </StatusBanner>
       )}
       {webspeechProvider && liveSupported && (
-        <p className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
           Browser transcription can&apos;t tell speakers apart, which can muddle the generated note.
           Upgrade to Cloudflare Nova-3 for speaker labeling.
         </p>
@@ -140,7 +140,7 @@ export function LiveTranscriptPreview({ webSpeech }: { webSpeech: UseWebSpeechTr
   if (!(webSpeech.listening || webSpeech.interimText || webSpeech.accumulatedText)) return null;
   return (
     <div
-      className="rounded-lg px-3.5 py-2.5 text-xs"
+      className="rounded-lg px-3.5 py-2.5 text-sm"
       style={{
         border: '1px solid var(--color-pt-accent-border)',
         background: 'var(--color-pt-accent-soft)',
