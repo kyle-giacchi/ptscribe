@@ -5,7 +5,7 @@
 ![React](https://img.shields.io/badge/React_19-20232A?style=flat&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=flat&logo=cloudflare&logoColor=white)
-![License](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0-blue)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
 **[Live demo →](https://ptscribe.kgiacchi.workers.dev/)**
 
@@ -198,4 +198,10 @@ PHI never touches a server. The Cloudflare Worker is a proxy only.
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE) — free for personal, educational, research, and non-commercial use.
+[GNU AGPL-3.0](LICENSE). You may run, modify, and self-host PTScribe — including commercially, in your own clinic — for free. If you modify it and offer it to others over a network, you must publish your modifications under the same license.
+
+**Clinics: this means you own it.** Deploy it to your own Cloudflare account with your own API keys, and there is no vendor between you and your data — no BAA with us required, because we never receive your PHI.
+
+A **commercial license** is available for anyone who wants to embed PTScribe in a closed-source product or offer it as a service without the AGPL's source-sharing obligation. To inquire, [open an issue](https://github.com/kyle-giacchi/ptscribe/issues/new?title=Commercial+license+inquiry).
+
+The PTScribe name and logo are trademarks and are not licensed for use by forks.
