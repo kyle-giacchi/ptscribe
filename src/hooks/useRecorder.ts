@@ -4,7 +4,7 @@ import { acquireWakeLock, releaseWakeLock } from '@/lib/wakeLock';
 import { createVoiceDetector, type VoiceDetector } from '@/lib/audio/voiceDetector';
 import type { RecordingLimitsSettings } from '@/types';
 
-export type RecorderStatus = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
+type RecorderStatus = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
 
 /**
  * Discrete, semantically-classified things that can happen during a clip.
@@ -24,7 +24,7 @@ export type RecorderEvent =
   | { type: 'silenceStart' }
   | { type: 'silenceEnd' };
 
-export interface UseRecorderOptions {
+interface UseRecorderOptions {
   limits?: RecordingLimitsSettings;
   /**
    * Preferred microphone `deviceId` (from the AudioCheck pre-flight). Passed to
@@ -88,6 +88,20 @@ const HEARTBEAT_INTERVAL_MS = 3000;
 // Continuous silence duration (seconds) before the muted-mic warning fires.
 const SILENCE_WARN_SEC = 30;
 
+/**
+ * Floor on how long a live-preview segment must be before it is worth a Whisper
+ * pass. The feature extractor zero-pads every input to a full 30 s mel window,
+ * so a 0.3 s cough costs the encoder exactly as much as a full sentence — and
+ * while it runs, the leaky bucket in useCapturePhase drops the real utterance
+ * queued behind it.
+ *
+ * This gates the *preview* only. The main MediaRecorder is a separate recorder
+ * on the same stream: the audio is still captured, still written to IDB, and
+ * still transcribed by the T2 pass. Set low enough that a genuine one-word
+ * answer ("yes", "no pain") still previews.
+ */
+const MIN_SEGMENT_MS = 700;
+
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined') return undefined;
   for (const type of PREFERRED_MIME_TYPES) {
@@ -145,6 +159,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  // Mirrors `blob` state so stop() can return the final blob even when it is
+  // called after onstop has already run (auto-stop paths: hardCap, idleAuto,
+  // micDisconnected, interrupted). State is a render behind; this is not.
+  const finalBlobRef = useRef<Blob | null>(null);
   const chunkIndexRef = useRef<number>(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -275,20 +293,29 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       const silenceMs = now - voiceDetectorRef.current.lastVoiceAtMs;
       const liveStream = streamRef.current;
       const mime = currentMimeRef.current;
-      if (!isSpeakingRef.current && silenceMs < 200 && liveStream) {
-        // Voice just started — open a new segment recorder
+      // Opens a segment recorder on `liveStream` and wires its chunk to the live
+      // preview. Best-effort: a failure here must never break main recording.
+      const openSegment = (startedAt: number) => {
+        if (!liveStream) return;
         try {
           const seg = new MediaRecorder(liveStream, mime ? { mimeType: mime } : undefined);
           seg.ondataavailable = (ev) => {
-            if (ev.data.size > 0) onChunkRef.current?.(ev.data, mime);
+            if (ev.data.size === 0) return;
+            if (Date.now() - startedAt < MIN_SEGMENT_MS) return;
+            onChunkRef.current?.(ev.data, mime);
           };
           seg.start();
           segmentRecRef.current = seg;
-          segmentStartAtRef.current = now;
+          segmentStartAtRef.current = startedAt;
           isSpeakingRef.current = true;
         } catch {
           /* best-effort — never break main recording */
         }
+      };
+
+      if (!isSpeakingRef.current && silenceMs < 200 && liveStream) {
+        // Voice just started — open a new segment recorder
+        openSegment(now);
       } else if (isSpeakingRef.current) {
         const segAge = now - segmentStartAtRef.current;
         if (silenceMs > 800 || segAge > 15_000) {
@@ -302,18 +329,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           }
           // Rotate immediately on max-length if speech is still live
           if (segAge > 15_000 && silenceMs < 200 && liveStream) {
-            try {
-              const seg2 = new MediaRecorder(liveStream, mime ? { mimeType: mime } : undefined);
-              seg2.ondataavailable = (ev) => {
-                if (ev.data.size > 0) onChunkRef.current?.(ev.data, mime);
-              };
-              seg2.start();
-              segmentRecRef.current = seg2;
-              segmentStartAtRef.current = now;
-              isSpeakingRef.current = true;
-            } catch {
-              /* best-effort */
-            }
+            openSegment(now);
           }
         }
       }
@@ -387,6 +403,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
       const mime = currentMimeRef.current;
       if (chunks.length > 0) {
         const finalBlob = new Blob(chunks, { type: mime });
+        finalBlobRef.current = finalBlob;
         setBlob(finalBlob);
         if (stopResolveRef.current) {
           stopResolveRef.current(finalBlob);
@@ -493,9 +510,14 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
             clearTimeout(stopTimeoutRef.current);
             stopTimeoutRef.current = null;
           }
-          const finalBlob = new Blob(chunksRef.current, {
-            type: mimeType || 'audio/webm',
-          });
+          // No chunks means nothing was captured — resolve null rather than a
+          // 0-byte Blob, which callers treat as a valid clip and persist. Matches
+          // the teardown path's own empty-chunk handling.
+          const finalBlob =
+            chunksRef.current.length > 0
+              ? new Blob(chunksRef.current, { type: mimeType || 'audio/webm' })
+              : null;
+          finalBlobRef.current = finalBlob;
           setBlob(finalBlob);
           setStatus('stopped');
           const reason = pendingStopReasonRef.current;
@@ -523,6 +545,9 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
         accumulatedRef.current = 0;
         setDurationSec(0);
         notifyDuration(0);
+        // Must clear alongside `blob` — a stale ref here would let the next clip
+        // save the *previous* clip's audio under its own id.
+        finalBlobRef.current = null;
         setBlob(null);
         pendingStopReasonRef.current = null;
         softWarnEmittedRef.current = false;
@@ -598,7 +623,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
   const stop = useCallback(() => {
     shouldBeRecordingRef.current = false;
     const r = recorderRef.current;
-    if (!r || r.state === 'inactive') return Promise.resolve(blob);
+    // Already stopped (auto-stop already ran onstop + teardown). Return the ref,
+    // not `blob` state — that closure is a render behind and would be null here,
+    // which callers read as "recording failed" and delete the clip.
+    if (!r || r.state === 'inactive') return Promise.resolve(finalBlobRef.current);
     return new Promise<Blob | null>((resolve) => {
       stopResolveRef.current = resolve;
       pendingStopReasonRef.current = 'manual';
@@ -614,10 +642,15 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
           chunksRef.current.length > 0
             ? new Blob(chunksRef.current, { type: currentMimeRef.current })
             : null;
+        finalBlobRef.current = fallback;
         cb(fallback);
+        // onstop never fired, so its teardown() never ran — release the mic,
+        // wake lock, visibility listener and heartbeat here instead of leaking
+        // them until the Session page unmounts.
+        teardown();
       }, 8000);
     });
-  }, [blob, tickPause]);
+  }, [tickPause, teardown]);
 
   const reset = useCallback(() => {
     teardown();
@@ -625,6 +658,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorder {
     accumulatedRef.current = 0;
     setDurationSec(0);
     notifyDuration(0);
+    finalBlobRef.current = null;
     setBlob(null);
     setError(null);
     setStatus('idle');

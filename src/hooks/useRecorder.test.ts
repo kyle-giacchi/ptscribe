@@ -20,6 +20,12 @@ vi.mock('@/lib/wakeLock', () => ({
   releaseWakeLock: vi.fn().mockResolvedValue(undefined),
 }));
 
+// `lastVoiceAtMs` is read on every 250 ms tick to decide whether a live-preview
+// segment recorder should open or close. Tests drive it through this handle:
+// `speaking: false` (the default) reads as permanent silence; `true` keeps the
+// timestamp pinned to now, i.e. continuous speech.
+const voiceState = vi.hoisted(() => ({ speaking: false }));
+
 vi.mock('@/lib/audio/voiceDetector', () => ({
   createVoiceDetector: () => ({
     setup: vi.fn(),
@@ -27,7 +33,9 @@ vi.mock('@/lib/audio/voiceDetector', () => ({
     sample: vi.fn(),
     resetIdleTimer: vi.fn(),
     analyser: {} as AnalyserNode,
-    lastVoiceAtMs: 0,
+    get lastVoiceAtMs() {
+      return voiceState.speaking ? Date.now() : 0;
+    },
   }),
 }));
 
@@ -113,6 +121,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   FakeMediaRecorder.instances = [];
+  voiceState.speaking = false;
 
   sentinel = { release: vi.fn().mockResolvedValue(undefined) };
   mockAcquire.mockResolvedValue(sentinel as unknown as WakeLockSentinel);
@@ -197,6 +206,13 @@ describe('useRecorder — exit paths release all three resources', () => {
     const { result } = renderHook(() => useRecorder());
     await startRecording(result);
     const track = currentStream.getTracks()[0];
+    // Feed a chunk so the resolved value is a real recording — with no chunks at
+    // all, stop() correctly resolves null (nothing was captured).
+    await act(async () => {
+      FakeMediaRecorder.instances[0].ondataavailable?.({
+        data: new Blob(['audio-bytes'], { type: 'audio/webm' }),
+      });
+    });
 
     let stopped: Blob | null = null;
     await act(async () => {
@@ -299,5 +315,121 @@ describe('useRecorder — backgrounding (Page Visibility)', () => {
     hiddenSpy2.mockRestore();
 
     expect(events).toEqual(['backgrounded', 'backgrounded']);
+  });
+});
+
+describe('useRecorder — stop() after an auto-stop returns the captured audio', () => {
+  // Regression: on every non-manual stop (hardCap, idleAuto, micDisconnected,
+  // browser-interrupted) the recorder fires onstop itself, then useCapturePhase's
+  // subscriber calls stop() to collect the blob. stop() used to return the `blob`
+  // state captured by its closure — a render behind, so null — and the caller
+  // read that as "recording failed" and deleted the clip and its audio.
+  async function autoStop() {
+    const recorder = FakeMediaRecorder.instances[0];
+    await act(async () => {
+      recorder.ondataavailable?.({ data: new Blob(['audio-bytes'], { type: 'audio/webm' }) });
+    });
+    // Browser-initiated: nothing called our stop(), so stopResolveRef is unset.
+    await act(async () => {
+      recorder.stop();
+    });
+  }
+
+  it('returns the recorded blob, not null, when onstop already ran', async () => {
+    const { result } = renderHook(() => useRecorder());
+    await startRecording(result);
+
+    await autoStop();
+
+    let returned: Blob | null = null;
+    await act(async () => {
+      returned = await result.current.stop();
+    });
+
+    expect(returned).toBeInstanceOf(Blob);
+    expect(returned!.size).toBeGreaterThan(0);
+  });
+
+  it('does not hand the previous clip audio to the next clip', async () => {
+    const { result } = renderHook(() => useRecorder());
+    await startRecording(result, 'clip-1');
+    await autoStop();
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    // Second clip starts and is auto-stopped before producing any data.
+    await startRecording(result, 'clip-2');
+    const second = FakeMediaRecorder.instances[1];
+    await act(async () => {
+      second.stop();
+    });
+
+    let returned: Blob | null = new Blob(['sentinel']);
+    await act(async () => {
+      returned = await result.current.stop();
+    });
+
+    // No data for clip-2 — must be null, never clip-1's audio.
+    expect(returned).toBeNull();
+  });
+
+  it('releases all three resources when the 8s stop fallback fires', async () => {
+    const { result } = renderHook(() => useRecorder());
+    await startRecording(result);
+    const track = currentStream.getTracks()[0];
+    const recorder = FakeMediaRecorder.instances[0];
+    // Recorder that never fires onstop — the safety-net timer must still tear down.
+    recorder.onstop = null;
+
+    let settled: Blob | null | undefined;
+    await act(async () => {
+      void result.current.stop().then((b) => {
+        settled = b;
+      });
+      await vi.advanceTimersByTimeAsync(8000);
+    });
+
+    expect(settled).toBeNull();
+    expect(mockRelease).toHaveBeenCalledWith(sentinel);
+    expect(track.stop).toHaveBeenCalled();
+    expect(visibilityListenerCount(addSpy, removeSpy)).toBe(0);
+  });
+});
+
+describe('useRecorder — live-preview segment duration gate', () => {
+  /**
+   * Segments below MIN_SEGMENT_MS (a cough, a chair scrape) cost a full 30 s-padded
+   * Whisper pass and starve the real utterance queued behind them. The gate drops
+   * them from the *preview* only — the main recorder still captures the audio for T2.
+   */
+  async function runSegment(speakingMs: number): Promise<Blob[]> {
+    const onChunk = vi.fn();
+    const { result } = renderHook(() => useRecorder());
+    result.current.onChunk.current = onChunk;
+    await startRecording(result);
+
+    const before = FakeMediaRecorder.instances.length;
+    voiceState.speaking = true;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250); // one tick → segment recorder opens
+    });
+    const segment = FakeMediaRecorder.instances[before];
+    expect(segment).toBeDefined();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(speakingMs);
+    });
+    segment.ondataavailable?.({ data: new Blob(['x'], { type: 'audio/webm' }) } as BlobEvent);
+
+    return onChunk.mock.calls.map((c) => c[0] as Blob);
+  }
+
+  it('drops a sub-700 ms segment', async () => {
+    expect(await runSegment(300)).toHaveLength(0);
+  });
+
+  it('forwards a segment past the floor', async () => {
+    expect(await runSegment(1000)).toHaveLength(1);
   });
 });
