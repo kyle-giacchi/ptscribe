@@ -18,6 +18,19 @@ const ML_ASSETS: Record<string, { file: string; contentType: string }> = {
     file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
     contentType: 'text/javascript',
   },
+  // transformers.js bundles its OWN onnxruntime-web (see @huggingface/transformers'
+  // nested node_modules) at a different version from the top-level one the VAD uses,
+  // and its browser build hard-codes the *asyncify* artifact names. Serve that exact
+  // pair so whisper.worker/privacyFilter.worker can pin wasmPaths to our origin
+  // instead of transformers' jsdelivr default, which CSP `connect-src 'self'` blocks.
+  '/ort-wasm-simd-threaded.asyncify.wasm': {
+    file: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm',
+    contentType: 'application/wasm',
+  },
+  '/ort-wasm-simd-threaded.asyncify.mjs': {
+    file: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs',
+    contentType: 'text/javascript',
+  },
   '/ort-wasm-simd-threaded.jsep.wasm': {
     file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
     contentType: 'application/wasm',
@@ -135,17 +148,27 @@ export default defineConfig({
         {
           src: 'node_modules/@ricky0123/vad-web/dist/silero_vad_legacy.onnx',
           dest: '.',
-          rename: 'silero_vad_legacy.onnx',
+          rename: { stripBase: true, name: 'silero_vad_legacy.onnx' },
         },
         {
           src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
           dest: '.',
-          rename: 'ort-wasm-simd-threaded.wasm',
+          rename: { stripBase: true, name: 'ort-wasm-simd-threaded.wasm' },
         },
         {
           src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
           dest: '.',
-          rename: 'ort-wasm-simd-threaded.mjs',
+          rename: { stripBase: true, name: 'ort-wasm-simd-threaded.mjs' },
+        },
+        {
+          src: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm',
+          dest: '.',
+          rename: { stripBase: true, name: 'ort-wasm-simd-threaded.asyncify.wasm' },
+        },
+        {
+          src: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs',
+          dest: '.',
+          rename: { stripBase: true, name: 'ort-wasm-simd-threaded.asyncify.mjs' },
         },
         // NOTE: the JSEP (WebGPU) variant — ort-wasm-simd-threaded.jsep.{wasm,mjs}
         // — is intentionally NOT copied into the build. Every onnxruntime consumer

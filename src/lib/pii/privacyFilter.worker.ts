@@ -13,6 +13,15 @@ env.remoteHost = MODEL_HOST;
 env.useBrowserCache = false; // IDB interceptor owns all caching
 env.allowLocalModels = false;
 
+// Pin onnxruntime's WASM artifacts to our own origin. transformers.js otherwise
+// defaults `wasmPaths` to https://cdn.jsdelivr.net/... (see its backends/onnx.js),
+// which the Worker's CSP `connect-src 'self' https://huggingface.co` blocks in
+// production — and which would be an extra cross-origin surface under COEP. The
+// asyncify artifact pair is copied into the build by vite.config.ts from
+// transformers' own nested onnxruntime-web, so the glue .mjs and the .wasm match
+// the version transformers was built against.
+env.backends.onnx.wasm!.wasmPaths = '/';
+
 // ── IDB model cache ──────────────────────────────────────────────────────────
 
 const IDB_NAME = 'ptscribe-model-cache';
