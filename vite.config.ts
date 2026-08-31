@@ -190,6 +190,14 @@ export default defineConfig({
   server: {
     port: 8080,
     strictPort: false,
+    // Mirror the Worker's cross-origin isolation headers (worker/index.ts) so
+    // `crossOriginIsolated` — and therefore multi-threaded onnxruntime — is true
+    // in dev too. Without this, dev and prod take different code paths through
+    // ort and any dev timing measurement says nothing about prod.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8787',

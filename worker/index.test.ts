@@ -523,6 +523,7 @@ describe('Security headers (withSecurityHeaders)', () => {
     expect(res.headers.get('X-Frame-Options')).toBe('DENY');
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+    expect(res.headers.get('Cross-Origin-Embedder-Policy')).toBe('require-corp');
   });
 
   it('/api/* responses are no-store; /api/model/* are not forced to no-store', async () => {

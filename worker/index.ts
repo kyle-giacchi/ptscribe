@@ -234,11 +234,18 @@ function withSecurityHeaders(res: Response, url: URL): Response {
   // browsers ignore it on HTTP. Cloudflare is HTTPS-only in production.
   headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
-  // Cross-origin isolation — keep it modest. COOP same-origin prevents window
-  // handle leaks from popups; CORP same-origin prevents cross-origin embeds of
-  // our assets. COEP is not enabled yet but is now unblocked (model files are
-  // same-origin via /api/model/*) — enabling it would give SharedArrayBuffer.
+  // Cross-origin isolation. COOP same-origin prevents window handle leaks from
+  // popups; CORP same-origin prevents cross-origin embeds of our assets. COEP
+  // require-corp is what actually turns on `crossOriginIsolated`, which gates
+  // SharedArrayBuffer — without it onnxruntime-web silently runs whisper-tiny.en
+  // at numThreads=1 on every device. The threaded WASM artifact already ships.
+  //
+  // Every cross-origin resource we load satisfies require-corp: Google Fonts
+  // (googleapis + gstatic) both send `Cross-Origin-Resource-Policy: cross-origin`,
+  // and the HuggingFace model fallback is a CORS-mode fetch (a successful CORS
+  // fetch satisfies COEP without CORP). Rollback is deleting the COEP line.
   headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
   headers.set('Cross-Origin-Resource-Policy', 'same-origin');
 
   // Suppress no-cache header from being clobbered if upstream set caching.
