@@ -11,6 +11,11 @@ import {
   LOCAL_WHISPER_DEFAULT_MODEL,
 } from '@/services/ai/client/localWhisper';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
+import {
+  recordLiveWhisperChunk,
+  recordLiveWhisperDrop,
+  resetLiveWhisperStats,
+} from '@/lib/debug/liveWhisperStats';
 import { playAlertChime } from '@/components/sessions/recording/playAlertChime';
 import type { AdvisoryAction } from './sessionMachine/recordingAdvisories';
 import type { SessionMachineAction, UploadStatus } from './sessionMachine/types';
@@ -18,7 +23,7 @@ import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
 import type { Session, SessionClip, Settings } from '@/types';
 
-export interface UseCapturePhaseParams {
+interface UseCapturePhaseParams {
   session: Session | undefined;
   recorder: UseRecorder;
   webSpeech: UseWebSpeechTranscript;
@@ -40,7 +45,7 @@ export interface UseCapturePhaseParams {
  */
 type ClipsPatch = (clips: SessionClip[]) => SessionClip[];
 
-export interface CapturePhaseResult {
+interface CapturePhaseResult {
   backgroundWarningDismissed: boolean;
   setBackgroundWarningDismissed: (v: boolean) => void;
   backgrounded: boolean;
@@ -155,8 +160,10 @@ export function useCapturePhase({
       return;
     }
     whisperPendingRef.current = null;
+    const startedAt = performance.now();
     try {
       const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
+      recordLiveWhisperChunk(performance.now() - startedAt, blob.size);
       const text = result.text.trim();
       if (text) {
         whisperTextRef.current = [...whisperTextRef.current, text];
@@ -177,6 +184,9 @@ export function useCapturePhase({
   }
 
   function handleChunk(blob: Blob) {
+    // Leaky bucket: the newest chunk replaces the pending one. Anything it
+    // overwrites was never transcribed — that is the silent drop we count.
+    if (whisperPendingRef.current) recordLiveWhisperDrop();
     whisperPendingRef.current = blob;
     if (whisperRunningRef.current) return;
     whisperRunningRef.current = true;
@@ -207,6 +217,7 @@ export function useCapturePhase({
     setWhisperBubbles([]);
     whisperTextRef.current = [];
     whisperPendingRef.current = null;
+    resetLiveWhisperStats();
     // 'none' override means record-now-transcribe-later: skip the live Whisper
     // preview pipeline so no chunks are sent to the (possibly unavailable) worker.
     recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : handleChunk;

@@ -2,11 +2,12 @@ import { Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import type { AiDebugPrompts, AiErrorEntry, GenerateKeyReport, Session } from '@/types';
-import type { PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
+import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
+import { useSessions } from '@/contexts/SessionsProvider';
 import { EnvironmentPanel, FeaturesPanel, StoragePanel } from './debug/EnvPanels';
 import { SessionAudioPanel } from './debug/SessionAudioPanel';
 import { TranscriptPanel } from './debug/TranscriptPanel';
+import { LiveWhisperPanel } from './debug/LiveWhisperPanel';
 
 export interface DebugDrawerStats {
   droppedSec: number;
@@ -15,46 +16,19 @@ export interface DebugDrawerStats {
   speedOriginalSec: number;
 }
 
-export interface DebugDrawerProps {
-  onClose: () => void;
-  /** Session id whose panels are shown, or null when opened off-session. */
-  activeSessionId?: string | null;
-  /** Full active session entity, for the audio/transcript inspection panels. */
-  activeSession?: Session | null;
-  debugStats: DebugDrawerStats | null;
-  speedFactor: number;
-  lastRawPayload?: string | null;
-  lastAiPrompts?: AiDebugPrompts | null;
-  lastKeyReport?: GenerateKeyReport | null;
-  /** Most recent on-device PII scrub run in the active session. */
-  lastPiiScrub?: PiiScrubDebug | null;
-  /** Persisted per-session AI-call error log (newest rendered first). */
-  aiErrors?: AiErrorEntry[];
-  /** Clears the active session's error log; omit to hide the action. */
-  onClearErrors?: () => void;
-}
-
 /**
- * App-global right-side debug drawer, opened from Settings → Debug Menu. Shows
+ * App-global right-side debug drawer, opened from Settings → Debug Menu. Mounted
+ * once at the app shell and wired straight to DebugDrawerProvider. Shows
  * silence-trim and speed-up stats plus AI prompt/payload/response inspection for
  * the active session; session-scoped panels render placeholder copy when opened
  * off-session or before data is populated.
  */
-export function DebugDrawer({
-  onClose,
-  activeSessionId,
-  activeSession,
-  debugStats,
-  speedFactor,
-  lastRawPayload,
-  lastAiPrompts,
-  lastKeyReport,
-  lastPiiScrub,
-  aiErrors,
-  onClearErrors,
-}: DebugDrawerProps) {
+export function DebugDrawer() {
+  const { open, closeDebug: onClose, activeSessionId, sessionDebug } = useDebugDrawer();
+  const { getSession, updateSession } = useSessions();
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
+  const [liveWhisperOn, setLiveWhisperOn] = useState(false);
   const [rawPayloadOpen, setRawPayloadOpen] = useState(false);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [requestPayloadOpen, setRequestPayloadOpen] = useState(false);
@@ -62,7 +36,23 @@ export function DebugDrawer({
   const [piiOpen, setPiiOpen] = useState(false);
   const [errorLogOpen, setErrorLogOpen] = useState(false);
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+
+  if (!open) return null;
+
   const hasSession = Boolean(activeSessionId);
+
+  const activeSession = activeSessionId ? (getSession(activeSessionId) ?? null) : null;
+  const aiErrors = activeSession?.aiErrors;
+  const debugStats = sessionDebug?.debugStats ?? null;
+  const speedFactor = sessionDebug?.speedFactor ?? 1.25;
+  const lastRawPayload = sessionDebug?.lastRawPayload ?? null;
+  const lastAiPrompts = sessionDebug?.lastAiPrompts ?? null;
+  const lastKeyReport = sessionDebug?.lastKeyReport ?? null;
+  const lastPiiScrub = sessionDebug?.lastPiiScrub ?? null;
+  const onClearErrors =
+    activeSessionId && aiErrors?.length
+      ? () => updateSession(activeSessionId, { aiErrors: [] })
+      : undefined;
 
   // Newest first; the ring buffer stores oldest→newest.
   const errorsNewestFirst = aiErrors ? [...aiErrors].reverse() : [];
@@ -542,6 +532,50 @@ export function DebugDrawer({
                     Run transcription to see speed-up data.
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* -- Live Whisper (T1) -------------------------- */}
+          <div
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--color-pt-border)',
+              overflow: 'hidden',
+            }}
+          >
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                cursor: 'pointer',
+                background: 'var(--color-pt-surface-alt)',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={liveWhisperOn}
+                onChange={(e) => setLiveWhisperOn(e.target.checked)}
+                style={{ accentColor: 'var(--color-pt-accent)' }}
+              />
+              <span
+                style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-fg)' }}
+              >
+                Live Whisper (T1) timing
+              </span>
+            </label>
+            {liveWhisperOn && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 5,
+                }}
+              >
+                <LiveWhisperPanel />
               </div>
             )}
           </div>
