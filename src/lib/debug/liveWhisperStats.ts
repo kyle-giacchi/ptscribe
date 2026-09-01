@@ -15,12 +15,19 @@ const chunkMs: number[] = [];
 let chunks = 0;
 let dropped = 0;
 let bytes = 0;
+let backend: 'webgpu' | 'wasm' | null = null;
 
 export function resetLiveWhisperStats(): void {
   chunkMs.length = 0;
   chunks = 0;
   dropped = 0;
   bytes = 0;
+  backend = null;
+}
+
+/** Which onnxruntime execution provider the Whisper worker actually loaded. */
+export function setLiveWhisperBackend(device: 'webgpu' | 'wasm'): void {
+  backend = device;
 }
 
 /** A pending chunk was replaced before it was ever transcribed. */
@@ -45,6 +52,8 @@ export interface LiveWhisperStatsSnapshot {
   lastMs: number;
   /** Mean blob size across transcribed chunks, bytes. */
   meanBytes: number;
+  /** Which onnxruntime execution provider the worker loaded, if known yet. */
+  backend: 'webgpu' | 'wasm' | null;
 }
 
 export function getLiveWhisperStats(): LiveWhisperStatsSnapshot {
@@ -57,5 +66,6 @@ export function getLiveWhisperStats(): LiveWhisperStatsSnapshot {
     medianMs: sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0,
     lastMs: chunkMs.length ? chunkMs[chunkMs.length - 1] : 0,
     meanBytes: chunks ? bytes / chunks : 0,
+    backend,
   };
 }

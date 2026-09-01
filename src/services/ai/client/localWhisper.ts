@@ -1,4 +1,5 @@
 import { clearModelCache } from '@/lib/audio/modelCache';
+import { setLiveWhisperBackend } from '@/lib/debug/liveWhisperStats';
 
 export const LOCAL_WHISPER_DEFAULT_MODEL = 'Xenova/whisper-tiny.en';
 
@@ -10,7 +11,8 @@ interface TranscribeResult {
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
   | { id: number; type: 'result'; text: string }
-  | { id: number; type: 'error'; error: string };
+  | { id: number; type: 'error'; error: string }
+  | { id: number; type: 'backend'; device: 'webgpu' | 'wasm' };
 
 type PendingEntry = {
   resolve: (text: string) => void;
@@ -66,6 +68,8 @@ function wireWorker(w: Worker): Worker {
       clearTimeout(entry.timer);
       _pending.delete(msg.id);
       entry.reject(new Error(msg.error));
+    } else if (msg.type === 'backend') {
+      setLiveWhisperBackend(msg.device);
     }
   };
   w.onerror = (e) => {

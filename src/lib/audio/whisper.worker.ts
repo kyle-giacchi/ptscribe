@@ -110,7 +110,8 @@ type InMsg =
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
   | { id: number; type: 'result'; text: string }
-  | { id: number; type: 'error'; error: string };
+  | { id: number; type: 'error'; error: string }
+  | { id: number; type: 'backend'; device: 'webgpu' | 'wasm' };
 
 const post = (msg: OutMsg) => (self as unknown as Worker).postMessage(msg);
 
@@ -128,29 +129,59 @@ async function getPipeline(
   if (currentPipeline && currentModel === model) return currentPipeline;
   // If a load is already in progress for the same model, wait for it.
   if (pipelineLoadPromise) return pipelineLoadPromise;
-  pipelineLoadPromise = pipeline('automatic-speech-recognition', model, {
-    // Force WASM backend — prevents onnxruntime-web from probing WebGPU/JSEP
-    // (ort-wasm-simd-threaded.jsep.mjs), which fails when the Workbox service
-    // worker intercepts the request and the CacheFirst handler throws.
-    device: 'wasm',
-    // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
-    // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
-    // and crashes because the required scale tensor is absent. 'basic' skips it.
-    session_options: { graphOptimizationLevel: 'basic' },
-    progress_callback: (p: { status: string; name?: string; loaded?: number; total?: number }) => {
-      post({ id: progressId, type: 'progress', ...p });
-    },
-  })
-    .then((p) => {
-      currentPipeline = p;
-      currentModel = model;
-      pipelineLoadPromise = null;
-      return p;
-    })
-    .catch((err) => {
-      pipelineLoadPromise = null;
-      throw err;
-    });
+
+  const progress_callback = (p: {
+    status: string;
+    name?: string;
+    loaded?: number;
+    total?: number;
+  }) => post({ id: progressId, type: 'progress', ...p });
+  // onnxruntime-web 1.25.1 has a bug where the 'extended' graph optimizer
+  // incorrectly applies TransposeDQWeightsForMatMulNBits to non-4-bit models
+  // and crashes because the required scale tensor is absent. 'basic' skips it.
+  const session_options = { graphOptimizationLevel: 'basic' as const };
+
+  pipelineLoadPromise = (async () => {
+    // WebGPU-capable devices get a WebGPU attempt first. The JSEP artifact is now
+    // served (see vite.config.ts), so this no longer trips the Workbox crash that
+    // used to force WASM everywhere. Left unset, dtype defaults to fp32 on webgpu
+    // vs. q8 (quantized) on wasm — transformers.js only has a wasm entry in its
+    // device→dtype default map — which conveniently sidesteps the quantized-op
+    // immaturity some WebGPU execution providers have; see plan README.
+    let device: 'webgpu' | 'wasm' = 'wasm';
+    let pipe: Awaited<ReturnType<typeof pipeline>> | null = null;
+    if ('gpu' in navigator) {
+      try {
+        pipe = await pipeline('automatic-speech-recognition', model, {
+          device: 'webgpu',
+          session_options,
+          progress_callback,
+        });
+        device = 'webgpu';
+      } catch {
+        pipe = null;
+      }
+    }
+    if (!pipe) {
+      pipe = await pipeline('automatic-speech-recognition', model, {
+        device: 'wasm',
+        session_options,
+        progress_callback,
+      });
+      device = 'wasm';
+    }
+
+    if (import.meta.env.DEV) post({ id: progressId, type: 'backend', device });
+
+    currentPipeline = pipe;
+    currentModel = model;
+    pipelineLoadPromise = null;
+    return pipe;
+  })().catch((err: unknown) => {
+    pipelineLoadPromise = null;
+    throw err;
+  });
+
   return pipelineLoadPromise;
 }
 

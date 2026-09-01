@@ -52,7 +52,7 @@ export function LiveWhisperPanel() {
       </div>
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
         Mean chunk {Math.round(stats.meanBytes / 1024)} KB · crossOriginIsolated:{' '}
-        {String(globalThis.crossOriginIsolated)}
+        {String(globalThis.crossOriginIsolated)} · backend: {stats.backend ?? 'loading…'}
       </div>
     </>
   );

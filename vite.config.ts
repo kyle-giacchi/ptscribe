@@ -31,12 +31,16 @@ const ML_ASSETS: Record<string, { file: string; contentType: string }> = {
     file: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs',
     contentType: 'text/javascript',
   },
+  // Nested copy, matching the asyncify pair above (must match the onnxruntime-web
+  // version transformers.js actually resolves at runtime — the top-level package's
+  // JSEP wasm is a different version and 0.7 MiB larger, tripping Cloudflare's 25 MiB
+  // per-static-asset limit; the nested one doesn't).
   '/ort-wasm-simd-threaded.jsep.wasm': {
-    file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
+    file: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
     contentType: 'application/wasm',
   },
   '/ort-wasm-simd-threaded.jsep.mjs': {
-    file: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+    file: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
     contentType: 'text/javascript',
   },
 };
@@ -109,22 +113,15 @@ export default defineConfig({
             },
           },
           {
-            // WASM JS module — cacheable, loaded on every whisper/pii session
-            urlPattern: /ort-wasm-simd-threaded(?!.*\.jsep).*\.mjs$/,
+            // WASM JS module (incl. JSEP/WebGPU variant) — cacheable, loaded on
+            // every whisper/pii/webgpu session
+            urlPattern: /ort-wasm-simd-threaded.*\.mjs$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'ml-assets',
               expiration: { maxEntries: 5 },
               cacheableResponse: { statuses: [0, 200] },
             },
-          },
-          {
-            // JSEP (WebGPU) module — we use device:'wasm' in all workers so
-            // this should never be requested, but if it is, let it fall through
-            // to the network rather than risk a CacheFirst handler throwing and
-            // blocking the ONNX runtime load entirely.
-            urlPattern: /ort-wasm-simd-threaded.*\.jsep\.mjs$/,
-            handler: 'NetworkOnly',
           },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/,
@@ -170,12 +167,20 @@ export default defineConfig({
           dest: '.',
           rename: { stripBase: true, name: 'ort-wasm-simd-threaded.asyncify.mjs' },
         },
-        // NOTE: the JSEP (WebGPU) variant — ort-wasm-simd-threaded.jsep.{wasm,mjs}
-        // — is intentionally NOT copied into the build. Every onnxruntime consumer
-        // (whisper.worker.ts, vadML.ts, privacyFilter worker) forces the plain WASM
-        // backend (device:'wasm'), so the JSEP file is never requested at runtime.
-        // It is 26 MiB, which exceeds Cloudflare Workers' 25 MiB per-asset limit and
-        // fails the deploy. Keep it out unless a worker actually opts into WebGPU.
+        {
+          // Nested copy — see the ML_ASSETS comment above for why (must match the
+          // onnxruntime-web version transformers.js resolves at runtime; the
+          // top-level package's JSEP wasm is 0.7 MiB larger and trips Cloudflare's
+          // 25 MiB per-asset limit).
+          src: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
+          dest: '.',
+          rename: { stripBase: true, name: 'ort-wasm-simd-threaded.jsep.wasm' },
+        },
+        {
+          src: 'node_modules/@huggingface/transformers/node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
+          dest: '.',
+          rename: { stripBase: true, name: 'ort-wasm-simd-threaded.jsep.mjs' },
+        },
       ],
     }),
   ],
