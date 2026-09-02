@@ -43,9 +43,11 @@ interface UseCapturePhaseParams {
 }
 
 /**
- * Mirrors the clip mutations a call already sent through `patchClips`, so the
- * caller can bring its own (render-stale) clip list current without waiting for
- * a React commit. This is what removes the `setTimeout(…, 0)` frame hacks.
+ * Mirrors the clip mutations a call already sent through `patchClips`, so
+ * Capture-end can work from a clip list that is current *now*, rather than
+ * deferring a frame and hoping React committed in between. Kept in a ref
+ * (`stagedClipsRef`) and consumed internally by `endCapture` — callers no
+ * longer thread it through. This is what removes the `setTimeout(…, 0)` hacks.
  */
 type ClipsPatch = (clips: SessionClip[]) => SessionClip[];
 
@@ -56,13 +58,13 @@ interface CapturePhaseResult {
   whisperBubbles: string[];
   uploadStatus: UploadStatus;
   handleStartRecording: () => Promise<void>;
-  handleFinishedRecording: () => Promise<ClipsPatch>;
+  handleFinishedRecording: () => Promise<void>;
   handlePauseResume: () => void;
   handleStopAndFinish: () => void;
   handleUploadAudio: (file: File) => Promise<string | null>;
   handleDeleteClip: (clipId: string) => Promise<void>;
   /** Runs the Capture-end pipeline and applies its result. Never navigates. */
-  endCapture: (clipsPatch?: ClipsPatch) => Promise<void>;
+  endCapture: () => Promise<void>;
   silencedMergedBlob: Blob | null;
   reset: () => void;
 }
@@ -118,9 +120,14 @@ export function useCapturePhase({
   // Prevents concurrent saves for the same clipId from corrupting each other mid-encryption.
   const isSavingRef = useRef<Set<string>>(new Set());
 
+  // The clip-mutation replay from the last handleFinishedRecording, consumed
+  // once by the endCapture that follows it. Reset to identity after each use so
+  // a bare endCapture() (upload flow) never replays a stale record-stop patch.
+  const stagedClipsRef = useRef<ClipsPatch>((c) => c);
+
   // Used by the auto-stop finalization effect to always call the latest closure.
-  const handleFinishedRecordingRef = useRef<() => Promise<ClipsPatch>>(async () => (c) => c);
-  const endCaptureRef = useRef<(clipsPatch?: ClipsPatch) => Promise<void>>(async () => {});
+  const handleFinishedRecordingRef = useRef<() => Promise<void>>(async () => {});
+  const endCaptureRef = useRef<() => Promise<void>>(async () => {});
 
   // Auto-clear terminal upload states after 3 s.
   useEffect(() => {
@@ -236,15 +243,17 @@ export function useCapturePhase({
     void handlePauseResumeAsync();
   }
 
-  async function handleFinishedRecording(): Promise<ClipsPatch> {
+  async function handleFinishedRecording(): Promise<void> {
     // Every clip mutation below goes through `stage`, which both persists it and
-    // records it into `staged`. The returned patch lets the Capture-end caller
+    // records it into `stagedClipsRef` so the Capture-end pass that follows can
     // work from a clip list that is current *now*, rather than deferring a frame
     // and hoping React committed in between.
     let staged: ClipsPatch = (c) => c;
+    stagedClipsRef.current = staged;
     const stage = (fn: ClipsPatch) => {
       const prev = staged;
       staged = (c) => fn(prev(c));
+      stagedClipsRef.current = staged;
       patchClips(fn);
     };
     // Mirrors patchClip exactly, updatedAt bump included.
@@ -253,7 +262,7 @@ export function useCapturePhase({
         clips.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)),
       );
 
-    if (!session) return staged;
+    if (!session) return;
     const clipId = activeClipIdRef.current;
 
     // Stop accepting new chunks immediately, then drain any in-flight Whisper
@@ -281,7 +290,7 @@ export function useCapturePhase({
                 status: 'failed',
                 errorMessage: 'Not enough device storage to save this recording.',
               });
-              return staged;
+              return;
             }
             if (available > 0 && finalBlob.size > available * 0.8) {
               addNotification(
@@ -297,7 +306,7 @@ export function useCapturePhase({
           if (import.meta.env.DEV) {
             console.warn(`[useCapturePhase] Skipping duplicate save for clip ${clipId}`);
           }
-          return staged;
+          return;
         }
         isSavingRef.current.add(clipId);
         try {
@@ -311,7 +320,7 @@ export function useCapturePhase({
             status: 'failed',
             errorMessage: (e as Error).message,
           });
-          return staged;
+          return;
         } finally {
           isSavingRef.current.delete(clipId);
         }
@@ -349,7 +358,7 @@ export function useCapturePhase({
       status: 'draft',
       ...(allT1Texts.length > 0 ? { t1Transcript: allT1Texts.join('\n\n') } : {}),
     });
-    return staged;
+    return;
   }
 
   function reset() {
@@ -359,7 +368,7 @@ export function useCapturePhase({
   function handleStopAndFinish() {
     // Navigation is the caller's (useSessionMachine.stopAndFinish already
     // dispatches view/setTab), so this only runs the pipeline.
-    void handleFinishedRecording().then((clipsPatch) => endCaptureRef.current(clipsPatch));
+    void handleFinishedRecording().then(() => endCaptureRef.current());
   }
 
   // ── Audio upload ─────────────────────────────────────────────────────────
@@ -498,10 +507,13 @@ export function useCapturePhase({
   }
 
   // ── Capture end — run the pipeline, apply its result ─────────────────────
-  // `clipsPatch` brings the render-time clip list current with mutations that
-  // handleFinishedRecording just made but React has not committed yet.
-  async function endCapture(clipsPatch?: ClipsPatch) {
-    const clips = clipsPatch ? clipsPatch(sortedClips) : sortedClips;
+  // Replays the clip mutations handleFinishedRecording just made (held in
+  // stagedClipsRef, since React may not have committed them yet), then resets
+  // the ref so a bare endCapture() from the upload flow never replays a stale
+  // record-stop patch.
+  async function endCapture() {
+    const clips = stagedClipsRef.current(sortedClips);
+    stagedClipsRef.current = (c) => c;
 
     let result;
     try {
@@ -584,8 +596,8 @@ export function useCapturePhase({
           // itself internally — handleFinishedRecording is never called by user
           // action, so the clip would stay 'pending' and never reach IDB.
           if (e.reason !== 'manual') {
-            void handleFinishedRecordingRef.current().then(async (clipsPatch) => {
-              await endCaptureRef.current(clipsPatch);
+            void handleFinishedRecordingRef.current().then(async () => {
+              await endCaptureRef.current();
               // Manual stop is navigated by useSessionMachine.stopAndFinish; an
               // auto-stop has no user action behind it, so it navigates here.
               dispatch({ type: 'view/setTab', tab: 'review' });
