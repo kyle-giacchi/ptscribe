@@ -100,7 +100,9 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
       <div
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        <span
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text)' }}
+        >
           {descriptor.label} API key
         </span>
         {isSet && !editing ? (
@@ -109,7 +111,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
-              fontSize: 12,
+              fontSize: 'var(--text-sm)',
               color: 'var(--color-positive, #16794a)',
             }}
           >
@@ -132,7 +134,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
           <button
             type="button"
             className="btn btn-primary"
-            style={{ minHeight: 36, padding: '6px 12px', fontSize: 12 }}
+            style={{ minHeight: 36, padding: '6px 12px', fontSize: 'var(--text-sm)' }}
             disabled={busy !== null || draft.trim().length === 0}
             onClick={handleSave}
           >
@@ -143,7 +145,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
             <button
               type="button"
               className="btn btn-ghost"
-              style={{ minHeight: 36, padding: '6px 10px', fontSize: 12 }}
+              style={{ minHeight: 36, padding: '6px 10px', fontSize: 'var(--text-sm)' }}
               disabled={busy !== null}
               onClick={() => {
                 setEditing(false);
@@ -160,7 +162,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+            style={{ minHeight: 32, padding: '4px 10px', fontSize: 'var(--text-sm)' }}
             disabled={busy !== null}
             onClick={() => {
               setEditing(true);
@@ -172,7 +174,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+            style={{ minHeight: 32, padding: '4px 10px', fontSize: 'var(--text-sm)' }}
             disabled={busy !== null}
             onClick={handleVerify}
           >
@@ -185,7 +187,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
             style={{
               minHeight: 32,
               padding: '4px 10px',
-              fontSize: 12,
+              fontSize: 'var(--text-sm)',
               color: 'var(--color-negative)',
             }}
             disabled={busy !== null}
@@ -204,7 +206,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
       {feedback ? (
         <span
           style={{
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             color:
               feedback.kind === 'ok' ? 'var(--color-positive, #16794a)' : 'var(--color-negative)',
           }}
@@ -213,7 +215,7 @@ export function ProviderKeyCard({ descriptor, status, onStatusChange, scope = 'u
         </span>
       ) : null}
 
-      <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)', lineHeight: 1.5 }}>
         <a
           href={descriptor.consoleUrl}
           target="_blank"

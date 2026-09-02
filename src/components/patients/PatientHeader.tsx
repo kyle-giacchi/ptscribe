@@ -64,7 +64,7 @@ export function PatientHeader({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-        <Avatar name={fullName || '?'} size={56} />
+        <Avatar name={fullName || '?'} color={patient.color} size={56} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
@@ -76,7 +76,7 @@ export function PatientHeader({
           >
             <span
               style={{
-                fontSize: 22,
+                fontSize: 'var(--text-xl)',
                 fontWeight: 600,
                 letterSpacing: '-0.3px',
                 color: 'var(--color-pt-text)',
@@ -86,7 +86,7 @@ export function PatientHeader({
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-pt-text-3)',
                 fontFamily: 'var(--font-mono)',
               }}
@@ -97,7 +97,7 @@ export function PatientHeader({
           </div>
           <div
             style={{
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               color: 'var(--color-pt-text-2)',
               marginTop: 4,
             }}
@@ -147,7 +147,7 @@ export function PatientHeader({
                 background: 'transparent',
                 borderBottom: `2px solid ${active ? 'var(--color-pt-accent)' : 'transparent'}`,
                 color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 fontWeight: active ? 600 : 500,
                 cursor: 'pointer',
                 flexShrink: 0,
@@ -158,7 +158,7 @@ export function PatientHeader({
               {count > 0 && (
                 <span
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 'var(--text-2xs)',
                     fontWeight: 600,
                     padding: '1px 6px',
                     borderRadius: 999,

@@ -17,16 +17,16 @@ interface FieldShellProps {
 export function Field({ label, error, hint, className, children }: FieldShellProps) {
   return (
     <label className={cn('block space-y-1', className)}>
-      <span className="text-xs font-medium" style={{ color: 'var(--color-fg-muted)' }}>
+      <span className="text-sm font-medium" style={{ color: 'var(--color-fg-muted)' }}>
         {label}
       </span>
       {children}
       {error ? (
-        <span className="block text-xs" style={{ color: 'var(--color-negative)' }}>
+        <span className="block text-sm" style={{ color: 'var(--color-negative)' }}>
           {error}
         </span>
       ) : hint ? (
-        <span className="block text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+        <span className="block text-sm" style={{ color: 'var(--color-fg-subtle)' }}>
           {hint}
         </span>
       ) : null}

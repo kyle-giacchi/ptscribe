@@ -9,7 +9,7 @@ export function VaultSecurityCard() {
         <Eyebrow>Vault &amp; security</Eyebrow>
         <p
           style={{
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             color: 'var(--color-pt-text-3)',
             margin: 0,
             lineHeight: 1.5,

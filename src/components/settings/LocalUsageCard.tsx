@@ -49,7 +49,7 @@ export function LocalUsageCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 12 }}>
         <Eyebrow>Local usage</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           Counts derived from local data; nothing leaves this device.
         </p>
         <div
@@ -66,7 +66,7 @@ export function LocalUsageCard() {
         <div style={{ display: 'grid', gap: 6 }}>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-pt-text-3)',
               textTransform: 'uppercase',
               letterSpacing: 0.4,
@@ -79,7 +79,7 @@ export function LocalUsageCard() {
             style={{
               display: 'flex',
               gap: 14,
-              fontSize: 11,
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-pt-text-3)',
             }}
           >
@@ -106,7 +106,7 @@ function UsageStat({ label, value }: { label: string; value: string }) {
     >
       <div
         style={{
-          fontSize: 10,
+          fontSize: 'var(--text-2xs)',
           letterSpacing: 0.4,
           textTransform: 'uppercase',
           color: 'var(--color-pt-text-3)',
@@ -116,7 +116,7 @@ function UsageStat({ label, value }: { label: string; value: string }) {
       </div>
       <div
         style={{
-          fontSize: 22,
+          fontSize: 'var(--text-xl)',
           fontVariantNumeric: 'tabular-nums',
           color: 'var(--color-pt-text-1)',
         }}

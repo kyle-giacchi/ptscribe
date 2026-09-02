@@ -65,10 +65,17 @@ export function ClipsListView({
         }}
       >
         <AudioLines size={14} strokeWidth={2} style={{ color: 'var(--color-pt-accent)' }} />
-        <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-pt-text)', margin: 0 }}>
+        <h2
+          style={{
+            fontSize: 'var(--text-md)',
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            margin: 0,
+          }}
+        >
           Audio clips
         </h2>
-        <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
           {clips.length} clip{clips.length !== 1 ? 's' : ''} · {formatDuration(total)} · this visit
         </span>
         <div style={{ flex: 1 }} />
@@ -95,10 +102,18 @@ export function ClipsListView({
       >
         {clips.length === 0 ? (
           <div style={{ padding: '32px 14px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+            <div
+              style={{
+                fontSize: 'var(--text-base)',
+                fontWeight: 600,
+                color: 'var(--color-pt-text-2)',
+              }}
+            >
               No clips yet
             </div>
-            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)', marginTop: 4 }}>
+            <div
+              style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', marginTop: 4 }}
+            >
               Record or upload a clip to start.
             </div>
           </div>
@@ -136,7 +151,7 @@ export function ClipsListView({
         <button
           type="button"
           className="btn btn-primary"
-          style={{ height: 34, fontSize: 12.5 }}
+          style={{ height: 34, fontSize: 'var(--text-sm)' }}
           onClick={() => {
             onClose();
             onRecord();
@@ -147,7 +162,7 @@ export function ClipsListView({
         <button
           type="button"
           className="btn btn-ghost"
-          style={{ height: 32, fontSize: 12 }}
+          style={{ height: 32, fontSize: 'var(--text-sm)' }}
           onClick={() => fileRef.current?.open()}
         >
           <Upload size={13} strokeWidth={2} /> Upload audio file
@@ -162,7 +177,7 @@ export function ClipsListView({
         <p
           style={{
             margin: 0,
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
             textAlign: 'center',
             lineHeight: 1.4,
@@ -332,16 +347,26 @@ function ClipCard({
       {/* Top row */}
       <div className="flex items-center gap-2">
         <span
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-pt-text-3)' }}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-xs)',
+            color: 'var(--color-pt-text-3)',
+          }}
         >
           #{index + 1}
         </span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        <span
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text)' }}
+        >
           Clip {index + 1}
         </span>
         <div style={{ flex: 1 }} />
         <span
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-pt-text-3)' }}
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 'var(--text-xs)',
+            color: 'var(--color-pt-text-3)',
+          }}
         >
           {formatDuration(clip.durationSec ?? 0)}
         </span>
@@ -349,12 +374,14 @@ function ClipCard({
 
       {/* Meta row */}
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{time}</span>
-        <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>· {source}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>{time}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+          · {source}
+        </span>
         <div style={{ flex: 1 }} />
         <span
           style={{
-            fontSize: 10,
+            fontSize: 'var(--text-2xs)',
             fontWeight: 700,
             padding: '2px 7px',
             borderRadius: 999,
@@ -399,12 +426,14 @@ function ClipCard({
             }}
           />
         ) : (
-          <span style={{ flex: 1, fontSize: 12, color: 'var(--color-pt-text-3)' }}>Loading…</span>
+          <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+            Loading…
+          </span>
         )}
         <button
           type="button"
           className="btn btn-ghost"
-          style={{ height: 28, fontSize: 12 }}
+          style={{ height: 28, fontSize: 'var(--text-sm)' }}
           onClick={onJump}
         >
           <CornerDownLeft size={12} strokeWidth={2} /> Jump to transcript

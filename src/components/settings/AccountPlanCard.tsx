@@ -112,7 +112,7 @@ export function AccountPlanCard() {
             style={{
               padding: '3px 10px',
               borderRadius: 20,
-              fontSize: 11.5,
+              fontSize: 'var(--text-xs)',
               fontWeight: 700,
               letterSpacing: '0.04em',
               background: tierStyle.bg,
@@ -122,7 +122,7 @@ export function AccountPlanCard() {
           >
             {TIER_LABELS[tier]}
           </span>
-          <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
             {TIER_DESCRIPTIONS[tier]}
           </span>
         </div>

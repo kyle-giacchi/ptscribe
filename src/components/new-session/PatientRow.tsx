@@ -37,7 +37,7 @@ export function PatientRow({
           boxSizing: 'border-box',
         }}
       >
-        <Avatar name={`${patient.firstName} ${patient.lastName}`} size={32} />
+        <Avatar name={`${patient.firstName} ${patient.lastName}`} color={patient.color} size={32} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             style={{
@@ -49,7 +49,7 @@ export function PatientRow({
           >
             <span
               style={{
-                fontSize: 13.5,
+                fontSize: 'var(--text-base)',
                 fontWeight: 600,
                 color: selected ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text)',
                 overflow: 'hidden',
@@ -62,7 +62,7 @@ export function PatientRow({
             </span>
             <span
               style={{
-                fontSize: 11,
+                fontSize: 'var(--text-xs)',
                 fontWeight: 500,
                 color: 'var(--color-pt-text-3)',
                 whiteSpace: 'nowrap',
@@ -77,7 +77,7 @@ export function PatientRow({
           {patient.primaryDiagnosis && (
             <div
               style={{
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-pt-text-3)',
                 marginTop: 1,
                 overflow: 'hidden',

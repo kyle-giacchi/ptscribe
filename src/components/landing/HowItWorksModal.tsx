@@ -693,7 +693,10 @@ export function VoiceChapter() {
         }
       />
 
-      <p className="ch__lede" style={{ fontSize: 14.5, marginTop: 4, marginBottom: 14 }}>
+      <p
+        className="ch__lede"
+        style={{ fontSize: 'var(--text-md)', marginTop: 4, marginBottom: 14 }}
+      >
         Worst case first. <em>What if every user needed the highest-quality transcription?</em>{' '}
         Nova-3 bills by the minute, and at any real scale that compounds. So before a single second
         of audio goes to the cloud, I leaned on two tricks from my past life in audio engineering:{' '}

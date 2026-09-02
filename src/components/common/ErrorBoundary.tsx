@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 16px',
-                fontSize: 22,
+                fontSize: 'var(--text-xl)',
               }}
               aria-hidden
             >
@@ -68,7 +68,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <h1
               style={{
                 margin: '0 0 8px',
-                fontSize: 18,
+                fontSize: 'var(--text-lg)',
                 fontWeight: 600,
                 color: 'var(--color-fg)',
                 letterSpacing: '-0.2px',
@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <p
               style={{
                 margin: '0 0 24px',
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 color: 'var(--color-fg-muted)',
                 lineHeight: 1.5,
               }}
@@ -98,7 +98,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 border: '1px solid var(--color-border)',
                 background: 'var(--color-surface)',
                 color: 'var(--color-fg)',
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 fontWeight: 500,
                 cursor: 'pointer',
               }}

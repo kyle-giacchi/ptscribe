@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Bell,
-  Lock,
-  Unlock,
   RotateCcw,
   Terminal,
   AlertCircle,
@@ -14,7 +12,6 @@ import {
 } from 'lucide-react';
 import { useStorageEstimate } from '@/hooks/useStorageEstimate';
 import { useClinician } from '@/contexts/ClinicianProvider';
-import { vault } from '@/lib/vault/vault';
 import { useNotifications } from '@/contexts/NotificationsProvider';
 import { useSessionReset } from '@/contexts/SessionResetContext';
 import { useGate } from '@/contexts/GateContext';
@@ -23,64 +20,6 @@ import { useDismissable } from '@/hooks/useDismissable';
 import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
 import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';
 import { relativeFromNow } from '@/utils/dates';
-
-function useVaultState(): { initialized: boolean; unlocked: boolean } {
-  const [state, setState] = useState(() => ({
-    initialized: vault.isInitialized(),
-    unlocked: vault.isUnlocked(),
-  }));
-
-  useEffect(() => {
-    const refresh = () =>
-      setState({ initialized: vault.isInitialized(), unlocked: vault.isUnlocked() });
-    const bc =
-      typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('ptnotes-vault') : null;
-    if (bc) bc.onmessage = refresh;
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    const interval = window.setInterval(refresh, 5000);
-    return () => {
-      bc?.close();
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-      window.clearInterval(interval);
-    };
-  }, []);
-
-  return state;
-}
-
-export function VaultPill() {
-  const { initialized, unlocked } = useVaultState();
-  if (!initialized) return null;
-  const Icon = unlocked ? Unlock : Lock;
-  const label = unlocked ? 'Unlocked' : 'Locked';
-  const tone = unlocked
-    ? { fg: '#0a6d70', bg: '#e6f7f6', border: '#9fdcdc' }
-    : {
-        fg: 'var(--color-pt-text-2)',
-        bg: 'var(--color-pt-surface-mut)',
-        border: 'var(--color-pt-border)',
-      };
-  return (
-    <span
-      title={`Vault is ${label.toLowerCase()}`}
-      className="inline-flex items-center gap-1"
-      style={{
-        fontSize: 11,
-        fontWeight: 500,
-        padding: '3px 8px',
-        borderRadius: 999,
-        border: `1px solid ${tone.border}`,
-        background: tone.bg,
-        color: tone.fg,
-      }}
-    >
-      <Icon size={11} strokeWidth={2} />
-      <span>Vault: {label}</span>
-    </span>
-  );
-}
 
 export function AlertsButton() {
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications();
@@ -140,7 +79,7 @@ export function AlertsButton() {
               borderRadius: 7,
               background: badgeColor,
               color: '#fff',
-              fontSize: 9,
+              fontSize: 'var(--text-2xs)',
               fontWeight: 700,
               lineHeight: '14px',
             }}
@@ -171,7 +110,9 @@ export function AlertsButton() {
               borderBottom: hasItems ? '1px solid var(--color-pt-border)' : 'none',
             }}
           >
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+            <span
+              style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-pt-text)' }}
+            >
               Warnings &amp; Errors
             </span>
             {hasNotifications && (
@@ -179,7 +120,7 @@ export function AlertsButton() {
                 type="button"
                 onClick={clearAll}
                 style={{
-                  fontSize: 11.5,
+                  fontSize: 'var(--text-xs)',
                   color: 'var(--color-pt-text-3)',
                   background: 'none',
                   border: 'none',
@@ -197,7 +138,7 @@ export function AlertsButton() {
               style={{
                 padding: '20px 14px',
                 textAlign: 'center',
-                fontSize: 12.5,
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-pt-text-3)',
               }}
             >
@@ -231,7 +172,7 @@ export function AlertsButton() {
                     <p
                       style={{
                         margin: 0,
-                        fontSize: 12,
+                        fontSize: 'var(--text-sm)',
                         fontWeight: 600,
                         color: 'var(--color-pt-text)',
                         lineHeight: 1.45,
@@ -242,7 +183,7 @@ export function AlertsButton() {
                     <p
                       style={{
                         margin: '2px 0 0',
-                        fontSize: 11.5,
+                        fontSize: 'var(--text-xs)',
                         color: 'var(--color-pt-text-2)',
                         lineHeight: 1.4,
                       }}
@@ -283,7 +224,7 @@ export function AlertsButton() {
                     <p
                       style={{
                         margin: 0,
-                        fontSize: 12,
+                        fontSize: 'var(--text-sm)',
                         color: 'var(--color-pt-text)',
                         lineHeight: 1.45,
                       }}
@@ -292,7 +233,7 @@ export function AlertsButton() {
                     </p>
                     <span
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 'var(--text-2xs)',
                         color: 'var(--color-pt-text-3)',
                         marginTop: 2,
                         display: 'block',
@@ -345,7 +286,7 @@ export function ProfileButton() {
           background: open ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
           color: open ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-text-2)',
           cursor: 'pointer',
-          fontSize: 11.5,
+          fontSize: 'var(--text-xs)',
           fontWeight: 600,
         }}
       >
@@ -375,13 +316,13 @@ export function ProfileButton() {
           >
             <div
               className="truncate"
-              style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)' }}
+              style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-pt-text)' }}
             >
               {clinician.name || 'Clinician'}
             </div>
             <div
               className="truncate"
-              style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)', marginTop: 1 }}
+              style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-pt-text-3)', marginTop: 1 }}
             >
               {clinician.credentials || clinician.practiceName || 'PTScribe'}
             </div>
@@ -393,7 +334,7 @@ export function ProfileButton() {
             className="flex items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
             style={{
               padding: '7px 12px',
-              fontSize: 12.5,
+              fontSize: 'var(--text-sm)',
               fontWeight: 500,
               color: 'var(--color-pt-text-2)',
               textDecoration: 'none',
@@ -414,7 +355,7 @@ export function ProfileButton() {
                 className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
                 style={{
                   padding: '7px 12px',
-                  fontSize: 12.5,
+                  fontSize: 'var(--text-sm)',
                   fontWeight: 500,
                   color: 'var(--color-pt-danger, #dc2626)',
                   background: 'none',
@@ -438,7 +379,7 @@ export function ProfileButton() {
               className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
               style={{
                 padding: '7px 12px',
-                fontSize: 12.5,
+                fontSize: 'var(--text-sm)',
                 fontWeight: 500,
                 color: 'var(--color-pt-text-2)',
                 background: 'none',
@@ -462,7 +403,7 @@ export function ProfileButton() {
             className="flex w-full items-center gap-2 transition-colors hover:bg-[var(--color-pt-surface-mut)]"
             style={{
               padding: '7px 12px',
-              fontSize: 12.5,
+              fontSize: 'var(--text-sm)',
               fontWeight: 500,
               color: 'var(--color-pt-danger, #dc2626)',
               background: 'none',

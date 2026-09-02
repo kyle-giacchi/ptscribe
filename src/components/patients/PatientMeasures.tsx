@@ -79,12 +79,18 @@ export function PatientMeasures({
 
       {trends.length === 0 && !adding && (
         <SurfaceCard padding={40} style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+          <div
+            style={{
+              fontSize: 'var(--text-base)',
+              fontWeight: 600,
+              color: 'var(--color-pt-text-2)',
+            }}
+          >
             No measures recorded
           </div>
           <div
             style={{
-              fontSize: 12,
+              fontSize: 'var(--text-sm)',
               color: 'var(--color-pt-text-3)',
               marginTop: 4,
               maxWidth: 420,
@@ -104,7 +110,7 @@ export function PatientMeasures({
             style={{
               padding: '12px 16px',
               borderBottom: '1px solid var(--color-pt-border)',
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               fontWeight: 600,
               color: 'var(--color-pt-text)',
             }}
@@ -163,10 +169,12 @@ function TrendRow({
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-pt-text)' }}>
+          <div
+            style={{ fontSize: 'var(--text-base)', fontWeight: 500, color: 'var(--color-pt-text)' }}
+          >
             {trend.label}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
             {trend.series.length} {trend.series.length === 1 ? 'reading' : 'readings'} · latest{' '}
             {fmtIsoDateOptional(trend.latest.takenAt)}
           </div>
@@ -175,7 +183,7 @@ function TrendRow({
         {/* Baseline → latest, so the number the clinician quotes is right there. */}
         <div
           style={{
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             color: 'var(--color-pt-text-3)',
             fontVariantNumeric: 'tabular-nums',
             whiteSpace: 'nowrap',
@@ -186,7 +194,7 @@ function TrendRow({
         </div>
         <div
           style={{
-            fontSize: 18,
+            fontSize: 'var(--text-lg)',
             fontWeight: 600,
             color: 'var(--color-pt-text)',
             fontVariantNumeric: 'tabular-nums',
@@ -194,7 +202,9 @@ function TrendRow({
           }}
         >
           {formatValue(trend.latest.value)}
-          <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)', fontWeight: 500 }}>
+          <span
+            style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', fontWeight: 500 }}
+          >
             {def.unit}
           </span>
         </div>
@@ -202,7 +212,7 @@ function TrendRow({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
           <span
             style={{
-              fontSize: 12,
+              fontSize: 'var(--text-sm)',
               fontWeight: 600,
               color: deltaColor,
               fontVariantNumeric: 'tabular-nums',
@@ -214,7 +224,7 @@ function TrendRow({
             <span
               title={`Change meets the published MCID of ${def.mcid}${def.unit}`}
               style={{
-                fontSize: 9.5,
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 700,
                 letterSpacing: '0.6px',
                 padding: '2px 6px',
@@ -244,7 +254,7 @@ function TrendRow({
 
       {open && (
         <div style={{ padding: '0 16px 14px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
             <thead>
               <tr style={{ color: 'var(--color-pt-text-3)', textAlign: 'left' }}>
                 <th style={{ fontWeight: 600, padding: '4px 0' }}>Date</th>
@@ -443,7 +453,7 @@ export function MeasureEntryForm({
       <div
         style={{
           marginTop: 8,
-          fontSize: 11.5,
+          fontSize: 'var(--text-xs)',
           color: outOfRange ? 'var(--color-pt-red)' : 'var(--color-pt-text-3)',
           minHeight: 16,
         }}

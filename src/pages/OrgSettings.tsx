@@ -103,7 +103,9 @@ export function OrgSettings() {
     return (
       <PageFrame>
         <SurfaceCard padding={20}>
-          <div style={{ color: 'var(--color-pt-text-3)', fontSize: 13 }}>Loading organization…</div>
+          <div style={{ color: 'var(--color-pt-text-3)', fontSize: 'var(--text-base)' }}>
+            Loading organization…
+          </div>
         </SurfaceCard>
       </PageFrame>
     );
@@ -115,7 +117,7 @@ export function OrgSettings() {
         <SurfaceCard padding={24}>
           <h1
             style={{
-              fontSize: 18,
+              fontSize: 'var(--text-lg)',
               fontWeight: 700,
               color: 'var(--color-pt-text)',
               margin: '0 0 8px',
@@ -125,7 +127,7 @@ export function OrgSettings() {
           </h1>
           <p
             style={{
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               color: 'var(--color-pt-text-2)',
               lineHeight: 1.55,
               margin: '0 0 16px',
@@ -147,7 +149,13 @@ export function OrgSettings() {
     return (
       <PageFrame>
         <SurfaceCard padding={24}>
-          <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', margin: '0 0 16px' }}>
+          <p
+            style={{
+              fontSize: 'var(--text-base)',
+              color: 'var(--color-pt-text-2)',
+              margin: '0 0 16px',
+            }}
+          >
             {state.message}
           </p>
           <PtButton variant="ghost" onClick={() => void load()}>
@@ -203,7 +211,7 @@ function OrgSettingsLoaded({
         <Eyebrow>Organization</Eyebrow>
         <h1
           style={{
-            fontSize: 20,
+            fontSize: 'var(--text-xl)',
             fontWeight: 700,
             color: 'var(--color-pt-text)',
             letterSpacing: '-0.01em',
@@ -212,7 +220,7 @@ function OrgSettingsLoaded({
         >
           {org.name}
         </h1>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           {org.contactEmail} · {org.phone}
           {!canManage && ' · You have view-only access'}
         </p>
@@ -252,7 +260,7 @@ function OrgConfigCard() {
   if (loading) {
     return (
       <SurfaceCard padding={20}>
-        <div style={{ color: 'var(--color-pt-text-3)', fontSize: 13 }}>
+        <div style={{ color: 'var(--color-pt-text-3)', fontSize: 'var(--text-base)' }}>
           Loading organization settings…
         </div>
       </SurfaceCard>
@@ -318,7 +326,7 @@ function OrgConfigForm() {
     <SurfaceCard padding={20}>
       <div style={{ display: 'grid', gap: 4, marginBottom: 16 }}>
         <Eyebrow>Organization settings</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           {canManage
             ? 'Policy and the shared library apply to everyone in your organization.'
             : 'Set by your organization’s owners and admins. View-only.'}
@@ -327,7 +335,9 @@ function OrgConfigForm() {
 
       {/* Policy: audio retention ceiling */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <label style={{ fontSize: 13, color: 'var(--color-pt-text)', minWidth: 180 }}>
+        <label
+          style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)', minWidth: 180 }}
+        >
           Audio retention (days)
         </label>
         {canManage ? (
@@ -341,7 +351,7 @@ function OrgConfigForm() {
             style={{
               width: 120,
               padding: '6px 10px',
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               border: '1px solid var(--color-pt-border)',
               borderRadius: 8,
               background: 'var(--color-pt-surface)',
@@ -349,14 +359,16 @@ function OrgConfigForm() {
             }}
           />
         ) : (
-          <span style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>
+          <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)' }}>
             {policy.retentionDays != null ? `${policy.retentionDays} days` : 'No limit'}
           </span>
         )}
       </div>
 
       {/* Shared library summary */}
-      <div style={{ fontSize: 13, color: 'var(--color-pt-text-2)', marginBottom: 16 }}>
+      <div
+        style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)', marginBottom: 16 }}
+      >
         Shared library: <strong>{sharedTemplates.length}</strong> template
         {sharedTemplates.length === 1 ? '' : 's'}, <strong>{sharedExercises.length}</strong>{' '}
         exercise
@@ -412,13 +424,21 @@ function MembersCard({
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+                <div
+                  style={{
+                    fontSize: 'var(--text-base)',
+                    fontWeight: 600,
+                    color: 'var(--color-pt-text)',
+                  }}
+                >
                   {m.name || m.email}
                   {m.isYou && (
                     <span style={{ color: 'var(--color-pt-text-3)', fontWeight: 400 }}> (you)</span>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>{m.email}</div>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+                  {m.email}
+                </div>
               </div>
               {editable ? (
                 <RoleSelect
@@ -495,7 +515,7 @@ function InvitesCard({
               flex: 1,
               minWidth: 200,
               padding: '8px 10px',
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               borderRadius: 8,
               border: '1.5px solid var(--color-pt-border)',
               background: 'var(--color-pt-surface)',
@@ -516,7 +536,13 @@ function InvitesCard({
 
       <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
         {invites.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)', fontStyle: 'italic' }}>
+          <div
+            style={{
+              fontSize: 'var(--text-base)',
+              color: 'var(--color-pt-text-3)',
+              fontStyle: 'italic',
+            }}
+          >
             No pending invites.
           </div>
         ) : (
@@ -532,10 +558,12 @@ function InvitesCard({
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: 'var(--color-pt-text)' }}>{inv.email}</div>
+                <div style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)' }}>
+                  {inv.email}
+                </div>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 'var(--text-xs)',
                     color: inv.expired ? 'var(--color-pt-red)' : 'var(--color-pt-text-3)',
                   }}
                 >
@@ -595,7 +623,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <h2
       style={{
-        fontSize: 11,
+        fontSize: 'var(--text-xs)',
         fontWeight: 700,
         letterSpacing: '0.07em',
         textTransform: 'uppercase',
@@ -625,7 +653,7 @@ function RoleSelect({
       onChange={(e) => onChange(e.target.value as OrgRole)}
       style={{
         padding: '7px 10px',
-        fontSize: 12.5,
+        fontSize: 'var(--text-sm)',
         borderRadius: 8,
         border: '1.5px solid var(--color-pt-border)',
         background: 'var(--color-pt-surface)',
@@ -647,7 +675,7 @@ function RolePill({ role }: { role: OrgRole }) {
   return (
     <span
       style={{
-        fontSize: 11,
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         letterSpacing: '0.04em',
         textTransform: 'uppercase',

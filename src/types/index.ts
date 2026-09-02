@@ -48,6 +48,8 @@ export interface Patient {
   icd10?: string;
   referringProvider?: string;
   notes?: string;
+  /** Avatar circle color as `#rrggbb`. Assigned at creation, editable. */
+  color?: string;
   status: PatientStatus;
   createdAt: number;
   updatedAt: number;

@@ -1,4 +1,4 @@
-export { Avatar } from './Avatar';
+export { Avatar, AVATAR_COLORS, randomAvatarColor, contrastText } from './Avatar';
 export { StatusBadge, StatusDot, type StatusTone } from './StatusBadge';
 export { StatCard, type StatTrend } from './StatCard';
 export { TagChip, QuickTagButton, TAG_TONES, type TagKind } from './TagChip';

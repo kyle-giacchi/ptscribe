@@ -51,9 +51,13 @@ export function SecurityComplianceCard() {
               flex: '0 0 auto',
             }}
           />
-          <span style={{ fontSize: 13, color: 'var(--color-pt-text-1)' }}>{vaultStatus.label}</span>
+          <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-1)' }}>
+            {vaultStatus.label}
+          </span>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>{disclosureLine}</div>
+        <div style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)' }}>
+          {disclosureLine}
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {vaultUnlocked && (
             <PtButton
@@ -73,7 +77,7 @@ export function SecurityComplianceCard() {
         {showFullDisclosure && <HipaaDisclosure variant="full" />}
         <p
           style={{
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
             margin: 0,
             lineHeight: 1.5,

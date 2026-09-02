@@ -22,7 +22,7 @@ function ClipAudioPlayer({ clipIndex, blob }: { clipIndex: number; blob: Blob })
     <div className="flex flex-col gap-1.5">
       <div
         style={{
-          fontSize: 10,
+          fontSize: 'var(--text-2xs)',
           fontWeight: 700,
           textTransform: 'uppercase',
           letterSpacing: '0.06em',
@@ -44,7 +44,7 @@ function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
       <div>
         <div
           style={{
-            fontSize: 10.5,
+            fontSize: 'var(--text-2xs)',
             fontWeight: 600,
             color: 'var(--color-pt-text-2)',
             marginBottom: 4,
@@ -57,12 +57,18 @@ function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
 
       <div>
         <div className="flex items-center gap-2" style={{ marginBottom: 4 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-pt-text-2)' }}>
+          <span
+            style={{
+              fontSize: 'var(--text-2xs)',
+              fontWeight: 600,
+              color: 'var(--color-pt-text-2)',
+            }}
+          >
             Merged Silenced
           </span>
-          <span style={{ fontSize: 9.5, color: '#0ea5e9' }}>T2 / T3 source</span>
+          <span style={{ fontSize: 'var(--text-2xs)', color: '#0ea5e9' }}>T2 / T3 source</span>
           {activeSilenced && activeSilenced.savedSec > 0 && (
-            <span style={{ fontSize: 9.5, fontWeight: 600, color: '#10b981' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 600, color: '#10b981' }}>
               −{activeSilenced.savedSec.toFixed(1)}s saved
             </span>
           )}
@@ -70,7 +76,7 @@ function SessionMergedAudio({ mergedBlob }: { mergedBlob: Blob }) {
         {compilingSilence ? (
           <div
             className="flex items-center gap-1.5"
-            style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
+            style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}
           >
             <Loader2 size={11} className="animate-spin" /> Computing…
           </div>
@@ -137,7 +143,7 @@ function SessionAudioBody({ session }: { session: Session }) {
         style={{ background: 'var(--color-pt-surface-mut)' }}
       >
         <AlertCircle size={13} style={{ color: 'var(--color-pt-text-3)', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
           Vault locked — unlock to access audio
         </span>
       </div>
@@ -148,7 +154,7 @@ function SessionAudioBody({ session }: { session: Session }) {
     return (
       <div
         className="flex items-center gap-2"
-        style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}
+        style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}
       >
         <Loader2 size={12} className="animate-spin" /> Loading audio from IndexedDB…
       </div>
@@ -166,7 +172,7 @@ function SessionAudioBody({ session }: { session: Session }) {
         <div className="flex flex-col gap-3">
           <div
             style={{
-              fontSize: 10,
+              fontSize: 'var(--text-2xs)',
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
@@ -195,7 +201,7 @@ export function SessionAudioPanel({ session }: { session: Session }) {
   );
 
   const badge = (
-    <span style={{ fontSize: 10.5, color: 'var(--color-pt-text-3)' }}>
+    <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-pt-text-3)' }}>
       {session.clips.length} clip{session.clips.length !== 1 ? 's' : ''}
     </span>
   );

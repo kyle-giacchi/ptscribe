@@ -157,7 +157,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
     patchClips,
     patchClip,
     persistPhiConfirmDismissed,
-    initial: { quickMode, autoRecord: searchParams.get('autoRecord') === '1' },
+    initial: {
+      quickMode,
+      autoRecord: searchParams.get('autoRecord') === '1',
+      tab: searchParams.get('tab') === 'review' ? 'review' : undefined,
+    },
     onEvent: handleMachineEvent,
   });
 
@@ -317,7 +321,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   <div>
                     <button
                       type="button"
-                      className="btn btn-ghost py-1 text-xs"
+                      className="btn btn-ghost py-1 text-sm"
                       onClick={() => actions.setTab('review')}
                     >
                       <ArrowLeft size={13} strokeWidth={2} /> Return to Notes
@@ -396,7 +400,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                           borderRadius: 8,
                           border: '1px solid var(--color-pt-border)',
                           background: 'var(--color-pt-surface-mut)',
-                          fontSize: 12.5,
+                          fontSize: 'var(--text-sm)',
                           color: 'var(--color-pt-text-3)',
                           lineHeight: 1.5,
                           marginBottom: 12,
@@ -417,7 +421,9 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         ]}
                       />
                       {noteTab === 'notes' && note && (
-                        <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                        <span
+                          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}
+                        >
                           {selectors.busy === 'generating'
                             ? 'Generating…'
                             : `last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
@@ -746,7 +752,13 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           title="Recording more will invalidate your generated note"
           size="sm"
         >
-          <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
+          <p
+            style={{
+              fontSize: 'var(--text-base)',
+              color: 'var(--color-pt-text-2)',
+              lineHeight: 1.55,
+            }}
+          >
             Any new clips will be added to your transcript, but your note was generated from the
             previous transcript. You&apos;ll need to re-run transcription and regenerate before the
             note reflects this recording.
@@ -820,7 +832,7 @@ function RightPanelTab({
         gap: 6,
         padding: '9px 12px',
         borderRadius: 8,
-        fontSize: 12.5,
+        fontSize: 'var(--text-sm)',
         fontWeight: 600,
         border: 'none',
         borderBottom: active ? '2px solid var(--color-pt-accent)' : '2px solid transparent',
@@ -834,7 +846,7 @@ function RightPanelTab({
       {typeof count === 'number' && count > 0 && (
         <span
           style={{
-            fontSize: 10,
+            fontSize: 'var(--text-2xs)',
             fontWeight: 700,
             borderRadius: 999,
             padding: '0 6px',

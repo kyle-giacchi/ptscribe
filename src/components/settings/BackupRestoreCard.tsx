@@ -65,7 +65,7 @@ export function BackupRestoreCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 10 }}>
         <Eyebrow>Backup &amp; restore</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           Your patient list, sessions, notes, templates, and exercises are exported as a single JSON
           file. Audio recordings stay in this browser and are not part of the JSON backup.
         </p>

@@ -2,11 +2,12 @@ import { Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { motion } from 'motion/react';
-import type { AiDebugPrompts, AiErrorEntry, GenerateKeyReport, Session } from '@/types';
-import type { PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
+import { useDebugDrawer } from '@/contexts/DebugDrawerProvider';
+import { useSessions } from '@/contexts/SessionsProvider';
 import { EnvironmentPanel, FeaturesPanel, StoragePanel } from './debug/EnvPanels';
 import { SessionAudioPanel } from './debug/SessionAudioPanel';
 import { TranscriptPanel } from './debug/TranscriptPanel';
+import { LiveWhisperPanel } from './debug/LiveWhisperPanel';
 
 export interface DebugDrawerStats {
   droppedSec: number;
@@ -15,46 +16,19 @@ export interface DebugDrawerStats {
   speedOriginalSec: number;
 }
 
-export interface DebugDrawerProps {
-  onClose: () => void;
-  /** Session id whose panels are shown, or null when opened off-session. */
-  activeSessionId?: string | null;
-  /** Full active session entity, for the audio/transcript inspection panels. */
-  activeSession?: Session | null;
-  debugStats: DebugDrawerStats | null;
-  speedFactor: number;
-  lastRawPayload?: string | null;
-  lastAiPrompts?: AiDebugPrompts | null;
-  lastKeyReport?: GenerateKeyReport | null;
-  /** Most recent on-device PII scrub run in the active session. */
-  lastPiiScrub?: PiiScrubDebug | null;
-  /** Persisted per-session AI-call error log (newest rendered first). */
-  aiErrors?: AiErrorEntry[];
-  /** Clears the active session's error log; omit to hide the action. */
-  onClearErrors?: () => void;
-}
-
 /**
- * App-global right-side debug drawer, opened from Settings → Debug Menu. Shows
+ * App-global right-side debug drawer, opened from Settings → Debug Menu. Mounted
+ * once at the app shell and wired straight to DebugDrawerProvider. Shows
  * silence-trim and speed-up stats plus AI prompt/payload/response inspection for
  * the active session; session-scoped panels render placeholder copy when opened
  * off-session or before data is populated.
  */
-export function DebugDrawer({
-  onClose,
-  activeSessionId,
-  activeSession,
-  debugStats,
-  speedFactor,
-  lastRawPayload,
-  lastAiPrompts,
-  lastKeyReport,
-  lastPiiScrub,
-  aiErrors,
-  onClearErrors,
-}: DebugDrawerProps) {
+export function DebugDrawer() {
+  const { open, closeDebug: onClose, activeSessionId, sessionDebug } = useDebugDrawer();
+  const { getSession, updateSession } = useSessions();
   const [silenceDebugOn, setSilenceDebugOn] = useState(false);
   const [speedDebugOn, setSpeedDebugOn] = useState(false);
+  const [liveWhisperOn, setLiveWhisperOn] = useState(false);
   const [rawPayloadOpen, setRawPayloadOpen] = useState(false);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [requestPayloadOpen, setRequestPayloadOpen] = useState(false);
@@ -62,7 +36,23 @@ export function DebugDrawer({
   const [piiOpen, setPiiOpen] = useState(false);
   const [errorLogOpen, setErrorLogOpen] = useState(false);
   const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+
+  if (!open) return null;
+
   const hasSession = Boolean(activeSessionId);
+
+  const activeSession = activeSessionId ? (getSession(activeSessionId) ?? null) : null;
+  const aiErrors = activeSession?.aiErrors;
+  const debugStats = sessionDebug?.debugStats ?? null;
+  const speedFactor = sessionDebug?.speedFactor ?? 1.25;
+  const lastRawPayload = sessionDebug?.lastRawPayload ?? null;
+  const lastAiPrompts = sessionDebug?.lastAiPrompts ?? null;
+  const lastKeyReport = sessionDebug?.lastKeyReport ?? null;
+  const lastPiiScrub = sessionDebug?.lastPiiScrub ?? null;
+  const onClearErrors =
+    activeSessionId && aiErrors?.length
+      ? () => updateSession(activeSessionId, { aiErrors: [] })
+      : undefined;
 
   // Newest first; the ring buffer stores oldest→newest.
   const errorsNewestFirst = aiErrors ? [...aiErrors].reverse() : [];
@@ -140,7 +130,14 @@ export function DebugDrawer({
             flexShrink: 0,
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-pt-text)', flex: 1 }}>
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 'var(--text-md)',
+              color: 'var(--color-pt-text)',
+              flex: 1,
+            }}
+          >
             Debug Menu
           </span>
           <button type="button" className="btn btn-ghost p-1.5" onClick={onClose}>
@@ -165,7 +162,7 @@ export function DebugDrawer({
                 borderRadius: 10,
                 border: '1px dashed var(--color-pt-border)',
                 padding: '12px 14px',
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-fg-subtle)',
                 background: 'var(--color-pt-surface-alt)',
               }}
@@ -198,13 +195,20 @@ export function DebugDrawer({
               }}
               onClick={() => setErrorLogOpen((v) => !v)}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-fg)',
+                  flex: 1,
+                }}
+              >
                 Error log
               </span>
               {errorsNewestFirst.length > 0 && (
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 700,
                     color: '#fff',
                     background: 'var(--color-pt-danger, #c0392b)',
@@ -216,7 +220,7 @@ export function DebugDrawer({
                   {errorsNewestFirst.length}
                 </span>
               )}
-              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                 {errorLogOpen ? '▲' : '▼'}
               </span>
             </button>
@@ -225,7 +229,7 @@ export function DebugDrawer({
                 style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}
               >
                 {errorsNewestFirst.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     {hasSession
                       ? 'No AI-call errors recorded for this session.'
                       : 'Open a session to see its recorded AI-call errors.'}
@@ -236,7 +240,7 @@ export function DebugDrawer({
                       <button
                         type="button"
                         className="btn btn-ghost"
-                        style={{ alignSelf: 'flex-end', fontSize: 11 }}
+                        style={{ alignSelf: 'flex-end', fontSize: 'var(--text-xs)' }}
                         onClick={onClearErrors}
                       >
                         Clear errors
@@ -270,7 +274,7 @@ export function DebugDrawer({
                           >
                             <span
                               style={{
-                                fontSize: 10.5,
+                                fontSize: 'var(--text-2xs)',
                                 fontWeight: 700,
                                 color: 'var(--color-pt-danger, #c0392b)',
                                 textTransform: 'uppercase',
@@ -279,13 +283,19 @@ export function DebugDrawer({
                             >
                               {entry.kind}
                             </span>
-                            <span style={{ fontSize: 11, color: 'var(--color-fg)', flex: 1 }}>
+                            <span
+                              style={{
+                                fontSize: 'var(--text-xs)',
+                                color: 'var(--color-fg)',
+                                flex: 1,
+                              }}
+                            >
                               {entry.call}
                               {entry.provider ? ` · ${entry.provider}` : ''}
                             </span>
                             <span
                               style={{
-                                fontSize: 10.5,
+                                fontSize: 'var(--text-2xs)',
                                 color: 'var(--color-fg-subtle)',
                                 fontVariantNumeric: 'tabular-nums',
                               }}
@@ -304,7 +314,7 @@ export function DebugDrawer({
                             >
                               <div
                                 style={{
-                                  fontSize: 10.5,
+                                  fontSize: 'var(--text-2xs)',
                                   color: 'var(--color-fg-subtle)',
                                   display: 'flex',
                                   flexWrap: 'wrap',
@@ -321,7 +331,7 @@ export function DebugDrawer({
                               {entry.detail && (
                                 <div
                                   style={{
-                                    fontSize: 11.5,
+                                    fontSize: 'var(--text-xs)',
                                     color: 'var(--color-fg)',
                                     whiteSpace: 'pre-wrap',
                                     wordBreak: 'break-word',
@@ -333,7 +343,7 @@ export function DebugDrawer({
                               {entry.rawSnippet && (
                                 <pre
                                   style={{
-                                    fontSize: 10,
+                                    fontSize: 'var(--text-2xs)',
                                     color: 'var(--color-fg-subtle)',
                                     background: 'var(--color-pt-surface)',
                                     border: '1px solid var(--color-pt-border)',
@@ -350,7 +360,12 @@ export function DebugDrawer({
                                 </pre>
                               )}
                               {entry.keyReport && (
-                                <div style={{ fontSize: 10.5, color: 'var(--color-fg-subtle)' }}>
+                                <div
+                                  style={{
+                                    fontSize: 'var(--text-2xs)',
+                                    color: 'var(--color-fg-subtle)',
+                                  }}
+                                >
                                   expected [{entry.keyReport.expected.join(', ') || '—'}] · returned
                                   [{entry.keyReport.returned.join(', ') || '—'}]
                                 </div>
@@ -363,7 +378,7 @@ export function DebugDrawer({
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: 4,
-                                  fontSize: 11,
+                                  fontSize: 'var(--text-xs)',
                                 }}
                                 onClick={() => {
                                   void navigator.clipboard
@@ -412,7 +427,9 @@ export function DebugDrawer({
                 onChange={(e) => setSilenceDebugOn(e.target.checked)}
                 style={{ accentColor: 'var(--color-pt-accent)' }}
               />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
+              <span
+                style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-fg)' }}
+              >
                 Silence visibility
               </span>
             </label>
@@ -427,20 +444,20 @@ export function DebugDrawer({
               >
                 {debugStats && debugStats.originalSec > 0 ? (
                   <>
-                    <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
                       <span style={{ fontWeight: 600, color: 'var(--color-fg)' }}>
                         {Math.round(debugStats.droppedSec)}s
                       </span>{' '}
                       trimmed ({Math.round((debugStats.droppedSec / debugStats.originalSec) * 100)}%
                       of recording)
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                       {Math.round(debugStats.originalSec)}s original →{' '}
                       {Math.round(debugStats.originalSec - debugStats.droppedSec)}s after trim
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Run transcription to see silence data.
                   </div>
                 )}
@@ -472,7 +489,9 @@ export function DebugDrawer({
                 onChange={(e) => setSpeedDebugOn(e.target.checked)}
                 style={{ accentColor: 'var(--color-pt-accent)' }}
               />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)' }}>
+              <span
+                style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-fg)' }}
+              >
                 Speed-up visibility
               </span>
             </label>
@@ -487,7 +506,7 @@ export function DebugDrawer({
               >
                 {debugStats && debugStats.speedOriginalSec > 0 ? (
                   <>
-                    <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
                       <span style={{ fontWeight: 600, color: 'var(--color-fg)' }}>
                         {Math.round(debugStats.speedSavedSec)}s
                       </span>{' '}
@@ -495,7 +514,7 @@ export function DebugDrawer({
                       {Math.round((debugStats.speedSavedSec / debugStats.speedOriginalSec) * 100)}%
                       speedup)
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--color-pt-text-2)' }}>
+                    <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
                       Speed factor:{' '}
                       <span
                         style={{
@@ -509,10 +528,54 @@ export function DebugDrawer({
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Run transcription to see speed-up data.
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* -- Live Whisper (T1) -------------------------- */}
+          <div
+            style={{
+              borderRadius: 10,
+              border: '1px solid var(--color-pt-border)',
+              overflow: 'hidden',
+            }}
+          >
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px',
+                cursor: 'pointer',
+                background: 'var(--color-pt-surface-alt)',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={liveWhisperOn}
+                onChange={(e) => setLiveWhisperOn(e.target.checked)}
+                style={{ accentColor: 'var(--color-pt-accent)' }}
+              />
+              <span
+                style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-fg)' }}
+              >
+                Live Whisper (T1) timing
+              </span>
+            </label>
+            {liveWhisperOn && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 5,
+                }}
+              >
+                <LiveWhisperPanel />
               </div>
             )}
           </div>
@@ -540,10 +603,17 @@ export function DebugDrawer({
               }}
               onClick={() => setAiPromptOpen((v) => !v)}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-fg)',
+                  flex: 1,
+                }}
+              >
                 AI prompt
               </span>
-              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                 {aiPromptOpen ? '▲' : '▼'}
               </span>
             </button>
@@ -572,7 +642,7 @@ export function DebugDrawer({
                         >
                           <span
                             style={{
-                              fontSize: 11,
+                              fontSize: 'var(--text-xs)',
                               fontWeight: 600,
                               color: 'var(--color-fg-subtle)',
                               textTransform: 'uppercase',
@@ -584,7 +654,12 @@ export function DebugDrawer({
                           <button
                             type="button"
                             className="btn btn-ghost"
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: 'var(--text-xs)',
+                            }}
                             onClick={() => {
                               void navigator.clipboard.writeText(value).then(
                                 () => toast.success('Copied'),
@@ -598,7 +673,7 @@ export function DebugDrawer({
                         </div>
                         <pre
                           style={{
-                            fontSize: 10.5,
+                            fontSize: 'var(--text-2xs)',
                             color: 'var(--color-fg-subtle)',
                             background: 'var(--color-pt-surface)',
                             border: '1px solid var(--color-pt-border)',
@@ -618,7 +693,7 @@ export function DebugDrawer({
                     ))}
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Generate a note to see the AI prompt.
                   </div>
                 )}
@@ -649,10 +724,17 @@ export function DebugDrawer({
               }}
               onClick={() => setRequestPayloadOpen((v) => !v)}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-fg)',
+                  flex: 1,
+                }}
+              >
                 Request payload
               </span>
-              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                 {requestPayloadOpen ? '▲' : '▼'}
               </span>
             </button>
@@ -662,10 +744,10 @@ export function DebugDrawer({
               >
                 {requestPayloadJson ? (
                   <>
-                    <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                       Exact JSON body POSTed to{' '}
-                      <code style={{ fontSize: 10.5 }}>/api/generate</code> (the Worker forwards it
-                      to Anthropic).
+                      <code style={{ fontSize: 'var(--text-2xs)' }}>/api/generate</code> (the Worker
+                      forwards it to Anthropic).
                     </div>
                     <button
                       type="button"
@@ -675,7 +757,7 @@ export function DebugDrawer({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 4,
-                        fontSize: 11,
+                        fontSize: 'var(--text-xs)',
                       }}
                       onClick={() => {
                         void navigator.clipboard.writeText(requestPayloadJson).then(
@@ -689,7 +771,7 @@ export function DebugDrawer({
                     </button>
                     <pre
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 'var(--text-2xs)',
                         color: 'var(--color-fg-subtle)',
                         background: 'var(--color-pt-surface)',
                         border: '1px solid var(--color-pt-border)',
@@ -707,7 +789,7 @@ export function DebugDrawer({
                     </pre>
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Generate a note to see the request payload.
                   </div>
                 )}
@@ -738,10 +820,17 @@ export function DebugDrawer({
               }}
               onClick={() => setRawPayloadOpen((v) => !v)}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-fg)',
+                  flex: 1,
+                }}
+              >
                 AI raw response
               </span>
-              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                 {rawPayloadOpen ? '▲' : '▼'}
               </span>
             </button>
@@ -759,7 +848,7 @@ export function DebugDrawer({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 4,
-                        fontSize: 11,
+                        fontSize: 'var(--text-xs)',
                       }}
                       onClick={() => {
                         void navigator.clipboard.writeText(lastRawPayload).then(
@@ -773,7 +862,7 @@ export function DebugDrawer({
                     </button>
                     <pre
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 'var(--text-2xs)',
                         color: 'var(--color-fg-subtle)',
                         background: 'var(--color-pt-surface)',
                         border: '1px solid var(--color-pt-border)',
@@ -791,7 +880,7 @@ export function DebugDrawer({
                     </pre>
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Generate a note to see the raw AI response.
                   </div>
                 )}
@@ -822,15 +911,24 @@ export function DebugDrawer({
               }}
               onClick={() => setKeyMapOpen((v) => !v)}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-fg)',
+                  flex: 1,
+                }}
+              >
                 Section mapping
               </span>
               {keyStatus && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: keyStatus.color }}>
+                <span
+                  style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: keyStatus.color }}
+                >
                   {keyStatus.label}
                 </span>
               )}
-              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                 {keyMapOpen ? '▲' : '▼'}
               </span>
             </button>
@@ -840,7 +938,7 @@ export function DebugDrawer({
               >
                 {lastKeyReport ? (
                   <>
-                    <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                       Keys the AI returned vs. the keys this template expects. A blank note with a
                       non-empty response and zero matches means a template/response mismatch.
                     </div>
@@ -859,13 +957,17 @@ export function DebugDrawer({
                     ).map(({ label, keys }) => (
                       <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span
-                          style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)' }}
+                          style={{
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 600,
+                            color: 'var(--color-fg-subtle)',
+                          }}
                         >
                           {label}
                         </span>
                         <code
                           style={{
-                            fontSize: 10.5,
+                            fontSize: 'var(--text-2xs)',
                             color: 'var(--color-fg-subtle)',
                             wordBreak: 'break-all',
                           }}
@@ -876,7 +978,7 @@ export function DebugDrawer({
                     ))}
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Generate a note to see the section mapping.
                   </div>
                 )}
@@ -907,13 +1009,20 @@ export function DebugDrawer({
               }}
               onClick={() => setPiiOpen((v) => !v)}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+              <span
+                style={{
+                  fontSize: 'var(--text-base)',
+                  fontWeight: 600,
+                  color: 'var(--color-fg)',
+                  flex: 1,
+                }}
+              >
                 PII scrub
               </span>
               {lastPiiScrub?.error ? (
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: 'var(--text-xs)',
                     fontWeight: 600,
                     color: 'var(--color-pt-danger, #c0392b)',
                   }}
@@ -921,11 +1030,17 @@ export function DebugDrawer({
                   Failed
                 </span>
               ) : lastPiiScrub ? (
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-fg-subtle)' }}>
+                <span
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 600,
+                    color: 'var(--color-fg-subtle)',
+                  }}
+                >
                   {lastPiiScrub.entityTotal} flagged
                 </span>
               ) : null}
-              <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                 {piiOpen ? '▲' : '▼'}
               </span>
             </button>
@@ -935,13 +1050,13 @@ export function DebugDrawer({
               >
                 {lastPiiScrub ? (
                   <>
-                    <div style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
                       Last scrub in this session. Regex matches structured identifiers instantly;
                       the deep scan adds names/places via the on-device NER model.
                     </div>
                     <div
                       style={{
-                        fontSize: 11.5,
+                        fontSize: 'var(--text-xs)',
                         color: 'var(--color-fg)',
                         display: 'flex',
                         flexDirection: 'column',
@@ -986,7 +1101,7 @@ export function DebugDrawer({
                         <span style={{ color: 'var(--color-fg-subtle)' }}>Model</span>
                         <code
                           style={{
-                            fontSize: 10.5,
+                            fontSize: 'var(--text-2xs)',
                             color: 'var(--color-fg-subtle)',
                             wordBreak: 'break-all',
                             textAlign: 'right',
@@ -999,7 +1114,7 @@ export function DebugDrawer({
                     {lastPiiScrub.error && (
                       <div
                         style={{
-                          fontSize: 11.5,
+                          fontSize: 'var(--text-xs)',
                           color: 'var(--color-pt-danger, #c0392b)',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
@@ -1010,7 +1125,7 @@ export function DebugDrawer({
                     )}
                   </>
                 ) : (
-                  <div style={{ fontSize: 12, color: 'var(--color-fg-subtle)' }}>
+                  <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-fg-subtle)' }}>
                     Open Scrub PII on a transcript to see the redaction breakdown.
                   </div>
                 )}

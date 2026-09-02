@@ -51,9 +51,14 @@ export function NoteExportMenu({ note, template, patient }: NoteExportMenuProps)
     };
   }, [open]);
 
+  // Pseudonymous file base: the name would otherwise escape the app's own
+  // protections into the download shelf, OS notification toasts, browser
+  // download history, and any directory listing. The PDF *body* still carries
+  // name/DOB/MRN — it has to, it's a chart document — but the filename doesn't
+  // need to.
   function fileBase(): string {
     const date = new Date(note.createdAt).toISOString().slice(0, 10);
-    return `${patient.lastName}_${patient.firstName}_${date}`.replace(/\s+/g, '_');
+    return `PT-${patient.id.slice(0, 8).toUpperCase()}_${date}`;
   }
 
   function copyText(text: string, label: string) {
@@ -94,7 +99,9 @@ export function NoteExportMenu({ note, template, patient }: NoteExportMenuProps)
 
   async function handleShare() {
     const text = renderNotePlainText(note, template, patient);
-    const title = `PT Note — ${patient.firstName} ${patient.lastName}`;
+    // Share sheets surface the title in OS-level previews and recent-share
+    // lists; the note body itself already carries the identity.
+    const title = `PT Note — ${fileBase()}`;
     try {
       await navigator.share({ title, text });
     } catch (e) {
@@ -115,7 +122,7 @@ export function NoteExportMenu({ note, template, patient }: NoteExportMenuProps)
         aria-expanded={open}
         aria-haspopup="menu"
         className="btn btn-ghost"
-        style={{ height: 34, padding: '0 12px', fontSize: 12.5 }}
+        style={{ height: 34, padding: '0 12px', fontSize: 'var(--text-sm)' }}
         title="Copy, print, or download this note"
       >
         {pdfBusy ? (
@@ -237,7 +244,7 @@ function MenuItem({
       className="flex w-full items-center gap-2.5 rounded-md"
       style={{
         padding: '8px 10px',
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
         color: 'var(--color-pt-text)',
         background: 'transparent',
         border: 'none',

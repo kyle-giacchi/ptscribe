@@ -37,6 +37,11 @@ const PatientSchema = z.object({
   icd10: z.string().optional(),
   referringProvider: z.string().optional(),
   notes: z.string().optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i)
+    .optional()
+    .catch(undefined),
   status: z.enum(['active', 'discharged', 'on_hold']),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),

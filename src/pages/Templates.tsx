@@ -80,7 +80,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
       >
         <div style={{ display: 'grid', gap: 4 }}>
           {!embedded && <Eyebrow>Templates</Eyebrow>}
-          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
             One template per visit type. Built-in formats are read-only — clone one to customize.
           </p>
         </div>
@@ -110,7 +110,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                 }}
               >
                 <Eyebrow>{FORMAT_LABEL[fmt]}</Eyebrow>
-                <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
                   {items.length} {items.length === 1 ? 'template' : 'templates'}
                 </span>
               </div>
@@ -126,7 +126,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                         justifyContent: 'space-between',
                         gap: 12,
                         padding: '12px 18px',
-                        fontSize: 13,
+                        fontSize: 'var(--text-base)',
                         borderBottom:
                           i === items.length - 1 ? 'none' : '1px solid var(--color-pt-border)',
                       }}
@@ -144,7 +144,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                                 gap: 4,
                                 padding: '2px 7px',
                                 borderRadius: 999,
-                                fontSize: 10,
+                                fontSize: 'var(--text-2xs)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.05em',
                                 background: 'var(--color-pt-surface-mut)',
@@ -163,7 +163,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                                 gap: 4,
                                 padding: '2px 7px',
                                 borderRadius: 999,
-                                fontSize: 10,
+                                fontSize: 'var(--text-2xs)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.05em',
                                 background: 'var(--color-pt-surface-mut)',
@@ -182,7 +182,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                                 gap: 4,
                                 padding: '2px 7px',
                                 borderRadius: 999,
-                                fontSize: 10,
+                                fontSize: 'var(--text-2xs)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.05em',
                                 background: 'var(--color-pt-accent-soft)',
@@ -195,7 +195,11 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                           )}
                         </div>
                         <div
-                          style={{ marginTop: 2, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}
+                          style={{
+                            marginTop: 2,
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-pt-text-3)',
+                          }}
                         >
                           {t.sections.length} sections
                         </div>
@@ -206,7 +210,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                             variant="ghost"
                             style={{
                               padding: '6px 10px',
-                              fontSize: 12,
+                              fontSize: 'var(--text-sm)',
                               color:
                                 orgDefaultId === t.id
                                   ? 'var(--color-pt-accent-fg)'
@@ -243,7 +247,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                         <PtButton
                           variant="ghost"
                           iconLeft={<Copy size={12} strokeWidth={2} />}
-                          style={{ padding: '6px 10px', fontSize: 12 }}
+                          style={{ padding: '6px 10px', fontSize: 'var(--text-sm)' }}
                           onClick={() => {
                             const clone = cloneTemplate(t);
                             toast.success('Template cloned');
@@ -257,7 +261,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                             <PtButton
                               variant="ghost"
                               iconLeft={<Pencil size={12} strokeWidth={2} />}
-                              style={{ padding: '6px 10px', fontSize: 12 }}
+                              style={{ padding: '6px 10px', fontSize: 'var(--text-sm)' }}
                               onClick={() => setEditing(t)}
                             >
                               Edit
@@ -266,7 +270,7 @@ export function Templates({ embedded = false }: { embedded?: boolean } = {}) {
                               variant="ghost"
                               style={{
                                 padding: '6px 10px',
-                                fontSize: 12,
+                                fontSize: 'var(--text-sm)',
                                 color: 'var(--color-pt-red)',
                               }}
                               onClick={() => {
@@ -318,7 +322,7 @@ function CreateTemplateModal({
 
   return (
     <Modal open onClose={onClose} title="New template" size="sm">
-      <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
+      <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-3)', margin: 0 }}>
         Templates are scoped to a visit type so the New Session picker can show only the relevant
         ones. You can refine sections and the AI prompt immediately after creating.
       </p>
@@ -427,13 +431,13 @@ function TemplateEditorModal({
         {tab === 'sections' ? (
           <div role="tabpanel" style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
                 The note's sections. Each key must match a key the AI prompt asks for.
               </span>
               <PtButton
                 variant="ghost"
                 iconLeft={<Plus size={12} strokeWidth={2} />}
-                style={{ padding: '6px 10px', fontSize: 12 }}
+                style={{ padding: '6px 10px', fontSize: 'var(--text-sm)' }}
                 onClick={add}
               >
                 Add section
@@ -448,7 +452,7 @@ function TemplateEditorModal({
                     border: '1px solid var(--color-pt-border)',
                     background: 'var(--color-pt-surface-mut)',
                     padding: 10,
-                    fontSize: 12,
+                    fontSize: 'var(--text-sm)',
                   }}
                 >
                   <div
@@ -475,21 +479,25 @@ function TemplateEditorModal({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <PtButton
                         variant="ghost"
-                        style={{ padding: '4px 8px', fontSize: 10 }}
+                        style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)' }}
                         onClick={() => move(i, -1)}
                       >
                         ↑
                       </PtButton>
                       <PtButton
                         variant="ghost"
-                        style={{ padding: '4px 8px', fontSize: 10 }}
+                        style={{ padding: '4px 8px', fontSize: 'var(--text-2xs)' }}
                         onClick={() => move(i, 1)}
                       >
                         ↓
                       </PtButton>
                       <PtButton
                         variant="ghost"
-                        style={{ padding: '4px 8px', fontSize: 10, color: 'var(--color-pt-red)' }}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: 'var(--text-2xs)',
+                          color: 'var(--color-pt-red)',
+                        }}
                         onClick={() => remove(i)}
                       >
                         <Trash2 size={11} />
@@ -515,7 +523,11 @@ function TemplateEditorModal({
             >
               <textarea
                 className="input"
-                style={{ minHeight: 200, fontSize: 12, fontFamily: 'var(--font-mono)' }}
+                style={{
+                  minHeight: 200,
+                  fontSize: 'var(--text-sm)',
+                  fontFamily: 'var(--font-mono)',
+                }}
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
               />
@@ -526,7 +538,7 @@ function TemplateEditorModal({
                 <Lock size={12} strokeWidth={2} style={{ color: 'var(--color-pt-text-3)' }} />
                 <Eyebrow>Always applied to every note</Eyebrow>
               </div>
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
                 PTScribe appends these to your instructions automatically. They can't be edited.
               </p>
               <LockedPromptBlock title="Privacy: never return identifiers" body={NO_PII_RULE} />
@@ -582,7 +594,7 @@ function EditorTab({
         cursor: 'pointer',
         padding: '8px 12px',
         marginBottom: -1,
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
         fontWeight: active ? 600 : 500,
         color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-3)',
         borderBottom: `2px solid ${active ? 'var(--color-pt-accent)' : 'transparent'}`,
@@ -624,7 +636,9 @@ function LockedPromptBlock({
         }}
       >
         <Lock size={11} strokeWidth={2} style={{ color: 'var(--color-pt-text-3)' }} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        <span
+          style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-pt-text)' }}
+        >
           {title}
         </span>
       </div>
@@ -633,7 +647,7 @@ function LockedPromptBlock({
           style={{
             margin: 0,
             padding: '8px 10px 0',
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
           }}
         >
@@ -644,7 +658,7 @@ function LockedPromptBlock({
         style={{
           margin: 0,
           padding: '8px 10px 10px',
-          fontSize: 11,
+          fontSize: 'var(--text-xs)',
           lineHeight: 1.5,
           fontFamily: 'var(--font-mono)',
           color: 'var(--color-pt-text-3)',

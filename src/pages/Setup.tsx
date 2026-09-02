@@ -105,7 +105,7 @@ export function Setup() {
               borderRadius: 8,
               background: 'var(--color-pt-accent)',
               color: '#ffffff',
-              fontSize: 14,
+              fontSize: 'var(--text-md)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               flexShrink: 0,
@@ -116,7 +116,7 @@ export function Setup() {
           <div>
             <div
               style={{
-                fontSize: 15.5,
+                fontSize: 'var(--text-md)',
                 fontWeight: 700,
                 color: 'var(--color-pt-text)',
                 letterSpacing: '-0.02em',
@@ -124,7 +124,7 @@ export function Setup() {
             >
               PTScribe
             </div>
-            <div style={{ fontSize: 12, color: 'var(--color-pt-text-3)' }}>
+            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
               {step === 'welcome'
                 ? 'A clinical scribe that lives in your browser.'
                 : "Tell us your role and we'll tailor the rest."}
@@ -199,7 +199,7 @@ function WelcomeStep({ onStart }: { onStart: () => void }) {
         <p
           style={{
             marginTop: 8,
-            fontSize: 13.5,
+            fontSize: 'var(--text-base)',
             color: 'var(--color-pt-text-2)',
             lineHeight: 1.55,
           }}
@@ -273,7 +273,7 @@ function RoleCard({
         <div>
           <div
             style={{
-              fontSize: 15,
+              fontSize: 'var(--text-md)',
               fontWeight: 700,
               color: 'var(--color-pt-text)',
               letterSpacing: '-0.01em',
@@ -284,7 +284,7 @@ function RoleCard({
           <p
             style={{
               marginTop: 6,
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               color: 'var(--color-pt-text-2)',
               lineHeight: 1.5,
             }}
@@ -375,7 +375,7 @@ function ProfileStep({ onNext }: { onNext: () => void }) {
           display: 'flex',
           gap: 10,
           alignItems: 'flex-start',
-          fontSize: 13,
+          fontSize: 'var(--text-base)',
           color: 'var(--color-pt-text-2)',
           cursor: 'pointer',
           lineHeight: 1.5,
@@ -439,11 +439,18 @@ function ConnectKeyStep({ onNext }: { onNext: () => void }) {
       {orgReady ? (
         <SurfaceCard padding={18}>
           <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-pt-text)' }}>
+            <div
+              style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--color-pt-text)' }}
+            >
               Your organization provides an AI key
             </div>
             <p
-              style={{ margin: 0, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}
+              style={{
+                margin: 0,
+                fontSize: 'var(--text-base)',
+                color: 'var(--color-pt-text-2)',
+                lineHeight: 1.5,
+              }}
             >
               You&apos;re ready to generate notes — no personal key needed. You can still add your
               own key in Settings to use a different provider.
@@ -516,7 +523,7 @@ function OwnerTipsStep({ onContinue }: { onContinue: () => void }) {
           <div>
             <div
               style={{
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 fontWeight: 700,
                 color: 'var(--color-pt-text)',
                 letterSpacing: '-0.01em',
@@ -527,7 +534,7 @@ function OwnerTipsStep({ onContinue }: { onContinue: () => void }) {
             <p
               style={{
                 marginTop: 4,
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 color: 'var(--color-pt-text-2)',
                 lineHeight: 1.5,
               }}
@@ -539,7 +546,7 @@ function OwnerTipsStep({ onContinue }: { onContinue: () => void }) {
           <div>
             <div
               style={{
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 fontWeight: 700,
                 color: 'var(--color-pt-text)',
                 letterSpacing: '-0.01em',
@@ -550,7 +557,7 @@ function OwnerTipsStep({ onContinue }: { onContinue: () => void }) {
             <p
               style={{
                 marginTop: 4,
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 color: 'var(--color-pt-text-2)',
                 lineHeight: 1.5,
               }}
@@ -631,7 +638,7 @@ function Stepper({ labels, current }: { labels: string[]; current: number }) {
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 fontWeight: 600,
                 background:
                   done || active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface-mut)',
@@ -644,7 +651,7 @@ function Stepper({ labels, current }: { labels: string[]; current: number }) {
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-3)',
                 fontWeight: active ? 600 : 400,
               }}
@@ -676,7 +683,7 @@ function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
       <h1
         style={{
           marginTop: 4,
-          fontSize: 22,
+          fontSize: 'var(--text-xl)',
           fontWeight: 700,
           color: 'var(--color-pt-text)',
           letterSpacing: '-0.01em',
@@ -684,7 +691,14 @@ function StepHeading({ title, subtitle }: { title: string; subtitle: string }) {
       >
         {title}
       </h1>
-      <p style={{ marginTop: 6, fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55 }}>
+      <p
+        style={{
+          marginTop: 6,
+          fontSize: 'var(--text-base)',
+          color: 'var(--color-pt-text-2)',
+          lineHeight: 1.55,
+        }}
+      >
         {subtitle}
       </p>
     </div>

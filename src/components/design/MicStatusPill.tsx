@@ -78,7 +78,7 @@ export function MicStatusPill({ state, elapsedSec, onClick }: MicStatusPillProps
         background: cfg.bg,
         border: `1px solid ${cfg.border}`,
         color: cfg.fg,
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
         fontWeight: 600,
         letterSpacing: '0.1px',
         cursor: onClick ? 'pointer' : 'default',
@@ -90,7 +90,7 @@ export function MicStatusPill({ state, elapsedSec, onClick }: MicStatusPillProps
         <span
           className="font-mono"
           style={{
-            fontSize: 12,
+            fontSize: 'var(--text-sm)',
             opacity: 0.75,
             paddingLeft: 8,
             borderLeft: `1px solid ${cfg.border}`,

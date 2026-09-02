@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2 } from 'lucide-react';
 import { Eyebrow, Heatmap, PtButton, StatusBadge, SurfaceCard } from '@/components/design';
-import { DAY_MS, fmtIsoDateOptional, relativeFromNow, startOfDay } from '@/utils/dates';
+import { DAY_MS, fmtIsoDateOptional, startOfDay } from '@/utils/dates';
 import { labelForType } from '@/utils/labels';
 import { daysInCare, dischargePct, adherencePct } from '@/utils/patientMetrics';
 import { measureDef } from '@/lib/clinical/measures';
@@ -18,7 +17,6 @@ export function PatientOverview({
   measurements,
   onStartPlan,
   exercises,
-  onDelete,
 }: {
   patient: Patient;
   sessions: Session[];
@@ -28,7 +26,6 @@ export function PatientOverview({
   onStartPlan: () => void;
   /** Read-only here — prescriptions are edited on the Plan of care tab. */
   exercises: Exercise[];
-  onDelete: () => void;
 }) {
   const [now] = useState(() => Date.now());
   const goalsMet = plan?.goals.filter((g) => g.met).length ?? 0;
@@ -61,64 +58,44 @@ export function PatientOverview({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 360px',
-        gap: 18,
+        gridTemplateColumns: '230px minmax(0, 1fr) 260px',
+        gap: 16,
         alignItems: 'start',
       }}
     >
-      <div style={{ display: 'grid', gap: 18, alignContent: 'start' }}>
+      <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
         <SurfaceCard padding="16px 18px">
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Eyebrow>Progress vs plan</Eyebrow>
-            <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
-              Last {Math.min(8, Math.max(2, Math.round(sessionsCount / 2)))} weeks
-            </div>
+          <Eyebrow>Progress vs plan</Eyebrow>
+          <div style={{ display: 'grid', placeItems: 'center', margin: '14px 0 18px' }}>
+            <GoalRing met={goalsMet} total={totalGoals} />
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 22,
-              marginTop: 12,
-            }}
-          >
-            <Metric
-              label="Goals met"
-              value={`${goalsMet}/${totalGoals || '—'}`}
-              delta={totalGoals ? `${Math.round((goalsMet / totalGoals) * 100)}%` : '—'}
-              tone={goalsMet > 0 ? 'good' : 'mute'}
-              target={totalGoals ? 'set in plan' : 'no plan goals yet'}
-              pct={totalGoals ? Math.round((goalsMet / totalGoals) * 100) : 0}
-            />
-            <Metric
-              label="Sessions"
-              value={String(sessionsCount)}
-              delta={pendingNotes ? `${pendingNotes} pending` : 'all signed'}
-              tone={pendingNotes ? 'warn' : 'good'}
-              target={`${finalizedNotes} signed`}
-              pct={sessionsCount > 0 ? Math.round((finalizedNotes / sessionsCount) * 100) : 0}
-            />
-            <Metric
+          <BarMetric
+            label="Sessions"
+            value={String(sessionsCount)}
+            segments={sessionsCount}
+            filled={finalizedNotes}
+            footLeft={`${sessionsCount} total`}
+            footRight={pendingNotes ? `${pendingNotes} pending` : 'all signed'}
+          />
+          <div style={{ marginTop: 14 }}>
+            <BarMetric
               label="Days in care"
               value={daysInCare(patient, sessions, plan).toString()}
-              delta={plan ? 'plan active' : 'no plan'}
-              tone={plan ? 'good' : 'mute'}
-              target={
+              pct={dischargePct(plan) ?? 0}
+              footLeft={`${daysInCare(patient, sessions, plan)} total`}
+              footRight={
                 plan?.expectedDischargeDate
                   ? `discharge ${fmtIsoDateOptional(plan.expectedDischargeDate)}`
-                  : 'open-ended'
+                  : plan
+                    ? 'plan active'
+                    : 'no plan'
               }
-              pct={dischargePct(plan) ?? 0}
             />
           </div>
         </SurfaceCard>
+      </div>
 
+      <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
         <SurfaceCard padding={0}>
           <div
             style={{
@@ -131,7 +108,7 @@ export function PatientOverview({
           >
             <div
               style={{
-                fontSize: 14,
+                fontSize: 'var(--text-md)',
                 fontWeight: 600,
                 color: 'var(--color-pt-text)',
               }}
@@ -142,7 +119,7 @@ export function PatientOverview({
               <button
                 type="button"
                 style={{
-                  fontSize: 12,
+                  fontSize: 'var(--text-sm)',
                   fontWeight: 600,
                   color: 'var(--color-pt-accent-fg)',
                   background: 'transparent',
@@ -154,11 +131,32 @@ export function PatientOverview({
               </button>
             )}
           </div>
+          {recentVisits.length > 0 && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: VISIT_COLS,
+                gap: 14,
+                padding: '8px 18px',
+                borderBottom: '1px solid var(--color-pt-border)',
+                fontSize: 'var(--text-2xs)',
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--color-pt-text-3)',
+              }}
+            >
+              <span>Date</span>
+              <span>Visit</span>
+              <span>Status</span>
+              <span />
+            </div>
+          )}
           {recentVisits.length === 0 ? (
             <div
               style={{
                 padding: 24,
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 color: 'var(--color-pt-text-3)',
                 textAlign: 'center',
               }}
@@ -188,7 +186,7 @@ export function PatientOverview({
             <Link
               to={`/patients/${patient.id}/measures`}
               style={{
-                fontSize: 11.5,
+                fontSize: 'var(--text-xs)',
                 fontWeight: 600,
                 color: 'var(--color-pt-accent-fg)',
                 textDecoration: 'none',
@@ -198,7 +196,9 @@ export function PatientOverview({
             </Link>
           </div>
           {topTrends.length === 0 ? (
-            <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+            <p
+              style={{ marginTop: 10, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}
+            >
               No measures recorded yet.
             </p>
           ) : (
@@ -215,12 +215,12 @@ export function PatientOverview({
                       alignItems: 'center',
                     }}
                   >
-                    <span style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)' }}>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
                       {t.label}
                     </span>
                     <span
                       style={{
-                        fontSize: 13,
+                        fontSize: 'var(--text-base)',
                         fontWeight: 600,
                         color: 'var(--color-pt-text)',
                         fontVariantNumeric: 'tabular-nums',
@@ -231,7 +231,7 @@ export function PatientOverview({
                     </span>
                     <span
                       style={{
-                        fontSize: 11.5,
+                        fontSize: 'var(--text-xs)',
                         fontWeight: 600,
                         minWidth: 40,
                         textAlign: 'right',
@@ -261,7 +261,7 @@ export function PatientOverview({
               <Link
                 to={`/patients/${patient.id}/plan`}
                 style={{
-                  fontSize: 11.5,
+                  fontSize: 'var(--text-xs)',
                   fontWeight: 600,
                   color: 'var(--color-pt-accent-fg)',
                   textDecoration: 'none',
@@ -281,7 +281,7 @@ export function PatientOverview({
                 gap: 12,
               }}
             >
-              <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)' }}>
+              <p style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)' }}>
                 No active plan of care. Start one to set goals and prescribe exercises.
               </p>
               <PtButton variant="accent-soft" onClick={onStartPlan}>
@@ -291,7 +291,7 @@ export function PatientOverview({
           ) : (
             <ul style={{ marginTop: 12, display: 'grid', gap: 6 }}>
               {plan.goals.length === 0 && (
-                <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+                <li style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
                   No goals set yet.
                 </li>
               )}
@@ -303,7 +303,7 @@ export function PatientOverview({
                     alignItems: 'baseline',
                     justifyContent: 'space-between',
                     gap: 10,
-                    fontSize: 12.5,
+                    fontSize: 'var(--text-sm)',
                     color: g.met ? 'var(--color-pt-text-3)' : 'var(--color-pt-text)',
                     textDecoration: g.met ? 'line-through' : 'none',
                   }}
@@ -312,7 +312,7 @@ export function PatientOverview({
                   <span
                     style={{
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
+                      fontSize: 'var(--text-xs)',
                       color: 'var(--color-pt-text-3)',
                       flexShrink: 0,
                     }}
@@ -324,29 +324,6 @@ export function PatientOverview({
             </ul>
           )}
         </SurfaceCard>
-
-        <div>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="transition-colors hover:bg-[var(--color-pt-surface-mut)]"
-            style={{
-              padding: '6px 10px',
-              borderRadius: 8,
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-pt-red)',
-              fontSize: 12,
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              cursor: 'pointer',
-            }}
-          >
-            <Trash2 size={12} strokeWidth={2} /> Remove patient
-          </button>
-        </div>
       </div>
 
       <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
@@ -364,7 +341,7 @@ export function PatientOverview({
           ) : (
             <p
               style={{
-                fontSize: 12.5,
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-pt-text-3)',
                 marginTop: 8,
               }}
@@ -386,7 +363,7 @@ export function PatientOverview({
           >
             <span
               style={{
-                fontSize: 26,
+                fontSize: 'var(--text-2xl)',
                 fontWeight: 600,
                 color: 'var(--color-pt-text)',
                 fontVariantNumeric: 'tabular-nums',
@@ -396,7 +373,7 @@ export function PatientOverview({
             </span>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 'var(--text-sm)',
                 color: 'var(--color-pt-accent-fg)',
                 fontWeight: 600,
               }}
@@ -411,7 +388,7 @@ export function PatientOverview({
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: 10.5,
+              fontSize: 'var(--text-2xs)',
               color: 'var(--color-pt-text-3)',
               marginTop: 6,
             }}
@@ -424,13 +401,15 @@ export function PatientOverview({
         <SurfaceCard padding="14px 16px">
           <Eyebrow>Notes & flags</Eyebrow>
           <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
-            {patient.notes && <FlagItem tone="amber" text={patient.notes} />}
+            {patient.notes && <PrivateNoteFlag text={patient.notes} />}
             {patient.referringProvider && (
               <FlagItem tone="mute" text={`Referred by ${patient.referringProvider}`} />
             )}
             {patient.icd10 && <FlagItem tone="mute" text={`ICD-10 ${patient.icd10}`} />}
             {!patient.notes && !patient.referringProvider && !patient.icd10 && (
-              <p style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>No flags on file.</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+                No flags on file.
+              </p>
             )}
           </div>
         </SurfaceCard>
@@ -438,6 +417,9 @@ export function PatientOverview({
     </div>
   );
 }
+
+/** Shared by the visits header row and each VisitRow so columns line up. */
+const VISIT_COLS = '110px minmax(0, 1fr) 70px 110px';
 
 function VisitRow({
   session,
@@ -454,7 +436,6 @@ function VisitRow({
     month: 'short',
     day: 'numeric',
   });
-  const summary = session.transcript?.slice(0, 90).trim() || labelForType(session.type);
   const pendingSign = note && !note.finalized;
 
   const noteBadgeTone = note?.finalized ? 'on-track' : note ? 'next' : ('done' as const);
@@ -464,17 +445,17 @@ function VisitRow({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '110px 1fr auto auto auto',
+        gridTemplateColumns: VISIT_COLS,
         gap: 14,
         alignItems: 'center',
-        padding: '12px 18px',
+        padding: '11px 18px',
         borderBottom: isLast ? 'none' : '1px solid var(--color-pt-border)',
       }}
     >
       <div
         style={{
           fontFamily: 'var(--font-mono)',
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           color: 'var(--color-pt-text-2)',
         }}
       >
@@ -482,28 +463,27 @@ function VisitRow({
       </div>
       <div
         style={{
-          fontSize: 13,
+          fontSize: 'var(--text-base)',
           color: 'var(--color-pt-text)',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
         }}
-        title={summary}
       >
-        {summary}
+        {labelForType(session.type)}
       </div>
       <StatusBadge tone={noteBadgeTone} label={noteBadgeLabel} />
       {pendingSign && note ? (
         <button
           type="button"
-          onClick={() => navigate(`/notes/${note.id}`)}
+          onClick={() => navigate(`/sessions/${note.sessionId}?tab=review`)}
           style={{
             padding: '4px 10px',
             borderRadius: 999,
             border: '1px solid var(--color-pt-amber-border)',
             background: 'var(--color-pt-amber-soft)',
             color: 'var(--color-pt-amber-fg)',
-            fontSize: 11.5,
+            fontSize: 'var(--text-xs)',
             fontWeight: 600,
             cursor: 'pointer',
           }}
@@ -513,7 +493,7 @@ function VisitRow({
       ) : note?.finalized ? (
         <span
           style={{
-            fontSize: 11.5,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
             fontWeight: 500,
           }}
@@ -524,7 +504,7 @@ function VisitRow({
         <Link
           to={`/sessions/${session.id}`}
           style={{
-            fontSize: 11.5,
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-pt-text-3)',
             fontWeight: 500,
             textDecoration: 'none',
@@ -533,85 +513,181 @@ function VisitRow({
           Open
         </Link>
       )}
-      <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
-        {relativeFromNow(session.date)}
-      </span>
     </div>
   );
 }
 
-function Metric({
-  label,
-  value,
-  delta,
-  tone,
-  target,
-  pct,
-}: {
-  label: string;
-  value: string;
-  delta: string;
-  tone: 'good' | 'warn' | 'bad' | 'mute';
-  target: string;
-  pct: number;
-}) {
-  const deltaColor =
-    tone === 'good'
-      ? 'var(--color-pt-accent-fg)'
-      : tone === 'warn'
-        ? 'var(--color-pt-amber-fg)'
-        : tone === 'bad'
-          ? 'var(--color-pt-red)'
-          : 'var(--color-pt-text-3)';
+/** Goals-met donut. Inline SVG — no chart lib for one arc. */
+function GoalRing({ met, total }: { met: number; total: number }) {
+  const pct = total ? met / total : 0;
+  const r = 56;
+  const circ = 2 * Math.PI * r;
   return (
-    <div>
-      <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{label}</div>
+    <div style={{ position: 'relative', width: 140, height: 140 }}>
+      <svg
+        width={140}
+        height={140}
+        viewBox="0 0 140 140"
+        role="img"
+        aria-label={`${met} of ${total} goals met`}
+      >
+        <circle
+          cx="70"
+          cy="70"
+          r={r}
+          fill="none"
+          stroke="var(--color-pt-slate-soft)"
+          strokeWidth="15"
+        />
+        {pct > 0 && (
+          <circle
+            cx="70"
+            cy="70"
+            r={r}
+            fill="none"
+            stroke="var(--color-pt-accent)"
+            strokeWidth="15"
+            strokeLinecap="round"
+            strokeDasharray={`${circ * pct} ${circ}`}
+            transform="rotate(-90 70 70)"
+          />
+        )}
+      </svg>
       <div
         style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: 8,
-          marginTop: 4,
+          position: 'absolute',
+          inset: 0,
+          display: 'grid',
+          placeContent: 'center',
+          textAlign: 'center',
+          gap: 1,
         }}
       >
-        <span
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>Goals met</div>
+        <div
           style={{
-            fontSize: 22,
+            fontSize: 'var(--text-2xl)',
             fontWeight: 600,
             color: 'var(--color-pt-text)',
             fontVariantNumeric: 'tabular-nums',
-            letterSpacing: '-0.3px',
+            letterSpacing: '-0.5px',
+            lineHeight: 1.1,
+          }}
+        >
+          {met}
+          <span style={{ color: 'var(--color-pt-text-3)' }}>/{total || '—'}</span>
+        </div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+          {total ? `${Math.round(pct * 100)}%` : 'no goals'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Label + value over a bar. Pass `segments` for a per-session tick bar, or
+ * `pct` for a continuous fill.
+ */
+function BarMetric({
+  label,
+  value,
+  pct,
+  segments,
+  filled = 0,
+  footLeft,
+  footRight,
+}: {
+  label: string;
+  value: string;
+  pct?: number;
+  segments?: number;
+  filled?: number;
+  footLeft: string;
+  footRight: string;
+}) {
+  // More than a dozen ticks reads as noise — fall back to a continuous bar.
+  const ticks = segments && segments > 0 && segments <= 12 ? segments : 0;
+  const fillPct = ticks ? 0 : (pct ?? (segments ? Math.min(100, segments * 8) : 0));
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: 8,
+        }}
+      >
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>{label}</span>
+        <span
+          style={{
+            fontSize: 'var(--text-md)',
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
           {value}
         </span>
-        <span style={{ fontSize: 11.5, color: deltaColor, fontWeight: 600 }}>{delta}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 3, marginTop: 7 }}>
+        {ticks ? (
+          Array.from({ length: ticks }, (_, i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                height: 6,
+                borderRadius: 3,
+                background: i < filled ? 'var(--color-pt-accent)' : 'var(--color-pt-slate-soft)',
+              }}
+            />
+          ))
+        ) : (
+          <div
+            style={{
+              position: 'relative',
+              flex: 1,
+              height: 6,
+              borderRadius: 999,
+              background: 'var(--color-pt-slate-soft)',
+            }}
+          >
+            <div
+              style={{
+                width: `${fillPct}%`,
+                height: '100%',
+                borderRadius: 999,
+                background: 'var(--color-pt-accent)',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                top: -2,
+                left: `calc(${fillPct}% - 5px)`,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: 'var(--color-pt-accent)',
+              }}
+            />
+          </div>
+        )}
       </div>
       <div
         style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 8,
           marginTop: 6,
-          height: 4,
-          borderRadius: 999,
-          background: 'var(--color-pt-slate-soft)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            width: `${pct}%`,
-            height: '100%',
-            background: 'var(--color-pt-accent)',
-          }}
-        />
-      </div>
-      <div
-        style={{
-          fontSize: 10.5,
+          fontSize: 'var(--text-2xs)',
           color: 'var(--color-pt-text-3)',
-          marginTop: 4,
         }}
       >
-        {target}
+        <span>{footLeft}</span>
+        <span>{footRight}</span>
       </div>
     </div>
   );
@@ -630,7 +706,7 @@ function ExRow({ name, dosage }: { name: string; dosage: string }) {
           display: 'grid',
           placeItems: 'center',
           color: 'var(--color-pt-text-2)',
-          fontSize: 14,
+          fontSize: 'var(--text-md)',
           fontWeight: 600,
         }}
         aria-hidden
@@ -640,7 +716,7 @@ function ExRow({ name, dosage }: { name: string; dosage: string }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 12.5,
+            fontSize: 'var(--text-sm)',
             fontWeight: 600,
             color: 'var(--color-pt-text)',
             whiteSpace: 'nowrap',
@@ -650,9 +726,39 @@ function ExRow({ name, dosage }: { name: string; dosage: string }) {
         >
           {name}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>{dosage}</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>{dosage}</div>
       </div>
     </div>
+  );
+}
+
+/**
+ * `patient.notes` is free text, which makes it the most likely place for the
+ * sensitive narrative — psych history, substance use, housing, safety concerns.
+ * The rest of this card is structured clinical metadata and stays visible; this
+ * one is hidden until asked for, so the Overview tab can be open in a treatment
+ * room without the note being readable from across it.
+ */
+function PrivateNoteFlag({ text }: { text: string }) {
+  const [revealed, setRevealed] = useState(false);
+  if (revealed) return <FlagItem tone="amber" text={text} />;
+  return (
+    <button
+      type="button"
+      onClick={() => setRevealed(true)}
+      style={{
+        display: 'block',
+        width: '100%',
+        padding: 0,
+        border: 'none',
+        background: 'none',
+        textAlign: 'left',
+        cursor: 'pointer',
+        font: 'inherit',
+      }}
+    >
+      <FlagItem tone="amber" text="Clinical note on file — click to show" />
+    </button>
   );
 }
 
@@ -693,7 +799,7 @@ function FlagItem({ tone, text }: { tone: 'amber' | 'mute'; text: string }) {
           flexShrink: 0,
         }}
       />
-      <div style={{ fontSize: 12, color: colors.fg, lineHeight: 1.45 }}>{text}</div>
+      <div style={{ fontSize: 'var(--text-sm)', color: colors.fg, lineHeight: 1.45 }}>{text}</div>
     </div>
   );
 }

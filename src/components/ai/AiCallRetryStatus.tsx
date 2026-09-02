@@ -24,7 +24,7 @@ export function AiCallRetryStatus({ provider, attempt, max }: Props) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        fontSize: 12,
+        fontSize: 'var(--text-sm)',
         color: 'var(--color-pt-text-2)',
       }}
     >

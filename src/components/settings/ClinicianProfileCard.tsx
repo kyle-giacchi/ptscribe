@@ -79,7 +79,7 @@ export function ClinicianProfileCard() {
         <Field label="Signature block" hint="Appended to exported notes.">
           <textarea
             className="input"
-            style={{ minHeight: 80, fontSize: 13 }}
+            style={{ minHeight: 80, fontSize: 'var(--text-base)' }}
             value={clinician.signatureBlock ?? ''}
             onChange={(e) => setClinician({ signatureBlock: e.target.value })}
           />

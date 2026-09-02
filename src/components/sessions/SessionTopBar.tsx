@@ -80,7 +80,7 @@ export function SessionTopBar({
           background: 'var(--color-pt-surface)',
           color: 'var(--color-pt-text-2)',
           textDecoration: 'none',
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           flexShrink: 0,
         }}
       >
@@ -100,13 +100,18 @@ export function SessionTopBar({
       <div style={{ minWidth: 0, flex: 1 }}>
         <div
           className="truncate"
-          style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-pt-text)', lineHeight: 1.25 }}
+          style={{
+            fontSize: 'var(--text-base)',
+            fontWeight: 600,
+            color: 'var(--color-pt-text)',
+            lineHeight: 1.25,
+          }}
         >
           {headline}
         </div>
         <div
           className="flex items-center gap-2 truncate"
-          style={{ fontSize: 11.5, color: 'var(--color-pt-text-2)', marginTop: 1 }}
+          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)', marginTop: 1 }}
         >
           <span>
             {dayLabel} · {timeLabel}
@@ -138,7 +143,7 @@ export function SessionTopBar({
           <button
             type="button"
             className="btn btn-ghost"
-            style={{ height: 32, padding: '0 12px', fontSize: 12.5 }}
+            style={{ height: 32, padding: '0 12px', fontSize: 'var(--text-sm)' }}
             onClick={onUnfinalize}
           >
             <LockOpen size={13} strokeWidth={2} /> Unlock
@@ -147,7 +152,7 @@ export function SessionTopBar({
           <button
             type="button"
             className="btn btn-primary"
-            style={{ height: 32, padding: '0 14px', fontSize: 12.5, fontWeight: 700 }}
+            style={{ height: 32, padding: '0 14px', fontSize: 'var(--text-sm)', fontWeight: 700 }}
             disabled={!note || missingRequiredLabels.length > 0}
             onClick={onFinalize}
             title={
@@ -172,7 +177,7 @@ function StatusBadge({ status, finalized }: { status: string; finalized: boolean
       className="inline-block rounded-full"
       style={{
         padding: '1px 7px',
-        fontSize: 10,
+        fontSize: 'var(--text-2xs)',
         fontWeight: 700,
         background: isGreen
           ? 'color-mix(in oklab, var(--color-positive) 12%, transparent)'

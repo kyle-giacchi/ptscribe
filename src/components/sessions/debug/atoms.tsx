@@ -46,11 +46,13 @@ export function KVRow({
       onClick={copyable ? () => copy(value) : undefined}
       title={copyable ? `Click to copy` : undefined}
     >
-      <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)', flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)', flexShrink: 0 }}>
+        {label}
+      </span>
       <span
         className="flex items-center gap-1.5"
         style={{
-          fontSize: 11,
+          fontSize: 'var(--text-xs)',
           color: 'var(--color-pt-text)',
           textAlign: 'right',
           wordBreak: 'break-all',
@@ -79,7 +81,7 @@ export function SectionLabel({ children }: { children: string }) {
   return (
     <div
       style={{
-        fontSize: 9.5,
+        fontSize: 'var(--text-2xs)',
         fontWeight: 700,
         letterSpacing: '0.9px',
         textTransform: 'uppercase',
@@ -99,11 +101,11 @@ export function FeaturePill({ ok, label }: { ok: boolean; label: string }) {
       className="flex items-center justify-between py-1.5"
       style={{ borderBottom: '1px solid var(--color-pt-border)' }}
     >
-      <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>{label}</span>
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>{label}</span>
       <span
         className="rounded-full px-2 py-0.5"
         style={{
-          fontSize: 9.5,
+          fontSize: 'var(--text-2xs)',
           fontWeight: 700,
           letterSpacing: '0.4px',
           textTransform: 'uppercase',
@@ -129,7 +131,7 @@ export function SettingChip({ label, value, ok }: { label: string; value: string
     <span
       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1"
       style={{
-        fontSize: 10.5,
+        fontSize: 'var(--text-2xs)',
         background: ok
           ? 'color-mix(in oklab, #10b981 10%, transparent)'
           : 'var(--color-pt-surface-mut)',
@@ -195,11 +197,20 @@ export function CollapsibleSection({
           }
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-fg)', flex: 1 }}>
+        <span
+          style={{
+            fontSize: 'var(--text-base)',
+            fontWeight: 600,
+            color: 'var(--color-fg)',
+            flex: 1,
+          }}
+        >
           {title}
         </span>
         {badge}
-        <span style={{ fontSize: 11, color: 'var(--color-fg-subtle)' }}>{open ? '▲' : '▼'}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-fg-subtle)' }}>
+          {open ? '▲' : '▼'}
+        </span>
       </div>
       {open && (
         <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>

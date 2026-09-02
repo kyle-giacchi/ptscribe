@@ -65,7 +65,7 @@ describe('GlobalTopNav', () => {
         <GlobalTopNav />
       </MemoryRouter>,
     );
-    expect(screen.getByText('My Chart')).toBeInTheDocument();
+    expect(screen.getByText('Today')).toBeInTheDocument();
     expect(screen.getByText('Review queue')).toBeInTheDocument();
     expect(screen.getByText('Patients')).toBeInTheDocument();
     expect(screen.getByText('Templates')).toBeInTheDocument();

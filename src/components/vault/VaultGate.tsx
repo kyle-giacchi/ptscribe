@@ -214,7 +214,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
             <Eyebrow>Vault</Eyebrow>
             <div
               style={{
-                fontSize: 18,
+                fontSize: 'var(--text-lg)',
                 fontWeight: 700,
                 color: 'var(--color-pt-text)',
                 letterSpacing: '-0.01em',
@@ -233,7 +233,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
             <p
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: 'var(--text-base)',
                 color: 'var(--color-pt-text-2)',
                 lineHeight: 1.5,
               }}
@@ -266,7 +266,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
               placeholder={recoveryMode ? 'Recovery code' : 'Passphrase'}
               aria-label={recoveryMode ? 'Recovery code' : 'Passphrase'}
               disabled={busy}
-              style={{ padding: '10px 12px', fontSize: 14 }}
+              style={{ padding: '10px 12px', fontSize: 'var(--text-md)' }}
             />
 
             {isSetup && (
@@ -279,12 +279,14 @@ export function VaultGate({ children }: { children: ReactNode }) {
                 placeholder="Confirm passphrase"
                 aria-label="Confirm passphrase"
                 disabled={busy}
-                style={{ padding: '10px 12px', fontSize: 14 }}
+                style={{ padding: '10px 12px', fontSize: 'var(--text-md)' }}
               />
             )}
 
             {error && (
-              <div style={{ fontSize: 12, color: 'var(--color-pt-danger, #c0392b)' }}>{error}</div>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-danger, #c0392b)' }}>
+                {error}
+              </div>
             )}
 
             <PtButton variant="primary" type="submit" disabled={busy || pass.length === 0}>
@@ -309,7 +311,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
                   background: 'none',
                   border: 'none',
                   padding: 0,
-                  fontSize: 12,
+                  fontSize: 'var(--text-sm)',
                   color: 'var(--color-pt-accent-fg)',
                   cursor: 'pointer',
                   justifySelf: 'start',
@@ -323,7 +325,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
               <p
                 style={{
                   margin: 0,
-                  fontSize: 11,
+                  fontSize: 'var(--text-xs)',
                   color: 'var(--color-pt-text-3)',
                   lineHeight: 1.5,
                 }}

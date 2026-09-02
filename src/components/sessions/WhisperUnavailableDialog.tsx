@@ -32,7 +32,14 @@ export function WhisperUnavailableDialog({
           style={{ color: 'var(--color-caution)', flexShrink: 0, marginTop: 1 }}
           aria-hidden="true"
         />
-        <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55, margin: 0 }}>
+        <p
+          style={{
+            fontSize: 'var(--text-base)',
+            color: 'var(--color-pt-text-2)',
+            lineHeight: 1.55,
+            margin: 0,
+          }}
+        >
           We couldn't load the local Whisper model. Your default transcription setting hasn't
           changed — pick how you'd like to handle just this recording.
         </p>
@@ -52,10 +59,10 @@ export function WhisperUnavailableDialog({
           onClick={onUseWebSpeech}
         >
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>
+            <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>
               Use Browser Live Transcription for this session
             </div>
-            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--text-sm)', opacity: 0.85, marginTop: 2 }}>
               No speaker labels. Default setting unchanged.
             </div>
           </div>
@@ -74,8 +81,10 @@ export function WhisperUnavailableDialog({
           onClick={onRecordWithoutTranscription}
         >
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>Record now, transcribe later</div>
-            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+            <div style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>
+              Record now, transcribe later
+            </div>
+            <div style={{ fontSize: 'var(--text-sm)', opacity: 0.85, marginTop: 2 }}>
               Audio saves to this session. Transcribe from the Review tab later.
             </div>
           </div>
@@ -94,7 +103,7 @@ export function WhisperUnavailableDialog({
         <button
           type="button"
           className="btn btn-ghost"
-          style={{ minHeight: 32, padding: '4px 10px', fontSize: 12 }}
+          style={{ minHeight: 32, padding: '4px 10px', fontSize: 'var(--text-sm)' }}
           onClick={onCancel}
         >
           Cancel

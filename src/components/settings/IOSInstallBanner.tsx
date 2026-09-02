@@ -18,7 +18,7 @@ export function IOSInstallBanner() {
         background: 'color-mix(in oklab, var(--color-pt-accent) 7%, var(--color-pt-surface))',
         borderRadius: 10,
         padding: '12px 14px',
-        fontSize: 13,
+        fontSize: 'var(--text-base)',
         color: 'var(--color-pt-accent-fg)',
         lineHeight: 1.55,
       }}

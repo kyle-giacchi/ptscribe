@@ -18,7 +18,7 @@ export function TranscriptCollapsedTab({ onExpand }: TranscriptCollapsedTabProps
         background: 'var(--color-pt-surface)',
         color: 'var(--color-pt-text-2)',
         cursor: 'pointer',
-        fontSize: 11.5,
+        fontSize: 'var(--text-xs)',
         fontWeight: 600,
         letterSpacing: '0.04em',
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',

@@ -40,7 +40,7 @@ export function StatusBanner({
   return (
     <div
       role="status"
-      className="flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-xs"
+      className="flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-sm"
       style={{
         borderTop: `1px solid ${tokens.border}`,
         borderRight: `1px solid ${tokens.border}`,

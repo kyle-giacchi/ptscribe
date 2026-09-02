@@ -41,7 +41,14 @@ export function OrgKeysCard({ canManage }: { canManage: boolean }) {
       <div style={{ display: 'grid', gap: 12 }}>
         <div style={{ display: 'grid', gap: 4 }}>
           <Eyebrow>AI provider keys</Eyebrow>
-          <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0, lineHeight: 1.5 }}>
+          <p
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-pt-text-3)',
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
             {canManage
               ? 'Members with no personal key generate notes against the organization’s key. Billing lands on the organization owner’s provider account.'
               : 'Keys your organization provides. When set, you can generate notes without adding your own key.'}
@@ -49,7 +56,9 @@ export function OrgKeysCard({ canManage }: { canManage: boolean }) {
         </div>
 
         {keys === null ? (
-          <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)' }}>Loading key status…</div>
+          <div style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-3)' }}>
+            Loading key status…
+          </div>
         ) : canManage ? (
           <div style={{ display: 'grid', gap: 10 }}>
             {PROVIDERS.map((descriptor) => (
@@ -80,7 +89,13 @@ function ReadOnlyOrgKeys({
   const present = providers.filter((p) => keys[p.id]?.set);
   if (present.length === 0) {
     return (
-      <div style={{ fontSize: 13, color: 'var(--color-pt-text-3)', fontStyle: 'italic' }}>
+      <div
+        style={{
+          fontSize: 'var(--text-base)',
+          color: 'var(--color-pt-text-3)',
+          fontStyle: 'italic',
+        }}
+      >
         Your organization hasn’t configured an AI key yet.
       </div>
     );
@@ -88,7 +103,10 @@ function ReadOnlyOrgKeys({
   return (
     <div style={{ display: 'grid', gap: 6 }}>
       {present.map((p) => (
-        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <div
+          key={p.id}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-base)' }}
+        >
           <Check size={14} strokeWidth={2.5} style={{ color: 'var(--color-positive, #16794a)' }} />
           <span style={{ color: 'var(--color-pt-text)' }}>{p.label}</span>
           <span style={{ color: 'var(--color-pt-text-3)' }}>

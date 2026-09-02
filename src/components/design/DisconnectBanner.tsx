@@ -46,10 +46,10 @@ export function DisconnectBanner({
         <AlertTriangle size={18} strokeWidth={2.2} />
       </div>
       <div className="min-w-0 flex-1">
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        <div style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--color-pt-text)' }}>
           Microphone disconnected
         </div>
-        <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-2)', marginTop: 2 }}>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)', marginTop: 2 }}>
           {message}
         </div>
       </div>
@@ -64,7 +64,7 @@ export function DisconnectBanner({
               borderRadius: 8,
               border: '1px solid var(--color-pt-border)',
               background: 'var(--color-pt-surface)',
-              fontSize: 12.5,
+              fontSize: 'var(--text-sm)',
               color: 'var(--color-pt-text)',
             }}
           >
@@ -80,7 +80,7 @@ export function DisconnectBanner({
               borderRadius: 8,
               background: 'var(--color-pt-red)',
               color: '#ffffff',
-              fontSize: 13,
+              fontSize: 'var(--text-base)',
               fontWeight: 600,
               border: 'none',
             }}

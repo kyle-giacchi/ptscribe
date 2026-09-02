@@ -38,7 +38,14 @@ export function PhiConfirmDialog({ open, onCancel, onConfirm }: Props) {
           strokeWidth={2}
           style={{ color: 'var(--color-caution)', flexShrink: 0, marginTop: 1 }}
         />
-        <p style={{ fontSize: 13, color: 'var(--color-pt-text-2)', lineHeight: 1.55, margin: 0 }}>
+        <p
+          style={{
+            fontSize: 'var(--text-base)',
+            color: 'var(--color-pt-text-2)',
+            lineHeight: 1.55,
+            margin: 0,
+          }}
+        >
           This will send data off of your device. All transcription text will be sent to Anthropic.
           Ensure your transcription text does not contain PHI.
         </p>
@@ -49,7 +56,7 @@ export function PhiConfirmDialog({ open, onCancel, onConfirm }: Props) {
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          fontSize: 13,
+          fontSize: 'var(--text-base)',
           color: 'var(--color-pt-text-2)',
           cursor: 'pointer',
           userSelect: 'none',

@@ -60,11 +60,13 @@ export function UploadProcessingView({
   if (t2Phase === 'error') {
     return (
       <div className="flex flex-col items-center gap-6 px-8 py-16">
-        <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+        <span
+          style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--color-pt-text)' }}
+        >
           Transcription failed
         </span>
         <span
-          className="text-center text-sm"
+          className="text-center text-base"
           style={{ color: 'var(--color-pt-text-3)', maxWidth: 300 }}
         >
           Automatic transcription could not complete. You can retry or continue to your notes.
@@ -87,7 +89,7 @@ export function UploadProcessingView({
 
   return (
     <div className="flex flex-col items-center gap-6 px-8 py-16">
-      <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-pt-text)' }}>
+      <span style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--color-pt-text)' }}>
         Processing audio
       </span>
       <div className="flex w-full flex-col items-center gap-2" style={{ maxWidth: 320 }}>
@@ -104,7 +106,7 @@ export function UploadProcessingView({
             }}
           />
         </div>
-        <span className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+        <span className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
           {stepLabel}
         </span>
       </div>

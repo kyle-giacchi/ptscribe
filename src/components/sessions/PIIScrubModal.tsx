@@ -150,7 +150,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
 
   return (
     <Modal open={open} onClose={resetAndClose} title="Scrub PII" size="xl">
-      <p className="text-sm" style={{ color: 'var(--color-fg-muted)' }}>
+      <p className="text-base" style={{ color: 'var(--color-fg-muted)' }}>
         Structured identifiers (email, phone, SSN, MRN) are matched instantly on-device. Run a deep
         scan to also catch names and places with the local AI model. Review the diff before applying
         — the scrubbed version replaces your edited transcript.
@@ -164,7 +164,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
           padding: '12px 16px',
           borderColor: 'var(--color-pt-border)',
           background: 'var(--color-pt-surface-alt)',
-          fontSize: 12,
+          fontSize: 'var(--text-sm)',
           lineHeight: '1.8',
           fontFamily: 'ui-monospace, monospace',
           whiteSpace: 'pre-wrap',
@@ -238,7 +238,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
       {/* Entity count summary */}
       {hasText && scanState === 'ready' && (
         <p
-          className="text-sm"
+          className="text-base"
           style={{ color: entityCount === 0 ? 'var(--color-fg-muted)' : 'var(--color-pt-accent)' }}
         >
           {entityCount === 0

@@ -33,7 +33,7 @@ export function ExercisePicker({ exercises, onPick, onClose }: Props) {
   }, [exercises, region, query]);
 
   const chipStyle = (active: boolean) => ({
-    fontSize: 11.5,
+    fontSize: 'var(--text-xs)',
     padding: '3px 9px',
     borderRadius: 999,
     cursor: 'pointer',
@@ -85,7 +85,13 @@ export function ExercisePicker({ exercises, onPick, onClose }: Props) {
 
       <div style={{ maxHeight: 240, overflowY: 'auto', display: 'grid', gap: 2 }}>
         {filtered.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)', padding: '6px 2px' }}>
+          <div
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-pt-text-3)',
+              padding: '6px 2px',
+            }}
+          >
             No exercises match.
           </div>
         ) : (
@@ -109,8 +115,10 @@ export function ExercisePicker({ exercises, onPick, onClose }: Props) {
                 textAlign: 'left',
               }}
             >
-              <span style={{ fontSize: 13, color: 'var(--color-pt-text)' }}>{e.name}</span>
-              <span style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+              <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)' }}>
+                {e.name}
+              </span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
                 {CATEGORY_LABEL[e.category]}
               </span>
             </button>

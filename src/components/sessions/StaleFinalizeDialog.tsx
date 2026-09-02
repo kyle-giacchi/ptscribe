@@ -10,7 +10,7 @@ interface Props {
 export function StaleFinalizeDialog({ open, onCancel, onRegenerate, onFinalizeAnyway }: Props) {
   return (
     <Modal open={open} onClose={onCancel} title="Finalize an out-of-date note?" size="sm">
-      <p style={{ fontSize: 14, color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 'var(--text-md)', color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
         This note was generated from an earlier version of the transcript, template, or modifiers.
         Finalizing now records a note that doesn't match the current transcript — regenerate to sync
         them, or finalize as-is if the note is already what you want.

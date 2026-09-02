@@ -146,7 +146,7 @@ function Pip({ status }: { status: CheckStatus }) {
     width: 20,
     height: 20,
     borderRadius: '50%',
-    fontSize: 11,
+    fontSize: 'var(--text-xs)',
     fontWeight: 700,
     flexShrink: 0,
   };
@@ -251,7 +251,7 @@ function CheckRow({
       <div style={{ flex: 1, display: 'grid', gap: 1, minWidth: 0 }}>
         <span
           style={{
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
             fontWeight: status === 'active' || status === 'pass' ? 600 : 500,
             color: pending ? 'var(--color-pt-text-3)' : 'var(--color-pt-text)',
           }}
@@ -259,7 +259,9 @@ function CheckRow({
           {META[id].title}
         </span>
         {detail && (
-          <span style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{detail}</span>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+            {detail}
+          </span>
         )}
         {extra}
         {fix && (
@@ -268,7 +270,7 @@ function CheckRow({
             style={{
               justifySelf: 'start',
               marginTop: 4,
-              fontSize: 11.5,
+              fontSize: 'var(--text-xs)',
               fontWeight: 600,
               color: 'var(--color-pt-accent-fg)',
               background: 'none',
@@ -284,7 +286,7 @@ function CheckRow({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span
           style={{
-            fontSize: 10,
+            fontSize: 'var(--text-2xs)',
             letterSpacing: '0.06em',
             textTransform: 'uppercase',
             color: 'var(--color-pt-text-3)',
@@ -504,12 +506,14 @@ export function CheckingRequirements() {
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 700,
-            fontSize: 13,
+            fontSize: 'var(--text-base)',
           }}
         >
           P
         </div>
-        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-pt-text)' }}>
+        <span
+          style={{ fontWeight: 600, fontSize: 'var(--text-md)', color: 'var(--color-pt-text)' }}
+        >
           PTScribe
         </span>
       </header>
@@ -526,12 +530,19 @@ export function CheckingRequirements() {
       >
         <div style={{ textAlign: 'center', display: 'grid', gap: 6, marginBottom: 28 }}>
           <Eyebrow>Getting ready</Eyebrow>
-          <h1 style={{ fontSize: 28, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>
+          <h1
+            style={{
+              fontSize: 'var(--text-2xl)',
+              fontWeight: 600,
+              letterSpacing: '-0.01em',
+              margin: 0,
+            }}
+          >
             Checking your setup
           </h1>
           <p
             style={{
-              fontSize: 12.5,
+              fontSize: 'var(--text-sm)',
               color: 'var(--color-pt-text-2)',
               maxWidth: 460,
               margin: '0 auto',
@@ -577,7 +588,7 @@ export function CheckingRequirements() {
           </PtButton>
         </div>
 
-        <p style={{ marginTop: 12, fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>
+        <p style={{ marginTop: 12, fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
           Transcription runs locally. Off-device AI enhancements available.
         </p>
       </div>

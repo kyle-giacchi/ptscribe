@@ -93,7 +93,13 @@ export function PatientQuickSearch() {
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         className="input"
-        style={{ height: 34, paddingLeft: 28, paddingRight: 10, width: '100%', fontSize: 12.5 }}
+        style={{
+          height: 34,
+          paddingLeft: 28,
+          paddingRight: 10,
+          width: '100%',
+          fontSize: 'var(--text-sm)',
+        }}
       />
       {open && results.length > 0 && (
         <ul
@@ -132,14 +138,14 @@ export function PatientQuickSearch() {
                   background: i === highlight ? 'var(--color-pt-accent-soft)' : 'transparent',
                   color: 'var(--color-pt-text)',
                   cursor: 'pointer',
-                  fontSize: 12.5,
+                  fontSize: 'var(--text-sm)',
                 }}
               >
                 <div style={{ fontWeight: 600 }}>
                   {p.firstName} {p.lastName}
                 </div>
                 {p.primaryDiagnosis && (
-                  <div style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
                     {p.primaryDiagnosis}
                   </div>
                 )}

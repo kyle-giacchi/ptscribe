@@ -110,7 +110,7 @@ export function RecordingPanel({
           action={
             <button
               type="button"
-              className="btn btn-ghost shrink-0 py-0.5 text-xs font-medium"
+              className="btn btn-ghost shrink-0 py-0.5 text-sm font-medium"
               style={{ color: 'var(--color-pt-amber-fg)', touchAction: 'manipulation' }}
               onClick={() => {
                 dispatchAdvisory({ type: 'clearAutoStopped' });

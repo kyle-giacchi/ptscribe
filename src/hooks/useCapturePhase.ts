@@ -1,3 +1,10 @@
+// This hook deliberately keeps "always-current" refs (durationSecRef,
+// recorderStatusRef, the *Ref latest-closure handles for the subscribe-once
+// RecorderEvent handler) and writes the recorder's imperative chunk sink
+// (`recorder.onChunk.current`) during render. react-hooks v7's compiler-flavour
+// rules flag all of these; the patterns are load-bearing here and predate the
+// rule. Modernising them is its own task.
+/* eslint-disable react-hooks/refs, react-hooks/immutability */
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch } from 'react';
 import { toast } from 'sonner';
@@ -11,6 +18,8 @@ import {
   LOCAL_WHISPER_DEFAULT_MODEL,
 } from '@/services/ai/client/localWhisper';
 import { MAX_AUDIO_BYTES } from '@/lib/audioLimits';
+import { resetLiveWhisperStats } from '@/lib/debug/liveWhisperStats';
+import { createLiveTranscriber, type LiveTranscriber } from '@/services/transcript/liveTranscriber';
 import { playAlertChime } from '@/components/sessions/recording/playAlertChime';
 import type { AdvisoryAction } from './sessionMachine/recordingAdvisories';
 import type { SessionMachineAction, UploadStatus } from './sessionMachine/types';
@@ -18,7 +27,7 @@ import type { UseRecorder } from './useRecorder';
 import type { UseWebSpeechTranscript } from './useLiveTranscript';
 import type { Session, SessionClip, Settings } from '@/types';
 
-export interface UseCapturePhaseParams {
+interface UseCapturePhaseParams {
   session: Session | undefined;
   recorder: UseRecorder;
   webSpeech: UseWebSpeechTranscript;
@@ -40,7 +49,7 @@ export interface UseCapturePhaseParams {
  */
 type ClipsPatch = (clips: SessionClip[]) => SessionClip[];
 
-export interface CapturePhaseResult {
+interface CapturePhaseResult {
   backgroundWarningDismissed: boolean;
   setBackgroundWarningDismissed: (v: boolean) => void;
   backgrounded: boolean;
@@ -79,9 +88,6 @@ export function useCapturePhase({
   const [whisperBubbles, setWhisperBubbles] = useState<string[]>([]);
   const [silencedMergedBlob, setSilencedMergedBlob] = useState<Blob | null>(null);
 
-  // Sync ref so processWhisperChunk can persist t1Transcript without waiting for state.
-  const whisperTextRef = useRef<string[]>([]);
-
   // Always-current ref so the live-transcript callback reads the latest duration.
   // Read from the recorder's live-duration store (updated every tick) rather than
   // the low-frequency `durationSec` state, which now only commits on pause/stop.
@@ -95,10 +101,19 @@ export function useCapturePhase({
   // Tracks the clip currently being recorded, so stop() knows which clip to update.
   const activeClipIdRef = useRef<string | null>(null);
 
-  // Leaky-bucket: at most one Whisper job runs at a time.
-  const whisperRunningRef = useRef(false);
-  const whisperPendingRef = useRef<Blob | null>(null);
-  const whisperChainPromiseRef = useRef<Promise<void>>(Promise.resolve());
+  // The T1 live-preview engine (leaky bucket, drain rule, drop counting) lives
+  // in its own module now. `patchClip` does functional updates and
+  // `activeClipIdRef` is always current, so freezing this closure is safe.
+  const [live] = useState<LiveTranscriber>(() =>
+    createLiveTranscriber({
+      transcribe: (blob) => transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL),
+      onText: (segments) => {
+        setWhisperBubbles(segments);
+        const clipId = activeClipIdRef.current;
+        if (clipId) patchClip(clipId, { t1Transcript: segments.join(' ') });
+      },
+    }),
+  );
 
   // Prevents concurrent saves for the same clipId from corrupting each other mid-encryption.
   const isSavingRef = useRef<Set<string>>(new Set());
@@ -147,42 +162,6 @@ export function useCapturePhase({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webSpeech.accumulatedText, webSpeechEnabled]);
 
-  // ── Live Whisper chunk processing (leaky-bucket) ─────────────────────────
-  async function processWhisperChunk(): Promise<void> {
-    const blob = whisperPendingRef.current;
-    if (!blob) {
-      whisperRunningRef.current = false;
-      return;
-    }
-    whisperPendingRef.current = null;
-    try {
-      const result = await transcribeLocally(blob, LOCAL_WHISPER_DEFAULT_MODEL);
-      const text = result.text.trim();
-      if (text) {
-        whisperTextRef.current = [...whisperTextRef.current, text];
-        setWhisperBubbles(whisperTextRef.current);
-        const clipId = activeClipIdRef.current;
-        if (clipId) patchClip(clipId, { t1Transcript: whisperTextRef.current.join(' ') });
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error('[useCapturePhase] Whisper live-preview chunk failed:', err);
-      }
-    }
-    if (whisperPendingRef.current) {
-      return processWhisperChunk();
-    } else {
-      whisperRunningRef.current = false;
-    }
-  }
-
-  function handleChunk(blob: Blob) {
-    whisperPendingRef.current = blob;
-    if (whisperRunningRef.current) return;
-    whisperRunningRef.current = true;
-    whisperChainPromiseRef.current = processWhisperChunk();
-  }
-
   // ── Recording controls ───────────────────────────────────────────────────
   async function handleStartRecording() {
     dispatch({ type: 'error/set', message: null });
@@ -205,11 +184,11 @@ export function useCapturePhase({
     patchSession({ status: 'recording' });
 
     setWhisperBubbles([]);
-    whisperTextRef.current = [];
-    whisperPendingRef.current = null;
+    live.reset();
+    resetLiveWhisperStats();
     // 'none' override means record-now-transcribe-later: skip the live Whisper
     // preview pipeline so no chunks are sent to the (possibly unavailable) worker.
-    recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : handleChunk;
+    recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : live.push;
 
     const ok = await recorder.start(clipId);
     if (!ok) {
@@ -233,29 +212,22 @@ export function useCapturePhase({
       recorder.pause();
       if (webSpeechEnabled) webSpeech.stop();
       // Drain any in-flight Whisper work so the result appears as a bubble before pausing.
-      await whisperChainPromiseRef.current;
-      if (whisperPendingRef.current && !whisperRunningRef.current) {
-        whisperRunningRef.current = true;
-        await (whisperChainPromiseRef.current = processWhisperChunk());
-      }
+      const currentT1 = await live.flush();
       const clipId = activeClipIdRef.current;
-      if (clipId && whisperTextRef.current.length > 0) {
-        patchClip(clipId, { t1Transcript: whisperTextRef.current.join(' ') });
+      if (clipId && currentT1) {
+        patchClip(clipId, { t1Transcript: currentT1 });
       }
       const prevT1Texts = sortedClips
         .filter((c) => c.id !== clipId)
         .map((c) => c.t1Transcript?.trim())
         .filter((t): t is string => Boolean(t));
-      const currentT1 = whisperTextRef.current.join(' ').trim();
       const allT1Texts = [...prevT1Texts, ...(currentT1 ? [currentT1] : [])];
       if (allT1Texts.length > 0) {
         patchSession({ t1Transcript: allT1Texts.join('\n\n') });
       }
     } else if (recorder.status === 'paused') {
       recorder.resume();
-      // Re-wire with the freshest handleChunk closure so post-resume Whisper
-      // segments capture the latest patchClip and whisperTextRef state.
-      recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : handleChunk;
+      recorder.onChunk.current = transcriptionProviderOverride === 'none' ? null : live.push;
       if (webSpeechEnabled && webSpeech.supported) webSpeech.start(() => durationSecRef.current);
     }
   }
@@ -287,14 +259,7 @@ export function useCapturePhase({
     // Stop accepting new chunks immediately, then drain any in-flight Whisper
     // work so the last spoken segment's transcription lands before we clear clipId.
     recorder.onChunk.current = null;
-    if (whisperRunningRef.current) {
-      await whisperChainPromiseRef.current;
-    }
-    if (whisperPendingRef.current && !whisperRunningRef.current) {
-      whisperRunningRef.current = true;
-      await (whisperChainPromiseRef.current = processWhisperChunk());
-    }
-    whisperPendingRef.current = null;
+    const whisperT1 = await live.flush();
 
     activeClipIdRef.current = null;
 
@@ -367,14 +332,13 @@ export function useCapturePhase({
     }
 
     const webSpeechT1 = webSpeechEnabled && clipId ? webSpeech.accumulatedText.trim() : '';
-    const whisperT1 = whisperTextRef.current.join(' ').trim();
     const currentClipT1 = webSpeechT1 || whisperT1;
 
     if (webSpeechEnabled && clipId && webSpeechT1) {
       stageClip(clipId, { t1Transcript: webSpeechT1 });
     }
     webSpeech.reset();
-    whisperTextRef.current = [];
+    live.reset();
 
     const prevT1Texts = sortedClips
       .filter((c) => c.id !== clipId)

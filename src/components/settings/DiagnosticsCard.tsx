@@ -9,7 +9,7 @@ export function DiagnosticsCard() {
     <SurfaceCard padding={18}>
       <div style={{ display: 'grid', gap: 10 }}>
         <Eyebrow>Diagnostics</Eyebrow>
-        <p style={{ fontSize: 12, color: 'var(--color-pt-text-3)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', margin: 0 }}>
           Re-run the pre-flight setup checks — browser support, microphone, on-device model, and
           storage. Useful when audio capture or transcription isn&apos;t working.
         </p>

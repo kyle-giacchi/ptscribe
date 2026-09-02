@@ -1,486 +1,125 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Search, UserPlus } from 'lucide-react';
-import { toast } from 'sonner';
-import { Eyebrow, PtButton, SurfaceCard } from '@/components/design';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PatientPicker } from '@/components/new-session/PatientPicker';
+import { AddPatientModal } from '@/components/patients/AddPatientModal';
 import { usePatients } from '@/contexts/PatientsProvider';
 import { useSessions } from '@/contexts/SessionsProvider';
-import { useTemplates } from '@/contexts/TemplatesProvider';
 import { useTemplateCatalog } from '@/hooks/useTemplateCatalog';
 import { isSameDay } from '@/utils/dates';
-import { PatientRow } from '@/components/new-session/PatientRow';
-import { TemplateSection } from '@/components/new-session/TemplateSection';
-import { StartBar } from '@/components/new-session/StartBar';
-import { NewTemplateModal } from '@/components/new-session/NewTemplateModal';
 import { UNASSIGNED_PATIENT_ID } from '@/types';
-import type { NoteFormat, NoteTemplate, Patient, Session, SessionType } from '@/types';
+import type { Patient, Session, SessionType } from '@/types';
 
-const TYPE_TO_FORMAT: Record<SessionType, NoteFormat> = {
-  evaluation: 'evaluation',
-  follow_up: 'soap',
-  progress: 'progress',
-  discharge: 'discharge',
-};
-
-const VISIT_TYPES: { type: SessionType; title: string }[] = [
-  { type: 'evaluation', title: 'Initial eval' },
-  { type: 'follow_up', title: 'Follow-up' },
-  { type: 'progress', title: 'Progress note' },
-  { type: 'discharge', title: 'Discharge' },
-];
+/** Every session starts as a follow-up; the type is changed on the session screen. */
+const DEFAULT_TYPE: SessionType = 'follow_up';
+const DEFAULT_FORMAT = 'soap';
 
 export function NewSession() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { patients, addPatient } = usePatients();
-  const { forPatient: sessionsForPatient, addSession } = useSessions();
-  const { addTemplate } = useTemplates();
-  const {
-    all: allTemplates,
-    orgTemplateIds,
-    defaultTemplateId: orgDefaultTemplateId,
-  } = useTemplateCatalog();
+  const { sessions, addSession } = useSessions();
+  const { all: allTemplates, defaultTemplateId: orgDefaultTemplateId } = useTemplateCatalog();
 
-  const [patientId, setPatientId] = useState(params.get('patientId') ?? '');
-  const [sessionType, setSessionType] = useState<SessionType>('follow_up');
-  const [templateId, setTemplateId] = useState<string>(() => {
-    if (!orgDefaultTemplateId) return '';
-    const tpl = allTemplates.find((t) => t.id === orgDefaultTemplateId);
-    if (!tpl) return '';
-    return tpl.format === TYPE_TO_FORMAT['follow_up'] ? tpl.id : '';
-  });
-  const [showAllTemplates, setShowAllTemplates] = useState(false);
-  const [creatingTemplate, setCreatingTemplate] = useState(false);
+  const [addingPatient, setAddingPatient] = useState(false);
   const [query, setQuery] = useState('');
-  // Pinned at mount — same-day filter only needs today's date once per visit
-  // to this page; remount on navigation re-pins it.
+  // Pinned at mount — the same-day filter only needs today's date once per
+  // visit to this page; remount on navigation re-pins it.
   const [now] = useState(() => Date.now());
 
-  const selectedPatient = useMemo(
-    () => patients.find((p) => p.id === patientId),
-    [patients, patientId],
-  );
-
-  const todaySessions = useMemo<Session[]>(() => {
-    if (!patientId) return [];
-    return sessionsForPatient(patientId).filter(
-      (s) => s.status !== 'finalized' && isSameDay(s.date, now),
-    );
-  }, [patientId, sessionsForPatient, now]);
+  const templateId = useMemo(() => {
+    const pool = allTemplates.filter((t) => t.format === DEFAULT_FORMAT);
+    return pool.find((t) => t.id === orgDefaultTemplateId)?.id ?? pool[0]?.id;
+  }, [allTemplates, orgDefaultTemplateId]);
 
   const filteredPatients = useMemo(() => {
     const q = query.trim().toLowerCase();
     return patients
       .filter((p) => p.status !== 'discharged')
-      .filter((p) => (q ? `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) : true))
+      .filter((p) => {
+        if (!q) return true;
+        const haystack = [
+          `${p.firstName} ${p.lastName}`,
+          `${p.lastName}, ${p.firstName}`,
+          p.mrn ?? '',
+          p.dob ? new Date(p.dob).toISOString().slice(0, 10) : '',
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      })
       .sort((a, b) => `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`));
   }, [patients, query]);
 
-  const visitTemplates = useMemo(() => {
-    const fmt = TYPE_TO_FORMAT[sessionType];
-    return allTemplates.filter((t) => t.format === fmt);
-  }, [allTemplates, sessionType]);
+  // Suggested = patients with a session today; if the day is empty, the most
+  // recently seen patients instead so the picker is never a blank slate.
+  const suggestedPatients = useMemo<Patient[]>(() => {
+    const lastSeen = new Map<string, number>();
+    for (const s of sessions) {
+      if (s.patientId === UNASSIGNED_PATIENT_ID) continue;
+      lastSeen.set(s.patientId, Math.max(lastSeen.get(s.patientId) ?? 0, s.date));
+    }
+    const active = patients.filter((p) => p.status !== 'discharged' && lastSeen.has(p.id));
+    const today = active.filter((p) => isSameDay(lastSeen.get(p.id) as number, now));
+    const pool = today.length > 0 ? today : active;
+    return pool
+      .sort((a, b) => (lastSeen.get(b.id) as number) - (lastSeen.get(a.id) as number))
+      .slice(0, 3);
+  }, [patients, sessions, now]);
 
-  const orgDefaultMatch =
-    (orgDefaultTemplateId && visitTemplates.find((t) => t.id === orgDefaultTemplateId)?.id) || '';
-  const effectiveTemplateId =
-    (templateId && visitTemplates.find((t) => t.id === templateId)?.id) ||
-    orgDefaultMatch ||
-    visitTemplates[0]?.id ||
-    '';
+  // Guards the ?patientId= deep link against StrictMode's double effect run —
+  // two sessions for one navigation would be silent data duplication.
+  const startedRef = useRef(false);
 
-  function chooseVisitType(next: SessionType) {
-    if (next === sessionType) return;
-    setSessionType(next);
-    setTemplateId('');
-    setShowAllTemplates(false);
-  }
-
-  function doCreateSession() {
-    const now = Date.now();
+  function startSession(patientId: string) {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    const createdAt = Date.now();
     const session: Session = {
       id: crypto.randomUUID(),
       patientId,
-      type: sessionType,
-      date: now,
+      type: DEFAULT_TYPE,
+      date: createdAt,
       status: 'draft',
       clips: [],
-      templateId: effectiveTemplateId || undefined,
-      createdAt: now,
-      updatedAt: now,
+      templateId,
+      createdAt,
+      updatedAt: createdAt,
     };
     addSession(session);
-    navigate(`/sessions/${session.id}`);
+    navigate(`/sessions/${session.id}`, { replace: true });
   }
 
-  function handleStart() {
-    if (!patientId) return;
-    doCreateSession();
-  }
+  // Deep link from a patient chart — skip the picker entirely.
+  const deepLinkPatientId = params.get('patientId');
+  useEffect(() => {
+    if (deepLinkPatientId) startSession(deepLinkPatientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkPatientId]);
 
-  function handleQuickNote() {
-    if (!patientId) return;
-    const now = Date.now();
-    const session: Session = {
-      id: crypto.randomUUID(),
-      patientId,
-      type: sessionType,
-      date: now,
-      status: 'draft',
-      clips: [],
-      templateId: effectiveTemplateId || undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addSession(session);
-    navigate(`/sessions/${session.id}?mode=quick`);
-  }
-
-  function handleRecordWithoutPatient() {
-    const now = Date.now();
-    const session: Session = {
-      id: crypto.randomUUID(),
-      patientId: UNASSIGNED_PATIENT_ID,
-      type: sessionType,
-      date: now,
-      status: 'draft',
-      clips: [],
-      templateId: effectiveTemplateId || undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addSession(session);
-    navigate(`/sessions/${session.id}?autoRecord=1`);
-  }
-
-  function handleQuickAddPatient() {
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    const parts = trimmed.split(/\s+/);
-    const firstName = parts[0];
-    const lastName = parts.slice(1).join(' ');
-    const now = Date.now();
-    const patient: Patient = {
-      id: crypto.randomUUID(),
-      firstName,
-      lastName,
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    };
+  function handleAddPatient(patient: Patient) {
     addPatient(patient);
-    setPatientId(patient.id);
-    setQuery('');
-    toast.success(`${firstName} added — fill in details any time from Patients.`);
+    setAddingPatient(false);
+    startSession(patient.id);
   }
 
-  function handleCreateTemplate(name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const now = Date.now();
-    const tpl: NoteTemplate = {
-      id: crypto.randomUUID(),
-      name: trimmed,
-      format: TYPE_TO_FORMAT[sessionType],
-      sections: [{ key: 'body', label: 'Body', promptHint: '' }],
-      systemPrompt:
-        'You are a clinical scribe. Return a JSON object whose keys match the provided section keys; each value is the section text in plain prose.',
-      builtin: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-    addTemplate(tpl);
-    setTemplateId(tpl.id);
-    setShowAllTemplates(true);
-    setCreatingTemplate(false);
-    toast.success('Template created — refine it any time on the Templates page.');
-  }
+  if (deepLinkPatientId) return null;
 
   return (
     <div
       style={{ padding: '20px 22px', display: 'grid', gap: 14, maxWidth: 760, margin: '0 auto' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Link
-          to="/today"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            fontSize: 12,
-            color: 'var(--color-pt-text-3)',
-            textDecoration: 'none',
-          }}
-        >
-          <ArrowLeft size={13} strokeWidth={2} /> Dashboard
-        </Link>
-        <span style={{ flex: 1 }} />
-        <Eyebrow>New session</Eyebrow>
-      </div>
-
-      {patients.length === 0 ? (
-        <SurfaceCard padding={28}>
-          <div style={{ display: 'grid', justifyItems: 'center', gap: 12, textAlign: 'center' }}>
-            <p style={{ fontSize: 13, color: 'var(--color-pt-text-3)', margin: 0 }}>
-              You need a patient before you can start a session.
-            </p>
-            <Link to="/patients" style={{ textDecoration: 'none' }}>
-              <PtButton variant="primary" iconLeft={<Plus size={14} strokeWidth={2} />}>
-                Add a patient
-              </PtButton>
-            </Link>
-          </div>
-        </SurfaceCard>
-      ) : (
-        <>
-          {/* Patient */}
-          <SurfaceCard>
-            <div style={{ padding: '14px 16px 12px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 10,
-                }}
-              >
-                <Eyebrow>Patient</Eyebrow>
-                {selectedPatient && (
-                  <span
-                    style={{ fontSize: 11.5, color: 'var(--color-pt-accent-fg)', fontWeight: 500 }}
-                  >
-                    {selectedPatient.firstName} {selectedPatient.lastName}
-                  </span>
-                )}
-              </div>
-              <div style={{ position: 'relative' }}>
-                <Search
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--color-pt-text-3)',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search patients…"
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    padding: '9px 10px 9px 30px',
-                    borderRadius: 8,
-                    border: '1px solid var(--color-pt-border)',
-                    fontSize: 13,
-                    color: 'var(--color-pt-text)',
-                    background: 'var(--color-pt-surface-mut)',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            </div>
-
-            {filteredPatients.length > 0 ? (
-              <ul
-                role="radiogroup"
-                aria-label="Patient"
-                style={{
-                  listStyle: 'none',
-                  margin: 0,
-                  padding: 0,
-                  maxHeight: 256,
-                  overflowY: 'auto',
-                  borderTop: '1px solid var(--color-pt-border)',
-                }}
-              >
-                {filteredPatients.map((p) => (
-                  <PatientRow
-                    key={p.id}
-                    patient={p}
-                    selected={p.id === patientId}
-                    onSelect={() => setPatientId(p.id)}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <div style={{ borderTop: '1px solid var(--color-pt-border)', padding: '12px 16px' }}>
-                {query.trim() ? (
-                  <button
-                    type="button"
-                    onClick={handleQuickAddPatient}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      fontSize: 13,
-                      color: 'var(--color-pt-accent-fg)',
-                      fontWeight: 500,
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    <UserPlus size={14} strokeWidth={2} />
-                    Add "{query.trim()}" as a new patient
-                  </button>
-                ) : (
-                  <span style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
-                    No active patients.
-                  </span>
-                )}
-              </div>
-            )}
-          </SurfaceCard>
-
-          {/* Same-day inline note */}
-          {todaySessions.length > 0 && (
-            <p
-              style={{
-                margin: 0,
-                padding: '8px 12px',
-                borderRadius: 8,
-                background: 'var(--color-pt-surface-mut)',
-                border: '1px solid var(--color-pt-border)',
-                fontSize: 12.5,
-                color: 'var(--color-pt-text-3)',
-                lineHeight: 1.4,
-              }}
-            >
-              Note: this patient already has a session today (started at{' '}
-              {todaySessions
-                .map((s) =>
-                  new Date(s.date).toLocaleTimeString(undefined, {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  }),
-                )
-                .join(', ')}
-              ).
-            </p>
-          )}
-
-          {/* Visit type + Template */}
-          <SurfaceCard padding={16}>
-            <div style={{ display: 'grid', gap: 16 }}>
-              <div>
-                <div style={{ marginBottom: 10 }}>
-                  <Eyebrow>Visit type</Eyebrow>
-                </div>
-                <div
-                  role="radiogroup"
-                  aria-label="Visit type"
-                  style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
-                >
-                  {VISIT_TYPES.map((vt) => {
-                    const active = vt.type === sessionType;
-                    return (
-                      <button
-                        key={vt.type}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => chooseVisitType(vt.type)}
-                        style={{
-                          padding: '7px 16px',
-                          borderRadius: 20,
-                          border: `1px solid ${active ? 'var(--color-pt-accent)' : 'var(--color-pt-border)'}`,
-                          background: active ? 'var(--color-pt-accent)' : 'var(--color-pt-surface)',
-                          color: active ? '#ffffff' : 'var(--color-pt-text-2)',
-                          fontSize: 13,
-                          fontWeight: active ? 600 : 400,
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          transition:
-                            'background 120ms ease, border-color 120ms ease, color 120ms ease',
-                          whiteSpace: 'nowrap',
-                          minHeight: 36,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {vt.title}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <TemplateSection
-                sessionType={sessionType}
-                visitTemplates={visitTemplates}
-                effectiveTemplateId={effectiveTemplateId}
-                orgDefaultTemplateId={orgDefaultTemplateId}
-                orgTemplateIds={orgTemplateIds}
-                showAllTemplates={showAllTemplates}
-                onPickTemplate={setTemplateId}
-                onShowAll={() => setShowAllTemplates(true)}
-                onCreate={() => setCreatingTemplate(true)}
-              />
-            </div>
-          </SurfaceCard>
-
-          <StartBar
-            patient={selectedPatient}
-            visitTitle={VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''}
-            disabled={!patientId}
-            onStart={handleStart}
-          />
-
-          <div style={{ textAlign: 'center' }}>
-            <button
-              type="button"
-              disabled={!patientId}
-              onClick={handleQuickNote}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--color-pt-border)',
-                borderRadius: 8,
-                padding: '7px 16px',
-                fontSize: 12.5,
-                color: patientId ? 'var(--color-pt-text-2)' : 'var(--color-pt-text-3)',
-                cursor: patientId ? 'pointer' : 'default',
-                fontFamily: 'inherit',
-                opacity: patientId ? 1 : 0.5,
-              }}
-            >
-              Quick Note — type directly, no recording
-            </button>
-          </div>
-
-          <div style={{ textAlign: 'center' }}>
-            <button
-              type="button"
-              onClick={handleRecordWithoutPatient}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '4px 8px',
-                fontSize: 12,
-                color: 'var(--color-pt-text-3)',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
-              }}
-            >
-              Record without picking a patient — assign later
-            </button>
-          </div>
-        </>
-      )}
-
-      <NewTemplateModal
-        open={creatingTemplate}
-        visitTypeLabel={VISIT_TYPES.find((v) => v.type === sessionType)?.title ?? ''}
-        onClose={() => setCreatingTemplate(false)}
-        onCreate={handleCreateTemplate}
+      <PatientPicker
+        results={filteredPatients}
+        suggested={suggestedPatients}
+        query={query}
+        onQuery={setQuery}
+        onSelect={startSession}
+        onNewPatient={() => setAddingPatient(true)}
+      />
+      <AddPatientModal
+        open={addingPatient}
+        onClose={() => setAddingPatient(false)}
+        onSave={handleAddPatient}
       />
     </div>
   );

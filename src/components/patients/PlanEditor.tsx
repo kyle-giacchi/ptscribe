@@ -69,7 +69,7 @@ export function PlanEditor({
       <div>
         <div
           style={{
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.06em',
@@ -80,7 +80,9 @@ export function PlanEditor({
         </div>
         <ul style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {plan.goals.length === 0 && (
-            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>No goals yet.</li>
+            <li style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+              No goals yet.
+            </li>
           )}
           {plan.goals.map((g) => (
             <li key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -94,7 +96,7 @@ export function PlanEditor({
               <span
                 style={{
                   flex: 1,
-                  fontSize: 13,
+                  fontSize: 'var(--text-base)',
                   color: g.met ? 'var(--color-pt-text-3)' : 'var(--color-pt-text)',
                   textDecoration: g.met ? 'line-through' : 'none',
                 }}
@@ -113,7 +115,7 @@ export function PlanEditor({
                   border: '1px solid var(--color-pt-border)',
                   borderRadius: 6,
                   padding: '2px 6px',
-                  fontSize: 11.5,
+                  fontSize: 'var(--text-xs)',
                   fontFamily: 'var(--font-mono)',
                   color: overdue(g) ? 'var(--color-pt-red)' : 'var(--color-pt-text-3)',
                 }}
@@ -166,7 +168,7 @@ export function PlanEditor({
       <div>
         <div
           style={{
-            fontSize: 11,
+            fontSize: 'var(--text-xs)',
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.06em',
@@ -177,7 +179,7 @@ export function PlanEditor({
         </div>
         <ul style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {plan.prescriptions.length === 0 && (
-            <li style={{ fontSize: 12.5, color: 'var(--color-pt-text-3)' }}>
+            <li style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
               No exercises prescribed.
             </li>
           )}
@@ -194,10 +196,12 @@ export function PlanEditor({
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 13, color: 'var(--color-pt-text)' }}>
+                  <div style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)' }}>
                     {ex?.name ?? 'Unknown exercise'}
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--color-pt-text-3)' }}>{p.dosage}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+                    {p.dosage}
+                  </div>
                 </div>
                 <button
                   type="button"

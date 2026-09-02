@@ -139,7 +139,7 @@ function AppProviders() {
                                                     height: '100%',
                                                     gap: 12,
                                                     color: 'var(--color-fg)',
-                                                    fontSize: 15,
+                                                    fontSize: 'var(--text-md)',
                                                   }}
                                                 >
                                                   <span style={{ fontSize: 32, lineHeight: 1 }}>
@@ -150,7 +150,7 @@ function AppProviders() {
                                                     to="/today"
                                                     style={{
                                                       color: 'var(--color-accent)',
-                                                      fontSize: 14,
+                                                      fontSize: 'var(--text-md)',
                                                     }}
                                                   >
                                                     Go to dashboard

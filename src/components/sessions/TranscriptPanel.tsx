@@ -199,7 +199,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
           </span>
           {tier && <TierChip tier={tier} />}
           {transcript.trim() && (
-            <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+            <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
               {transcript.trim().split(/\s+/).filter(Boolean).length}w
             </span>
           )}
@@ -310,13 +310,13 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                   setSearchQuery(e.target.value);
                   setMatchIndex(0);
                 }}
-                className="input h-9 py-0 text-sm"
+                className="input h-9 py-0 text-base"
                 style={{ paddingLeft: 30, paddingRight: searchQuery ? 56 : 8, width: '100%' }}
               />
               {searchQuery && (
                 <>
                   <span
-                    className="absolute text-[10px] tabular-nums"
+                    className="text-2xs absolute tabular-nums"
                     style={{ right: 44, color: 'var(--color-fg-subtle)' }}
                   >
                     {matchCount > 0 ? `${safeIndex + 1}/${matchCount}` : '0'}
@@ -376,7 +376,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                   <input
                     type="text"
                     aria-label="Find"
-                    className="input h-7 py-0 text-sm"
+                    className="input h-7 py-0 text-base"
                     style={{ width: '10rem' }}
                     placeholder="Find"
                     value={searchQuery}
@@ -388,7 +388,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                   <input
                     type="text"
                     aria-label="Replace with"
-                    className="input h-7 py-0 text-sm"
+                    className="input h-7 py-0 text-base"
                     style={{ width: '10rem' }}
                     placeholder="Replace with"
                     value={replaceStr}
@@ -404,7 +404,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                     Replace All
                   </button>
                   {replaceCount !== null && (
-                    <span className="text-[11px]" style={{ color: 'var(--color-fg-subtle)' }}>
+                    <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
                       {replaceCount === 0
                         ? 'No matches'
                         : `Replaced ${replaceCount} occurrence${replaceCount !== 1 ? 's' : ''}`}
@@ -471,7 +471,7 @@ function PillButton({
         gap: 5,
         padding: '5px 10px',
         borderRadius: 999,
-        fontSize: 12,
+        fontSize: 'var(--text-sm)',
         fontWeight: 600,
         border: `1px solid ${on ? 'var(--color-pt-accent-border)' : 'var(--color-pt-border)'}`,
         background: on ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-surface)',
@@ -491,7 +491,7 @@ function TierChip({ tier }: { tier: 'modified' | 'cloud' | 'local' }) {
   return (
     <span
       style={{
-        fontSize: 10,
+        fontSize: 'var(--text-2xs)',
         fontWeight: 700,
         padding: '2px 7px',
         borderRadius: 999,
@@ -566,7 +566,7 @@ function FormattedTranscriptView({
   if (!transcript.trim()) {
     return (
       <div className="px-4 py-8 text-center">
-        <p className="text-sm" style={{ color: 'var(--color-fg-subtle)' }}>
+        <p className="text-base" style={{ color: 'var(--color-fg-subtle)' }}>
           No transcript yet — record a clip or generate AI transcription.
         </p>
       </div>
@@ -577,7 +577,7 @@ function FormattedTranscriptView({
     <div
       ref={rootRef}
       className="space-y-3 overflow-y-auto px-4 py-3"
-      style={{ flex: 1, minHeight: 320, fontSize: 13, lineHeight: '1.7' }}
+      style={{ flex: 1, minHeight: 320, fontSize: 'var(--text-base)', lineHeight: '1.7' }}
     >
       {segments.map((seg, si) => (
         <div key={si} data-ts={seg.estimatedSec ?? si * 60}>
@@ -587,7 +587,7 @@ function FormattedTranscriptView({
               aria-label={`Timestamp ${seg.minuteLabel}`}
             >
               <span
-                className="text-[11px] font-semibold tabular-nums"
+                className="text-xs font-semibold tabular-nums"
                 style={{ color: 'var(--color-fg-subtle)', minWidth: 36 }}
               >
                 {seg.minuteLabel}
@@ -598,7 +598,7 @@ function FormattedTranscriptView({
           <div className="flex items-start gap-3">
             {seg.speaker && (
               <span
-                className="shrink-0 text-[11px] font-semibold tabular-nums"
+                className="shrink-0 text-xs font-semibold tabular-nums"
                 style={{
                   color: seg.speaker === 'Dr' ? 'var(--color-pt-accent)' : 'var(--color-fg-muted)',
                   minWidth: 24,

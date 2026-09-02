@@ -119,12 +119,12 @@ export function StoragePanel() {
       {info?.quota != null && usagePct !== null && (
         <div>
           <div className="flex items-baseline justify-between" style={{ marginBottom: 5 }}>
-            <span style={{ fontSize: 10, color: 'var(--color-pt-text-3)' }}>
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--color-pt-text-3)' }}>
               {formatBytes(info.quota.usage)} of {formatBytes(info.quota.quota)}
             </span>
             <span
               style={{
-                fontSize: 10,
+                fontSize: 'var(--text-2xs)',
                 fontWeight: 700,
                 fontFamily: 'var(--font-mono, ui-monospace, monospace)',
                 color: usagePct > 80 ? '#ef4444' : usagePct > 60 ? '#f59e0b' : '#10b981',
@@ -157,7 +157,7 @@ export function StoragePanel() {
       {!info ? (
         <div
           className="flex items-center gap-2"
-          style={{ fontSize: 11, color: 'var(--color-pt-text-3)' }}
+          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}
         >
           <Loader2 size={12} className="animate-spin" />
           Loading…
@@ -215,7 +215,7 @@ export function FeaturesPanel() {
   const badge = (
     <span
       style={{
-        fontSize: 10.5,
+        fontSize: 'var(--text-2xs)',
         fontWeight: 700,
         padding: '2px 8px',
         borderRadius: 999,

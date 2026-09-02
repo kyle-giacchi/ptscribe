@@ -65,7 +65,7 @@ export function BlobWaveform({ blob }: { blob: Blob }) {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="btn btn-secondary text-xs"
+          className="btn btn-secondary text-sm"
           onClick={() => wsRef.current?.playPause()}
           disabled={!ready}
           aria-label={playing ? 'Pause' : 'Play'}
@@ -78,14 +78,14 @@ export function BlobWaveform({ blob }: { blob: Blob }) {
           className="min-h-[56px] flex-1 overflow-hidden rounded-md sm:min-h-20"
         />
         <span
-          className="font-mono text-xs tabular-nums"
+          className="font-mono text-sm tabular-nums"
           style={{ color: 'var(--color-fg-subtle)' }}
         >
           {formatDuration(current)} / {formatDuration(duration)}
         </span>
       </div>
       {error && (
-        <p className="text-xs" style={{ color: 'var(--color-negative)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-negative)' }}>
           {error}
         </p>
       )}

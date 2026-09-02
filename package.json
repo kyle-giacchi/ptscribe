@@ -2,7 +2,7 @@
   "name": "ptnotes",
   "version": "0.1.0",
   "description": "PTScribe — local-first clinical scribe for physical therapy: record sessions, transcribe with Whisper, and draft structured notes with Claude.",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "author": "Kyle Giacchi",
   "type": "module",
   "scripts": {

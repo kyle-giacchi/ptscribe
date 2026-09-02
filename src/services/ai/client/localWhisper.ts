@@ -1,8 +1,9 @@
 import { clearModelCache } from '@/lib/audio/modelCache';
+import { setLiveWhisperBackend } from '@/lib/debug/liveWhisperStats';
 
 export const LOCAL_WHISPER_DEFAULT_MODEL = 'Xenova/whisper-tiny.en';
 
-export interface TranscribeResult {
+interface TranscribeResult {
   text: string;
   source: 'whisper' | 'webspeech' | 'manual';
 }
@@ -10,7 +11,8 @@ export interface TranscribeResult {
 type OutMsg =
   | { id: number; type: 'progress'; status: string; name?: string; loaded?: number; total?: number }
   | { id: number; type: 'result'; text: string }
-  | { id: number; type: 'error'; error: string };
+  | { id: number; type: 'error'; error: string }
+  | { id: number; type: 'backend'; device: 'webgpu' | 'wasm' };
 
 type PendingEntry = {
   resolve: (text: string) => void;
@@ -66,6 +68,8 @@ function wireWorker(w: Worker): Worker {
       clearTimeout(entry.timer);
       _pending.delete(msg.id);
       entry.reject(new Error(msg.error));
+    } else if (msg.type === 'backend') {
+      setLiveWhisperBackend(msg.device);
     }
   };
   w.onerror = (e) => {
@@ -123,10 +127,10 @@ export class WhisperExhaustedError extends Error {
   }
 }
 
-export type WhisperLoadStatus = 'idle' | 'loading' | 'ready' | 'exhausted';
+type WhisperLoadStatus = 'idle' | 'loading' | 'ready' | 'exhausted';
 
 /** Coarse preload progress for UI (the "Checking your setup" gate). */
-export interface WhisperPreloadProgress {
+interface WhisperPreloadProgress {
   phase: 'downloading' | 'loading' | 'ready';
   /** 0–100 while downloading; undefined otherwise. */
   pct?: number;
@@ -280,15 +284,23 @@ export async function clearWhisperModelCache(): Promise<void> {
 
 // ── Audio utilities ───────────────────────────────────────────────────────────
 
+/**
+ * Decode-only AudioContext, shared across calls. Constructing one per chunk is
+ * expensive and browsers cap concurrent contexts (~6 in Chrome); the live path
+ * calls this once per utterance for a whole session, and `voiceDetector` already
+ * holds a second context for the analyser. Never closed — it is reused.
+ */
+let decodeCtx: AudioContext | null = null;
+
+function getDecodeContext(): AudioContext {
+  // Safari closes/suspends contexts on backgrounding, so re-create a dead one.
+  if (!decodeCtx || decodeCtx.state === 'closed') decodeCtx = new AudioContext();
+  return decodeCtx;
+}
+
 export async function blobToFloat32(blob: Blob): Promise<Float32Array> {
   const arrayBuffer = await blob.arrayBuffer();
-  const context = new AudioContext();
-  let decoded: AudioBuffer;
-  try {
-    decoded = await context.decodeAudioData(arrayBuffer);
-  } finally {
-    context.close();
-  }
+  const decoded = await getDecodeContext().decodeAudioData(arrayBuffer);
   const TARGET_SR = 16000;
   const offlineCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * TARGET_SR), TARGET_SR);
   const source = offlineCtx.createBufferSource();
