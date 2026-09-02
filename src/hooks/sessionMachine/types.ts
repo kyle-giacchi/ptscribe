@@ -85,7 +85,13 @@ export type SessionGate =
   /** Content-loss confirmation before switching templates over note text. */
   | { kind: 'template-change'; targetTemplateId: string }
   /** Confirmation before wiping clips, transcripts, and the note. */
-  | { kind: 'reset-confirm' };
+  | { kind: 'reset-confirm' }
+  /** Append-vs-replace choice before regenerating over existing note text. */
+  | { kind: 'generate-overwrite' }
+  /** Feedback authoring before regenerating when transcript/template/modifiers are unchanged. */
+  | { kind: 'generate-feedback' }
+  /** Warn that recording more will leave the existing generated note stale. */
+  | { kind: 'record-warn' };
 
 export type GateResolution =
   | { kind: 'phi-confirm'; outcome: 'confirm'; dontShowAgain: boolean }
@@ -96,7 +102,11 @@ export type GateResolution =
       outcome: 'use-web-speech' | 'record-without-transcription' | 'cancel';
     }
   | { kind: 'template-change'; outcome: 'confirm' | 'cancel' }
-  | { kind: 'reset-confirm'; outcome: 'confirm' | 'cancel' };
+  | { kind: 'reset-confirm'; outcome: 'confirm' | 'cancel' }
+  | { kind: 'generate-overwrite'; outcome: 'append' | 'replace' | 'cancel' }
+  | { kind: 'generate-feedback'; outcome: 'cancel' }
+  | { kind: 'generate-feedback'; outcome: 'regenerate'; feedback: string }
+  | { kind: 'record-warn'; outcome: 'confirm' | 'cancel' };
 
 // ── View slice (workflow view, not layout) ────────────────────────────────
 

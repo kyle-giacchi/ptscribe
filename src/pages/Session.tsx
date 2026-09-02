@@ -36,6 +36,9 @@ import { PhiConfirmDialog } from '@/components/sessions/PhiConfirmDialog';
 import { WhisperUnavailableDialog } from '@/components/sessions/WhisperUnavailableDialog';
 import { StaleFinalizeDialog } from '@/components/sessions/StaleFinalizeDialog';
 import { TemplateChangeDialog } from '@/components/sessions/TemplateChangeDialog';
+import { GenerateOverwriteDialog } from '@/components/sessions/GenerateOverwriteDialog';
+import { GenerateFeedbackDialog } from '@/components/sessions/GenerateFeedbackDialog';
+import { RecordWarnDialog } from '@/components/sessions/RecordWarnDialog';
 import { AiCallError } from '@/components/ai/AiCallError';
 import { AiCallRetryStatus } from '@/components/ai/AiCallRetryStatus';
 import { useDebugDrawer, type PiiScrubDebug } from '@/contexts/DebugDrawerProvider';
@@ -48,7 +51,6 @@ import { TranscriptCollapsedTab } from '@/components/sessions/TranscriptCollapse
 import { ResetSessionModal } from '@/components/sessions/ResetSessionModal';
 import { UploadProcessingView } from '@/components/sessions/UploadProcessingView';
 import { ErrorBanner } from '@/components/common/ErrorBanner';
-import { Modal } from '@/components/ui/Modal';
 
 export function SessionPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -119,7 +121,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   const clipsFileRef = useRef<AudioFileInputHandle>(null);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   const [demoCompleteOpen, setDemoCompleteOpen] = useState(false);
-  const [recordWarnOpen, setRecordWarnOpen] = useState(false);
   const { setActiveSessionId, setSessionDebug } = useDebugDrawer();
 
   useAudioRecovery(sessionId, session, patchClips);
@@ -213,7 +214,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           confirm: `This sends the transcript to ${cloudFallback} for this note only. Your settings stay on your own server.`,
           onUse: () => {
             actions.clearGenerateAiError();
-            actions.generate('replace', undefined, cloudFallback);
+            actions.generate(cloudFallback);
           },
         }
       : undefined;
@@ -222,13 +223,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
 
   const gate = state.gate;
 
-  function handleRecordStart() {
-    if (selectors.hasGeneratedNote) {
-      setRecordWarnOpen(true);
-    } else {
-      actions.startRecording();
-    }
-  }
   const sortedClips = selectors.sortedClips;
   const hasEverRecorded = sessions.some((s) => s.clips.length > 0);
 
@@ -346,7 +340,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                   clips={sortedClips}
                   whisperBubbles={whisperBubbles}
                   uploadStatus={state.capture.uploadStatus}
-                  onStart={handleRecordStart}
+                  onStart={actions.startRecording}
                   onStopAndFinish={actions.stopAndFinish}
                   onPauseResume={actions.pauseResume}
                   onUpload={(file) => {
@@ -438,7 +432,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                           templates={allTemplates}
                           hasDraftContent={!!note?.sections.some((s) => s.body.trim().length > 0)}
                           canGenerate={selectors.canGenerate}
-                          requiresFeedback={selectors.inputsUnchanged}
                           isGenerating={selectors.busy === 'generating'}
                           note={note}
                           patient={patient}
@@ -745,44 +738,29 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
         {/* ── Demo complete modal (host-applied demo policy) ── */}
         <DemoCompleteModal open={demoCompleteOpen} onClose={() => setDemoCompleteOpen(false)} />
 
-        {/* ── New-recording warning (existing generated note will become stale) ── */}
-        <Modal
-          open={recordWarnOpen}
-          onClose={() => setRecordWarnOpen(false)}
-          title="Recording more will invalidate your generated note"
-          size="sm"
-        >
-          <p
-            style={{
-              fontSize: 'var(--text-base)',
-              color: 'var(--color-pt-text-2)',
-              lineHeight: 1.55,
-            }}
-          >
-            Any new clips will be added to your transcript, but your note was generated from the
-            previous transcript. You&apos;ll need to re-run transcription and regenerate before the
-            note reflects this recording.
-          </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setRecordWarnOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setRecordWarnOpen(false);
-                actions.startRecording();
-              }}
-            >
-              Continue recording
-            </button>
-          </div>
-        </Modal>
+        {/* Append-vs-replace choice before regenerating over existing note text */}
+        <GenerateOverwriteDialog
+          open={gate?.kind === 'generate-overwrite'}
+          onCancel={() => actions.resolveGate({ kind: 'generate-overwrite', outcome: 'cancel' })}
+          onAppend={() => actions.resolveGate({ kind: 'generate-overwrite', outcome: 'append' })}
+          onReplace={() => actions.resolveGate({ kind: 'generate-overwrite', outcome: 'replace' })}
+        />
+
+        {/* Feedback authoring before regenerating when inputs are unchanged */}
+        <GenerateFeedbackDialog
+          open={gate?.kind === 'generate-feedback'}
+          onCancel={() => actions.resolveGate({ kind: 'generate-feedback', outcome: 'cancel' })}
+          onRegenerate={(feedback) =>
+            actions.resolveGate({ kind: 'generate-feedback', outcome: 'regenerate', feedback })
+          }
+        />
+
+        {/* New-recording warning (existing generated note will become stale) */}
+        <RecordWarnDialog
+          open={gate?.kind === 'record-warn'}
+          onCancel={() => actions.resolveGate({ kind: 'record-warn', outcome: 'cancel' })}
+          onConfirm={() => actions.resolveGate({ kind: 'record-warn', outcome: 'confirm' })}
+        />
 
         {/* ── PII scrub modal ──────────────────────────────── */}
         <PIIScrubModal

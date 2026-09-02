@@ -94,7 +94,6 @@ interface SessionMachineSelectors {
   canGenerate: boolean;
   isTranscriptLocked: boolean;
   isRecording: boolean;
-  hasGeneratedNote: boolean;
   showBackgroundWarning: boolean;
   missingRequiredLabels: string[];
   sortedClips: SessionClip[];
@@ -139,12 +138,14 @@ interface SessionMachineActions {
   clearTranscribeAiError: () => void;
   copyTranscript: () => void;
   // Note (Generate / Finalize)
-  /** May open the PHI gate instead of generating. */
-  generate: (
-    mode?: 'replace' | 'append',
-    feedback?: string,
-    cloudOverride?: CloudGenerationProvider,
-  ) => void;
+  /**
+   * Regenerate request. Routes through whichever gate the current state needs
+   * — generate-feedback (inputs unchanged), generate-overwrite (note has
+   * content), then the PHI gate — before it actually generates. `cloudOverride`
+   * is the one-shot cloud retry after a self-hosted failure; it re-runs the
+   * last intent (replace, no feedback) without re-prompting.
+   */
+  generate: (cloudOverride?: CloudGenerationProvider) => void;
   /** May open the stale-finalize gate instead of finalizing. */
   finalize: () => void;
   unfinalize: () => void;
@@ -334,13 +335,10 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
   const noteHasContent = !!note && note.sections.some((s) => s.body.trim().length > 0);
   const noteIsStale = noteHasContent && !inputsUnchanged;
 
-  // ── Generate / Finalize (PHI + stale gates) ──────────────────────────────
-  const generate = useCallback(
-    (
-      mode: 'replace' | 'append' = 'replace',
-      feedback?: string,
-      cloudOverride?: CloudGenerationProvider,
-    ) => {
+  // ── Generate / Finalize (feedback + overwrite + PHI + stale gates) ────────
+  // Last leg once mode + feedback are settled: PHI gate, then run.
+  const proceedGenerate = useCallback(
+    (mode: 'replace' | 'append', feedback?: string, cloudOverride?: CloudGenerationProvider) => {
       if (settings.session.phiConfirmDismissed) {
         void generatePhase.run(mode, feedback, cloudOverride);
       } else {
@@ -351,6 +349,24 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       }
     },
     [settings.session.phiConfirmDismissed, generatePhase],
+  );
+
+  const generate = useCallback(
+    (cloudOverride?: CloudGenerationProvider) => {
+      // One-shot cloud retry of the last intent — no re-prompt (ADR-0011).
+      if (cloudOverride) {
+        proceedGenerate('replace', undefined, cloudOverride);
+        return;
+      }
+      if (noteHasContent && inputsUnchanged) {
+        dispatch({ type: 'gate/open', gate: { kind: 'generate-feedback' } });
+      } else if (noteHasContent) {
+        dispatch({ type: 'gate/open', gate: { kind: 'generate-overwrite' } });
+      } else {
+        proceedGenerate('replace');
+      }
+    },
+    [noteHasContent, inputsUnchanged, proceedGenerate],
   );
 
   const doFinalize = useCallback(() => {
@@ -371,8 +387,8 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     doFinalize();
   }, [noteIsStale, doFinalize]);
 
-  // ── Recording (whisper gate) ─────────────────────────────────────────────
-  const startRecording = useCallback(() => {
+  // ── Recording (record-warn gate, then whisper gate) ──────────────────────
+  const beginRecording = useCallback(() => {
     const provider = state.providerOverride ?? settings.ai.transcription.provider;
     if (provider === 'local' && whisperExhausted) {
       dispatch({ type: 'gate/open', gate: { kind: 'whisper-unavailable' } });
@@ -380,6 +396,16 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     }
     void captureRef.current.handleStartRecording();
   }, [state.providerOverride, settings.ai.transcription.provider, whisperExhausted]);
+
+  const startRecording = useCallback(() => {
+    // A generated note already exists — recording more clips will leave it
+    // stale until the transcript is re-run and the note regenerated.
+    if (note) {
+      dispatch({ type: 'gate/open', gate: { kind: 'record-warn' } });
+      return;
+    }
+    beginRecording();
+  }, [note, beginRecording]);
   const startRecordingRef = useRef(startRecording);
   useEffect(() => {
     startRecordingRef.current = startRecording;
@@ -472,8 +498,17 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
           void generatePhase.run(gate.intent.mode, gate.intent.feedback, gate.intent.cloudOverride);
         }
       } else if (resolution.kind === 'stale-finalize') {
-        if (resolution.outcome === 'regenerate') generate('replace');
+        // A stale note by definition has content and diverged inputs — regenerate
+        // means replace, straight to the PHI gate (no append/replace prompt).
+        if (resolution.outcome === 'regenerate') proceedGenerate('replace');
         else if (resolution.outcome === 'finalize-anyway') doFinalize();
+      } else if (resolution.kind === 'generate-overwrite') {
+        if (resolution.outcome === 'append') proceedGenerate('append');
+        else if (resolution.outcome === 'replace') proceedGenerate('replace');
+      } else if (resolution.kind === 'generate-feedback') {
+        if (resolution.outcome === 'regenerate') proceedGenerate('replace', resolution.feedback);
+      } else if (resolution.kind === 'record-warn') {
+        if (resolution.outcome === 'confirm') beginRecording();
       } else if (resolution.kind === 'whisper-unavailable') {
         if (resolution.outcome === 'use-web-speech') {
           pendingStartRef.current = true;
@@ -491,7 +526,8 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
     [
       persistPhiConfirmDismissed,
       generatePhase,
-      generate,
+      proceedGenerate,
+      beginRecording,
       doFinalize,
       applyTemplateChange,
       doResetSession,
@@ -698,7 +734,6 @@ export function useSessionMachine(params: UseSessionMachineParams): SessionMachi
       isTranscriptLocked:
         sortedClips.length === 0 && !effectiveTranscript.trim() && !state.view.recordingSkipped,
       isRecording: recorder.status === 'recording' || recorder.status === 'paused',
-      hasGeneratedNote: !!note,
       showBackgroundWarning: capturePhase.backgrounded && !capturePhase.backgroundWarningDismissed,
       missingRequiredLabels: generatePhase.missingRequiredLabels,
       sortedClips,
