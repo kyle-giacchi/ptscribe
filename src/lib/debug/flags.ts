@@ -1,6 +1,6 @@
 /**
- * Build-time gate for the in-app debug tooling (Debug Menu drawer). Mirrors the
- * `VITE_DEMO_MODE` pattern: on by default, set `VITE_DEBUG_TOOLS=false` to hide
- * the Settings → Debug Menu entry point in a build.
+ * Build-time gate for the in-app debug tooling (Debug Menu drawer). Dev-only —
+ * Vite statically replaces `import.meta.env.DEV` with `false` in production, so
+ * the drawer and its panels tree-shake out of the bundle entirely.
  */
-export const DEBUG_TOOLS_ENABLED = import.meta.env.VITE_DEBUG_TOOLS !== 'false';
+export const DEBUG_TOOLS_ENABLED = import.meta.env.DEV;

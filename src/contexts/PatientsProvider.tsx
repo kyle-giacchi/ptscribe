@@ -4,7 +4,7 @@ import { makeListMutators } from './listSlice';
 import { audioRepository } from '@/services/AudioRepository';
 import { UNASSIGNED_PATIENT_ID, type Patient } from '@/types';
 
-export interface PatientsContextValue {
+interface PatientsContextValue {
   patients: Patient[];
   addPatient: (patient: Patient) => void;
   updatePatient: (id: string, patch: Partial<Patient>) => void;

@@ -5,7 +5,7 @@ import type { AppData } from '@/types';
 
 type SliceSetter<T> = (next: T[] | ((prev: T[]) => T[])) => void;
 
-export interface ListSliceConfig<T extends ListItem, V> {
+interface ListSliceConfig<T extends ListItem, V> {
   /** Used in the hook's "must be used within" guard, e.g. 'Sessions' → useSessions/SessionsProvider. */
   label: string;
   /** Read this slice's array out of AppData. */

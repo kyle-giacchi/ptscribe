@@ -33,7 +33,7 @@ export interface RetryPolicy {
   onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
-export interface RetryFetchResult {
+interface RetryFetchResult {
   /**
    * The final HTTP Response: either `ok`, or a non-retryable failure. The body
    * is unconsumed so the adapter can read it for classification.
@@ -131,6 +131,16 @@ async function isDeclaredNonRetryable(res: Response): Promise<boolean> {
     return body.retryable === false;
   } catch {
     return false;
+  }
+}
+
+/** Pull the Worker's `{ code }` discriminator out of an error body, if present. */
+export function parseErrorCode(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown };
+    return typeof parsed.code === 'string' ? parsed.code : undefined;
+  } catch {
+    return undefined;
   }
 }
 

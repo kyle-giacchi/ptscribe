@@ -17,9 +17,9 @@ import { isCloudProvider } from '@/types';
  * - `ready`:    a personal OR org key is set for the active provider.
  * - `missing`:  authenticated, BYOK on, but no usable key anywhere.
  */
-export type UsableKeyState = 'loading' | 'ready' | 'missing' | 'signin' | 'disabled';
+type UsableKeyState = 'loading' | 'ready' | 'missing' | 'signin' | 'disabled';
 
-export interface UsableKey {
+interface UsableKey {
   state: UsableKeyState;
   provider: KeyProvider | null;
   personalSet: boolean;

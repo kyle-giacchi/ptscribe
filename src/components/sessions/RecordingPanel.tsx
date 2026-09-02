@@ -21,7 +21,7 @@ import type {
   RecordingAdvisories,
 } from '@/hooks/sessionMachine/recordingAdvisories';
 
-export interface RecordingPanelProps {
+interface RecordingPanelProps {
   recorder: UseRecorder;
   webSpeech: UseWebSpeechTranscript;
   clips: SessionClip[];

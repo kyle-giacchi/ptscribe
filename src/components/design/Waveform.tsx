@@ -9,7 +9,7 @@ const COLORS: Record<MicState, string> = {
   idle: '#c2cad6',
 };
 
-export interface WaveformProps {
+interface WaveformProps {
   micState: MicState;
   height?: number;
   analyser?: AnalyserNode | null;

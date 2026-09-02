@@ -4,6 +4,7 @@ import {
   hashUserConfig,
   reconcile,
   readSyncRecord,
+  restoreEndpointKeys,
   writeSyncRecord,
   configSyncKey,
   type ServerUserConfig,
@@ -164,5 +165,79 @@ describe('sync record persistence', () => {
   it('returns null on malformed JSON', () => {
     localStorage.setItem(configSyncKey('u2'), '{bad');
     expect(readSyncRecord('u2')).toBeNull();
+  });
+});
+
+describe('self-hosted endpoint apiKey never reaches the server', () => {
+  // user_config.settings is a plaintext D1 column. AppData is vault-encrypted on
+  // disk, so the endpoint bearer token is only protected while it stays local.
+  // strip (push) and restore (pull) are a pair — one without the other either
+  // leaks the token or deletes the user's own key on next sync.
+  function appDataWithEndpointKey(): AppData {
+    const base = defaultAppData();
+    return {
+      ...base,
+      settings: {
+        ...base.settings,
+        ai: {
+          ...base.settings.ai,
+          generation: {
+            ...base.settings.ai.generation,
+            endpoints: {
+              local: { baseUrl: 'http://localhost:11434', model: 'llama3', apiKey: 'sk-secret' },
+              network: { baseUrl: 'https://lan-box:8000', model: 'qwen' },
+            },
+          },
+        },
+      },
+    };
+  }
+
+  it('strips apiKey from the sync payload', () => {
+    const { settings } = projectUserConfig(appDataWithEndpointKey());
+    const endpoints = settings.ai.generation.endpoints!;
+
+    expect(endpoints.local?.apiKey).toBeUndefined();
+    // Non-secret endpoint config still syncs.
+    expect(endpoints.local?.baseUrl).toBe('http://localhost:11434');
+    expect(endpoints.local?.model).toBe('llama3');
+  });
+
+  it('leaves no trace of the token anywhere in the serialized payload', () => {
+    const serialized = JSON.stringify(projectUserConfig(appDataWithEndpointKey()));
+
+    expect(serialized).not.toContain('sk-secret');
+    expect(serialized).not.toContain('apiKey');
+  });
+
+  it('restores the local apiKey when applying a server payload', () => {
+    const local = appDataWithEndpointKey().settings;
+    const fromServer = projectUserConfig(appDataWithEndpointKey()).settings;
+
+    const applied = restoreEndpointKeys(fromServer, local);
+
+    expect(applied.ai.generation.endpoints?.local?.apiKey).toBe('sk-secret');
+    // An endpoint that never had a key stays keyless.
+    expect(applied.ai.generation.endpoints?.network?.apiKey).toBeUndefined();
+  });
+
+  it('does not invent a key when the local side has none', () => {
+    const localNoKey = defaultAppData().settings;
+    const fromServer = projectUserConfig(appDataWithEndpointKey()).settings;
+
+    const applied = restoreEndpointKeys(fromServer, localNoKey);
+
+    expect(applied.ai.generation.endpoints?.local?.apiKey).toBeUndefined();
+  });
+
+  it('keeps a server-side baseUrl change while preserving the local key', () => {
+    const local = appDataWithEndpointKey().settings;
+    const fromServer = projectUserConfig(appDataWithEndpointKey()).settings;
+    fromServer.ai.generation.endpoints!.local!.baseUrl = 'http://localhost:9999';
+
+    const applied = restoreEndpointKeys(fromServer, local);
+
+    expect(applied.ai.generation.endpoints?.local?.baseUrl).toBe('http://localhost:9999');
+    expect(applied.ai.generation.endpoints?.local?.apiKey).toBe('sk-secret');
   });
 });

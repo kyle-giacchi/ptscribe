@@ -1,4 +1,5 @@
 import { StatusDot } from './StatusBadge';
+import { formatDuration } from '@/utils/format';
 
 export type MicState = 'connected' | 'paused' | 'weak' | 'disconnected' | 'idle';
 
@@ -48,17 +49,7 @@ const CFG: Record<
   },
 };
 
-export function formatElapsed(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const s = Math.floor(seconds % 60)
-    .toString()
-    .padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-export interface MicStatusPillProps {
+interface MicStatusPillProps {
   state: MicState;
   elapsedSec?: number;
   onClick?: () => void;
@@ -96,7 +87,7 @@ export function MicStatusPill({ state, elapsedSec, onClick }: MicStatusPillProps
             borderLeft: `1px solid ${cfg.border}`,
           }}
         >
-          {formatElapsed(elapsedSec)}
+          {formatDuration(elapsedSec)}
         </span>
       )}
     </button>

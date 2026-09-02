@@ -103,7 +103,7 @@ export function Setup() {
               width: 30,
               height: 30,
               borderRadius: 8,
-              background: 'var(--color-pt-accent)',
+              background: 'var(--color-pt-accent-deep)',
               color: '#ffffff',
               fontSize: 'var(--text-md)',
               fontWeight: 800,

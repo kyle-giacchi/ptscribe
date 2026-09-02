@@ -8,7 +8,7 @@ import {
 
 // ── Shared ────────────────────────────────────────────────────────────────
 
-export interface RetryStatus {
+interface RetryStatus {
   provider: AiProvider;
   attempt: number;
   max: number;
@@ -16,7 +16,7 @@ export interface RetryStatus {
 
 // ── Generate slice ────────────────────────────────────────────────────────
 
-export type GeneratePhase = 'idle' | 'generating' | 'error';
+type GeneratePhase = 'idle' | 'generating' | 'error';
 
 export interface GenerateState {
   phase: GeneratePhase;
@@ -29,9 +29,9 @@ export interface GenerateState {
 
 // ── Transcribe slice ──────────────────────────────────────────────────────
 
-export type TranscribePhase = 'idle' | 'transcribing' | 'error';
+type TranscribePhase = 'idle' | 'transcribing' | 'error';
 
-export interface TranscribeDebugStats {
+interface TranscribeDebugStats {
   droppedSec: number;
   originalSec: number;
   speedSavedSec: number;
@@ -47,7 +47,7 @@ export interface TranscribeState {
 
 // ── Capture slice ─────────────────────────────────────────────────────────
 
-export type UploadPhase = 'idle' | 'reading' | 'saving' | 'done' | 'error';
+type UploadPhase = 'idle' | 'reading' | 'saving' | 'done' | 'error';
 
 export interface UploadStatus {
   phase: UploadPhase;
@@ -85,7 +85,13 @@ export type SessionGate =
   /** Content-loss confirmation before switching templates over note text. */
   | { kind: 'template-change'; targetTemplateId: string }
   /** Confirmation before wiping clips, transcripts, and the note. */
-  | { kind: 'reset-confirm' };
+  | { kind: 'reset-confirm' }
+  /** Append-vs-replace choice before regenerating over existing note text. */
+  | { kind: 'generate-overwrite' }
+  /** Feedback authoring before regenerating when transcript/template/modifiers are unchanged. */
+  | { kind: 'generate-feedback' }
+  /** Warn that recording more will leave the existing generated note stale. */
+  | { kind: 'record-warn' };
 
 export type GateResolution =
   | { kind: 'phi-confirm'; outcome: 'confirm'; dontShowAgain: boolean }
@@ -96,11 +102,15 @@ export type GateResolution =
       outcome: 'use-web-speech' | 'record-without-transcription' | 'cancel';
     }
   | { kind: 'template-change'; outcome: 'confirm' | 'cancel' }
-  | { kind: 'reset-confirm'; outcome: 'confirm' | 'cancel' };
+  | { kind: 'reset-confirm'; outcome: 'confirm' | 'cancel' }
+  | { kind: 'generate-overwrite'; outcome: 'append' | 'replace' | 'cancel' }
+  | { kind: 'generate-feedback'; outcome: 'cancel' }
+  | { kind: 'generate-feedback'; outcome: 'regenerate'; feedback: string }
+  | { kind: 'record-warn'; outcome: 'confirm' | 'cancel' };
 
 // ── View slice (workflow view, not layout) ────────────────────────────────
 
-export interface ViewState {
+interface ViewState {
   tab: 'record' | 'review';
   /** "Skip — edit manually" entry: review tab is reachable with zero clips. */
   recordingSkipped: boolean;
@@ -110,7 +120,7 @@ export interface ViewState {
 // The machine baseline + the clinician's in-memory edit overlay. The
 // effective transcript (edited if non-blank, else baseline) is a selector.
 
-export interface TranscriptDocState {
+interface TranscriptDocState {
   baseline: string;
   edited: string;
 }
@@ -119,7 +129,7 @@ export interface TranscriptDocState {
 // Drives the UploadProcessingView choreography: upload → clip saved → merge
 // + T2 (skipNav) → ≥2 s minimum display → navigate to review.
 
-export interface UploadFlowState {
+interface UploadFlowState {
   /** True from upload start until the flow clears (success, bail, or error). */
   active: boolean;
   clipId: string | null;
@@ -191,7 +201,7 @@ export type SessionMachineAction =
   // session reset (machine-state half; entity wipes happen in the runner)
   | { type: 'machine/reset' };
 
-export interface SessionMachineInit {
+interface SessionMachineInit {
   /** ?mode=quick — start on the review tab with recording skipped. */
   quickMode?: boolean;
   /** ?tab=review — open straight on the note, without skipping recording. */

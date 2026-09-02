@@ -272,7 +272,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
             <button
               type="button"
               className="btn"
-              style={{ background: 'var(--color-pt-accent)', color: '#fff', border: 'none' }}
+              style={{ background: 'var(--color-pt-accent-deep)', color: '#fff', border: 'none' }}
               onClick={handleApply}
             >
               <EyeOff size={13} strokeWidth={2} />

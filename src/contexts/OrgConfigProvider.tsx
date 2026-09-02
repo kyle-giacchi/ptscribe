@@ -35,7 +35,7 @@ export interface OrgPolicy {
   allowedModels?: string[];
 }
 
-export interface OrgConfigValue {
+interface OrgConfigValue {
   /** True while the org session has an orgId and we've not yet resolved a load. */
   loading: boolean;
   policy: OrgPolicy;

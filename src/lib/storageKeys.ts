@@ -50,8 +50,6 @@ export const LEGACY_UNSCOPED_KEYS = [
   BASE_KEYS.pageModes,
 ] as const;
 
-export type StorageKey = string;
-
 const AUDIO_DB_BASE = 'ptnotes-audio';
 
 export const AUDIO_DB = {

@@ -3,6 +3,11 @@
   "name": "ptscribe",
   "main": "worker/index.ts",
   "compatibility_date": "2026-04-26",
+  // better-auth imports node:crypto / node:async_hooks — without this flag the
+  // Worker fails to boot at all ("No such module 'node:crypto'"). Undiscovered
+  // until now because local dev defaults to demo mode, which never starts the
+  // Worker's auth path.
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

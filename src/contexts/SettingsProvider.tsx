@@ -13,7 +13,7 @@ import type {
   Settings,
 } from '@/types';
 
-export interface SettingsContextValue {
+interface SettingsContextValue {
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
   updateAi: (patch: Partial<AISettings>) => void;

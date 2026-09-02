@@ -6,7 +6,7 @@ import { ShieldAlert } from 'lucide-react';
  * three places clinicians read it.
  */
 
-export type HipaaDisclosureVariant = 'full' | 'compact';
+type HipaaDisclosureVariant = 'full' | 'compact';
 
 export function HipaaDisclosure({
   variant = 'full',

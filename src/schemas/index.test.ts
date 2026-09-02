@@ -40,6 +40,16 @@ describe('AppDataSchema', () => {
     expect(AppDataSchema.safeParse(bad).success).toBe(false);
   });
 
+  // Regression: a plain z.record with enum keys is exhaustive in zod 4 — it
+  // rejected a save with only `local` configured, which silently reset AppData.
+  it('accepts a partially configured self-hosted endpoints map', () => {
+    const data = defaultAppData();
+    data.settings.ai.generation.endpoints = {
+      local: { baseUrl: 'http://127.0.0.1:11434', model: 'llama3' },
+    };
+    expect(AppDataSchema.safeParse(data).success).toBe(true);
+  });
+
   it('seeds at least one built-in template and several built-in exercises', () => {
     const seed = defaultAppData();
     expect(seed.templates.some((t) => t.builtin)).toBe(true);

@@ -19,6 +19,7 @@ import { isDemoMode } from '@/lib/demoMode';
 import { DEMO_USER } from '@/lib/auth/demo';
 import {
   projectUserConfig,
+  restoreEndpointKeys,
   hashUserConfig,
   reconcile,
   readSyncRecord,
@@ -103,7 +104,9 @@ export function ConfigSyncProvider({ children }: { children: ReactNode }) {
         // Apply each slice exactly once with a full replacement. For templates/
         // exercises, keep built-ins and replace the custom subset (never chain
         // add→update on one slice — the double-write footgun).
-        updateSettingsSlice(s.settings);
+        // Endpoint apiKeys are stripped before upload, so the server copy never
+        // has them — re-graft the local ones or this full replacement wipes them.
+        updateSettingsSlice((prev) => restoreEndpointKeys(s.settings, prev));
         updateClinicianSlice(s.clinician);
         updateTemplatesSlice((prev) => [...prev.filter((t) => t.builtin), ...s.templates]);
         updateExercisesSlice((prev) => [...prev.filter((e) => e.builtin), ...s.exercises]);

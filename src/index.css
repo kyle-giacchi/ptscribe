@@ -21,9 +21,11 @@
   --color-pt-accent-soft: #e6f7f6;
   --color-pt-accent-border: #9fdcdc;
   --color-pt-accent-fg: #0a6d70;
-  /* Deep teal that stays fixed across themes — used where white text sits on
-     top of the accent (Priority Inbox header bar). 5.3:1 against #fff. */
+  /* Deep teal that stays fixed across themes — used wherever white text sits on
+     top of the accent (Priority Inbox header bar, .btn-primary). 6.1:1 against
+     #fff. Plain --color-pt-accent is only 3:1 with white and must not carry it. */
   --color-pt-accent-deep: #0a6d70;
+  --color-pt-accent-deep-hover: #08585b;
 
   /* Semantic — red */
   --color-pt-red: #dc2942;
@@ -240,11 +242,11 @@ body {
       border-color 120ms ease-out;
   }
   .btn-primary {
-    background: var(--color-pt-accent);
+    background: var(--color-pt-accent-deep);
     color: #ffffff;
   }
   .btn-primary:hover {
-    background: var(--color-pt-accent-fg);
+    background: var(--color-pt-accent-deep-hover);
   }
   .btn-secondary {
     background: var(--color-pt-surface);

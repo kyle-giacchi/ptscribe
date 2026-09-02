@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { whisperLoader } from '@/services/ai/client/localWhisper';
 
-export interface WhisperLoadingState {
+interface WhisperLoadingState {
   loading: boolean;
   exhausted: boolean;
 }

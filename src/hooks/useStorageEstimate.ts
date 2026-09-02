@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 // Whisper tiny (q8) ~75 MB + privacy-filter ~30 MB, with headroom.
 const LOCAL_MODELS_MIN_BYTES = 150 * 1024 * 1024;
 
-export interface StorageEstimate {
+interface StorageEstimate {
   loading: boolean;
   /** Total storage quota granted to this origin (bytes), or null if unavailable. */
   quota: number | null;

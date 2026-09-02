@@ -12,7 +12,7 @@ import type {
   ModifierBeyondNote,
 } from '@/types';
 
-export interface BuildPromptArgs {
+interface BuildPromptArgs {
   template: NoteTemplate;
   transcript: string;
   patient: Patient;

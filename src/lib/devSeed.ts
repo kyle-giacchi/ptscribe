@@ -268,7 +268,7 @@ function visitType(index: number, total: number): SessionType {
   return index % 4 === 0 ? 'progress' : 'follow_up';
 }
 
-export interface DevSeed {
+interface DevSeed {
   patients: Patient[];
   sessions: Session[];
   notes: Note[];

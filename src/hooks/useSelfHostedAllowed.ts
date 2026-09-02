@@ -2,6 +2,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isDemoMode } from '@/lib/demoMode';
 import { isTestUserSession } from '@/lib/profile/profileId';
 
+// ponytail: DEV builds skip the sign-in gate so the local/in-network segments
+// are reachable from the dev quick-login session. Prod keeps the ADR-0011 gate.
+
 /**
  * Whether local / in-network model routing is available (ADR-0011).
  *
@@ -11,5 +14,6 @@ import { isTestUserSession } from '@/lib/profile/profileId';
  */
 export function useSelfHostedAllowed(): boolean {
   const { isAuthenticated } = useAuth();
+  if (import.meta.env.DEV) return !isDemoMode();
   return isAuthenticated && !isDemoMode() && !isTestUserSession();
 }

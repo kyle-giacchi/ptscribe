@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { NoteSectionEditor } from '@/components/notes/NoteSectionEditor';
 import type { Note, NoteSection, NoteTemplate, Patient } from '@/types';
 
-export interface NotePanelProps {
+interface NotePanelProps {
   patient: Patient;
   note: Note | undefined;
   template: NoteTemplate | undefined;

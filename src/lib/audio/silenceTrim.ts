@@ -3,19 +3,19 @@ import { mixToMono } from './pcm';
 import { DEFAULT_VAD_OPTIONS, type SpeechRange, type VadOptions } from './vad';
 import { findSpeechRangesML } from './vadML';
 
-export interface TrimReport {
+interface TrimReport {
   originalSec: number;
   keptSec: number;
   droppedSec: number;
   droppedRanges: SpeechRange[];
 }
 
-export interface TrimResult {
+interface TrimResult {
   trimmed: Blob;
   report: TrimReport;
 }
 
-export interface TrimOptions extends Partial<VadOptions> {
+interface TrimOptions extends Partial<VadOptions> {
   /** Optional override for the AudioContext factory (used by tests). */
   audioContextFactory?: () => AudioContext;
 }

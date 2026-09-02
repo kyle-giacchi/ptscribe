@@ -1,5 +1,5 @@
 import { AppDataSchema } from '@/schemas';
-import type { AppData } from '@/types';
+import { APP_DATA_VERSION, type AppData } from '@/types';
 
 /**
  * Validates that stored data is at the current schema version.
@@ -8,7 +8,7 @@ import type { AppData } from '@/types';
  */
 export function migrate(data: unknown): AppData {
   const version = (data as { version?: unknown }).version;
-  if (version !== 1) {
+  if (version !== APP_DATA_VERSION) {
     throw new Error(
       `Stored data version ${version} is not supported. ` +
         `Clear localStorage and reload to start fresh.`,

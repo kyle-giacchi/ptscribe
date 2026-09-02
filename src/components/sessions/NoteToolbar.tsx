@@ -1,6 +1,5 @@
 import { memo, useRef, useState } from 'react';
 import { ChevronDown, Loader2, RotateCw, Sparkles, SlidersHorizontal } from 'lucide-react';
-import { Modal } from '@/components/ui/Modal';
 import { TemplateDropdown } from './TemplateDropdown';
 import { ModifierPopover } from './ModifierPopover';
 import { NoteExportMenu } from './NoteExportMenu';
@@ -11,14 +10,15 @@ interface NoteToolbarProps {
   templates: NoteTemplate[];
   hasDraftContent: boolean;
   canGenerate: boolean;
-  requiresFeedback: boolean;
   isGenerating: boolean;
   note: Note | undefined;
   patient: Patient;
   modifiers: SessionModifiers;
   onTemplateChange: (id: string) => void;
   onManageTemplates: () => void;
-  onGenerate: (mode: 'replace' | 'append', feedback?: string) => void;
+  /** Fires the workflow's generate intent — the machine raises the append/replace
+   *  or feedback gate as needed. */
+  onGenerate: () => void;
   onModifiersChange: (next: SessionModifiers) => void;
 }
 
@@ -39,7 +39,6 @@ function NoteToolbarImpl({
   templates,
   hasDraftContent,
   canGenerate,
-  requiresFeedback,
   isGenerating,
   note,
   patient,
@@ -49,9 +48,6 @@ function NoteToolbarImpl({
   onGenerate,
   onModifiersChange,
 }: NoteToolbarProps) {
-  const [overwriteOpen, setOverwriteOpen] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [feedbackText, setFeedbackText] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
   const modifierBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -59,16 +55,6 @@ function NoteToolbarImpl({
   const hasCustomActive = modifiers.customInstructions.some((c) => c.active);
 
   const generateDisabled = !canGenerate || isGenerating;
-
-  function handleRegenerate() {
-    if (requiresFeedback) {
-      setFeedbackOpen(true);
-    } else if (hasDraftContent) {
-      setOverwriteOpen(true);
-    } else {
-      onGenerate('replace');
-    }
-  }
 
   return (
     <div
@@ -159,7 +145,7 @@ function NoteToolbarImpl({
         style={{ height: 34, padding: '0 14px', fontSize: 'var(--text-sm)' }}
         disabled={generateDisabled}
         aria-busy={isGenerating}
-        onClick={handleRegenerate}
+        onClick={() => onGenerate()}
       >
         {isGenerating ? (
           <>
@@ -175,111 +161,6 @@ function NoteToolbarImpl({
           </>
         )}
       </button>
-
-      <Modal
-        open={overwriteOpen}
-        onClose={() => setOverwriteOpen(false)}
-        title="This note already has content"
-        size="sm"
-      >
-        <p style={{ fontSize: 'var(--text-md)', color: 'var(--color-pt-text-2)', lineHeight: 1.5 }}>
-          You've already written into this note. Choose <strong>Append</strong> to add the newly
-          generated text below what's there, or <strong>Replace</strong> to overwrite it. Replacing
-          cannot be undone.
-        </p>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button type="button" className="btn btn-ghost" onClick={() => setOverwriteOpen(false)}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={generateDisabled}
-            onClick={() => {
-              setOverwriteOpen(false);
-              if (!generateDisabled) onGenerate('append');
-            }}
-          >
-            <Sparkles size={13} strokeWidth={2} /> Append
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={generateDisabled}
-            onClick={() => {
-              setOverwriteOpen(false);
-              if (!generateDisabled) onGenerate('replace');
-            }}
-          >
-            <RotateCw size={13} strokeWidth={2} /> Replace
-          </button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={feedbackOpen}
-        onClose={() => {
-          setFeedbackOpen(false);
-          setFeedbackText('');
-        }}
-        title="What would you like improved?"
-        size="sm"
-      >
-        <p
-          style={{
-            fontSize: 'var(--text-md)',
-            color: 'var(--color-pt-text-2)',
-            lineHeight: 1.5,
-            marginBottom: 10,
-          }}
-        >
-          The transcript and settings haven't changed. Tell the AI what to fix.
-        </p>
-        <textarea
-          value={feedbackText}
-          onChange={(e) => setFeedbackText(e.target.value)}
-          placeholder="e.g. The assessment was too vague — expand functional limitations"
-          autoFocus
-          style={{
-            width: '100%',
-            minHeight: 80,
-            padding: '8px 10px',
-            borderRadius: 6,
-            border: '1px solid var(--color-pt-border)',
-            background: 'var(--color-pt-surface)',
-            color: 'var(--color-pt-text)',
-            fontSize: 'var(--text-base)',
-            lineHeight: 1.5,
-            resize: 'vertical',
-            boxSizing: 'border-box',
-          }}
-        />
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              setFeedbackOpen(false);
-              setFeedbackText('');
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!feedbackText.trim() || generateDisabled}
-            onClick={() => {
-              const fb = feedbackText.trim();
-              setFeedbackOpen(false);
-              setFeedbackText('');
-              onGenerate('replace', fb);
-            }}
-          >
-            <RotateCw size={13} strokeWidth={2} /> Regenerate
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }

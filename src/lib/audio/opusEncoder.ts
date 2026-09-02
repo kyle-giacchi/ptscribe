@@ -6,13 +6,13 @@ export const FRAME_MS = 20;
 /** 32 kbps mono is well above the speech-quality knee for Whisper input. */
 const OPUS_BITRATE = 32_000;
 
-export interface PcmFrame {
+interface PcmFrame {
   offset: number;
   length: number;
   timestampUs: number;
 }
 
-export interface EncodeResult {
+interface EncodeResult {
   /** Encoded Blob if `ok: true`; otherwise an empty Blob — caller should fall back to original. */
   blob: Blob;
   ok: boolean;

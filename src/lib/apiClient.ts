@@ -15,7 +15,7 @@ export class GateRejectedError extends Error {
   }
 }
 
-export interface ApiFetchOptions {
+interface ApiFetchOptions {
   /** When true (default), a 401 is treated as a rejected gate code: the stored
    *  code is cleared and {@link GateRejectedError} is thrown. Session-authed
    *  routes (BYOK /api/generate, /api/keys/*) pass `false` so their 401s —

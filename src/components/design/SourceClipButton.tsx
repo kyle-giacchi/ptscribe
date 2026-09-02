@@ -1,6 +1,6 @@
 import { TAG_TONES, type TagKind } from './TagChip';
 
-export interface SourceClipButtonProps {
+interface SourceClipButtonProps {
   timestamp: string;
   text: string;
   confidence?: number;

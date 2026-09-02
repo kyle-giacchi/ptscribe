@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-export interface NetworkStatus {
+interface NetworkStatus {
   isOnline: boolean;
   isOffline: boolean;
   /** True for ~3 s after recovering from an offline period. */

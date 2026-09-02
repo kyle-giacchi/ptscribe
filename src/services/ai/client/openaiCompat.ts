@@ -17,7 +17,7 @@ import { AiCallError, type AiProvider } from '../errors';
 import { retryFetch, safeReadText } from './retryFetch';
 import type { SelfHostedEndpoint, SelfHostedProvider } from '@/types';
 
-export interface OpenAiCompatArgs {
+interface OpenAiCompatArgs {
   provider: SelfHostedProvider;
   endpoint: SelfHostedEndpoint;
   /** Full system prompt — composed client-side, modifier block already appended. */
@@ -139,7 +139,7 @@ export async function callOpenAiCompat(args: OpenAiCompatArgs): Promise<{ text: 
   return { text };
 }
 
-export interface ConnectionTestResult {
+interface ConnectionTestResult {
   ok: boolean;
   /** Model IDs the server advertises — feeds the Settings model picker. */
   models: string[];

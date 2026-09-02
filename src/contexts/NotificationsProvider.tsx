@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 
-export interface AppNotification {
+interface AppNotification {
   id: string;
   level: 'warning' | 'error';
   message: string;

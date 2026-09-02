@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { trimSilence } from '@/lib/audio/silenceTrim';
 import { useSettings } from '@/contexts/SettingsProvider';
 
-export type CompiledAudio = { blob: Blob; forId: string; savedSec: number };
+type CompiledAudio = { blob: Blob; forId: string; savedSec: number };
 type CompileError = { msg: string; forId: string };
 
 const KEY = 'merged';

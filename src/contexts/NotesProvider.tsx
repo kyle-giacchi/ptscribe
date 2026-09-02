@@ -1,7 +1,7 @@
 import { createListSliceContext } from './createListSliceContext';
 import type { Note } from '@/types';
 
-export interface NotesContextValue {
+interface NotesContextValue {
   notes: Note[];
   addNote: (note: Note) => void;
   updateNote: (id: string, patch: Partial<Note>) => void;

@@ -7,13 +7,13 @@ import type { AiErrorEntry, Session } from '@/types';
 /** Shared timeout for AI calls (generate, cloud transcribe). */
 export const AI_CALL_TIMEOUT_MS = 180_000;
 
-export interface AiCallErrorClassification {
+interface AiCallErrorClassification {
   dispatchActions: SessionMachineAction[];
   entry: Omit<AiErrorEntry, 'id' | 'ts'>;
   toastMessage?: string;
 }
 
-export interface RunAiCallParams<TResult> {
+interface RunAiCallParams<TResult> {
   session: Session | undefined;
   dispatch: Dispatch<SessionMachineAction>;
   patchSession: (patch: Partial<Session>) => void;

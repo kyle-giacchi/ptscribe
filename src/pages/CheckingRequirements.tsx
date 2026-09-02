@@ -176,7 +176,10 @@ function Pip({ status }: { status: CheckStatus }) {
   }
   if (status === 'pass') {
     return (
-      <span style={{ ...base, background: 'var(--color-pt-accent)', color: '#fff' }} aria-hidden>
+      <span
+        style={{ ...base, background: 'var(--color-pt-accent-deep)', color: '#fff' }}
+        aria-hidden
+      >
         <Check size={12} strokeWidth={3} />
       </span>
     );
@@ -500,7 +503,7 @@ export function CheckingRequirements() {
             width: 26,
             height: 26,
             borderRadius: 7,
-            background: 'var(--color-pt-accent)',
+            background: 'var(--color-pt-accent-deep)',
             color: '#fff',
             display: 'flex',
             alignItems: 'center',

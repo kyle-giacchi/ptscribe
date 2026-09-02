@@ -7,7 +7,7 @@ export { SegmentedControl } from './SegmentedControl';
 export { SoapLine } from './SoapLine';
 export { SourceClipButton } from './SourceClipButton';
 export { Heatmap } from './Heatmap';
-export { MicStatusPill, formatElapsed, type MicState } from './MicStatusPill';
+export { MicStatusPill, type MicState } from './MicStatusPill';
 export { Waveform } from './Waveform';
 export { DisconnectBanner } from './DisconnectBanner';
 export { SurfaceCard, Eyebrow } from './Card';

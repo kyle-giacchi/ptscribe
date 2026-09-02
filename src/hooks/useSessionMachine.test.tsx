@@ -203,17 +203,29 @@ describe('PHI gate', () => {
     const params = makeParams();
     const { result } = renderHook(() => useSessionMachine(params));
 
-    await act(async () => result.current.actions.generate('replace'));
+    await act(async () => result.current.actions.generate());
 
     expect(result.current.state.gate).toMatchObject({ kind: 'phi-confirm' });
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('confirm resumes the parked intent (mode + feedback survive the gate)', async () => {
-    const params = makeParams();
+  it('feedback authored at the feedback gate survives the PHI gate that follows', async () => {
+    const params = makeParams({ note: makeNote() });
     const { result } = renderHook(() => useSessionMachine(params));
 
-    await act(async () => result.current.actions.generate('append', 'shorter please'));
+    // Note has content + inputs unchanged → generate() raises the feedback gate.
+    await act(async () => result.current.actions.generate());
+    expect(result.current.state.gate).toMatchObject({ kind: 'generate-feedback' });
+
+    await act(async () =>
+      result.current.actions.resolveGate({
+        kind: 'generate-feedback',
+        outcome: 'regenerate',
+        feedback: 'shorter please',
+      }),
+    );
+    expect(result.current.state.gate).toMatchObject({ kind: 'phi-confirm' });
+
     await act(async () =>
       result.current.actions.resolveGate({
         kind: 'phi-confirm',
@@ -279,11 +291,11 @@ describe('single-gate invariant', () => {
     const { result } = renderHook(() => useSessionMachine(params));
 
     await act(async () => result.current.actions.generate());
-    expect(result.current.state.gate).toMatchObject({ kind: 'phi-confirm' });
+    expect(result.current.state.gate).toMatchObject({ kind: 'generate-feedback' });
 
     // Template change over note content would open its own gate — dropped.
     await act(async () => result.current.actions.changeTemplate('tpl-2'));
-    expect(result.current.state.gate).toMatchObject({ kind: 'phi-confirm' });
+    expect(result.current.state.gate).toMatchObject({ kind: 'generate-feedback' });
     expect(params.patchSession).not.toHaveBeenCalledWith(
       expect.objectContaining({ templateId: 'tpl-2' }),
     );
@@ -362,6 +374,98 @@ describe('stale-finalize gate', () => {
     expect(params.onEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'note/finalized' }),
     );
+  });
+});
+
+// ── Generate-overwrite gate ────────────────────────────────────────────────
+
+describe('generate-overwrite gate', () => {
+  // Note has content, but inputs diverged → the append/replace choice, not feedback.
+  const divergedNote = () => makeNote({ generatedFromTranscript: 'old text' });
+
+  it('generate() opens the overwrite gate when the note has content and inputs changed', async () => {
+    const params = makeParams({ note: divergedNote() });
+    const { result } = renderHook(() => useSessionMachine(params));
+
+    await act(async () => result.current.actions.generate());
+
+    expect(result.current.state.gate).toMatchObject({ kind: 'generate-overwrite' });
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
+  it('replace routes through the PHI gate, then generates', async () => {
+    const params = makeParams({ note: divergedNote() });
+    const { result } = renderHook(() => useSessionMachine(params));
+
+    await act(async () => result.current.actions.generate());
+    await act(async () =>
+      result.current.actions.resolveGate({ kind: 'generate-overwrite', outcome: 'replace' }),
+    );
+    expect(result.current.state.gate).toMatchObject({ kind: 'phi-confirm' });
+
+    await act(async () =>
+      result.current.actions.resolveGate({
+        kind: 'phi-confirm',
+        outcome: 'confirm',
+        dontShowAgain: false,
+      }),
+    );
+    expect(mockGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancel drops the intent', async () => {
+    const params = makeParams({ note: divergedNote() });
+    const { result } = renderHook(() => useSessionMachine(params));
+
+    await act(async () => result.current.actions.generate());
+    await act(async () =>
+      result.current.actions.resolveGate({ kind: 'generate-overwrite', outcome: 'cancel' }),
+    );
+
+    expect(result.current.state.gate).toBeNull();
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+});
+
+// ── Record-warn gate ───────────────────────────────────────────────────────
+
+describe('record-warn gate', () => {
+  it('startRecording() with an existing note opens the warning instead of recording', async () => {
+    const recorder = makeRecorder();
+    const params = makeParams({ recorder, note: makeNote() });
+    const { result } = renderHook(() => useSessionMachine(params));
+
+    await act(async () => result.current.actions.startRecording());
+
+    expect(result.current.state.gate).toMatchObject({ kind: 'record-warn' });
+    expect(recorder.start).not.toHaveBeenCalled();
+  });
+
+  it('confirm starts recording', async () => {
+    const recorder = makeRecorder();
+    const params = makeParams({ recorder, note: makeNote() });
+    const { result } = renderHook(() => useSessionMachine(params));
+
+    await act(async () => result.current.actions.startRecording());
+    await act(async () =>
+      result.current.actions.resolveGate({ kind: 'record-warn', outcome: 'confirm' }),
+    );
+
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancel does not record', async () => {
+    const recorder = makeRecorder();
+    const params = makeParams({ recorder, note: makeNote() });
+    const { result } = renderHook(() => useSessionMachine(params));
+
+    await act(async () => result.current.actions.startRecording());
+    await act(async () =>
+      result.current.actions.resolveGate({ kind: 'record-warn', outcome: 'cancel' }),
+    );
+
+    expect(result.current.state.gate).toBeNull();
+    expect(recorder.start).not.toHaveBeenCalled();
   });
 });
 

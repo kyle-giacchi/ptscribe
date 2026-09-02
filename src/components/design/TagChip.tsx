@@ -19,7 +19,7 @@ export const TAG_TONES: Record<
   note: { bg: '#f1f3f7', border: '#dde2ea', dot: '#7c8699', fg: '#374055', label: 'Note' },
 };
 
-export interface TagChipProps {
+interface TagChipProps {
   kind: TagKind;
   text?: string;
 }
@@ -65,7 +65,7 @@ export const TagChip = memo(function TagChip({ kind, text }: TagChipProps) {
   );
 });
 
-export interface QuickTagButtonProps {
+interface QuickTagButtonProps {
   kind: TagKind;
   onClick?: () => void;
   label?: string;

@@ -1,4 +1,5 @@
 import { wordCount } from '@/lib/clinical/transcript';
+import { formatDuration } from '@/utils/format';
 import type { SessionClip } from '@/types';
 
 export interface TranscriptSegment {
@@ -53,15 +54,12 @@ export function parseTranscriptSegments(
     const showMinuteDivider = minute !== prevMinute;
     if (showMinuteDivider) prevMinute = minute;
 
-    const mm = String(Math.floor(estimatedSec / 60)).padStart(2, '0');
-    const ss = String(Math.floor(estimatedSec % 60)).padStart(2, '0');
-
     return {
       text,
       speaker,
       estimatedSec,
       showMinuteDivider,
-      minuteLabel: `${mm}:${ss}`,
+      minuteLabel: formatDuration(estimatedSec),
     };
   });
 }
@@ -85,14 +83,12 @@ export function parseChunkedTranscript(clips: SessionClip[]): TranscriptSegment[
   for (const clip of sorted) {
     for (const chunk of clip.transcriptChunks!) {
       const absoluteSec = clipOffset + chunk.startSec;
-      const mm = String(Math.floor(absoluteSec / 60)).padStart(2, '0');
-      const ss = String(Math.floor(absoluteSec % 60)).padStart(2, '0');
       segments.push({
         text: chunk.text,
         speaker: null,
         estimatedSec: absoluteSec,
         showMinuteDivider: true, // every real chunk always gets a timestamp header
-        minuteLabel: `${mm}:${ss}`,
+        minuteLabel: formatDuration(absoluteSec),
       });
     }
     clipOffset += clip.durationSec;

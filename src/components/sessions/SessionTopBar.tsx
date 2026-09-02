@@ -4,7 +4,7 @@ import type { Patient, Session, Note } from '@/types';
 import { isDemoMode } from '@/lib/demoMode';
 import { AddClipButton } from './AddClipButton';
 
-export interface SessionTopBarProps {
+interface SessionTopBarProps {
   patient: Patient;
   session: Session;
   note: Note | undefined;

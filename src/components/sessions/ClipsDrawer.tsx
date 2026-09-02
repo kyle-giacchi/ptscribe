@@ -23,7 +23,7 @@ interface ClipsDrawerProps {
   t2Label: string;
 }
 
-export interface ClipsListViewProps {
+interface ClipsListViewProps {
   clips: SessionClip[];
   total: number;
   newest: SessionClip | null;
