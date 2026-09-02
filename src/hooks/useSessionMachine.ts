@@ -82,7 +82,7 @@ export interface UseSessionMachineParams {
   onEvent?: (event: SessionMachineEvent) => void;
 }
 
-export interface SessionMachineSelectors {
+interface SessionMachineSelectors {
   /** Edited overlay if non-blank, else the machine baseline. */
   effectiveTranscript: string;
   hasUserEdits: boolean;
@@ -108,7 +108,7 @@ export interface SessionMachineSelectors {
   transcribeUsed: number;
 }
 
-export interface SessionMachineActions {
+interface SessionMachineActions {
   // Capture
   /** May open the whisper-unavailable gate instead of starting. */
   startRecording: () => void;
@@ -163,7 +163,7 @@ export interface SessionMachineActions {
   resolveGate: (resolution: GateResolution) => void;
 }
 
-export interface SessionMachine {
+interface SessionMachine {
   state: SessionMachineState;
   selectors: SessionMachineSelectors;
   actions: SessionMachineActions;

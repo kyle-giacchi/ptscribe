@@ -19,9 +19,9 @@ import type { Session } from '@/types';
 
 const TIER_RANK = { t1: 1, t2: 2, t3: 3 } as const;
 
-export type MachineTier = keyof typeof TIER_RANK;
+type MachineTier = keyof typeof TIER_RANK;
 
-export interface TierPromotion {
+interface TierPromotion {
   transcript: string;
   activeTranscriptTier: MachineTier;
 }
@@ -48,7 +48,7 @@ export function promoteTier(
   return { transcript: produced.text, activeTranscriptTier: produced.tier };
 }
 
-export type TierWritePatch = TierPromotion & {
+type TierWritePatch = TierPromotion & {
   editedTranscript: undefined;
 } & { [K in `${MachineTier}Transcript`]?: string };
 

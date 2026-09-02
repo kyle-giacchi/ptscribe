@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { TagKind } from './TagChip';
 import { TAG_TONES } from './TagChip';
 
-export interface SoapLineProps {
+interface SoapLineProps {
   text: ReactNode;
   anchor?: TagKind;
   edited?: boolean;

@@ -1,7 +1,78 @@
+/**
+ * Domain types. Every persisted shape is `z.infer`red from its Zod schema in
+ * `@/schemas` and re-exported here — declared once, validated once. This file
+ * owns the runtime constants and the few types that are never persisted
+ * (catalog definitions, debug payloads, UI keys).
+ *
+ * The `export type` re-export below is erased at compile time, so `@/schemas`
+ * importing the constants from here is not a runtime cycle.
+ */
+
+export type {
+  AISettings,
+  ActivityEntry,
+  AiErrorCall,
+  AiErrorEntry,
+  AiErrorEntryKind,
+  AppData,
+  AudioSettings,
+  BodyRegion,
+  Clinician,
+  CustomInstruction,
+  DensityMode,
+  Exercise,
+  ExerciseCategory,
+  FirstRunRole,
+  FirstRunState,
+  GenerateKeyReport,
+  GenerationProvider,
+  Measurement,
+  ModifierBeyondNote,
+  ModifierClinicalDetail,
+  ModifierCodingBilling,
+  ModifierLanguage,
+  ModifierLength,
+  ModifierVoice,
+  Note,
+  NoteActivities,
+  NoteFormat,
+  NoteSection,
+  NoteTemplate,
+  NoteTemplateSection,
+  OrgPolicySettings,
+  Patient,
+  PatientStatus,
+  PlanGoal,
+  PlanOfCare,
+  Prescription,
+  RecordingLimitsSettings,
+  SecuritySettings,
+  SelfHostedEndpoint,
+  Session,
+  SessionClip,
+  ClipStatus,
+  SessionModifiers,
+  SessionStatus,
+  SessionType,
+  SessionWorkflowSettings,
+  Settings,
+  Sex,
+  Side,
+  SilenceDetectionSettings,
+  SilenceSensitivity,
+  SpeedFactor,
+  SpeedUpSettings,
+  ThemeMode,
+  TranscriptChunk,
+  TranscriptTier,
+  TranscriptionProvider,
+} from '@/schemas';
+
+import type { BodyRegion, ExerciseCategory, GenerationProvider } from '@/schemas';
+
 export type ID = string;
 
 export const APP_DATA_VERSION = 1;
-export type AppDataVersion = typeof APP_DATA_VERSION;
 
 /**
  * Disclosure copy version. Bump when the HIPAA / data-handling text changes
@@ -9,353 +80,12 @@ export type AppDataVersion = typeof APP_DATA_VERSION;
  */
 export const DISCLOSURE_VERSION = 1;
 
-/** Lifetime cap on cloud (Nova) transcription runs per session — see {@link Session.cloudTranscribeCount}. */
+/** Lifetime cap on cloud (Nova) transcription runs per session — see `Session.cloudTranscribeCount`. */
 export const MAX_TRANSCRIBES_PER_SESSION = 1;
-/** Lifetime cap on Anthropic note-generation runs per session — see {@link Session.generateCount}. */
+/** Lifetime cap on Anthropic note-generation runs per session — see `Session.generateCount`. */
 export const MAX_GENERATES_PER_SESSION = 10;
 
-// ─── Clinician ──────────────────────────────────────────────────────────────
-
-export interface Clinician {
-  name: string;
-  credentials: string; // e.g. "DPT, OCS"
-  npi?: string;
-  practiceName?: string;
-  practiceAddress?: string;
-  phone?: string;
-  email?: string;
-  signatureBlock?: string;
-  /**
-   * Timestamp (ms) when the clinician acknowledged the HIPAA / data-handling
-   * disclosure. Set during Setup; absence means the wizard hasn't completed.
-   */
-  acknowledgedDisclosureAt?: number;
-}
-
-// ─── Patient ────────────────────────────────────────────────────────────────
-
-export type Sex = 'F' | 'M' | 'X';
-export type PatientStatus = 'active' | 'discharged' | 'on_hold';
-
-export interface Patient {
-  id: ID;
-  firstName: string;
-  lastName: string;
-  dob?: number; // ms timestamp
-  sex?: Sex;
-  mrn?: string;
-  primaryDiagnosis?: string;
-  icd10?: string;
-  referringProvider?: string;
-  notes?: string;
-  /** Avatar circle color as `#rrggbb`. Assigned at creation, editable. */
-  color?: string;
-  status: PatientStatus;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// ─── Modifiers ──────────────────────────────────────────────────────────────
-
-// Radio groups (single-select per group)
-export type ModifierVoice = '1st_person' | '2nd_person' | '3rd_person';
-export type ModifierLength = 'concise' | 'balanced' | 'detailed';
-export type ModifierLanguage = 'medical_terminology' | 'plain_language' | 'spanish_output';
-
-// Checkbox groups (multi-select)
-export type ModifierClinicalDetail =
-  | 'pertinent_negatives'
-  | 'include_ros'
-  | 'quote_verbatim'
-  | 'differential_diagnosis'
-  | 'risk_scores';
-
-export type ModifierCodingBilling = 'icd10_suggestions' | 'em_level' | 'hcc_flags';
-
-export type ModifierBeyondNote =
-  | 'suggested_orders'
-  | 'med_rec_check'
-  | 'patient_education'
-  | 'transcript_timestamps';
-
-export interface CustomInstruction {
-  id: string;
-  text: string;
-  active: boolean;
-}
-
-export interface SessionModifiers {
-  voice?: ModifierVoice;
-  length?: ModifierLength;
-  language?: ModifierLanguage;
-  clinicalDetail: ModifierClinicalDetail[];
-  codingBilling: ModifierCodingBilling[];
-  beyondNote: ModifierBeyondNote[];
-  customInstructions: CustomInstruction[];
-}
-
-// ─── Session ────────────────────────────────────────────────────────────────
-
-export type SessionType = 'evaluation' | 'follow_up' | 'progress' | 'discharge';
-export type SessionStatus =
-  | 'draft'
-  | 'recording'
-  | 'transcribing'
-  | 'generating'
-  | 'ready'
-  | 'finalized';
-export type TranscriptTier = 't1' | 't2' | 't3' | 'edited';
-
-/**
- * One discrete audio take inside a session. A session is a sequence of these.
- * `id` doubles as the AudioRepository key (both for the consolidated Blob in
- * `recordings` and for the per-chunk WAL rows in `recording_chunks`).
- */
-export type ClipStatus =
-  | 'pending' // recording in flight; no consolidated Blob yet
-  | 'ready' // audio saved, awaiting transcription
-  | 'transcribing' // Whisper request in flight
-  | 'transcribed' // transcript text populated
-  | 'failed'; // last transcription attempt failed
-
-export interface TranscriptChunk {
-  startSec: number; // seconds from clip start (real, not estimated)
-  text: string;
-}
-
-export interface SessionClip {
-  id: ID;
-  index: number;
-  durationSec: number;
-  status: ClipStatus;
-  transcript?: string; // active transcript — mirrors the active tier's text
-  t1Transcript?: string; // Tier 1 (Live Browser): Web Speech real-time capture during recording
-  t2Transcript?: string; // Tier 2 (Whisper Local): auto-pass result, frozen after first write
-  t3Transcript?: string; // Tier 3 (Nova AI): cloud result, written by explicit transcription action
-  transcriptChunks?: TranscriptChunk[]; // real 2-min chunks from local Whisper; absent after cloud pass
-  transcriptedAt?: number;
-  startOffsetSec?: number;
-  errorMessage?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface Session {
-  id: ID;
-  patientId: ID;
-  type: SessionType;
-  date: number;
-  durationMin?: number;
-  status: SessionStatus;
-  clips: SessionClip[];
-  transcript?: string; // active transcript — mirrors the active tier's text
-  t1Transcript?: string; // Tier 1 (Live Browser): merged per-clip Web Speech live transcripts
-  t2Transcript?: string; // Tier 2 (Whisper Local): merged result, frozen after auto-pass
-  t3Transcript?: string; // Tier 3 (Nova AI): merged cloud result, written on explicit transcription
-  editedTranscript?: string; // Edited: user-modified transcript text
-  activeTranscriptTier?: TranscriptTier;
-  noteId?: ID;
-  templateId?: ID;
-  modifiers?: SessionModifiers;
-  /**
-   * Capped ring buffer (~20, newest last) of recent AI-call failures for this
-   * session — generation, transcription, PII, and model-fetch. Persisted so a
-   * silent/transient failure (e.g. a blank note from a key mismatch) can be
-   * diagnosed from the Debug Menu after the fact, surviving reload. Encrypted
-   * at rest with the rest of the Session. See {@link AiErrorEntry}.
-   */
-  aiErrors?: AiErrorEntry[];
-  /**
-   * Lifetime count of cloud (Nova) transcription runs for this session. Capped at
-   * {@link MAX_TRANSCRIBES_PER_SESSION}. Persisted so the cap survives reload, Revert, and
-   * Unlock — never reset by any client action. Absent is treated as 0 at read time.
-   * See CONTEXT.md §Cloud-transcription cap.
-   */
-  cloudTranscribeCount?: number;
-  /**
-   * Lifetime count of Anthropic note-generation runs for this session. Capped at
-   * {@link MAX_GENERATES_PER_SESSION}. Persisted so the cap survives reload, Revert, and
-   * Unlock — never reset by any client action. Absent is treated as 0 at read time.
-   */
-  generateCount?: number;
-  /**
-   * ms timestamp the session was finalized. Anchors finalize-gated audio
-   * retention (CONTEXT.md §Audio retention). Absent on non-finalized sessions;
-   * legacy finalized sessions are backfilled to `updatedAt` at migration time.
-   */
-  finalizedAt?: number;
-  createdAt: number;
-  updatedAt: number;
-}
-
-/** Which AI call produced an {@link AiErrorEntry}. */
-export type AiErrorCall =
-  | 'generate'
-  | 'transcribe-cloud'
-  | 'transcribe-local'
-  | 'pii'
-  | 'model-fetch';
-
-/**
- * Failure kind for an {@link AiErrorEntry}. The first five mirror the transport
- * `AiErrorKind` (services/ai/errors.ts); the last three are app-level outcomes
- * that look "successful" at the network layer but yield an unusable note.
- */
-export type AiErrorEntryKind =
-  | 'network'
-  | 'rate_limit'
-  | 'auth'
-  | 'empty'
-  | 'timeout'
-  | 'parse' // 200 OK but the JSON could not be parsed
-  | 'key_mismatch' // parsed, but returned keys don't match the template
-  | 'blank' // parsed + keys matched, but every section came back empty
-  // BYOK generation (ADR-0009/0010) — persisted so the error log explains a key/auth failure offline.
-  | 'no_key'
-  | 'key_rejected'
-  | 'provider_limited'
-  | 'signin_required'
-  | 'service_unavailable'
-  | 'demo_disabled'
-  | 'unreachable' // self-hosted endpoint didn't answer (down / CORS / mixed content / private-network block)
-  | 'model_missing'; // self-hosted endpoint is up but doesn't serve the configured model
-
-/**
- * One persisted AI-call failure. Transport failures store lean metadata only;
- * content failures (parse/key_mismatch/blank) additionally carry a bounded
- * `rawSnippet` and the `keyReport` so a blank note can be explained offline.
- */
-export interface AiErrorEntry {
-  id: ID;
-  ts: number;
-  call: AiErrorCall;
-  /** e.g. 'anthropic' | 'nova' | 'whisper-local' | 'r2' | 'huggingface'. */
-  provider?: string;
-  kind: AiErrorEntryKind;
-  /** HTTP status, when the failure came from a fetch. */
-  status?: number;
-  /** End-to-end duration of the failed call in ms. */
-  latencyMs?: number;
-  /** Attempts made before giving up (retry-aware calls). */
-  attempts?: number;
-  /** Short, non-content description (status text, error message). */
-  detail?: string;
-  /** Content failures only: bounded slice of the raw response (~2k chars). */
-  rawSnippet?: string;
-  /** Content failures on the generate path only: key-mapping diagnosis. */
-  keyReport?: GenerateKeyReport;
-}
-
-// ─── Note ───────────────────────────────────────────────────────────────────
-
-export type NoteFormat = 'soap' | 'evaluation' | 'progress' | 'discharge' | 'custom';
-
-export interface NoteSection {
-  key: string;
-  label: string;
-  body: string;
-}
-
-export interface Note {
-  id: ID;
-  sessionId: ID;
-  patientId: ID;
-  format: NoteFormat;
-  templateId?: ID;
-  sections: NoteSection[];
-  finalized: boolean;
-  finalizedAt?: number;
-  /**
-   * Timestamp (ms) of the first save after a finalized note was unlocked and
-   * edited. Set on the first qualifying save; never overwritten after that.
-   */
-  editedAfterFinalizedAt?: number;
-  /**
-   * Running count of save operations that occurred after finalization.
-   * Incremented each time `updateNote` is called while `finalized` was true
-   * at the time of unlock.
-   */
-  editedAfterFinalizedCount?: number;
-  modifiers?: SessionModifiers;
-  generatedFromTranscript?: string;
-  /**
-   * Per-visit exercise log. Never sent to the AI, never part of staleness, and
-   * never written into `sections`. Survives regeneration because generation
-   * patches only sections/templateId/format/modifiers/generatedFromTranscript.
-   */
-  activities?: NoteActivities;
-  createdAt: number;
-  updatedAt: number;
-}
-
-/**
- * One logged exercise on a Note. Extends {@link Prescription} so write-back to
- * PlanOfCare is a field-for-field map with no translation layer.
- */
-export interface ActivityEntry extends Prescription {
-  /**
-   * Denormalized at add-time. Built-in exercises are delete-protected, but custom
-   * ones are not — without this snapshot, deleting a custom exercise would corrupt
-   * the exercise name in every finalized note that referenced it.
-   */
-  exerciseName: string;
-}
-
-/**
- * Per-visit activity log (CONTEXT.md workflow: documentation artifact only).
- * Deliberately NOT part of note staleness — see `src/services/note/staleness.ts`.
- */
-export interface NoteActivities {
-  /** Exercises the patient performed in clinic this visit. */
-  performed: ActivityEntry[];
-  /** Take-home program assigned this visit. */
-  home: ActivityEntry[];
-}
-
-// ─── Template ───────────────────────────────────────────────────────────────
-
-export interface NoteTemplateSection {
-  key: string;
-  label: string;
-  promptHint?: string;
-  /** When true, NotePanel blocks finalize until this section has a non-empty body. */
-  required?: boolean;
-}
-
-export interface NoteTemplate {
-  id: ID;
-  name: string;
-  format: NoteFormat;
-  sections: NoteTemplateSection[];
-  systemPrompt: string;
-  builtin: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// ─── Exercise ───────────────────────────────────────────────────────────────
-
-export type BodyRegion =
-  | 'cervical'
-  | 'thoracic'
-  | 'lumbar'
-  | 'shoulder'
-  | 'elbow'
-  | 'wrist_hand'
-  | 'hip'
-  | 'knee'
-  | 'ankle_foot'
-  | 'core'
-  | 'gait_balance'
-  | 'other';
-
-export type ExerciseCategory =
-  | 'strength'
-  | 'mobility'
-  | 'stability'
-  | 'cardio'
-  | 'neuro'
-  | 'manual_therapy';
+// ─── Exercise catalog labels ────────────────────────────────────────────────
 
 export const BODY_REGIONS: BodyRegion[] = [
   'cervical',
@@ -405,51 +135,8 @@ export const CATEGORY_LABEL: Record<ExerciseCategory, string> = {
   manual_therapy: 'Manual therapy',
 };
 
-export interface Exercise {
-  id: ID;
-  name: string;
-  region: BodyRegion;
-  category: ExerciseCategory;
-  instructions: string;
-  defaultDosage?: string;
-  cues?: string;
-  videoUrl?: string;
-  builtin: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
+// ─── Objective measures (catalog definitions — not persisted) ───────────────
 
-// ─── Plan of Care ───────────────────────────────────────────────────────────
-
-export interface PlanGoal {
-  id: ID;
-  text: string;
-  targetDate?: number;
-  met: boolean;
-}
-
-export interface Prescription {
-  id: ID;
-  exerciseId: ID;
-  dosage: string;
-  notes?: string;
-}
-
-export interface PlanOfCare {
-  id: ID;
-  patientId: ID;
-  startDate: number;
-  expectedDischargeDate?: number;
-  goals: PlanGoal[];
-  prescriptions: Prescription[];
-  active: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// ─── Objective measures ─────────────────────────────────────────────────────
-
-export type Side = 'left' | 'right';
 export type MeasureKind = 'pain' | 'rom' | 'strength' | 'outcome' | 'functional';
 
 /**
@@ -476,42 +163,13 @@ export interface MeasureDef {
   hint?: string;
 }
 
-/**
- * One recorded data point. Patient-owned rather than visit-owned: measures are
- * routinely taken outside a documented visit, and every useful view of them
- * (trend, baseline vs latest) is per-patient. `sessionId` is a back-link when
- * the value was captured during a visit.
- */
-export interface Measurement {
-  id: ID;
-  patientId: ID;
-  sessionId?: ID;
-  /** References `MeasureDef.id`. Free string so a retired catalog entry still renders. */
-  measureId: string;
-  side?: Side;
-  value: number;
-  takenAt: number;
-  notes?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// ─── Settings ───────────────────────────────────────────────────────────────
-
-export type TranscriptionProvider = 'cloudflare' | 'webspeech' | 'local' | 'none';
-/**
- * `local` (loopback server on the clinician's machine) and `network` (clinic-hosted
- * server on the LAN/VPN) are *self-hosted*: the browser calls them directly, with no
- * Worker in the path and no BYOK key on our side. See ADR-0011.
- */
-export type GenerationProvider = 'anthropic' | 'openai' | 'google' | 'local' | 'network' | 'none';
+// ─── Generation provider helpers ────────────────────────────────────────────
 
 /** Providers whose key we store server-side and whose calls the Worker proxies. */
 export type CloudGenerationProvider = Exclude<GenerationProvider, 'none' | 'local' | 'network'>;
 export type SelfHostedProvider = Extract<GenerationProvider, 'local' | 'network'>;
 
 export const CLOUD_GENERATION_PROVIDERS = ['anthropic', 'openai', 'google'] as const;
-export const SELF_HOSTED_PROVIDERS = ['local', 'network'] as const;
 
 export function isCloudProvider(p: GenerationProvider): p is CloudGenerationProvider {
   return (CLOUD_GENERATION_PROVIDERS as readonly string[]).includes(p);
@@ -519,161 +177,8 @@ export function isCloudProvider(p: GenerationProvider): p is CloudGenerationProv
 export function isSelfHostedProvider(p: GenerationProvider): p is SelfHostedProvider {
   return p === 'local' || p === 'network';
 }
-export type DensityMode = 'cozy' | 'compact';
-export type ThemeMode = 'system' | 'light' | 'dark';
-
-export interface AISettings {
-  transcription: {
-    provider: TranscriptionProvider;
-    model: string; // e.g. '@cf/openai/whisper-large-v3-turbo'
-  };
-  generation: {
-    provider: GenerationProvider;
-    model: string; // e.g. 'claude-sonnet-4-6'
-    /** Endpoint config for the self-hosted providers. Absent until configured. */
-    endpoints?: Partial<Record<SelfHostedProvider, SelfHostedEndpoint>>;
-    /** Cloud provider offered as a fallback when a self-hosted call fails.
-     *  Never used automatically — the user has to accept it in the dialog. */
-    cloudFallback?: CloudGenerationProvider;
-  };
-}
-
-/** An OpenAI-compatible server the browser talks to directly (Ollama, LM Studio, vLLM…). */
-export interface SelfHostedEndpoint {
-  /** Origin + optional path prefix, no trailing `/v1`. `http://` only for loopback. */
-  baseUrl: string;
-  model: string;
-  /** Optional bearer token for the user's own server. Vault-encrypted with the rest of AppData. */
-  apiKey?: string;
-}
-
-export type SilenceSensitivity = 'low' | 'medium' | 'high';
-
-export interface SilenceDetectionSettings {
-  enabled: boolean;
-  sensitivity: SilenceSensitivity;
-  padMs: number;
-}
 
 export const SUPPORTED_SPEEDS = [1.25, 1.5, 1.75] as const;
-export type SpeedFactor = (typeof SUPPORTED_SPEEDS)[number];
-
-export interface SpeedUpSettings {
-  enabled: boolean;
-  speed: SpeedFactor;
-}
-
-export interface AudioSettings {
-  silenceDetection: SilenceDetectionSettings;
-  speedUp: SpeedUpSettings;
-  /**
-   * `deviceId` of the microphone chosen in the AudioCheck pre-flight. Passed to
-   * `getUserMedia` as `{ deviceId: { ideal } }` so a real recording reuses it,
-   * falling back to the system default if the device is gone. Undefined = default
-   * device. Device IDs are origin-scoped and rotate when permissions reset.
-   */
-  inputDeviceId?: string;
-}
-
-export interface SecuritySettings {
-  /**
-   * Minutes of user inactivity before the vault auto-locks. `0` disables
-   * auto-lock; default `10`. Bounded `[0, 120]` in the schema.
-   */
-  idleLockMinutes: number;
-}
-
-export interface SessionWorkflowSettings {
-  /**
-   * When true, "Stop & finish" chains stop → transcribe → generate → copy in one
-   * tap. When false, the user advances each step manually. Default true.
-   */
-  autoFinish: boolean;
-  /**
-   * When true, the browser Web Speech API runs alongside Whisper during recording,
-   * writing t1Transcript from cloud captions. Off by default — Whisper VAD segments
-   * are the default T1 source.
-   */
-  webSpeechEnabled: boolean;
-  /**
-   * On-device model used for PII scrubbing. 'openai/privacy-filter' requires ONNX
-   * files pre-seeded to R2 (see scripts/convert-privacy-filter.py). 'Xenova/bert-base-NER'
-   * has ONNX exports on HuggingFace and works without R2 setup. Default: openai/privacy-filter.
-   */
-  piiModel?: 'openai/privacy-filter' | 'Xenova/bert-base-NER';
-  /**
-   * When true, skip the "transcript leaves device" confirmation that appears
-   * before Generate / Regenerate sends the transcript to Anthropic. Toggled via
-   * a "Don't show this again" checkbox in the dialog, restorable from User
-   * Settings → Notes & Templates. Default false.
-   */
-  phiConfirmDismissed: boolean;
-}
-
-/**
- * Soft + hard caps on how long a single recording can run before the recorder
- * nudges the clinician to split, then auto-stops. Defends Marcus's
- * cost-predictability and "lunch-left-recording" failure modes.
- */
-export interface RecordingLimitsSettings {
-  /** Show a non-blocking "split this?" banner once duration passes this many minutes. Default 75. Bounded [15, 240]. */
-  softWarnAtMinutes: number;
-  /** Auto-stop the recorder when duration crosses this many minutes. Default 90. Bounded [30, 240]. */
-  maxMinutes: number;
-  /** When the mic input has been silent for this many continuous minutes, surface an idle-stop prompt. `0` disables. Default 10. Bounded [0, 60]. */
-  idleAutoStopMinutes: number;
-}
-
-/**
- * Org-wide documentation policy. The `activeTemplateId` makes one template the
- * organization default — NewSession and the generator use it unless the
- * clinician explicitly picks another.
- */
-export interface OrgPolicySettings {
-  activeTemplateId?: ID;
-}
-
-export type FirstRunRole = 'owner' | 'clinician';
-
-/**
- * State captured during the first launch fork. `role` distinguishes the
- * owner-set-up-the-team flow from the clinician-just-record flow.
- * `disclosureVersion` matches `DISCLOSURE_VERSION` at the time the user
- * acknowledged the disclosure — bump the constant to re-prompt.
- * `onboardingUrlConsumed` is set true after `?role=…&clinic=…` URL params have
- * been read once so refreshes don't re-pre-fill.
- */
-export interface FirstRunState {
-  role?: FirstRunRole;
-  onboardingDoneAt?: number;
-  disclosureVersion?: number;
-  onboardingUrlConsumed?: boolean;
-  /**
-   * Set once the "Checking your setup" pre-flight gate has been completed (demo
-   * first-run). Presence skips the gate on subsequent demo entries.
-   */
-  setupCheckDoneAt?: number;
-}
-
-export interface Settings {
-  ai: AISettings;
-  audio: AudioSettings;
-  security: SecuritySettings;
-  session: SessionWorkflowSettings;
-  recordingLimits: RecordingLimitsSettings;
-  orgPolicy: OrgPolicySettings;
-  firstRun: FirstRunState;
-  ui: {
-    sidebarCollapsed: boolean;
-    densityMode: DensityMode;
-    theme: ThemeMode;
-    /** IANA timezone string (e.g. 'America/New_York'). Undefined = browser default. */
-    timezone?: string;
-  };
-  retention: {
-    autoDeleteAudioAfterDays?: number;
-  };
-}
 
 /**
  * Fixed ID for the built-in "Unassigned" patient. Quick-record paths target this
@@ -687,15 +192,9 @@ export const UNASSIGNED_PATIENT_ID = 'patient:unassigned';
 
 export type AnalysisMode = 'simple' | 'power';
 export type PageKey =
-  | 'dashboard'
-  | 'patients'
-  | 'patient_detail'
-  | 'session'
-  | 'notes'
-  | 'templates'
-  | 'exercises';
+  'dashboard' | 'patients' | 'patient_detail' | 'session' | 'notes' | 'templates' | 'exercises';
 
-// ─── AI debug ───────────────────────────────────────────────────────────────
+// ─── AI debug (in-memory only) ──────────────────────────────────────────────
 
 export interface AiDebugPrompts {
   /** Model id sent to the Worker (resolved, after the default fallback). */
@@ -703,42 +202,4 @@ export interface AiDebugPrompts {
   system: string;
   modifierBlock: string;
   user: string;
-}
-
-/**
- * Diagnostic comparison of the JSON keys the model returned against the keys
- * the active template expects. Lets us explain a blank note precisely:
- * `matched: []` with a non-empty `returned` means a key mismatch, not an
- * empty-transcript result.
- */
-export interface GenerateKeyReport {
-  /** Section keys the template expects (`template.sections[*].key`). */
-  expected: string[];
-  /** Top-level keys present in the model's parsed JSON. */
-  returned: string[];
-  /** Expected keys the model actually returned. */
-  matched: string[];
-  /** Expected keys the model omitted. */
-  missing: string[];
-  /** Keys the model returned that the template does not use. */
-  unexpected: string[];
-  /** Matched keys whose value was blank or not a string. */
-  emptyMatched: string[];
-}
-
-// ─── AppData root ───────────────────────────────────────────────────────────
-
-export interface AppData {
-  version: AppDataVersion;
-  lastModified: number;
-  tenantId: string;
-  clinician: Clinician;
-  patients: Patient[];
-  sessions: Session[];
-  notes: Note[];
-  templates: NoteTemplate[];
-  exercises: Exercise[];
-  plans: PlanOfCare[];
-  measurements: Measurement[];
-  settings: Settings;
 }

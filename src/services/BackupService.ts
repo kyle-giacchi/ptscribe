@@ -35,7 +35,7 @@ interface CipherParts {
   ciphertext: string;
 }
 
-export interface PortableBackup {
+interface PortableBackup {
   kind: typeof BACKUP_KIND;
   v: typeof PORTABLE_BACKUP_VERSION;
   encrypted: true;
@@ -64,7 +64,7 @@ export interface PortableBackup {
   payload: CipherParts;
 }
 
-export interface EncryptedBackup {
+interface EncryptedBackup {
   kind: typeof BACKUP_KIND;
   v: typeof BACKUP_VERSION;
   encrypted: true;
@@ -72,27 +72,24 @@ export interface EncryptedBackup {
   envelope: string;
 }
 
-export interface PlaintextBackup {
+interface PlaintextBackup {
   kind: typeof BACKUP_KIND;
   v: typeof BACKUP_VERSION;
   encrypted: false;
   data: AppData;
 }
 
-export type BackupFile = PortableBackup | EncryptedBackup | PlaintextBackup;
-
-export type ImportError =
+type ImportError =
   | { code: 'INVALID_JSON'; message: string }
   | { code: 'VAULT_LOCKED'; message: string }
   | { code: 'PASSPHRASE_REQUIRED'; message: string }
   | { code: 'WRONG_PASSPHRASE'; message: string }
   | { code: 'SCHEMA_INVALID'; message: string };
 
-export type ImportResult =
-  | { ok: true; data: AppData; encrypted: boolean }
-  | { ok: false; error: ImportError };
+type ImportResult =
+  { ok: true; data: AppData; encrypted: boolean } | { ok: false; error: ImportError };
 
-export interface ImportOptions {
+interface ImportOptions {
   /** Passphrase for restoring a portable backup on a device whose vault can't decrypt it. */
   passphrase?: string;
   /** Recovery code, as an alternative to the passphrase, for the same restore. */

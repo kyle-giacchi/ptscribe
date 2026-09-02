@@ -9,7 +9,7 @@ const TREND_COLORS: Record<StatTrend, string> = {
   neutral: '#5a6577',
 };
 
-export interface StatCardProps {
+interface StatCardProps {
   eyebrow: string;
   value: ReactNode;
   trend?: ReactNode;

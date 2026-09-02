@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useAppData } from './AppDataProvider';
 import type { Clinician } from '@/types';
 
-export interface ClinicianContextValue {
+interface ClinicianContextValue {
   clinician: Clinician;
   setClinician: (patch: Partial<Clinician>) => void;
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 const LOW_STORAGE_BYTES = 200 * 1024 * 1024; // 200 MB
 const CRITICAL_STORAGE_BYTES = 50 * 1024 * 1024; //  50 MB
 
-export type MicPermissionState = 'granted' | 'denied' | 'prompt' | 'unavailable';
+type MicPermissionState = 'granted' | 'denied' | 'prompt' | 'unavailable';
 
 export interface DeviceCapabilities {
   /** True while async checks (permissions, storage) are still in flight. */

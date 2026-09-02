@@ -12,7 +12,7 @@ const LIST_LABEL: Record<ListKey, string> = {
   home: 'Home program',
 };
 
-export interface PatientActivitiesCardProps {
+interface PatientActivitiesCardProps {
   /** Already resolved by the caller — either the note's value or the plan seed. */
   activities: NoteActivities;
   exercises: Exercise[];

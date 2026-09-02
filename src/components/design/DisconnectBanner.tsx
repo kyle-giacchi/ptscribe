@@ -1,6 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
 
-export interface DisconnectBannerProps {
+interface DisconnectBannerProps {
   message?: string;
   onReplayTone?: () => void;
   onReconnect?: () => void;

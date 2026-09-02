@@ -1,7 +1,7 @@
 import type { SessionClip } from '@/types';
 import type { T2Phase } from '@/hooks/useBackgroundTranscription';
 
-export type ClipStatusTone = 'accent' | 'negative' | 'amber';
+type ClipStatusTone = 'accent' | 'negative' | 'amber';
 
 // ── "Is this clip usable?" — four different questions ──────────────────────
 // These are deliberately not one predicate. Each answers a different question

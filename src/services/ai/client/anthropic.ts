@@ -11,9 +11,9 @@
 
 import { apiFetch } from '@/lib/apiClient';
 import { AiCallError, classifyError, type AiProvider } from '../errors';
-import { retryFetch, safeReadText } from './retryFetch';
+import { parseErrorCode, retryFetch, safeReadText } from './retryFetch';
 
-export interface AnthropicMessageArgs {
+interface AnthropicMessageArgs {
   /** BYOK provider the Worker should generate against. Defaults to 'anthropic'.
    *  Sent in the /api/generate body; the Worker resolves the user's key for it. */
   provider?: Extract<AiProvider, 'anthropic' | 'openai' | 'google'>;
@@ -35,7 +35,7 @@ export interface AnthropicMessageArgs {
   onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
-export interface AnthropicResult {
+interface AnthropicResult {
   text: string;
 }
 
@@ -107,14 +107,4 @@ export async function callAnthropic(args: AnthropicMessageArgs): Promise<Anthrop
     });
   }
   return { text: data.text };
-}
-
-/** Pull the Worker's `{ code }` discriminator out of an error body, if present. */
-function parseErrorCode(body: string): string | undefined {
-  try {
-    const parsed = JSON.parse(body) as { code?: unknown };
-    return typeof parsed.code === 'string' ? parsed.code : undefined;
-  } catch {
-    return undefined;
-  }
 }

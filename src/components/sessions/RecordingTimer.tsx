@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { formatDuration } from '@/utils/format';
 
-export interface RecordingTimerProps {
+interface RecordingTimerProps {
   /** Subscribe to the recorder's live-duration store (from `useRecorder`). */
   subscribeDuration: (cb: () => void) => () => void;
   /** Read the current elapsed seconds snapshot (from `useRecorder`). */

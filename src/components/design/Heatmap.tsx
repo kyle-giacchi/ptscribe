@@ -1,4 +1,4 @@
-export interface HeatmapProps {
+interface HeatmapProps {
   values: number[]; // 0..1
   cellSize?: number;
   gap?: number;

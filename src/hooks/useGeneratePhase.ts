@@ -35,9 +35,9 @@ export interface UseGeneratePhaseParams {
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
 }
 
-export type GenerateMode = 'replace' | 'append';
+type GenerateMode = 'replace' | 'append';
 
-export interface GeneratePhaseResult {
+interface GeneratePhaseResult {
   /**
    * `cloudOverride` runs this one call against a cloud provider instead of the
    * configured self-hosted endpoint. It is never chosen automatically — the user

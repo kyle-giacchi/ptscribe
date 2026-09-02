@@ -160,7 +160,7 @@ export function AuthCallback() {
             style={{
               width: '100%',
               padding: '14px',
-              background: busy ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent)',
+              background: busy ? 'var(--color-pt-text-3)' : 'var(--color-pt-accent-deep)',
               color: '#ffffff',
               border: 'none',
               borderRadius: 12,

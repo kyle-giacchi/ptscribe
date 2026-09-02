@@ -40,10 +40,6 @@ export function monthsBetween(fromTs: number, toTs: number): number {
   return (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth());
 }
 
-export function todayIso(): string {
-  return fmtIsoDate(Date.now());
-}
-
 export function relativeFromNow(ts: number, now = Date.now()): string {
   const diff = now - ts;
   if (diff < 0) return 'in the future';

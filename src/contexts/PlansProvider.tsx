@@ -1,7 +1,7 @@
 import { createListSliceContext } from './createListSliceContext';
 import type { PlanOfCare } from '@/types';
 
-export interface PlansContextValue {
+interface PlansContextValue {
   plans: PlanOfCare[];
   addPlan: (plan: PlanOfCare) => void;
   updatePlan: (id: string, patch: Partial<PlanOfCare>) => void;

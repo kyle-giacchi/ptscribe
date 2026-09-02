@@ -1,7 +1,7 @@
 import { createListSliceContext } from './createListSliceContext';
 import type { Exercise } from '@/types';
 
-export interface ExercisesContextValue {
+interface ExercisesContextValue {
   exercises: Exercise[];
   addExercise: (exercise: Exercise) => void;
   updateExercise: (id: string, patch: Partial<Exercise>) => void;

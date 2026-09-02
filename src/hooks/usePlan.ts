@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { PLAN_LIMITS, type PlanLimits, type PlanTier } from '@/types/plans';
 
-export interface UsePlanReturn {
+interface UsePlanReturn {
   tier: PlanTier;
   limits: PlanLimits;
   isWithinLimit: (resource: keyof PlanLimits, currentCount: number) => boolean;

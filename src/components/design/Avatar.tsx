@@ -42,7 +42,7 @@ function hashColor(name: string): string {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length].hex;
 }
 
-export interface AvatarProps {
+interface AvatarProps {
   name: string;
   /** Any hex color (`#rrggbb`). Falls back to a hash of `name` when absent. */
   color?: string;

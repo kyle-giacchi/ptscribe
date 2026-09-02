@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 
-export interface SegmentedItem<V extends string> {
+interface SegmentedItem<V extends string> {
   value: V;
   label: ReactNode;
 }
 
-export interface SegmentedControlProps<V extends string> {
+interface SegmentedControlProps<V extends string> {
   value: V;
   onChange: (v: V) => void;
   items: SegmentedItem<V>[];

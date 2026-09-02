@@ -1,7 +1,7 @@
 import { createListSliceContext } from './createListSliceContext';
 import type { Measurement } from '@/types';
 
-export interface MeasurementsContextValue {
+interface MeasurementsContextValue {
   measurements: Measurement[];
   addMeasurement: (measurement: Measurement) => void;
   updateMeasurement: (id: string, patch: Partial<Measurement>) => void;

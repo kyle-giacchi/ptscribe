@@ -1,17 +1,12 @@
 /**
- * Client-side mirror of the Worker's provider/model catalog (worker/providers/*).
- * The Worker's per-adapter `models` list is the single source of truth for
- * ordering/labels; we fetch it once at module load via GET /api/providers and
- * cache it through a tiny useSyncExternalStore. FALLBACK_CATALOG (today's
- * known-good values) seeds the store immediately so nothing renders empty
- * while the fetch is in flight, and is kept if the fetch fails.
+ * Client-side BYOK provider/model catalog. A plain constant — it changes on
+ * deploy, and the bundle redeploys with the Worker, so there is nothing to
+ * fetch. Keep in sync with worker/providers/* when models change.
  */
 
-import { useSyncExternalStore } from 'react';
-import { apiFetch } from '@/lib/apiClient';
 import type { KeyProvider } from './keysClient';
 
-export interface ProviderModel {
+interface ProviderModel {
   id: string;
   label: string;
 }
@@ -26,7 +21,7 @@ export interface ProviderDescriptor {
   keyHint: string;
 }
 
-const FALLBACK_CATALOG: Record<KeyProvider, ProviderDescriptor> = {
+const CATALOG: Record<KeyProvider, ProviderDescriptor> = {
   anthropic: {
     id: 'anthropic',
     label: 'Anthropic',
@@ -61,53 +56,12 @@ const FALLBACK_CATALOG: Record<KeyProvider, ProviderDescriptor> = {
   },
 };
 
-let catalog: Record<KeyProvider, ProviderDescriptor> = FALLBACK_CATALOG;
-const listeners = new Set<() => void>();
-
-function isDescriptor(v: unknown): v is ProviderDescriptor {
-  const d = v as Partial<ProviderDescriptor> | null;
-  return (
-    !!d &&
-    typeof d.id === 'string' &&
-    typeof d.label === 'string' &&
-    Array.isArray(d.models) &&
-    d.models.length > 0
-  );
-}
-
-async function load() {
-  try {
-    const res = await apiFetch('/api/providers', { method: 'GET' }, { interceptGate: false });
-    if (!res.ok) return;
-    const body = (await res.json()) as { providers?: unknown };
-    if (!Array.isArray(body.providers)) return;
-    const next: Partial<Record<KeyProvider, ProviderDescriptor>> = {};
-    for (const p of body.providers) {
-      if (isDescriptor(p)) next[p.id as KeyProvider] = p;
-    }
-    // Only replace once every known provider resolved cleanly — a partial
-    // response would otherwise silently drop a provider from the UI.
-    if (Object.keys(next).length === Object.keys(FALLBACK_CATALOG).length) {
-      catalog = next as Record<KeyProvider, ProviderDescriptor>;
-      listeners.forEach((l) => l());
-    }
-  } catch {
-    // keep FALLBACK_CATALOG
-  }
-}
-void load();
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-/** Live provider/model catalog, kept in sync with the Worker's registry. */
+/** Provider/model catalog. Hook-shaped for the existing call sites. */
 export function useProviderCatalog(): Record<KeyProvider, ProviderDescriptor> {
-  return useSyncExternalStore(subscribe, () => catalog);
+  return CATALOG;
 }
 
 /** Plain (non-hook) read for event-handler callbacks, e.g. onChange provider pickers. */
 export function defaultModelFor(provider: KeyProvider): string {
-  return catalog[provider].models[0].id;
+  return CATALOG[provider].models[0].id;
 }

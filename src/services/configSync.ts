@@ -11,7 +11,15 @@
 // AppData.lastModified bumps on patient edits that must NOT trigger a sync, so a
 // dedicated version avoids pushing clinical-edit churn to the server.
 
-import type { AppData, Clinician, Settings, NoteTemplate, Exercise } from '@/types';
+import type {
+  AppData,
+  Clinician,
+  Settings,
+  NoteTemplate,
+  Exercise,
+  SelfHostedEndpoint,
+  SelfHostedProvider,
+} from '@/types';
 
 export interface UserConfigProjection {
   settings: Settings;
@@ -26,13 +34,59 @@ export interface ServerUserConfig extends UserConfigProjection {
 }
 
 /**
+ * Self-hosted endpoint bearer tokens are device-local secrets. AppData is
+ * vault-encrypted on disk, but `user_config.settings` is a plaintext D1 column —
+ * so the token must be stripped before it leaves the device, and re-grafted from
+ * local state on pull so a sync doesn't wipe the user's own key. Paired with
+ * `restoreEndpointKeys`; changing one without the other either leaks or deletes.
+ */
+function mapEndpoints(
+  settings: AppData['settings'],
+  fn: (ep: SelfHostedEndpoint, provider: SelfHostedProvider) => SelfHostedEndpoint,
+): AppData['settings'] {
+  const endpoints = settings.ai.generation.endpoints;
+  if (!endpoints) return settings;
+  const next: Partial<Record<SelfHostedProvider, SelfHostedEndpoint>> = {};
+  for (const [provider, ep] of Object.entries(endpoints) as [
+    SelfHostedProvider,
+    SelfHostedEndpoint | undefined,
+  ][]) {
+    if (ep) next[provider] = fn(ep, provider);
+  }
+  return {
+    ...settings,
+    ai: {
+      ...settings.ai,
+      generation: { ...settings.ai.generation, endpoints: next },
+    },
+  };
+}
+
+/** Drop every endpoint `apiKey` before the payload is sent to the server. */
+export function stripEndpointKeys(settings: AppData['settings']): AppData['settings'] {
+  return mapEndpoints(settings, ({ apiKey: _drop, ...rest }) => rest);
+}
+
+/** Re-graft locally held endpoint `apiKey`s onto a server payload being applied. */
+export function restoreEndpointKeys(
+  incoming: AppData['settings'],
+  local: AppData['settings'],
+): AppData['settings'] {
+  const localEndpoints = local.ai.generation.endpoints;
+  return mapEndpoints(incoming, (ep, provider) => {
+    const apiKey = localEndpoints?.[provider]?.apiKey;
+    return apiKey ? { ...ep, apiKey } : ep;
+  });
+}
+
+/**
  * Build the sync payload from AppData. ONLY non-clinical config is included;
  * built-in templates/exercises are dropped (they're regenerated locally and the
  * server rejects them anyway). This is the authoritative clinical-exclusion point.
  */
 export function projectUserConfig(appData: AppData): UserConfigProjection {
   return {
-    settings: appData.settings,
+    settings: stripEndpointKeys(appData.settings),
     clinician: appData.clinician,
     templates: appData.templates.filter((t) => !t.builtin),
     exercises: appData.exercises.filter((e) => !e.builtin),
@@ -55,10 +109,8 @@ export function hashUserConfig(projection: UserConfigProjection): string {
   return stableStringify(projection);
 }
 
-export type ReconcileAction =
-  | { action: 'apply'; server: ServerUserConfig }
-  | { action: 'push' }
-  | { action: 'noop' };
+type ReconcileAction =
+  { action: 'apply'; server: ServerUserConfig } | { action: 'push' } | { action: 'noop' };
 
 /**
  * Last-write-wins decision on login:
@@ -82,7 +134,7 @@ export function reconcile(
 
 // ── Per-user sync record (localStorage) ──────────────────────────────────────
 
-export interface ConfigSyncRecord {
+interface ConfigSyncRecord {
   /** Hash of the last projection we pushed or applied. */
   hash: string;
   /** Config version we believe is current locally. */

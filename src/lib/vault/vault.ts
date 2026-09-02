@@ -33,7 +33,7 @@ interface WrappedDekJson {
   ciphertext: string;
 }
 
-export interface VaultEnvelope {
+interface VaultEnvelope {
   v: 1;
   kdf: KdfDescriptor;
   wrappedDek: WrappedDekJson;
@@ -55,7 +55,7 @@ interface DataEnvelope {
   ciphertext: string;
 }
 
-export type UnlockResult = { ok: true } | { ok: false; reason: 'bad_passphrase' | 'corrupt' };
+type UnlockResult = { ok: true } | { ok: false; reason: 'bad_passphrase' | 'corrupt' };
 
 let dek: CryptoKey | null = null;
 

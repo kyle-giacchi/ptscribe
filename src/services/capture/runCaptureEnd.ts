@@ -3,14 +3,14 @@ import { trimSilence } from '@/lib/audio/silenceTrim';
 import { isMergeable } from '@/utils/clips';
 import type { SessionClip, Settings } from '@/types';
 
-export interface CaptureEndInput {
+interface CaptureEndInput {
   /** The full, current clip list — not a stale render snapshot. */
   clips: SessionClip[];
   loadAudio: (clipId: string) => Promise<Blob | null>;
   silenceDetection: Settings['audio']['silenceDetection'];
 }
 
-export interface CaptureEndResult {
+interface CaptureEndResult {
   /** Silence-trimmed, merged session audio. `null` when no clip audio loaded. */
   silenced: Blob | null;
   /** Mergeable clips whose audio could not be read back from the repository. */

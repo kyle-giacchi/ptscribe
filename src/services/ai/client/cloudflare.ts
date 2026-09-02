@@ -19,9 +19,9 @@
 
 import { apiFetch } from '@/lib/apiClient';
 import { AiCallError, classifyError } from '../errors';
-import { retryFetch, safeReadText } from './retryFetch';
+import { parseErrorCode, retryFetch, safeReadText } from './retryFetch';
 
-export interface CloudflareWhisperArgs {
+interface CloudflareWhisperArgs {
   model: string; // e.g. '@cf/deepgram/nova-3'
   audio: Blob;
   language?: string;
@@ -29,7 +29,7 @@ export interface CloudflareWhisperArgs {
   onRetry?: (info: { attempt: number; max: number; reason: string }) => void;
 }
 
-export interface CloudflareWhisperResult {
+interface CloudflareWhisperResult {
   text: string;
 }
 
@@ -92,14 +92,4 @@ export async function transcribeWithCloudflare(
     });
   }
   return { text: data.text };
-}
-
-/** Pull the Worker's `{ code }` discriminator out of an error body, if present. */
-function parseErrorCode(body: string): string | undefined {
-  try {
-    const parsed = JSON.parse(body) as { code?: unknown };
-    return typeof parsed.code === 'string' ? parsed.code : undefined;
-  } catch {
-    return undefined;
-  }
 }

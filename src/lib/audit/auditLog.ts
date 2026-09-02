@@ -23,7 +23,7 @@ import { STORAGE_KEYS } from '@/lib/storageKeys';
 const MAX_ENTRIES = 500;
 export const GENESIS_HASH = '0'.repeat(64);
 
-export type AuditAction =
+type AuditAction =
   | 'vault:unlocked'
   | 'vault:locked'
   | 'vault:passphrase_changed'

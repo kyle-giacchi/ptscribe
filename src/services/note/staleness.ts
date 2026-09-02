@@ -16,7 +16,7 @@ import type { ID, Note, SessionModifiers } from '@/types';
  */
 
 /** The live generation inputs to compare against a note's snapshot. */
-export interface NoteInputs {
+interface NoteInputs {
   transcript: string;
   templateId?: ID;
   modifiers?: SessionModifiers;

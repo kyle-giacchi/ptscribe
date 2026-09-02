@@ -46,7 +46,7 @@ export function base64ToBytes(b64: string): Uint8Array {
  * Portable v2 backups carry the parameters they were created with so a KEK can
  * be re-derived correctly even if the module defaults change in a later release.
  */
-export interface KdfParams {
+interface KdfParams {
   memoryKib?: number;
   iterations?: number;
   parallelism?: number;
@@ -90,7 +90,7 @@ export async function generateDek(): Promise<CryptoKey> {
   ]);
 }
 
-export interface WrappedDek {
+interface WrappedDek {
   iv: Uint8Array;
   ciphertext: Uint8Array;
 }

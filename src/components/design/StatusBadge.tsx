@@ -1,14 +1,7 @@
 import { memo } from 'react';
 
 export type StatusTone =
-  | 'on-track'
-  | 'plateau'
-  | 'flagged'
-  | 'new'
-  | 'done'
-  | 'live'
-  | 'next'
-  | 'upcoming';
+  'on-track' | 'plateau' | 'flagged' | 'new' | 'done' | 'live' | 'next' | 'upcoming';
 
 const TONES: Record<
   StatusTone,
@@ -73,7 +66,7 @@ const TONES: Record<
   },
 };
 
-export interface StatusBadgeProps {
+interface StatusBadgeProps {
   tone: StatusTone;
   label?: string;
 }

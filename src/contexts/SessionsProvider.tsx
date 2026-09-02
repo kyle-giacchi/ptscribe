@@ -1,7 +1,7 @@
 import { createListSliceContext } from './createListSliceContext';
 import type { Session, SessionStatus } from '@/types';
 
-export interface SessionsContextValue {
+interface SessionsContextValue {
   sessions: Session[];
   addSession: (session: Session) => void;
   updateSession: (id: string, patch: Partial<Session>) => void;

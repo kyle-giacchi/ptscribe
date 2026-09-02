@@ -10,8 +10,5 @@
 /** Hard cap — when a single clip's recorded duration crosses this, the page rotates to a new clip. */
 export const MAX_CLIP_DURATION_SEC = 1500; // 25 min
 
-/** Soft warning threshold — surface a visual hint before the auto-rotate. */
-export const WARN_CLIP_DURATION_SEC = 1200; // 20 min (80% of the cap)
-
 /** Maximum audio blob size accepted by the Whisper transcription endpoint. */
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;

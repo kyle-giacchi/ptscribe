@@ -7,7 +7,7 @@ export function isLikelyEncryptedAudio(buf: Uint8Array): boolean {
   return !isPlaintextAudio(buf);
 }
 
-export interface MigrationResult {
+interface MigrationResult {
   migratedAppData: boolean;
   migratedClips: number;
 }

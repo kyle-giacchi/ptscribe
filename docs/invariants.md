@@ -274,12 +274,11 @@ Rules:
 
 ## Type changes ripple
 
-Adding a new field to a domain type requires all four of:
+Domain types are `z.infer`red from the Zod schemas — `src/schemas/index.ts` declares each field once and `src/types/index.ts` re-exports the inferred type. Adding a new field requires:
 
-1. Type definition in `src/types/index.ts`
-2. Zod schema update in `src/schemas/index.ts`
-3. Default value in `defaultAppData()` (and any other factory functions)
-4. Migration entry in `src/utils/migrations.ts` — bump `APP_DATA_VERSION` and add a `v{N} -> v{N+1}` step
+1. Zod schema field in `src/schemas/index.ts` (the type follows automatically)
+2. Default value in `defaultAppData()` (and any other factory functions)
+3. Migration entry in `src/utils/migrations.ts` — bump `APP_DATA_VERSION` and add a `v{N} -> v{N+1}` step
 
 Skipping the migration means existing persisted data will fail `AppDataSchema.safeParse` and be silently reset to defaults on next load.
 

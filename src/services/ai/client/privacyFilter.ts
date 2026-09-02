@@ -1,5 +1,4 @@
 export const PRIVACY_FILTER_MODEL = 'Xenova/bert-base-NER';
-export const PRIVACY_FILTER_MODEL_OPENAI_Q4 = 'openai/privacy-filter';
 
 // dtype passed to Transformers.js pipeline per model.
 // bert-base-NER → 'q8' (model_quantized.onnx, ~90 MB, no external data file)
@@ -22,7 +21,7 @@ type OutMsg =
   | { id: number; type: 'result'; scrubbed: string; entityCount: number; spans: PIISpan[] }
   | { id: number; type: 'error'; error: string };
 
-export type ScrubModelResult = { scrubbed: string; entityCount: number; spans: PIISpan[] };
+type ScrubModelResult = { scrubbed: string; entityCount: number; spans: PIISpan[] };
 
 type PendingEntry = {
   resolve: (result: ScrubModelResult) => void;

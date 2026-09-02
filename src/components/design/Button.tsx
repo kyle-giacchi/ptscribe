@@ -4,7 +4,8 @@ type Variant = 'primary' | 'ghost' | 'danger' | 'accent-soft';
 
 const VARIANT_STYLES: Record<Variant, React.CSSProperties> = {
   primary: {
-    background: 'var(--color-pt-accent)',
+    // -deep, not -accent: white on plain accent is 3:1 and fails WCAG AA.
+    background: 'var(--color-pt-accent-deep)',
     color: '#ffffff',
     border: 'none',
     padding: '9px 14px',
@@ -41,7 +42,7 @@ const VARIANT_STYLES: Record<Variant, React.CSSProperties> = {
   },
 };
 
-export interface PtButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface PtButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   iconLeft?: ReactNode;
   iconRight?: ReactNode;

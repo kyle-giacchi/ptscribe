@@ -1,7 +1,7 @@
 import { createListSliceContext } from './createListSliceContext';
 import type { NoteTemplate } from '@/types';
 
-export interface TemplatesContextValue {
+interface TemplatesContextValue {
   templates: NoteTemplate[];
   addTemplate: (template: NoteTemplate) => void;
   updateTemplate: (id: string, patch: Partial<NoteTemplate>) => void;

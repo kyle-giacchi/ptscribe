@@ -41,7 +41,7 @@ const FALLBACK: Record<'sign-in' | 'register', string> = {
 };
 
 /** Shape returned by every better-auth passkey action's `error` field. */
-export interface PasskeyErrorLike {
+interface PasskeyErrorLike {
   code?: string;
   message?: string;
 }

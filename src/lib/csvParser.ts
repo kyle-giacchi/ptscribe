@@ -1,4 +1,4 @@
-export interface ParsedInviteRow {
+interface ParsedInviteRow {
   email: string;
 }
 

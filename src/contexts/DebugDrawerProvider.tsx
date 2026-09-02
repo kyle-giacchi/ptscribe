@@ -32,7 +32,7 @@ export interface PiiScrubDebug {
   error?: string;
 }
 
-export interface SessionDebugData {
+interface SessionDebugData {
   debugStats: DebugDrawerStats | null;
   speedFactor: number;
   lastRawPayload?: string | null;

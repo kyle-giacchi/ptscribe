@@ -18,7 +18,7 @@ export type AiErrorKind =
 
 export type AiProvider = 'anthropic' | 'nova' | 'openai' | 'google' | 'local' | 'network';
 
-export interface AiCallErrorInit {
+interface AiCallErrorInit {
   kind: AiErrorKind;
   provider: AiProvider;
   status?: number;
@@ -67,7 +67,7 @@ export function classifyError(code: string | undefined, res: Response): AiErrorK
   return classifyResponse(res, 'anthropic');
 }
 
-export interface FriendlyAiError {
+interface FriendlyAiError {
   title: string;
   description: string;
   action: 'retry' | 'wait' | 'refresh' | 'shorten' | 'check_network' | 'open_settings' | 'signin';

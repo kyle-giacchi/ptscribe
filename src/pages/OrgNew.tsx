@@ -12,9 +12,9 @@ import { parseCsvInvites } from '@/lib/csvParser';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type OrgDraft = { name: string; contactEmail: string; phone: string };
-export type InviteRole = 'admin' | 'manager' | 'standard' | 'student';
-export type InviteRow = { id: string; email: string; role: InviteRole };
+type OrgDraft = { name: string; contactEmail: string; phone: string };
+type InviteRole = 'admin' | 'manager' | 'standard' | 'student';
+type InviteRow = { id: string; email: string; role: InviteRole };
 
 type GateState =
   | { status: 'loading' }
@@ -190,7 +190,7 @@ export function OrgNew() {
               width: 30,
               height: 30,
               borderRadius: 8,
-              background: 'var(--color-pt-accent)',
+              background: 'var(--color-pt-accent-deep)',
               color: '#ffffff',
               fontSize: 'var(--text-md)',
               fontWeight: 800,

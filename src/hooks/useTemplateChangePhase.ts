@@ -3,7 +3,7 @@ import type { Dispatch } from 'react';
 import type { SessionMachineAction } from './sessionMachine/types';
 import type { Note, NoteSection, NoteTemplate, Session } from '@/types';
 
-export interface UseTemplateChangePhaseParams {
+interface UseTemplateChangePhaseParams {
   session: Session | undefined;
   note: Note | undefined;
   allTemplates: NoteTemplate[];
@@ -12,7 +12,7 @@ export interface UseTemplateChangePhaseParams {
   dispatch: Dispatch<SessionMachineAction>;
 }
 
-export interface TemplateChangePhaseResult {
+interface TemplateChangePhaseResult {
   /** May open the template-change gate when the note has content. */
   changeTemplate: (templateId: string) => void;
   /** Applies the switch directly — called on mount-time init and on gate confirm. */

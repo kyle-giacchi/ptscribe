@@ -25,7 +25,7 @@ export interface UseTranscriptSourceParams {
   recordAction: ReturnType<typeof useActionGuard>['recordAction'];
 }
 
-export interface TranscriptSourceResult {
+interface TranscriptSourceResult {
   backgroundT2: BackgroundT2State;
   runT3: (_clipId?: string) => Promise<void>;
   revertToLocal: () => void;

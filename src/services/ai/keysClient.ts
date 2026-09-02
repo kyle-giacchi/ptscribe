@@ -25,11 +25,10 @@ export interface KeyStatus {
 
 /** Returned by every mutating call: ok, or an actionable failure reason. */
 export type KeyMutationResult =
-  | { ok: true; status: KeyStatus }
-  | { ok: false; code: string; message: string };
+  { ok: true; status: KeyStatus } | { ok: false; code: string; message: string };
 
 /** GET result: the masked statuses, or a sentinel meaning "sign in first". */
-export type KeyListResult = { signinRequired: true } | { signinRequired: false; keys: KeyStatus[] };
+type KeyListResult = { signinRequired: true } | { signinRequired: false; keys: KeyStatus[] };
 
 const NOT_OK = (res: Response, body: { code?: unknown; error?: unknown }): KeyMutationResult => ({
   ok: false,

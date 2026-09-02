@@ -14,7 +14,8 @@ import { ConfigSyncProvider } from '@/contexts/ConfigSyncProvider';
 import { OrgConfigProvider } from '@/contexts/OrgConfigProvider';
 import { NotificationsProvider } from '@/contexts/NotificationsProvider';
 import { DebugDrawerProvider } from '@/contexts/DebugDrawerProvider';
-import { GlobalDebugDrawer } from '@/components/sessions/GlobalDebugDrawer';
+import { DebugDrawer } from '@/components/sessions/DebugDrawer';
+import { DEBUG_TOOLS_ENABLED } from '@/lib/debug/flags';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FirstRunGuard } from '@/components/common/FirstRunGuard';
 import { DemoBootstrap } from '@/components/common/DemoBootstrap';
@@ -162,7 +163,7 @@ function AppProviders() {
                                         </Suspense>
                                       </FirstRunGuard>
                                     </DemoBootstrap>
-                                    <GlobalDebugDrawer />
+                                    {DEBUG_TOOLS_ENABLED && <DebugDrawer />}
                                   </DebugDrawerProvider>
                                 </SettingsProvider>
                               </MeasurementsProvider>

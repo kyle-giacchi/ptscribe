@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 
-export interface SurfaceCardProps extends HTMLAttributes<HTMLDivElement> {
+interface SurfaceCardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   padding?: number | string;
   radius?: number;
@@ -34,7 +34,7 @@ export const SurfaceCard = memo(function SurfaceCard({
   );
 });
 
-export interface EyebrowProps {
+interface EyebrowProps {
   children: ReactNode;
   className?: string;
 }
