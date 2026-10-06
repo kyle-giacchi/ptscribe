@@ -39,7 +39,7 @@
 Standard scripts are in `package.json`. The non-obvious ones:
 
 ```
-npm run lint       ESLint. Target: 0 errors. Note: pre-commit hook runs typecheck + vitest but NOT lint — run this manually before PRs.
+npm run test:e2e   Playwright on its own port (8090) with demo mode forced on. Pre-push runs it; pre-commit runs lint-staged + typecheck + vitest.
 npm run typecheck  tsc --noEmit -p tsconfig.app.json  <- NOT root tsconfig.json
 
 npx tsx scripts/seed-r2-models.ts   Pre-populate R2 with Whisper model files (run once before first deploy)
@@ -69,6 +69,7 @@ See [README.md](README.md) for the full stack overview. Key agent-relevant detai
 - [docs/workflows.md](docs/workflows.md) — domain model (entities, AI prompt shape) + end-to-end workflows and state machines
 - [docs/transcription.md](docs/transcription.md) — transcription pipeline: cloud vs local paths, VAD, chunking, T1/T2/T3 tiers
 - [docs/style-guide.md](docs/style-guide.md) — UI conventions
+- [CODING_STANDARDS.md](CODING_STANDARDS.md) — review-time judgement rules; read when reviewing a diff
 
 **Product strategy**
 
