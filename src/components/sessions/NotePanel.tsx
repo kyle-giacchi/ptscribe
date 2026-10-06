@@ -75,7 +75,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
 
       {/* Section list */}
       {sections.length === 0 ? (
-        <p className="text-base" style={{ color: 'var(--color-fg-subtle)' }}>
+        <p className="text-base" style={{ color: 'var(--color-pt-text-2)' }}>
           Pick a template to see its sections.
         </p>
       ) : (
@@ -100,7 +100,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
                       type="button"
                       className="btn btn-ghost p-0.5"
                       title="Add exercise to patient plan"
-                      style={{ color: 'var(--color-fg-subtle)' }}
+                      style={{ color: 'var(--color-pt-text-2)' }}
                       onClick={() => navigate(`/patients/${patient.id}`)}
                     >
                       <ClipboardList size={11} strokeWidth={2} />
@@ -111,7 +111,7 @@ function NotePanelImpl({ patient, note, template, isStale, onSectionChange }: No
                       type="button"
                       className="btn btn-ghost"
                       style={{
-                        color: 'var(--color-fg-subtle)',
+                        color: 'var(--color-pt-text-2)',
                         fontSize: 'var(--text-xs)',
                         padding: '2px 6px',
                         gap: 3,

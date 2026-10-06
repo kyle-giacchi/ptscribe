@@ -88,7 +88,7 @@ export function ExercisePicker({ exercises, onPick, onClose }: Props) {
           <div
             style={{
               fontSize: 'var(--text-sm)',
-              color: 'var(--color-pt-text-3)',
+              color: 'var(--color-pt-text-2)',
               padding: '6px 2px',
             }}
           >
@@ -118,7 +118,7 @@ export function ExercisePicker({ exercises, onPick, onClose }: Props) {
               <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)' }}>
                 {e.name}
               </span>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
                 {CATEGORY_LABEL[e.category]}
               </span>
             </button>

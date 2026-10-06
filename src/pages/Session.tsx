@@ -22,7 +22,7 @@ import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
 import { useSessionPatcher } from '@/hooks/useSessionPatcher';
 import { relativeFromNow } from '@/utils/dates';
 import { useAudioRecovery } from '@/hooks/useAudioRecovery';
-import { useResizablePanes } from '@/hooks/useResizablePanes';
+import { useResizablePanes, PANE_MIN_PCT, PANE_MAX_PCT } from '@/hooks/useResizablePanes';
 import { useSessionMachine, type SessionMachineEvent } from '@/hooks/useSessionMachine';
 import { RecordingPanel } from '@/components/sessions/RecordingPanel';
 import { ClipsDrawer, ClipsListView } from '@/components/sessions/ClipsDrawer';
@@ -108,7 +108,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
   // ── Layout state (page-owned; never affects workflow correctness) ────────
   const isNarrowViewport = useBelowBreakpoint(1024);
   const [transcriptCollapsed, setTranscriptCollapsed] = useState(isNarrowViewport);
-  const { notePct, containerRef: reviewGridRef, startResize } = useResizablePanes();
+  const { notePct, containerRef: reviewGridRef, startResize, nudge } = useResizablePanes();
   const [piiScrubOpen, setPiiScrubOpen] = useState(false);
   const [piiScrub, setPiiScrub] = useState<PiiScrubDebug | null>(null);
   const [seekSignal, setSeekSignal] = useState<{ seconds: number; id: number } | null>(null);
@@ -298,9 +298,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
           {/* ① Record tab */}
           {state.view.tab === 'record' && (
             <div
-              role="tabpanel"
-              id="panel-record"
-              aria-labelledby="tab-record"
               style={{
                 maxWidth: 960,
                 margin: '0 auto',
@@ -362,9 +359,6 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
               <ReviewEmptyState />
             ) : (
               <div
-                role="tabpanel"
-                id="panel-review"
-                aria-labelledby="tab-review"
                 style={{
                   position: 'relative',
                   maxWidth: transcriptCollapsed ? 860 : '100%',
@@ -395,7 +389,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                           border: '1px solid var(--color-pt-border)',
                           background: 'var(--color-pt-surface-mut)',
                           fontSize: 'var(--text-sm)',
-                          color: 'var(--color-pt-text-3)',
+                          color: 'var(--color-pt-text-2)',
                           lineHeight: 1.5,
                           marginBottom: 12,
                         }}
@@ -416,11 +410,11 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       />
                       {noteTab === 'notes' && note && (
                         <span
-                          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}
+                          style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}
                         >
                           {selectors.busy === 'generating'
                             ? 'Generating…'
-                            : `last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
+                            : `Last generated ${note.updatedAt ? relativeFromNow(note.updatedAt) : ''}`}
                         </span>
                       )}
                     </div>
@@ -498,7 +492,17 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                       role="separator"
                       aria-orientation="vertical"
                       aria-label="Resize transcript panel"
+                      aria-valuenow={Math.round(notePct)}
+                      aria-valuemin={PANE_MIN_PCT}
+                      aria-valuemax={PANE_MAX_PCT}
+                      tabIndex={0}
                       onPointerDown={startResize}
+                      onKeyDown={(e) => {
+                        const step = e.key === 'ArrowLeft' ? -5 : e.key === 'ArrowRight' ? 5 : 0;
+                        if (!step) return;
+                        e.preventDefault();
+                        nudge(step);
+                      }}
                       style={{
                         alignSelf: 'stretch',
                         cursor: 'col-resize',
@@ -528,7 +532,7 @@ function SessionRoute({ sessionId }: { sessionId: string }) {
                         flexDirection: 'column',
                       }}
                     >
-                      <div role="tablist" className="flex items-stretch" style={{ gap: 8 }}>
+                      <div role="group" className="flex items-stretch" style={{ gap: 8 }}>
                         <RightPanelTab
                           active={rightPanelTab === 'transcript'}
                           onClick={() => setRightPanelTab('transcript')}
@@ -802,8 +806,7 @@ function RightPanelTab({
   return (
     <button
       type="button"
-      role="tab"
-      aria-selected={active}
+      aria-pressed={active}
       onClick={onClick}
       className="inline-flex flex-1 items-center justify-center transition-colors"
       style={{
@@ -816,7 +819,7 @@ function RightPanelTab({
         borderBottom: active ? '2px solid var(--color-pt-accent)' : '2px solid transparent',
         cursor: 'pointer',
         background: 'transparent',
-        color: active ? 'var(--color-pt-text-1)' : 'var(--color-pt-text-2)',
+        color: active ? 'var(--color-pt-text)' : 'var(--color-pt-text-2)',
       }}
     >
       {icon}
@@ -828,7 +831,7 @@ function RightPanelTab({
             fontWeight: 700,
             borderRadius: 999,
             padding: '0 6px',
-            background: active ? 'var(--color-pt-accent)' : 'var(--color-pt-border)',
+            background: active ? 'var(--color-pt-accent-deep)' : 'var(--color-pt-border)',
             color: active ? '#ffffff' : 'var(--color-pt-text-2)',
           }}
         >

@@ -43,18 +43,18 @@ function RouteTile({
       <span style={{ flexShrink: 0, color: 'var(--color-pt-text-2)' }}>{icon}</span>
       <span className="flex min-w-0 flex-col" style={{ flex: 1 }}>
         <span
-          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text-1)' }}
+          style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--color-pt-text)' }}
         >
           {title}
         </span>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
           {subtitle}
         </span>
       </span>
       <ChevronRight
         size={16}
         strokeWidth={2}
-        style={{ flexShrink: 0, color: 'var(--color-pt-text-3)' }}
+        style={{ flexShrink: 0, color: 'var(--color-pt-text-2)' }}
       />
     </button>
   );
@@ -201,20 +201,16 @@ export function IdleRecordingCard({
               fontSize: 'var(--text-2xl)',
               fontWeight: 600,
               letterSpacing: '-0.01em',
-              color: 'var(--color-pt-text-1)',
+              color: 'var(--color-pt-text)',
               margin: 0,
               textAlign: 'center',
             }}
           >
-            {countingDown
-              ? 'Get ready…'
-              : isAddingClip
-                ? 'Record another clip'
-                : 'Tap to start recording'}
+            {countingDown ? 'Get ready…' : isAddingClip ? 'Record another clip' : 'Start recording'}
           </motion.h1>
         </AnimatePresence>
         {isAddingClip && !countingDown && (
-          <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
             Add another clip to this session
           </p>
         )}
@@ -313,8 +309,6 @@ export function IdleRecordingCard({
               ) : countingDown ? (
                 <motion.span
                   key={`count-${countdown}`}
-                  aria-live="polite"
-                  aria-label={`Recording starts in ${countdown}`}
                   initial={{ opacity: 0, scale: 0.55 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 1.25 }}
@@ -347,7 +341,7 @@ export function IdleRecordingCard({
           </button>
         </div>
         {micHelper && !countingDown && (
-          <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
             {micHelper}
           </p>
         )}
@@ -372,7 +366,7 @@ export function IdleRecordingCard({
           <div style={{ flex: 1, height: 1, background: 'var(--color-pt-border)' }} />
           <span
             className="text-2xs font-semibold uppercase"
-            style={{ letterSpacing: '0.08em', color: 'var(--color-pt-text-3)' }}
+            style={{ letterSpacing: '0.08em', color: 'var(--color-pt-text-2)' }}
           >
             or
           </span>
@@ -410,8 +404,8 @@ export function IdleRecordingCard({
           {!isAddingClip && (
             <RouteTile
               icon={<PenLine size={22} strokeWidth={2} />}
-              title="Skip / Edit Manually"
-              subtitle="Type the note manually or add audio later!"
+              title="Write note manually"
+              subtitle="Type the note now, or add audio later."
               disabled={isUploading}
               onClick={onSkip}
             />
@@ -419,7 +413,12 @@ export function IdleRecordingCard({
         </div>
 
         {/* Inline upload status — replaces toast */}
-        <div style={{ minHeight: 18 }}>
+        {/* Stable live regions: rendered before their text changes so updates announce.
+            The countdown digit itself remounts per tick, so it can't carry aria-live. */}
+        <span role="status" className="sr-only">
+          {countingDown ? `Recording starts in ${countdown}` : ''}
+        </span>
+        <div role="status" style={{ minHeight: 18 }}>
           {hasStatusMessage && (
             <p
               key={uploadStatus.message}
@@ -430,7 +429,7 @@ export function IdleRecordingCard({
                     ? 'var(--color-pt-red-fg)'
                     : uploadStatus.phase === 'done'
                       ? 'var(--color-pt-accent-fg)'
-                      : 'var(--color-pt-text-3)',
+                      : 'var(--color-pt-text-2)',
                 animation: 'transcript-slide-in 200ms ease-out both',
               }}
             >

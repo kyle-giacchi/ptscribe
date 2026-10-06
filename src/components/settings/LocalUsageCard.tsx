@@ -99,7 +99,7 @@ function UsageStat({ label, value }: { label: string; value: string }) {
         padding: '10px 12px',
         borderRadius: 10,
         border: '1px solid var(--color-pt-border, rgba(0,0,0,0.08))',
-        background: 'var(--color-pt-surface-2, rgba(0,0,0,0.02))',
+        background: 'var(--color-surface-2)',
         display: 'grid',
         gap: 2,
       }}
@@ -118,7 +118,7 @@ function UsageStat({ label, value }: { label: string; value: string }) {
         style={{
           fontSize: 'var(--text-xl)',
           fontVariantNumeric: 'tabular-nums',
-          color: 'var(--color-pt-text-1)',
+          color: 'var(--color-pt-text)',
         }}
       >
         {value}

@@ -172,7 +172,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
         }}
       >
         {!hasText && (
-          <span style={{ color: 'var(--color-fg-subtle)' }}>
+          <span style={{ color: 'var(--color-pt-text-2)' }}>
             <em>No transcript to scan.</em>
           </span>
         )}
@@ -196,7 +196,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
                   <del
                     key={idx}
                     style={{
-                      color: 'var(--color-error, #dc2626)',
+                      color: 'var(--color-negative)',
                       textDecoration: 'line-through',
                       background: 'color-mix(in oklab, #dc2626 10%, transparent)',
                       borderRadius: 2,
@@ -227,7 +227,7 @@ export function PIIScrubModal({ open, transcript, onApply, onClose, onScrubDebug
         {scanState === 'error' && (
           <span
             className="flex items-start gap-2"
-            style={{ color: 'var(--color-error, #dc2626)', fontFamily: 'inherit' }}
+            style={{ color: 'var(--color-negative)', fontFamily: 'inherit' }}
           >
             <AlertCircle size={13} style={{ marginTop: 2, flexShrink: 0 }} />
             {errorMsg}

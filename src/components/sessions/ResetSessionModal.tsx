@@ -20,7 +20,7 @@ export function ResetSessionModal({ open, onClose, onConfirm }: ResetSessionModa
         </button>
         <button
           className="btn"
-          style={{ background: 'var(--color-pt-danger, #dc2626)', color: '#fff', border: 'none' }}
+          style={{ background: 'var(--color-danger)', color: '#fff', border: 'none' }}
           onClick={onConfirm}
         >
           <RotateCcw size={13} strokeWidth={2} />

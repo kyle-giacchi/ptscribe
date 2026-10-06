@@ -191,7 +191,7 @@ export function AudioCheck({ open, onClose }: { open: boolean; onClose: () => vo
         style={{
           borderRadius: 10,
           border: '1px solid var(--color-pt-border)',
-          background: 'var(--color-pt-surface-2, var(--color-pt-surface))',
+          background: 'var(--color-surface-2)',
           padding: 12,
         }}
       >

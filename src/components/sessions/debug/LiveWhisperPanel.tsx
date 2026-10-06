@@ -43,7 +43,7 @@ export function LiveWhisperPanel() {
         <span
           style={{
             ...valStyle,
-            color: stats.dropped ? 'var(--color-pt-warn, #b7791f)' : 'var(--color-fg)',
+            color: stats.dropped ? 'var(--color-warning)' : 'var(--color-fg)',
           }}
         >
           {stats.dropped}

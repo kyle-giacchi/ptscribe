@@ -46,7 +46,7 @@ describe('SessionTopBar', () => {
     expect(screen.getByText(/L knee OA/)).toBeInTheDocument();
   });
 
-  it('Sign & export is disabled when missingRequiredLabels is non-empty', () => {
+  it('Sign & export is aria-disabled when missingRequiredLabels is non-empty', () => {
     const note: Note = {
       id: 'n1',
       sessionId: 's1',
@@ -74,6 +74,6 @@ describe('SessionTopBar', () => {
       </MemoryRouter>,
     );
     const btn = screen.getByText(/Sign & export/).closest('button')!;
-    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('aria-disabled', 'true');
   });
 });

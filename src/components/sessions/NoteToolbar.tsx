@@ -82,6 +82,7 @@ function NoteToolbarImpl({
         ref={modifierBtnRef}
         type="button"
         onClick={() => setPopoverOpen((o) => !o)}
+        aria-expanded={popoverOpen}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -108,9 +109,9 @@ function NoteToolbarImpl({
               height: 18,
               padding: '0 6px',
               borderRadius: 999,
-              border: '1px solid var(--color-pt-border)',
-              background: 'var(--color-pt-bg, var(--color-pt-surface))',
-              color: 'var(--color-pt-text-2)',
+              border: '1px solid var(--color-pt-slate-border)',
+              background: 'var(--color-pt-slate-soft)',
+              color: 'var(--color-pt-slate-fg)',
               fontSize: 'var(--text-2xs)',
               fontWeight: 600,
             }}
@@ -139,9 +140,11 @@ function NoteToolbarImpl({
       {/* Right cluster */}
       {note && template && <NoteExportMenu note={note} template={template} patient={patient} />}
 
+      {/* One filled action per view: Generate leads until the note has content,
+          then Sign & export (SessionTopBar) takes the fill. */}
       <button
         type="button"
-        className="btn btn-primary"
+        className={`btn ${hasDraftContent ? 'btn-secondary' : 'btn-primary'}`}
         style={{ height: 34, padding: '0 14px', fontSize: 'var(--text-sm)' }}
         disabled={generateDisabled}
         aria-busy={isGenerating}

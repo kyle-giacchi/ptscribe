@@ -23,7 +23,7 @@ export function SegmentedControl<V extends string>({
   const fontSize = size === 'sm' ? 11.5 : 12.5;
   return (
     <div
-      role="tablist"
+      role="group"
       className="inline-flex items-center"
       style={{
         background: '#eaeef4',
@@ -38,8 +38,7 @@ export function SegmentedControl<V extends string>({
           <button
             key={it.value}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-pressed={active}
             onClick={() => onChange(it.value)}
             className="transition-colors"
             style={{

@@ -67,7 +67,7 @@ export function UploadProcessingView({
         </span>
         <span
           className="text-center text-base"
-          style={{ color: 'var(--color-pt-text-3)', maxWidth: 300 }}
+          style={{ color: 'var(--color-pt-text-2)', maxWidth: 300 }}
         >
           Automatic transcription could not complete. You can retry or continue to your notes.
         </span>
@@ -106,7 +106,7 @@ export function UploadProcessingView({
             }}
           />
         </div>
-        <span className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+        <span className="text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
           {stepLabel}
         </span>
       </div>

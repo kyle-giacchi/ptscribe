@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { AudioLines, Mic, Trash2, Upload, X, CornerDownLeft } from 'lucide-react';
+import { AlertTriangle, AudioLines, Mic, Trash2, Upload, X, CornerDownLeft } from 'lucide-react';
 import { audioRepository } from '@/services/AudioRepository';
 import { duration, ease } from '@/lib/motion';
 import { useBelowBreakpoint } from '@/hooks/useBelowBreakpoint';
@@ -75,7 +75,7 @@ export function ClipsListView({
         >
           Audio clips
         </h2>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
           {clips.length} clip{clips.length !== 1 ? 's' : ''} · {formatDuration(total)} · this visit
         </span>
         <div style={{ flex: 1 }} />
@@ -112,7 +112,7 @@ export function ClipsListView({
               No clips yet
             </div>
             <div
-              style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)', marginTop: 4 }}
+              style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)', marginTop: 4 }}
             >
               Record or upload a clip to start.
             </div>
@@ -178,7 +178,7 @@ export function ClipsListView({
           style={{
             margin: 0,
             fontSize: 'var(--text-xs)',
-            color: 'var(--color-pt-text-3)',
+            color: 'var(--color-pt-text-2)',
             textAlign: 'center',
             lineHeight: 1.4,
           }}
@@ -303,6 +303,7 @@ function ClipCard({
   t2Label: string;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -350,7 +351,7 @@ function ClipCard({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 'var(--text-xs)',
-            color: 'var(--color-pt-text-3)',
+            color: 'var(--color-pt-text-2)',
           }}
         >
           #{index + 1}
@@ -365,7 +366,7 @@ function ClipCard({
           style={{
             fontFamily: 'var(--font-mono)',
             fontSize: 'var(--text-xs)',
-            color: 'var(--color-pt-text-3)',
+            color: 'var(--color-pt-text-2)',
           }}
         >
           {formatDuration(clip.durationSec ?? 0)}
@@ -374,8 +375,8 @@ function ClipCard({
 
       {/* Meta row */}
       <div className="flex items-center gap-2">
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>{time}</span>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>{time}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
           · {source}
         </span>
         <div style={{ flex: 1 }} />
@@ -426,7 +427,7 @@ function ClipCard({
             }}
           />
         ) : (
-          <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+          <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
             Loading…
           </span>
         )}
@@ -446,13 +447,59 @@ function ClipCard({
             height: 28,
             padding: '0 8px',
             marginLeft: 'auto',
-            color: 'var(--color-pt-danger, #dc2626)',
+            color: 'var(--color-pt-red-fg)',
           }}
-          onClick={onDelete}
+          aria-expanded={pendingDelete}
+          onClick={() => setPendingDelete(true)}
         >
           <Trash2 size={12} strokeWidth={2} />
         </button>
       </div>
+
+      {/* Deleting removes the clip's audio and transcript with no undo — confirm inline. */}
+      {pendingDelete && (
+        <div
+          role="group"
+          aria-label={`Confirm delete clip ${index + 1}`}
+          className="flex items-center gap-2 rounded-lg"
+          style={{
+            padding: '8px 10px',
+            border: '1px solid var(--color-pt-red-border)',
+            background: 'var(--color-pt-red-soft)',
+            color: 'var(--color-pt-red-fg)',
+            fontSize: 'var(--text-sm)',
+          }}
+        >
+          <AlertTriangle size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            Delete this clip and its transcript? This can&apos;t be undone.
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ height: 28, fontSize: 'var(--text-sm)' }}
+            onClick={() => setPendingDelete(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{
+              height: 28,
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-pt-red-fg)',
+              fontWeight: 700,
+            }}
+            onClick={() => {
+              setPendingDelete(false);
+              onDelete();
+            }}
+          >
+            Delete clip
+          </button>
+        </div>
+      )}
     </div>
   );
 }

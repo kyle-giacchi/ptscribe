@@ -45,6 +45,8 @@ export function SessionTopBar({
     minute: '2-digit',
   });
   const durMin = Math.round(totalDurationSec / 60);
+  // Shares the one filled-action slot with NoteToolbar's Generate button.
+  const hasNoteContent = !!note?.sections.some((s) => s.body.trim().length > 0);
   const sessionTypeLabel = SESSION_TYPE_LABEL[session.type] ?? session.type;
   const headline = [
     `${patient.firstName} ${patient.lastName}`,
@@ -86,7 +88,7 @@ export function SessionTopBar({
       >
         {isDemoMode() ? (
           <>
-            <Home size={13} strokeWidth={2} /> Go Home
+            <Home size={13} strokeWidth={2} /> Go home
           </>
         ) : (
           <>
@@ -100,6 +102,7 @@ export function SessionTopBar({
       <div style={{ minWidth: 0, flex: 1 }}>
         <div
           className="truncate"
+          title={headline}
           style={{
             fontSize: 'var(--text-base)',
             fontWeight: 600,
@@ -149,15 +152,25 @@ export function SessionTopBar({
             <LockOpen size={13} strokeWidth={2} /> Unlock
           </button>
         ) : (
+          // Missing required sections keep the button focusable (aria-disabled, not
+          // disabled): a native-disabled tooltip never reaches keyboard or touch
+          // users, while a click runs finalize(), which names the empty sections.
           <button
             type="button"
-            className="btn btn-primary"
-            style={{ height: 32, padding: '0 14px', fontSize: 'var(--text-sm)', fontWeight: 700 }}
-            disabled={!note || missingRequiredLabels.length > 0}
+            className={`btn ${hasNoteContent ? 'btn-primary' : 'btn-secondary'}`}
+            style={{
+              height: 32,
+              padding: '0 14px',
+              fontSize: 'var(--text-sm)',
+              fontWeight: 700,
+              opacity: missingRequiredLabels.length > 0 ? 0.55 : 1,
+            }}
+            disabled={!note}
+            aria-disabled={missingRequiredLabels.length > 0 || undefined}
             onClick={onFinalize}
             title={
               missingRequiredLabels.length > 0
-                ? `Required sections empty: ${missingRequiredLabels.join(', ')}`
+                ? `Fill in the required sections before signing: ${missingRequiredLabels.join(', ')}`
                 : undefined
             }
           >
@@ -179,10 +192,8 @@ function StatusBadge({ status, finalized }: { status: string; finalized: boolean
         padding: '1px 7px',
         fontSize: 'var(--text-2xs)',
         fontWeight: 700,
-        background: isGreen
-          ? 'color-mix(in oklab, var(--color-positive) 12%, transparent)'
-          : 'rgba(26,32,48,0.07)',
-        color: isGreen ? 'var(--color-positive)' : 'var(--color-pt-text-2)',
+        background: isGreen ? 'var(--color-pt-accent-soft)' : 'var(--color-pt-slate-soft)',
+        color: isGreen ? 'var(--color-pt-accent-fg)' : 'var(--color-pt-slate-fg)',
       }}
     >
       {label}
