@@ -105,7 +105,7 @@ export function RecordingNotices({
         </StatusBanner>
       )}
       {webspeechProvider && liveSupported && (
-        <p className="text-sm" style={{ color: 'var(--color-pt-text-3)' }}>
+        <p className="text-sm" style={{ color: 'var(--color-pt-text-2)' }}>
           Browser transcription can&apos;t tell speakers apart, which can muddle the generated note.
           Upgrade to Cloudflare Nova-3 for speaker labeling.
         </p>
@@ -152,7 +152,7 @@ export function LiveTranscriptPreview({ webSpeech }: { webSpeech: UseWebSpeechTr
       </span>
       <span style={{ color: 'var(--color-pt-text)' }}>{webSpeech.accumulatedText}</span>
       {webSpeech.interimText && (
-        <span className="italic" style={{ color: 'var(--color-pt-text-3)' }}>
+        <span className="italic" style={{ color: 'var(--color-pt-text-2)' }}>
           {' '}
           {webSpeech.interimText}
         </span>

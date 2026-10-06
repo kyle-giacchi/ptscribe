@@ -97,7 +97,7 @@ export function PatientActivitiesCard({
             {LIST_LABEL[list]}
           </span>
           {list === 'home' && seededFromPlan && (
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
               from plan of care
             </span>
           )}
@@ -111,7 +111,7 @@ export function PatientActivitiesCard({
                 fontSize: 'var(--text-xs)',
                 padding: '2px 6px',
                 gap: 3,
-                color: 'var(--color-pt-text-3)',
+                color: 'var(--color-pt-text-2)',
               }}
             >
               <ArrowUp size={10} strokeWidth={2} /> Copy from performed
@@ -121,7 +121,7 @@ export function PatientActivitiesCard({
 
         <ul style={{ display: 'grid', gap: 5, margin: 0, padding: 0, listStyle: 'none' }}>
           {entries.length === 0 && (
-            <li style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+            <li style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
               Nothing logged yet.
             </li>
           )}
@@ -133,7 +133,7 @@ export function PatientActivitiesCard({
                 {e.exerciseName}
               </span>
               {readOnly ? (
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-3)' }}>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-text-2)' }}>
                   {e.notes ? `${e.dosage} — ${e.notes}` : e.dosage}
                 </span>
               ) : (
@@ -161,7 +161,7 @@ export function PatientActivitiesCard({
                     style={{
                       background: 'transparent',
                       border: 'none',
-                      color: 'var(--color-pt-text-3)',
+                      color: 'var(--color-pt-text-2)',
                       cursor: 'pointer',
                     }}
                   >

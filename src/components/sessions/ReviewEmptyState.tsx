@@ -1,9 +1,6 @@
 export function ReviewEmptyState() {
   return (
     <div
-      role="tabpanel"
-      id="panel-review"
-      aria-labelledby="tab-review"
       style={{
         padding: '44px 24px',
         textAlign: 'center',
@@ -23,7 +20,7 @@ export function ReviewEmptyState() {
         Nothing to review yet
       </div>
       <div
-        style={{ fontSize: 'var(--text-base)', color: 'var(--color-fg-subtle)', lineHeight: 1.6 }}
+        style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-2)', lineHeight: 1.6 }}
       >
         Record a clip or upload audio, then come back here.
       </div>

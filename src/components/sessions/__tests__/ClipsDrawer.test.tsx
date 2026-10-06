@@ -81,6 +81,8 @@ describe('ClipsDrawer', () => {
       />,
     );
     fireEvent.click(screen.getByLabelText('Delete clip 1'));
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete clip' }));
     expect(onDelete).toHaveBeenCalledWith('clipX');
   });
 

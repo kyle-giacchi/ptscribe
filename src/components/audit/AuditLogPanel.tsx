@@ -57,7 +57,7 @@ export function AuditLogPanel() {
     integrity === null
       ? 'var(--color-pt-text-3)'
       : integrity.valid
-        ? 'var(--color-pt-success, #22c55e)'
+        ? 'var(--color-success)'
         : '#ef4444';
 
   const statusText =
@@ -101,7 +101,7 @@ export function AuditLogPanel() {
             lineHeight: 1.6,
             maxHeight: 240,
             overflowY: 'auto',
-            background: 'var(--color-pt-surface-2, rgba(255,255,255,0.04))',
+            background: 'var(--color-surface-2)',
             borderRadius: 6,
             padding: '8px 10px',
           }}

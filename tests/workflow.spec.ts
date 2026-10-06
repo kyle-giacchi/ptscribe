@@ -8,7 +8,7 @@ import { test, expect, type Page } from '@playwright/test';
 //    vault and seeds a demo patient + empty draft session (no login/wizard).
 //  - The access gate is a client-side sha256 obscurity check; we pre-seed its
 //    stored hash so the Landing code prompt is skipped.
-//  - The record tab's "Skip — edit manually" tile reaches the Review tab without
+//  - The record tab's "Write note manually" tile reaches the Review tab without
 //    a microphone, and `/api/*` is stubbed so nothing hits the network.
 //
 // This exercises the real entry → access gate → setup-check → demo-bootstrap →
@@ -44,8 +44,8 @@ async function stubNetwork(page: Page): Promise<void> {
 
 /**
  * Boot fresh, clear the access + setup-check gates, and reach the Review tab of
- * the demo session with a blank note (via "Skip — edit manually"). Leaves the
- * page showing the "Clinical note" heading and the editable transcript.
+ * the demo session with a blank note (via "Write note manually"). Leaves the
+ * page showing the editable transcript.
  */
 async function reachBlankReview(page: Page): Promise<void> {
   await page.goto('/');
@@ -59,18 +59,16 @@ async function reachBlankReview(page: Page): Promise<void> {
   // First run routes to /setup-check; the mic/model checks can't pass headless,
   // so take the explicit "Continue to recording" escape hatch (SPA nav — no reload,
   // so the demo "Welcome back" prompt does not appear).
-  const cont = page.getByRole('button', { name: /continue to recording/i });
+  const cont = page.getByRole('button', { name: 'Continue to recording' });
   await expect(cont).toBeVisible({ timeout: 20_000 });
   await cont.click();
 
   // Skip recording → Review tab with an empty, editable transcript.
-  const skip = page.getByText(/Skip.*edit manually/i);
+  const skip = page.getByRole('button', { name: 'Write note manually' });
   await expect(skip).toBeVisible({ timeout: 15_000 });
   await skip.click();
 
-  await expect(page.getByRole('heading', { name: 'Clinical note' })).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.getByPlaceholder(EDITOR_PLACEHOLDER)).toBeVisible({ timeout: 15_000 });
 }
 
 test('headline session surface is reachable with a blank, editable note', async ({ page }) => {
@@ -80,7 +78,7 @@ test('headline session surface is reachable with a blank, editable note', async 
   // The clinician can type a transcript by hand…
   await expect(page.getByPlaceholder(EDITOR_PLACEHOLDER)).toBeVisible();
   // …and the note-generation control is present.
-  await expect(page.getByRole('button', { name: /generate/i }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Generate', exact: true })).toBeVisible();
 });
 
 test('editing the transcript after generating marks the note stale', async ({ page }) => {
@@ -88,19 +86,25 @@ test('editing the transcript after generating marks the note stale', async ({ pa
   await reachBlankReview(page);
 
   // The empty-state textarea flips to a read-only formatted view once the
-  // transcript is non-empty, so type once, then re-open it via "Edit transcript"
+  // transcript is non-empty, so type once, then re-open it via "Edit"
   // (which pins edit mode) and blur to commit through patchSession → encrypted save.
   await page.getByPlaceholder(EDITOR_PLACEHOLDER).fill(TRANSCRIPT);
-  await page.getByRole('button', { name: 'Edit transcript' }).click();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   const editor = page.getByPlaceholder(EDITOR_PLACEHOLDER);
   await expect(editor).toBeVisible();
   await editor.fill(TRANSCRIPT);
   await editor.blur();
 
   // Generate a note from the committed transcript (stubbed response).
-  const generate = page.getByRole('button', { name: /generate/i }).first();
+  const generate = page.getByRole('button', { name: 'Generate', exact: true });
   await expect(generate).toBeEnabled({ timeout: 15_000 });
   await generate.click();
+
+  // First generate asks to confirm data leaves the device (PhiConfirmDialog).
+  const phi = page.getByRole('dialog', { name: 'Send transcript to Anthropic?' });
+  await expect(phi).toBeVisible();
+  await phi.getByRole('button', { name: 'I confirm' }).click();
+  await expect(phi).toBeHidden();
 
   // The "last generated …" indicator only renders once a note exists.
   await expect(page.getByText(/last generated/i)).toBeVisible({ timeout: 15_000 });

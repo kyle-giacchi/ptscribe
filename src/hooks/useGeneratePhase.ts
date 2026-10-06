@@ -374,7 +374,9 @@ export function useGeneratePhase({
 
   const finalize = useCallback(() => {
     if (missingRequiredLabels.length > 0) {
-      toast.error(`Required sections empty: ${missingRequiredLabels.join(', ')}`);
+      toast.error(
+        `Fill in the required sections before signing: ${missingRequiredLabels.join(', ')}`,
+      );
       return;
     }
     const target = ensureNote();

@@ -1,0 +1,7 @@
+echo "Running e2e tests..."
+npm run test:e2e -- --reporter=line
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "E2E tests failed — push blocked. Fix them (or run 'npm run test:e2e' to reproduce) before pushing."
+  exit 1
+fi

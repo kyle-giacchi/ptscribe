@@ -10,7 +10,6 @@ import {
   EyeOff,
   PanelRightClose,
   Loader2,
-  Info,
 } from 'lucide-react';
 import type { SessionClip } from '@/types';
 import {
@@ -175,31 +174,9 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
           className="flex flex-wrap items-center gap-2"
           style={{ padding: '12px 16px', background: 'var(--color-pt-surface)' }}
         >
-          <span
-            title={
-              tier === 'modified'
-                ? 'This transcript has been manually edited.'
-                : tier === 'cloud'
-                  ? 'Transcribed with cloud AI (speaker diarization).'
-                  : 'Transcribed on-device.'
-            }
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 22,
-              height: 22,
-              borderRadius: 999,
-              border: '1px solid var(--color-pt-border)',
-              color: 'var(--color-fg-subtle)',
-              flexShrink: 0,
-            }}
-          >
-            <Info size={12} strokeWidth={2} />
-          </span>
           {tier && <TierChip tier={tier} />}
           {transcript.trim() && (
-            <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+            <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
               {transcript.trim().split(/\s+/).filter(Boolean).length}w
             </span>
           )}
@@ -241,6 +218,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
               accent
               disabled={transcribing || Boolean(cloudDisabledReason)}
               onClick={handleCreateClick}
+              describedBy={cloudDisabledReason ? 'improve-disabled-reason' : undefined}
               title={
                 cloudDisabledReason ??
                 'Re-transcribe using cloud AI (silence trimmed + sped up) for a cleaner result.'
@@ -275,11 +253,27 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
             onClick={onCollapse}
             aria-label="Collapse transcript panel"
             title="Collapse transcript panel"
-            style={{ color: 'var(--color-fg-subtle)' }}
+            style={{ color: 'var(--color-pt-text-2)' }}
           >
             <PanelRightClose size={13} strokeWidth={2} />
           </button>
         </div>
+
+        {/* A natively disabled button can't show its tooltip to keyboard or touch
+            users, so the reason Improve is off is rendered as visible text. */}
+        {canImproveWithAI && cloudDisabledReason && transcript.trim() && (
+          <p
+            id="improve-disabled-reason"
+            className="text-xs"
+            style={{
+              padding: '0 16px 8px',
+              background: 'var(--color-pt-surface)',
+              color: 'var(--color-pt-text-2)',
+            }}
+          >
+            {cloudDisabledReason}
+          </p>
+        )}
 
         {/* Header — Row 2 (search, read-only mode only) */}
         {!effectiveEditMode && (
@@ -297,7 +291,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                 style={{
                   position: 'absolute',
                   left: 10,
-                  color: 'var(--color-fg-subtle)',
+                  color: 'var(--color-pt-text-2)',
                   pointerEvents: 'none',
                 }}
               />
@@ -317,7 +311,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                 <>
                   <span
                     className="text-2xs absolute tabular-nums"
-                    style={{ right: 44, color: 'var(--color-fg-subtle)' }}
+                    style={{ right: 44, color: 'var(--color-pt-text-2)' }}
                   >
                     {matchCount > 0 ? `${safeIndex + 1}/${matchCount}` : '0'}
                   </span>
@@ -328,7 +322,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                       right: 24,
                       width: 18,
                       height: 18,
-                      color: 'var(--color-fg-subtle)',
+                      color: 'var(--color-pt-text-2)',
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
@@ -346,7 +340,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                       right: 6,
                       width: 18,
                       height: 18,
-                      color: 'var(--color-fg-subtle)',
+                      color: 'var(--color-pt-text-2)',
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
@@ -404,7 +398,7 @@ function TranscriptPanelImpl(props: TranscriptPanelProps) {
                     Replace All
                   </button>
                   {replaceCount !== null && (
-                    <span className="text-xs" style={{ color: 'var(--color-fg-subtle)' }}>
+                    <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
                       {replaceCount === 0
                         ? 'No matches'
                         : `Replaced ${replaceCount} occurrence${replaceCount !== 1 ? 's' : ''}`}
@@ -451,9 +445,11 @@ function PillButton({
   disabled,
   active,
   accent,
+  describedBy,
 }: {
   children: React.ReactNode;
   onClick: () => void;
+  describedBy?: string;
   title?: string;
   disabled?: boolean;
   active?: boolean;
@@ -465,6 +461,7 @@ function PillButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-describedby={describedBy}
       title={title}
       className="inline-flex items-center"
       style={{
@@ -566,7 +563,7 @@ function FormattedTranscriptView({
   if (!transcript.trim()) {
     return (
       <div className="px-4 py-8 text-center">
-        <p className="text-base" style={{ color: 'var(--color-fg-subtle)' }}>
+        <p className="text-base" style={{ color: 'var(--color-pt-text-2)' }}>
           No transcript yet — record a clip or generate AI transcription.
         </p>
       </div>
@@ -588,7 +585,7 @@ function FormattedTranscriptView({
             >
               <span
                 className="text-xs font-semibold tabular-nums"
-                style={{ color: 'var(--color-fg-subtle)', minWidth: 36 }}
+                style={{ color: 'var(--color-pt-text-2)', minWidth: 36 }}
               >
                 {seg.minuteLabel}
               </span>

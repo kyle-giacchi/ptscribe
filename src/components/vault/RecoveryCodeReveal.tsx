@@ -101,7 +101,7 @@ export function RecoveryCodeReveal({
             alignItems: 'flex-start',
             gap: 8,
             fontSize: 'var(--text-base)',
-            color: 'var(--color-pt-text-1)',
+            color: 'var(--color-pt-text)',
             cursor: 'pointer',
           }}
         >

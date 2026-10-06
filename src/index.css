@@ -278,17 +278,17 @@ body {
     transition: border-color 120ms ease-out;
   }
   .input:focus {
-    outline: none;
     border-color: var(--color-pt-accent);
-    box-shadow: 0 0 0 3px rgba(14, 165, 168, 0.22);
   }
   .input::placeholder {
     color: var(--color-pt-text-3);
   }
 }
 
+/* accent-fg: 6.1:1 on light surfaces, 8.7:1+ on dark — the old 55%-alpha
+   teal measured 1.8:1 and failed the 3:1 focus-indicator minimum. */
 *:focus-visible {
-  outline: 2px solid rgba(14, 165, 168, 0.55);
+  outline: 2px solid var(--color-pt-accent-fg);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -370,7 +370,6 @@ body {
 /* TipTap ProseMirror styles for note section editors */
 .tiptap-content {
   min-height: 5.5rem;
-  outline: none;
   font-size: var(--text-md);
   line-height: 1.55;
   color: var(--color-pt-text);

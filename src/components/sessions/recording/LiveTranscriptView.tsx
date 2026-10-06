@@ -48,7 +48,7 @@ function ChatBubble({
         {timestamp && (
           <span
             className="text-2xs mt-1 block text-right tabular-nums"
-            style={{ color: 'var(--color-pt-text-3)' }}
+            style={{ color: 'var(--color-pt-text-2)' }}
           >
             {timestamp}
           </span>
@@ -156,14 +156,14 @@ export function LiveTranscriptView({
                   />
                 ))}
               </div>
-              <p className="text-sm italic" style={{ color: 'var(--color-pt-text-3)' }}>
+              <p className="text-sm italic" style={{ color: 'var(--color-pt-text-2)' }}>
                 Transcribing&hellip;
               </p>
             </div>
             {showNoSpeechHint && (
               <p
                 className="text-center text-sm leading-relaxed"
-                style={{ color: 'var(--color-pt-text-3)' }}
+                style={{ color: 'var(--color-pt-text-2)' }}
               >
                 Transcription starts after the first audio chunk (~5 s).
               </p>
@@ -196,7 +196,7 @@ export function LiveTranscriptView({
                       <ChatBubble isInterim>
                         <p
                           className="text-base leading-relaxed italic"
-                          style={{ color: 'var(--color-pt-text-3)' }}
+                          style={{ color: 'var(--color-pt-text-2)' }}
                         >
                           {interimText}
                           <span

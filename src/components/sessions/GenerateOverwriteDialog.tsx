@@ -20,11 +20,11 @@ export function GenerateOverwriteDialog({ open, onCancel, onAppend, onReplace }:
         <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancel
         </button>
-        <button type="button" className="btn btn-secondary" onClick={onAppend}>
+        <button type="button" className="btn btn-primary" onClick={onAppend} autoFocus>
           <Sparkles size={13} strokeWidth={2} /> Append
         </button>
-        <button type="button" className="btn btn-primary" onClick={onReplace}>
-          <RotateCw size={13} strokeWidth={2} /> Replace
+        <button type="button" className="btn btn-secondary" onClick={onReplace}>
+          <RotateCw size={13} strokeWidth={2} /> Replace note
         </button>
       </div>
     </Modal>

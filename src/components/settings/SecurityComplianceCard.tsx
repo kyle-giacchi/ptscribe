@@ -51,7 +51,7 @@ export function SecurityComplianceCard() {
               flex: '0 0 auto',
             }}
           />
-          <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text-1)' }}>
+          <span style={{ fontSize: 'var(--text-base)', color: 'var(--color-pt-text)' }}>
             {vaultStatus.label}
           </span>
         </div>

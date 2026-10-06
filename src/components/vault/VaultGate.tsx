@@ -284,7 +284,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
             )}
 
             {error && (
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-danger, #c0392b)' }}>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}>
                 {error}
               </div>
             )}

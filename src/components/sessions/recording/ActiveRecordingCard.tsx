@@ -43,7 +43,7 @@ export function ActiveRecordingCard({
           <div className="flex items-center gap-2">
             <p
               className="text-xs font-semibold tracking-[0.18em] uppercase"
-              style={{ color: 'var(--color-pt-text-3)' }}
+              style={{ color: 'var(--color-pt-text-2)' }}
             >
               Transcript
             </p>
@@ -58,7 +58,7 @@ export function ActiveRecordingCard({
                 Live Transcription
               </span>
             ) : (
-              <span className="text-2xs italic" style={{ color: 'var(--color-pt-text-3)' }}>
+              <span className="text-2xs italic" style={{ color: 'var(--color-pt-text-2)' }}>
                 Live unavailable · processed after recording
               </span>
             )}
@@ -72,7 +72,7 @@ export function ActiveRecordingCard({
               className="flex items-center gap-1.5"
               style={{ touchAction: 'manipulation', minHeight: 44 }}
             >
-              <span className="text-xs" style={{ color: 'var(--color-pt-text-3)' }}>
+              <span className="text-xs" style={{ color: 'var(--color-pt-text-2)' }}>
                 visible
               </span>
               <span
@@ -108,7 +108,7 @@ export function ActiveRecordingCard({
               background: 'var(--color-pt-surface)',
             }}
           >
-            <p className="text-sm italic" style={{ color: 'var(--color-pt-text-3)' }}>
+            <p className="text-sm italic" style={{ color: 'var(--color-pt-text-2)' }}>
               Transcript hidden
             </p>
           </div>
@@ -125,7 +125,7 @@ export function ActiveRecordingCard({
       <div className="flex shrink-0 flex-col gap-3 pl-5" style={{ width: 224 }}>
         <p
           className="text-xs font-semibold tracking-[0.18em] uppercase"
-          style={{ color: 'var(--color-pt-text-3)' }}
+          style={{ color: 'var(--color-pt-text-2)' }}
         >
           Controls
         </p>

@@ -62,10 +62,10 @@ export function DebugDrawer() {
   const keyStatus = !lastKeyReport
     ? null
     : lastKeyReport.returned.length > 0 && lastKeyReport.matched.length === 0
-      ? { label: 'Key mismatch', color: 'var(--color-pt-danger, #c0392b)' }
+      ? { label: 'Key mismatch', color: 'var(--color-danger)' }
       : lastKeyReport.missing.length > 0 || lastKeyReport.unexpected.length > 0
-        ? { label: 'Partial match', color: 'var(--color-pt-warn, #b7791f)' }
-        : { label: 'All matched', color: 'var(--color-pt-success, #2f855a)' };
+        ? { label: 'Partial match', color: 'var(--color-warning)' }
+        : { label: 'All matched', color: 'var(--color-success)' };
 
   // Exact JSON body the browser POSTs to /api/generate (forwarded to Anthropic
   // by the Worker). maxTokens/temperature/cacheSystem are omitted because the
@@ -211,7 +211,7 @@ export function DebugDrawer() {
                     fontSize: 'var(--text-xs)',
                     fontWeight: 700,
                     color: '#fff',
-                    background: 'var(--color-pt-danger, #c0392b)',
+                    background: 'var(--color-danger)',
                     borderRadius: 999,
                     padding: '1px 7px',
                     fontVariantNumeric: 'tabular-nums',
@@ -276,7 +276,7 @@ export function DebugDrawer() {
                               style={{
                                 fontSize: 'var(--text-2xs)',
                                 fontWeight: 700,
-                                color: 'var(--color-pt-danger, #c0392b)',
+                                color: 'var(--color-danger)',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.04em',
                               }}
@@ -1024,7 +1024,7 @@ export function DebugDrawer() {
                   style={{
                     fontSize: 'var(--text-xs)',
                     fontWeight: 600,
-                    color: 'var(--color-pt-danger, #c0392b)',
+                    color: 'var(--color-danger)',
                   }}
                 >
                   Failed
@@ -1115,7 +1115,7 @@ export function DebugDrawer() {
                       <div
                         style={{
                           fontSize: 'var(--text-xs)',
-                          color: 'var(--color-pt-danger, #c0392b)',
+                          color: 'var(--color-danger)',
                           whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word',
                         }}

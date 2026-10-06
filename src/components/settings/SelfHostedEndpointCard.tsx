@@ -113,9 +113,7 @@ export function SelfHostedEndpointCard({ provider }: Props) {
         />
       </Field>
       {urlError ? (
-        <div
-          style={{ fontSize: 'var(--text-sm)', color: 'var(--color-pt-danger)', lineHeight: 1.5 }}
-        >
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-danger)', lineHeight: 1.5 }}>
           {urlError}
         </div>
       ) : null}

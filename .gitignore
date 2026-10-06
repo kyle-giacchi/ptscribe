@@ -29,6 +29,7 @@ test-results/
 playwright-report/
 playwright/.cache/
 .playwright-mcp/
+.playwright-cli/
 coverage/
 
 # Stray screenshots at repo root

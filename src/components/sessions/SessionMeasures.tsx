@@ -77,7 +77,7 @@ export function SessionMeasures({
             <div
               style={{
                 fontSize: 'var(--text-sm)',
-                color: 'var(--color-pt-text-3)',
+                color: 'var(--color-pt-text-2)',
                 lineHeight: 1.5,
               }}
             >
@@ -188,7 +188,7 @@ function QuickRow({
         <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--color-pt-text)' }}>
           {trend.label}
         </div>
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-3)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-pt-text-2)' }}>
           {outOfRange
             ? `Must be ${def.min}–${def.max}${def.unit}`
             : previous
@@ -208,7 +208,7 @@ function QuickRow({
                 ? 'var(--color-pt-accent-fg)'
                 : better === false
                   ? 'var(--color-pt-red)'
-                  : 'var(--color-pt-text-3)',
+                  : 'var(--color-pt-text-2)',
           }}
         >
           {formatChange(delta)}
@@ -229,7 +229,7 @@ function QuickRow({
             <span
               style={{
                 fontSize: 'var(--text-xs)',
-                color: 'var(--color-pt-text-3)',
+                color: 'var(--color-pt-text-2)',
                 fontWeight: 500,
               }}
             >
@@ -244,7 +244,7 @@ function QuickRow({
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: 'var(--color-pt-text-3)',
+                color: 'var(--color-pt-text-2)',
                 cursor: 'pointer',
                 display: 'grid',
                 placeItems: 'center',
